@@ -1,0 +1,34 @@
+<!DOCTYPE html>
+<html>
+<head><title>Browser Benchmark Example</title></head>
+<body>
+<h1>Browser Benchmark: Allocations</h1>
+<p>Define <code>window.__bench</code> and benchforge handles iteration + timing.</p>
+<script>
+function buildArray() {
+  return Array.from({ length: 5000 }, () => Math.random());
+}
+
+function sortArray(arr) {
+  return [...arr].sort((a, b) => a - b);
+}
+
+function mapToObjects(arr) {
+  return arr.map((v, i) => ({ value: v, index: i, label: "item" + i }));
+}
+
+function filterAndReduce(objs) {
+  return objs
+    .filter(o => o.value > 0.5)
+    .reduce((acc, o) => acc + o.value, 0);
+}
+
+window.__bench = () => {
+  const arr = buildArray();
+  const sorted = sortArray(arr);
+  const objs = mapToObjects(sorted);
+  filterAndReduce(objs);
+};
+</script>
+</body>
+</html>

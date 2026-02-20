@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html>
+<head><title>Browser Heap Profiling Example</title></head>
+<body>
+<h1>Browser Heap Profiling Example</h1>
+<pre id="log"></pre>
+<script>
+const log = document.getElementById("log");
+function print(msg) {
+  log.textContent += msg + "\n";
+}
+
+function allocArrays() {
+  const results = [];
+  for (let i = 0; i < 10000; i++) results.push(new Array(100).fill(i));
+  return results;
+}
+
+function allocTypedArrays() {
+  const buffers = [];
+  for (let i = 0; i < 5000; i++) buffers.push(new Float64Array(64));
+  return buffers;
+}
+
+function allocStrings() {
+  const strings = [];
+  for (let i = 0; i < 20000; i++) strings.push("x".repeat(200) + i);
+  return strings;
+}
+
+function allocObjects() {
+  const objs = [];
+  for (let i = 0; i < 10000; i++) objs.push({ a: i, b: [i, i + 1], c: { d: i } });
+  return objs;
+}
+
+async function run() {
+  print("Starting heap profiling...");
+  await window.__start?.();
+
+  const a = allocArrays();
+  const b = allocTypedArrays();
+  const c = allocStrings();
+  const d = allocObjects();
+
+  print(`arrays: ${a.length}, typed: ${b.length}, strings: ${c.length}, objects: ${d.length}`);
+  await window.__done?.();
+  print("Done!");
+}
+
+run();
+</script>
+</body>
+</html>

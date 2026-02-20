@@ -1,0 +1,64 @@
+{
+  "name": "benchforge",
+  "private": true,
+  "type": "module",
+  "bin": "bin/benchforge",
+  "files": [
+    "bin",
+    "dist",
+    "src"
+  ],
+  "scripts": {
+    "build": "tsdown",
+    "build:plots": "tsdown --config tsdown.plots.config.ts",
+    "example:bench": "bin/benchforge --url file://$PWD/examples/browser-bench/index.html --gc-stats --heap-sample --html",
+    "example:heap": "bin/benchforge --url file://$PWD/examples/browser-heap/index.html --heap-sample --gc-stats",
+    "example:lap": "bin/benchforge --url file://$PWD/examples/browser-lap/index.html --gc-stats --heap-sample --html",
+    "fix": "biome check --fix --unsafe --error-on-warnings",
+    "lint": "biome check --error-on-warnings",
+    "prepublishOnly": "run-s lint build build:plots",
+    "test": "pnpm --node-options=--expose-gc vitest --hideSkippedTests --exclude '**/*.e2e.test.ts'",
+    "test:e2e": "pnpm --node-options=--expose-gc vitest run '.e2e.'",
+    "test:once": "pnpm --node-options=--expose-gc vitest run --exclude '**/*.e2e.test.ts'",
+    "typecheck": "tsgo"
+  },
+  "publishConfig": {
+    "bin": {
+      "benchforge": "dist/bin/benchforge.mjs"
+    },
+    "exports": {
+      ".": {
+        "import": "./dist/index.mjs"
+      },
+      "./json": {
+        "import": "./dist/JsonFormat.mjs"
+      }
+    }
+  },
+  "exports": {
+    ".": {
+      "import": "./src/index.ts"
+    },
+    "./json": {
+      "import": "./src/export/JsonFormat.ts"
+    }
+  },
+  "dependencies": {
+    "esbuild": "^0.25.0",
+    "open": "^10.2.0",
+    "picocolors": "^1.1.1",
+    "table": "^6.9.0",
+    "yargs": "^18.0.0"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "^2.4.3",
+    "@types/node": "^25.3.0",
+    "@types/yargs": "^17.0.35",
+    "@typescript/native-preview": "7.0.0-dev.20251012.1",
+    "npm-run-all": "^4.1.5",
+    "playwright": "^1.50.0",
+    "tsdown": "0.19.0-beta.3",
+    "vite": "^7.3.1",
+    "vitest": "^4.0.18"
+  }
+}

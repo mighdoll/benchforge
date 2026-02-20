@@ -1,0 +1,30 @@
+{
+  "compilerOptions": {
+    "target": "ESNext",
+    "lib": ["ESNext"],
+    "types": ["node"],
+
+    "noEmit": true,
+    "resolveJsonModule": true,
+    "allowJs": true,
+
+    "module": "preserve",
+    "allowImportingTsExtensions": true,
+    "forceConsistentCasingInFileNames": true,
+    "verbatimModuleSyntax": true,
+    "isolatedModules": true,
+    "skipLibCheck": true,
+    "moduleDetection": "force",
+    "erasableSyntaxOnly": true,
+
+    "strict": true,
+    "noFallthroughCasesInSwitch": true,
+    "noUncheckedSideEffectImports": true
+  },
+  "exclude": [
+    "**/node_modules",
+    "**/dist",
+    "src/tests/fixtures",
+    "src/html/browser"
+  ]
+}

@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html>
+<head><title>Browser Lap Mode Example</title></head>
+<body>
+<h1>Browser Lap Mode: Allocations</h1>
+<p>Uses <code>__start/__lap/__done</code> for per-iteration timing + heap profiling.</p>
+<pre id="log"></pre>
+<script>
+const log = document.getElementById("log");
+function print(msg) { log.textContent += msg + "\n"; }
+
+function allocArrays() {
+  const results = [];
+  for (let i = 0; i < 500; i++) results.push(new Array(100).fill(i));
+  return results;
+}
+
+function allocTypedArrays() {
+  const buffers = [];
+  for (let i = 0; i < 250; i++) buffers.push(new Float64Array(64));
+  return buffers;
+}
+
+function allocStrings() {
+  const strings = [];
+  for (let i = 0; i < 1000; i++) strings.push("x".repeat(200) + i);
+  return strings;
+}
+
+function allocObjects() {
+  const objs = [];
+  for (let i = 0; i < 500; i++) objs.push({ a: i, b: [i, i + 1], c: { d: i } });
+  return objs;
+}
+
+async function run() {
+  print("Starting lap mode benchmark...");
+  const retained = [];
+  await __start();
+  for (let i = 0; i < 100; i++) {
+    retained.push(allocArrays(), allocTypedArrays(), allocStrings(), allocObjects());
+    __lap();
+  }
+  await __done();
+  print(`Done! (100 laps, ${retained.length} retained allocations)`);
+}
+
+run();
+</script>
+</body>
+</html>

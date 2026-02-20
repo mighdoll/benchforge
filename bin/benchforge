@@ -1,0 +1,3 @@
+#!/usr/bin/env -S node --experimental-strip-types
+import { runDefaultBench } from "../src/index.ts";
+await runDefaultBench();
