@@ -1,4 +1,5 @@
 import { type ChildProcess, fork } from "node:child_process";
+import { existsSync } from "node:fs";
 import path from "node:path";
 import type { BenchmarkSpec } from "../Benchmark.ts";
 import type { HeapProfile } from "../heap-sample/HeapSampler.ts";
@@ -263,13 +264,8 @@ function createCleanup(
 
 /** Create worker process with configuration */
 function createWorkerProcess(gcStats: boolean) {
-  const workerPath = path.join(import.meta.dirname!, "WorkerScript.ts");
-  const execArgv = [
-    "--expose-gc",
-    "--allow-natives-syntax",
-    "--experimental-strip-types",
-    "--no-warnings=ExperimentalWarning",
-  ];
+  const workerPath = resolveWorkerPath();
+  const execArgv = ["--expose-gc", "--allow-natives-syntax"];
   if (gcStats) execArgv.push("--trace-gc-nvp");
 
   return fork(workerPath, [], {
@@ -280,6 +276,14 @@ function createWorkerProcess(gcStats: boolean) {
       NODE_OPTIONS: "",
     },
   });
+}
+
+/** Resolve WorkerScript path for dev (.ts) or dist (.mjs) */
+function resolveWorkerPath(): string {
+  const dir = import.meta.dirname!;
+  const tsPath = path.join(dir, "WorkerScript.ts");
+  if (existsSync(tsPath)) return tsPath;
+  return path.join(dir, "runners", "WorkerScript.mjs");
 }
 
 // Consider: --no-compilation-cache, --max-old-space-size=512, --no-lazy
