@@ -27,7 +27,6 @@ export { defaultCliArgs, parseCliArgs } from "./cli/CliArgs.ts";
 export type { ExportOptions, MatrixExportOptions } from "./cli/RunBenchCLI.ts";
 export {
   benchExports,
-  cliExtraColumns,
   cliToMatrixOptions,
   defaultMatrixReport,
   defaultReport,

@@ -35,9 +35,6 @@ import {
   parseMatrixFilter,
 } from "../matrix/MatrixFilter.ts";
 import {
-  type ExtraColumn,
-  gcStatsColumns,
-  heapTotalColumn,
   type MatrixReportOptions,
   reportMatrixResults,
 } from "../matrix/MatrixReport.ts";
@@ -742,23 +739,18 @@ export function cliToMatrixOptions(args: DefaultCliArgs): RunMatrixOptions {
   };
 }
 
-/** Generate report for matrix results. Auto-includes GC/heap columns if args set. */
+/** Generate report for matrix results. Uses same sections as regular benchmarks. */
 export function defaultMatrixReport(
   results: MatrixResults[],
   reportOptions?: MatrixReportOptions,
   args?: DefaultCliArgs,
 ): string {
-  const options = args ? mergeAutoColumns(reportOptions, args) : reportOptions;
+  const options = args
+    ? mergeMatrixDefaults(reportOptions, args, results)
+    : reportOptions;
   return results.map(r => reportMatrixResults(r, options)).join("\n\n");
 }
 
-/** @return extra columns based on CLI args (gc-stats, heap-sample) */
-export function cliExtraColumns(args: DefaultCliArgs): ExtraColumn[] {
-  const columns: ExtraColumn[] = [];
-  if (args["gc-stats"]) columns.push(...gcStatsColumns);
-  if (args["heap-sample"]) columns.push(heapTotalColumn);
-  return columns;
-}
 
 /** @return HeapReportOptions from CLI args */
 function cliHeapReportOptions(args: DefaultCliArgs): HeapReportOptions {
@@ -770,22 +762,25 @@ function cliHeapReportOptions(args: DefaultCliArgs): HeapReportOptions {
   };
 }
 
-/** Merge auto-detected columns with user-provided extraColumns */
-function mergeAutoColumns(
+/** Apply default sections and extra columns for matrix reports */
+function mergeMatrixDefaults(
   reportOptions: MatrixReportOptions | undefined,
   args: DefaultCliArgs,
-): MatrixReportOptions | undefined {
-  // Don't auto-add columns if sections are provided (sections handle their own columns)
-  if (reportOptions?.sections?.length) return reportOptions;
+  results: MatrixResults[],
+): MatrixReportOptions {
+  const result: MatrixReportOptions = { ...reportOptions };
 
-  const autoColumns = cliExtraColumns(args);
-  if (autoColumns.length === 0) return reportOptions;
+  if (!result.sections?.length) {
+    const groups = matrixToReportGroups(results);
+    result.sections = buildReportSections(
+      args.adaptive,
+      args["gc-stats"],
+      hasField(groups, "cpu"),
+      args["trace-opt"] && hasField(groups, "optStatus"),
+    );
+  }
 
-  const userColumns = reportOptions?.extraColumns ?? [];
-  return {
-    ...reportOptions,
-    extraColumns: [...userColumns, ...autoColumns],
-  };
+  return result;
 }
 
 /** Run matrix suite with full CLI handling (parse, run, report, export) */

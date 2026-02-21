@@ -285,15 +285,15 @@ test("baselineVariant with inline variants", async () => {
   expect(typeof slowVariant?.cases[0].deltaPercent).toBe("number");
 });
 
-test("baselineVariant error when variant not found", async () => {
+test("baselineVariant skips when variant not found", async () => {
   const matrix: BenchMatrix = {
     name: "BadBaselineVariant",
     variants: { fast: () => {} },
     baselineVariant: "nonexistent",
   };
-  await expect(runMatrix(matrix)).rejects.toThrow(
-    "Baseline variant 'nonexistent' not found",
-  );
+  const result = await runMatrix(matrix);
+  // No deltaPercent since baseline variant wasn't found
+  expect(result.variants[0].cases[0].deltaPercent).toBeUndefined();
 });
 
 const variantsDirUrl = `file://${import.meta.dirname}/fixtures/variants/`;
