@@ -176,10 +176,7 @@ async function runSingleBatch(
   const baselineReport = baseline
     ? await runSingleBenchmark(baseline, runParams)
     : undefined;
-  const reports = [];
-  for (const benchmark of benchmarks) {
-    reports.push(await runSingleBenchmark(benchmark, runParams));
-  }
+  const reports = await serialMap(benchmarks, b => runSingleBenchmark(b, runParams));
   return { name, reports, baseline: baselineReport };
 }
 
@@ -825,6 +822,15 @@ export interface MatrixExportOptions {
   sections?: any[];
   currentVersion?: GitVersion;
   baselineVersion?: GitVersion;
+}
+
+/** Sequential map - like Promise.all(arr.map(fn)) but runs one at a time */
+async function serialMap<T, R>(arr: T[], fn: (item: T) => Promise<R>): Promise<R[]> {
+  const results: R[] = [];
+  for (const item of arr) {
+    results.push(await fn(item));
+  }
+  return results;
 }
 
 /** Run matrix benchmarks, display table, and generate exports */
