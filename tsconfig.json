@@ -4,15 +4,16 @@
     "lib": ["ESNext"],
     "types": ["node"],
 
+    "declaration": true,
     "noEmit": true,
     "resolveJsonModule": true,
-    "allowJs": true,
 
     "module": "preserve",
     "allowImportingTsExtensions": true,
     "forceConsistentCasingInFileNames": true,
     "verbatimModuleSyntax": true,
     "isolatedModules": true,
+    "isolatedDeclarations": true,
     "skipLibCheck": true,
     "moduleDetection": "force",
     "erasableSyntaxOnly": true,
@@ -25,6 +26,7 @@
     "**/node_modules",
     "**/dist",
     "src/tests/fixtures",
-    "src/html/browser"
+    "src/html/browser",
+    "*.config.ts"
   ]
 }

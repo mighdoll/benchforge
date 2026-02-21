@@ -1,20 +1,16 @@
-import type { Argv } from "yargs";
+import type { Argv, InferredOptionTypes } from "yargs";
 import yargs from "yargs";
 
-export const defaultTime = 0.642;
 export const defaultAdaptiveMaxTime = 20;
-export const defaultPauseInterval = 0;
-export const defaultPauseDuration = 100;
 
 export type Configure<T> = (yargs: Argv) => Argv<T>;
 
-/** @return CLI args type from builder function */
-export type DefaultCliArgs =
-  ReturnType<typeof defaultCliArgs> extends Argv<infer T> ? T : never;
+/** CLI args type inferred from cliOptions */
+export type DefaultCliArgs = InferredOptionTypes<typeof cliOptions>;
 
 // biome-ignore format: compact option definitions
 const cliOptions = {
-  time:           { type: "number",  default: defaultTime, requiresArg: true, describe: "test duration in seconds" },
+  time:           { type: "number",  default: 0.642, requiresArg: true, describe: "test duration in seconds" },
   cpu:            { type: "boolean", default: false, describe: "CPU counter measurements (requires root)" },
   collect:        { type: "boolean", default: false, describe: "force GC after each iteration" },
   "gc-stats":     { type: "boolean", default: false, describe: "collect GC statistics (Node: --trace-gc-nvp, browser: CDP tracing)" },
@@ -33,8 +29,8 @@ const cliOptions = {
   "trace-opt":    { type: "boolean", default: false, describe: "trace V8 optimization tiers (requires --allow-natives-syntax)" },
   "skip-settle":  { type: "boolean", default: false, describe: "skip post-warmup settle time (see V8 optimization cold start)" },
   "pause-first":  { type: "number",  describe: "iterations before first pause (then pause-interval applies)" },
-  "pause-interval": { type: "number", default: defaultPauseInterval, describe: "iterations between pauses for V8 optimization (0 to disable)" },
-  "pause-duration": { type: "number", default: defaultPauseDuration, describe: "pause duration in ms for V8 optimization" },
+  "pause-interval": { type: "number", default: 0, describe: "iterations between pauses for V8 optimization (0 to disable)" },
+  "pause-duration": { type: "number", default: 100, describe: "pause duration in ms for V8 optimization" },
   batches:          { type: "number",  default: 1, describe: "divide time into N batches, alternating baseline/current order" },
   iterations:       { type: "number",  requiresArg: true, describe: "exact number of iterations (overrides --time)" },
   "heap-sample":    { type: "boolean", default: false, describe: "heap sampling allocation attribution (includes garbage)" },
@@ -50,7 +46,7 @@ const cliOptions = {
 } as const;
 
 /** @return yargs with standard benchmark options */
-export function defaultCliArgs(yargsInstance: Argv) {
+export function defaultCliArgs(yargsInstance: Argv): Argv<DefaultCliArgs> {
   return yargsInstance.options(cliOptions).help().strict();
 }
 

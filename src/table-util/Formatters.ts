@@ -41,7 +41,7 @@ export function timeMs(ms: unknown): string | null {
 }
 
 /** Format as rate (value per unit) */
-export function rate(unit: string) {
+export function rate(unit: string): (value: unknown) => string | null {
   return (value: unknown) => {
     if (typeof value !== "number") return null;
     return `${integer(value)}/${unit}`;

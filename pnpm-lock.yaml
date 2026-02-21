@@ -44,7 +44,7 @@ importers:
         version: 1.58.2
       tsdown:
         specifier: 0.20.3
-        version: 0.20.3(@typescript/native-preview@7.0.0-dev.20260220.1)
+        version: 0.20.3(@typescript/native-preview@7.0.0-dev.20260220.1)(typescript@5.9.3)
       vite:
         specifier: ^7.3.1
         version: 7.3.1(@types/node@25.3.0)
@@ -1468,6 +1468,11 @@ packages:
     resolution: {integrity: sha512-3KS2b+kL7fsuk/eJZ7EQdnEmQoaho/r6KUef7hxvltNA5DR8NAUM+8wJMbJyZ4G9/7i3v5zPBIMN5aybAh2/Jg==}
     engines: {node: '>= 0.4'}
 
+  typescript@5.9.3:
+    resolution: {integrity: sha512-jl1vZzPDinLr9eUt3J/t7V6FgNEw9QjvBPdysz9KfQDD41fQrC2Y4vKQdiaUpFT4bXlb1RHhLpp8wtm6M5TgSw==}
+    engines: {node: '>=14.17'}
+    hasBin: true
+
   unbox-primitive@1.1.0:
     resolution: {integrity: sha512-nWJ91DjeOkej/TA8pXQ3myruKpKEYgqvpw9lz4OPHj/NWFNluYrjbz9j01CJ8yKQd2g4jFoOkINCTW2I5LEEyw==}
     engines: {node: '>= 0.4'}
@@ -2693,7 +2698,7 @@ snapshots:
       path-parse: 1.0.7
       supports-preserve-symlinks-flag: 1.0.0
 
-  rolldown-plugin-dts@0.22.1(@typescript/native-preview@7.0.0-dev.20260220.1)(rolldown@1.0.0-rc.3):
+  rolldown-plugin-dts@0.22.1(@typescript/native-preview@7.0.0-dev.20260220.1)(rolldown@1.0.0-rc.3)(typescript@5.9.3):
     dependencies:
       '@babel/generator': 8.0.0-rc.1
       '@babel/helper-validator-identifier': 8.0.0-rc.1
@@ -2707,6 +2712,7 @@ snapshots:
       rolldown: 1.0.0-rc.3
     optionalDependencies:
       '@typescript/native-preview': 7.0.0-dev.20260220.1
+      typescript: 5.9.3
     transitivePeerDependencies:
       - oxc-resolver
 
@@ -2955,7 +2961,7 @@ snapshots:
 
   tree-kill@1.2.2: {}
 
-  tsdown@0.20.3(@typescript/native-preview@7.0.0-dev.20260220.1):
+  tsdown@0.20.3(@typescript/native-preview@7.0.0-dev.20260220.1)(typescript@5.9.3):
     dependencies:
       ansis: 4.2.0
       cac: 6.7.14
@@ -2966,13 +2972,15 @@ snapshots:
       obug: 2.1.1
       picomatch: 4.0.3
       rolldown: 1.0.0-rc.3
-      rolldown-plugin-dts: 0.22.1(@typescript/native-preview@7.0.0-dev.20260220.1)(rolldown@1.0.0-rc.3)
+      rolldown-plugin-dts: 0.22.1(@typescript/native-preview@7.0.0-dev.20260220.1)(rolldown@1.0.0-rc.3)(typescript@5.9.3)
       semver: 7.7.4
       tinyexec: 1.0.2
       tinyglobby: 0.2.15
       tree-kill: 1.2.2
       unconfig-core: 7.5.0
       unrun: 0.2.27
+    optionalDependencies:
+      typescript: 5.9.3
     transitivePeerDependencies:
       - '@ts-macro/tsc'
       - '@typescript/native-preview'
@@ -3015,6 +3023,9 @@ snapshots:
       is-typed-array: 1.1.15
       possible-typed-array-names: 1.1.0
       reflect.getprototypeof: 1.0.10
+
+  typescript@5.9.3:
+    optional: true
 
   unbox-primitive@1.1.0:
     dependencies:
