@@ -334,9 +334,7 @@ function applyBaselineVariant(
   baselineVariantId: string,
 ): void {
   const baselineVariant = variants.find(v => v.id === baselineVariantId);
-  if (!baselineVariant) {
-    throw new Error(`Baseline variant '${baselineVariantId}' not found`);
-  }
+  if (!baselineVariant) return;
 
   const baselineByCase = new Map<string, MeasuredResults>();
   for (const c of baselineVariant.cases) {
