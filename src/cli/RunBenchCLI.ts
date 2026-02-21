@@ -845,6 +845,11 @@ export async function matrixBenchExports(
   console.log(report);
 
   const reportGroups = matrixToReportGroups(results);
+
+  if (args["heap-sample"]) {
+    printHeapReports(reportGroups, cliHeapReportOptions(args));
+  }
+
   await exportReports({
     results: reportGroups,
     args,
