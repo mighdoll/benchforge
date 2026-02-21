@@ -29,18 +29,12 @@
     "exports": {
       ".": {
         "import": "./dist/index.mjs"
-      },
-      "./json": {
-        "import": "./dist/JsonFormat.mjs"
       }
     }
   },
   "exports": {
     ".": {
       "import": "./src/index.ts"
-    },
-    "./json": {
-      "import": "./src/export/JsonFormat.ts"
     }
   },
   "dependencies": {
