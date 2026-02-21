@@ -385,12 +385,7 @@ export async function benchExports(
   const results = await runBenchmarks(suite, args);
   const report = defaultReport(results, args);
   console.log(report);
-
-  if (args["heap-sample"]) {
-    printHeapReports(results, cliHeapReportOptions(args));
-  }
-
-  await exportReports({ results, args, suiteName: suite.name });
+  await finishReports(results, args, suite.name);
 }
 
 /** Run browser profiling via Playwright + CDP, report with standard pipeline */
@@ -632,6 +627,19 @@ export interface ExportOptions {
   baselineVersion?: GitVersion;
 }
 
+/** Print heap reports (if enabled) and export results */
+async function finishReports(
+  results: ReportGroup[],
+  args: DefaultCliArgs,
+  suiteName?: string,
+  exportOptions?: MatrixExportOptions,
+): Promise<void> {
+  if (args["heap-sample"]) {
+    printHeapReports(results, cliHeapReportOptions(args));
+  }
+  await exportReports({ results, args, suiteName, ...exportOptions });
+}
+
 /** Export reports (HTML, JSON, Perfetto) based on CLI args */
 export async function exportReports(options: ExportOptions): Promise<void> {
   const { results, args, sections, suiteName } = options;
@@ -845,15 +853,5 @@ export async function matrixBenchExports(
   console.log(report);
 
   const reportGroups = matrixToReportGroups(results);
-
-  if (args["heap-sample"]) {
-    printHeapReports(reportGroups, cliHeapReportOptions(args));
-  }
-
-  await exportReports({
-    results: reportGroups,
-    args,
-    suiteName: suite.name,
-    ...exportOptions,
-  });
+  await finishReports(reportGroups, args, suite.name, exportOptions);
 }
