@@ -21,5 +21,6 @@ export default defineConfig({
     "yargs",
     "yargs/helpers",
   ],
+  checks: { eval: false },
   logLevel: "warn",
 });
