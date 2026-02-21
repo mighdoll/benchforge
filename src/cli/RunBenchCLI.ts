@@ -173,7 +173,9 @@ async function runSingleBatch(
   const baselineReport = baseline
     ? await runSingleBenchmark(baseline, runParams)
     : undefined;
-  const reports = await serialMap(benchmarks, b => runSingleBenchmark(b, runParams));
+  const reports = await serialMap(benchmarks, b =>
+    runSingleBenchmark(b, runParams),
+  );
   return { name, reports, baseline: baselineReport };
 }
 
@@ -751,7 +753,6 @@ export function defaultMatrixReport(
   return results.map(r => reportMatrixResults(r, options)).join("\n\n");
 }
 
-
 /** @return HeapReportOptions from CLI args */
 function cliHeapReportOptions(args: DefaultCliArgs): HeapReportOptions {
   return {
@@ -828,7 +829,10 @@ export interface MatrixExportOptions {
 }
 
 /** Sequential map - like Promise.all(arr.map(fn)) but runs one at a time */
-async function serialMap<T, R>(arr: T[], fn: (item: T) => Promise<R>): Promise<R[]> {
+async function serialMap<T, R>(
+  arr: T[],
+  fn: (item: T) => Promise<R>,
+): Promise<R[]> {
   const results: R[] = [];
   for (const item of arr) {
     results.push(await fn(item));
