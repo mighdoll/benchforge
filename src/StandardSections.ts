@@ -13,16 +13,14 @@ export interface TimeStats {
   mean?: number;
   p50?: number;
   p99?: number;
-  convergence?: number;
 }
 
-/** Section: mean, p50, p99 timing with convergence */
+/** Section: mean, p50, p99 timing */
 export const timeSection: ResultsMapper<TimeStats> = {
   extract: (results: MeasuredResults) => ({
     mean: results.time?.avg,
     p50: results.time?.p50,
     p99: results.time?.p99,
-    convergence: results.convergence?.confidence,
   }),
   columns: (): ReportColumnGroup<TimeStats>[] => [
     {
@@ -31,11 +29,6 @@ export const timeSection: ResultsMapper<TimeStats> = {
         { key: "mean", title: "mean", formatter: timeMs, comparable: true },
         { key: "p50", title: "p50", formatter: timeMs, comparable: true },
         { key: "p99", title: "p99", formatter: timeMs, comparable: true },
-      ],
-    },
-    {
-      columns: [
-        { key: "convergence", title: "conv%", formatter: formatConvergence },
       ],
     },
   ],

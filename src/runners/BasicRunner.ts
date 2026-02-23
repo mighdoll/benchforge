@@ -5,10 +5,8 @@ import type {
   OptStatusInfo,
   PausePoint,
 } from "../MeasuredResults.ts";
-import { checkConvergence } from "./AdaptiveWrapper.ts";
 import type { BenchRunner, RunnerOptions } from "./BenchRunner.ts";
 import { executeBenchmark } from "./BenchRunner.ts";
-import { msToNs } from "./RunnerUtils.ts";
 
 /**
  * Wait time after gc() for V8 to stabilize (ms).
@@ -91,7 +89,6 @@ const defaultCollectOptions = {
 
 function buildMeasuredResults(name: string, c: CollectResult): MeasuredResults {
   const time = computeStats(c.samples);
-  const convergence = checkConvergence(c.samples.map(s => s * msToNs));
   return {
     name,
     samples: c.samples,
@@ -100,7 +97,6 @@ function buildMeasuredResults(name: string, c: CollectResult): MeasuredResults {
     timestamps: c.timestamps,
     time,
     heapSize: { avg: c.heapGrowth, min: c.heapGrowth, max: c.heapGrowth },
-    convergence,
     optStatus: c.optStatus,
     optSamples: c.optSamples,
     pausePoints: c.pausePoints,

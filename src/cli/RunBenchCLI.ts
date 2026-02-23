@@ -38,12 +38,10 @@ import {
   type MatrixReportOptions,
   reportMatrixResults,
 } from "../matrix/MatrixReport.ts";
-import { checkConvergence } from "../runners/AdaptiveWrapper.ts";
 import { computeStats } from "../runners/BasicRunner.ts";
 import type { RunnerOptions } from "../runners/BenchRunner.ts";
 import type { KnownRunner } from "../runners/CreateRunner.ts";
 import { runBenchmark } from "../runners/RunnerOrchestrator.ts";
-import { msToNs } from "../runners/RunnerUtils.ts";
 import {
   adaptiveSection,
   browserGcStatsSection,
@@ -309,7 +307,6 @@ function mergeResults(results: MeasuredResults[]): MeasuredResults {
   const allSamples = results.flatMap(r => r.samples);
   const allWarmup = results.flatMap(r => r.warmupSamples || []);
   const time = computeStats(allSamples);
-  const convergence = checkConvergence(allSamples.map(s => s * msToNs));
 
   let offset = 0;
   const allPausePoints = results.flatMap(r => {
@@ -327,7 +324,6 @@ function mergeResults(results: MeasuredResults[]): MeasuredResults {
     warmupSamples: allWarmup.length ? allWarmup : undefined,
     time,
     totalTime: results.reduce((sum, r) => sum + (r.totalTime || 0), 0),
-    convergence,
     pausePoints: allPausePoints.length ? allPausePoints : undefined,
   };
 }

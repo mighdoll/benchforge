@@ -151,18 +151,17 @@ The `--profile` flag executes exactly one iteration with no warmup, making it id
 Results are displayed in a formatted table:
 
 ```
-╔═════════════════╤═══════════════════════════════════════════╤═══════╤═════════╗
-║                 │                   time                    │       │         ║
-║ name            │ mean  Δ% CI                    p50   p99  │ conv% │ runs    ║
-╟─────────────────┼───────────────────────────────────────────┼───────┼─────────╢
-║ quicksort       │ 0.17  +5.5% [+4.7%, +6.2%]     0.15  0.63 │ 100%  │ 1,134   ║
-║ insertion sort  │ 0.24  +25.9% [+25.3%, +27.4%]  0.18  0.36 │ 100%  │ 807     ║
-║ --> native sort │ 0.16                           0.15  0.41 │ 100%  │ 1,210   ║
-╚═════════════════╧═══════════════════════════════════════════╧═══════╧═════════╝
+╔═════════════════╤═══════════════════════════════════════════╤═════════╗
+║                 │                   time                    │         ║
+║ name            │ mean  Δ% CI                    p50   p99  │ runs    ║
+╟─────────────────┼───────────────────────────────────────────┼─────────╢
+║ quicksort       │ 0.17  +5.5% [+4.7%, +6.2%]     0.15  0.63 │ 1,134   ║
+║ insertion sort  │ 0.24  +25.9% [+25.3%, +27.4%]  0.18  0.36 │ 807     ║
+║ --> native sort │ 0.16                           0.15  0.41 │ 1,210   ║
+╚═════════════════╧═══════════════════════════════════════════╧═════════╝
 ```
 
 - **Δ% CI**: Percentage difference from baseline with bootstrap confidence interval
-- **conv%**: Convergence percentage (100% = stable measurements)
 
 ### HTML
 
@@ -284,136 +283,23 @@ V8's sampling profiler uses Poisson-distributed sampling. When an allocation occ
 - Node.js 22.6+ (for native TypeScript support)
 - Use `--expose-gc --allow-natives-syntax` flags for garbage collection monitoring and V8 native functions
 
-## Adaptive Mode
+## Adaptive Mode (Experimental)
 
-Adaptive mode automatically adjusts the number of benchmark iterations until measurements stabilize, providing statistically significant results without excessive runtime.
+Adaptive mode (`--adaptive`) automatically adjusts iteration count until measurements stabilize. The algorithm is still being tuned — use `--help` for available options.
 
-### Using Adaptive Mode
+## Interpreting Results
 
-```bash
-# Enable adaptive benchmarking with default settings
-simple-cli.ts --adaptive
-
-# Customize time limits
-simple-cli.ts --adaptive --time 60 --min-time 5
-
-# Combine with other options
-simple-cli.ts --adaptive --filter "quicksort"
-```
-
-### CLI Options for Adaptive Mode
-
-- `--adaptive` - Enable adaptive sampling mode
-- `--min-time <seconds>` - Minimum time before convergence can stop (default: 1s)
-- `--convergence <percent>` - Confidence threshold 0-100 (default: 95)
-- `--time <seconds>` - Maximum time limit (default: 20s in adaptive mode)
-
-### How It Works
-
-1. **Initial Sampling**: Collects initial batch of ~100 samples (includes warmup)
-2. **Window Comparison**: Compares recent samples against previous window
-3. **Stability Detection**: Checks median drift and outlier impact between windows
-4. **Convergence**: Stops when both metrics are stable (<5% drift) or reaches threshold
-
-Progress is shown during execution:
-```
-◊ quicksort: 75% confident (2.1s)
-```
-
-### Output with Adaptive Mode
-
-```
-╔═════════════════╤═════════════════════════════════════════════╤═══════╤═════════╤══════╗
-║                 │                    time                     │       │         │      ║
-║ name            │ median  Δ% CI                    mean  p99  │ conv% │ runs    │ time ║
-╟─────────────────┼─────────────────────────────────────────────┼───────┼─────────┼──────╢
-║ quicksort       │ 0.17    +17.3% [+15.4%, +20.0%]  0.20  0.65 │ 100%  │ 526     │ 0.0s ║
-║ insertion sort  │ 0.18    +24.2% [+23.9%, +24.6%]  0.19  0.36 │ 100%  │ 529     │ 0.0s ║
-║ --> native sort │ 0.15                             0.15  0.25 │ 100%  │ 647     │ 0.0s ║
-╚═════════════════╧═════════════════════════════════════════════╧═══════╧═════════╧══════╝
-```
-
-- **conv%**: Convergence percentage (100% = stable measurements)
-- **time**: Total sampling duration for that benchmark
-
-## Statistical Considerations: Mean vs Median
-
-### When to Use Mean with Confidence Intervals
-
-**Best for:**
-- **Normally distributed data** - When benchmark times follow a bell curve
-- **Statistical comparison** - Comparing performance between implementations
-- **Throughput analysis** - Understanding average system performance
-- **Resource planning** - Estimating typical resource usage
-
-**Advantages:**
-- Provides confidence intervals for statistical significance
-- Captures the full distribution including outliers
-- Better for detecting small but consistent performance differences
-- Standard in academic performance research
-
-**Example use cases:**
-- Comparing algorithm implementations
-- Measuring API response times under normal load
-- Evaluating compiler optimizations
-- Benchmarking pure computational functions
-
-### When to Use Median (p50)
-
-**Best for:**
-- **Skewed distributions** - When outliers are common
-- **Latency-sensitive applications** - Where typical user experience matters
-- **Noisy environments** - Systems with unpredictable interference
-- **Service Level Agreements** - "50% of requests complete within X ms"
-
-**Advantages:**
-- Robust to outliers and system noise
-- Better represents "typical" performance
-- More stable in virtualized/cloud environments
-- Less affected by GC pauses and OS scheduling
-
-**Example use cases:**
-- Web server response times
-- Database query performance
-- UI responsiveness metrics
-- Real-time system benchmarks
-
-### Interpreting Results
-
-#### Baseline Comparison (Δ% CI)
+### Baseline Comparison (Δ% CI)
 ```
 0.17  +5.5% [+4.7%, +6.2%]
 ```
-This shows the benchmark is 5.5% slower than baseline, with a bootstrap confidence interval of [+4.7%, +6.2%]. Use this for comparing implementations.
+The benchmark is 5.5% slower than baseline, with a bootstrap confidence interval of [+4.7%, +6.2%].
 
-#### Percentiles
+### Percentiles
 ```
 p50: 0.15ms, p99: 0.27ms
 ```
-This shows that 50% of runs completed in ≤0.15ms and 99% in ≤0.27ms. Use this when you care about consistency and tail latencies.
-
-### Practical Guidelines
-
-1. **Use adaptive mode when:**
-   - You want automatic convergence detection
-   - Benchmarks have varying execution times
-   - You need stable measurements without guessing iteration counts
-
-2. **Use fixed iterations when:**
-   - Comparing across runs/machines (reproducibility)
-   - You know roughly how many samples you need
-   - Running in CI pipelines with time constraints
-
-3. **Interpreting conv%:**
-   - 100% = measurements are stable
-   - <100% = still converging or high variance
-   - Red color indicates low confidence
-
-### Statistical Notes
-
-- **Bootstrap CI**: Baseline comparison uses permutation testing with bootstrap confidence intervals
-- **Window Stability**: Adaptive mode compares sliding windows for median drift and outlier impact
-- **Independence**: Assumes benchmark iterations are independent (use `--worker` flag for better isolation)
+50% of runs completed in ≤0.15ms and 99% in ≤0.27ms. Use percentiles when you care about consistency and tail latencies.
 
 ## Understanding GC Time Measurements
 
