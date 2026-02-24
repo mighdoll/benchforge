@@ -1,0 +1,6 @@
+packages:
+  - "."
+  - "benchforge-browser"
+
+catalog:
+  playwright: "^1.58.0"

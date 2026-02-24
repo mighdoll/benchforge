@@ -389,8 +389,9 @@ export async function browserBenchExports(args: DefaultCliArgs): Promise<void> {
     ({ profileBrowser } = await import("../browser/BrowserHeapSampler.ts"));
   } catch {
     throw new Error(
-      "playwright is required for browser benchmarking (--url).\n" +
-        "Install it with:\n" +
+      "playwright is required for browser benchmarking (--url).\n\n" +
+        "Quick start:  npx benchforge-browser --url <your-url>\n\n" +
+        "Or install manually:\n" +
         "  npm install playwright\n" +
         "  npx playwright install chromium",
     );

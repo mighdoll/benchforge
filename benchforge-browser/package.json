@@ -1,0 +1,12 @@
+{
+  "name": "benchforge-browser",
+  "version": "0.1.0",
+  "type": "module",
+  "bin": {
+    "benchforge-browser": "./bin.mjs"
+  },
+  "dependencies": {
+    "benchforge": "workspace:^",
+    "playwright": "catalog:"
+  }
+}
