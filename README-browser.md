@@ -62,10 +62,13 @@ With laps for per-iteration statistics:
 
 ```html
 <script>
-__start();
-for (let i = 0; i < 100; i++) { doWork(); __lap(); }
-__done();
-// ==> 100 samples with full statistics (mean, p50, p99)
+async function run() {
+  await __start();
+  for (let i = 0; i < 100; i++) { doWork(); __lap(); }
+  await __done();
+  // ==> 100 samples with full statistics (mean, p50, p99)
+}
+run();
 </script>
 ```
 
@@ -73,12 +76,12 @@ With rAF (excludes idle time between frames):
 
 ```html
 <script>
-function frame() {
-  __start();             // reset timing origin, skip idle gap
+async function frame() {
+  await __start();             // reset timing origin, skip idle gap
   renderScene();
   __lap();               // sample = start-to-lap only
   if (more) requestAnimationFrame(frame);
-  else __done();
+  else await __done();
 }
 requestAnimationFrame(frame);
 </script>
