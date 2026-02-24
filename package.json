@@ -44,6 +44,14 @@
     "table": "^6.9.0",
     "yargs": "^18.0.0"
   },
+  "peerDependencies": {
+    "playwright": ">=1.40.0"
+  },
+  "peerDependenciesMeta": {
+    "playwright": {
+      "optional": true
+    }
+  },
   "devDependencies": {
     "@biomejs/biome": "^2.4.4",
     "@types/node": "^25.3.0",

@@ -9,10 +9,7 @@ import { runMatrix } from "../BenchMatrix.ts";
 import type { BenchGroup, BenchmarkSpec, BenchSuite } from "../Benchmark.ts";
 import type { BenchmarkReport, ReportGroup } from "../BenchmarkReport.ts";
 import { reportResults } from "../BenchmarkReport.ts";
-import {
-  type BrowserProfileResult,
-  profileBrowser,
-} from "../browser/BrowserHeapSampler.ts";
+import type { BrowserProfileResult } from "../browser/BrowserHeapSampler.ts";
 import { exportBenchmarkJson } from "../export/JsonExport.ts";
 import { exportPerfettoTrace } from "../export/PerfettoExport.ts";
 import type { GitVersion } from "../GitUtils.ts";
@@ -386,6 +383,19 @@ export async function benchExports(
 /** Run browser profiling via Playwright + CDP, report with standard pipeline */
 export async function browserBenchExports(args: DefaultCliArgs): Promise<void> {
   warnBrowserFlags(args);
+
+  let profileBrowser: typeof import("../browser/BrowserHeapSampler.ts").profileBrowser;
+  try {
+    ({ profileBrowser } = await import("../browser/BrowserHeapSampler.ts"));
+  } catch {
+    throw new Error(
+      "playwright is required for browser benchmarking (--url).\n" +
+        "Install it with:\n" +
+        "  npm install playwright\n" +
+        "  npx playwright install chromium",
+    );
+  }
+
   const url = args.url!;
   const { iterations, time } = args;
   const result = await profileBrowser({
