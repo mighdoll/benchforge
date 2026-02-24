@@ -12,6 +12,7 @@ export interface BrowserProfileParams {
   heapOptions?: HeapSampleOptions;
   gcStats?: boolean;
   headless?: boolean;
+  chromeArgs?: string[];
   timeout?: number; // seconds
   maxTime?: number; // ms, bench function iteration time limit
   maxIterations?: number; // exact iteration count (bench function mode)
@@ -37,11 +38,11 @@ interface LapModeHandle {
 export async function profileBrowser(
   params: BrowserProfileParams,
 ): Promise<BrowserProfileResult> {
-  const { url, headless = true, timeout = 60 } = params;
+  const { url, headless = true, chromeArgs, timeout = 60 } = params;
   const { gcStats: collectGc } = params;
   const { samplingInterval = 32768 } = params.heapOptions ?? {};
 
-  const browser = await chromium.launch({ headless });
+  const browser = await chromium.launch({ headless, args: chromeArgs });
   try {
     const page = await browser.newPage();
     page.setDefaultTimeout(timeout * 1000);

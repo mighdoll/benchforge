@@ -141,6 +141,7 @@ Page                              CLI (Playwright + CDP)
 | `--heap-verbose` | false | Show full URLs with line numbers |
 | `--heap-user-only` | false | Filter to user code only |
 | `--headless` | true | Run headless (`--no-headless` to show browser) |
+| `--chrome-args <flags>` | | Extra Chromium flags (space-separated, e.g. `"--no-turbo-inlining"`) |
 | `--timeout <seconds>` | 60 | Max wait time |
 
 Node-only flags (`--cpu`, `--trace-opt`, `--adaptive`, `--collect`, etc.)

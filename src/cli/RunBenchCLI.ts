@@ -396,6 +396,7 @@ export async function browserBenchExports(args: DefaultCliArgs): Promise<void> {
       stackDepth: args["heap-depth"],
     },
     headless: args.headless,
+    chromeArgs: args["chrome-args"]?.split(/\s+/).filter(Boolean),
     timeout: args.timeout,
     gcStats: args["gc-stats"],
     maxTime: iterations ? Number.MAX_SAFE_INTEGER : time * 1000,
