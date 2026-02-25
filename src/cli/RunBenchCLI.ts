@@ -853,18 +853,20 @@ export interface MatrixExportOptions {
   baselineVersion?: GitVersion;
 }
 
-/** Strip matching surrounding quotes from a string.
+/** Strip surrounding quotes from a chrome arg token.
  *
- * (Needed because --chrome-args values like --js-flags="--help" pass through
- * yargs and spawn() without shell processing.)
+ * (Needed because --chrome-args values pass through yargs and spawn() without
+ * shell processing, so literal quote characters reach Chrome/V8 unrecognized.)
  */
 function stripQuotes(s: string): string {
-  /* 
-    (['"]): opening quote
-    (.*): content
-    \1: require the same closing quote 
-  */
-  return s.replace(/^(['"])(.*)\1$/s, "$2");
+  /* (['"]): opening quote; (.*): content; \1: require same closing quote */
+  const unquote = s.replace(/^(['"])(.*)\1$/s, "$2");
+
+  /* value portion: --flag="--value" or --flag='--value'
+     (-[^=]+=): flag name and =; (['"])(.*)\2: quoted value */
+  const valueUnquote = unquote.replace(/^(-[^=]+=)(['"])(.*)\2$/s, "$1$3");
+
+  return valueUnquote;
 }
 
 /** Sequential map - like Promise.all(arr.map(fn)) but runs one at a time */
