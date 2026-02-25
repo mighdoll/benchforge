@@ -252,10 +252,15 @@ async function collectTracing(
 /** Forward Chrome's stderr to the terminal so V8 flag warnings are visible. */
 function pipeChromeStderr(server: BrowserServer): void {
   const proc = server.process();
-  proc.stderr?.on("data", (chunk: Buffer) => {
-    const text = chunk.toString().trim();
-    if (text) process.stderr.write(`[chrome] ${text}\n`);
-  });
+  const pipe = (stream: NodeJS.ReadableStream | null) =>
+    stream?.on("data", (chunk: Buffer) => {
+      for (const line of chunk.toString().split("\n")) {
+        const text = line.trim();
+        if (text) process.stderr.write(`[chrome] ${text}\n`);
+      }
+    });
+  pipe(proc.stdout);
+  pipe(proc.stderr);
 }
 
 export { profileBrowser as profileBrowserHeap };
