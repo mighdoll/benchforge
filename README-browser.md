@@ -144,7 +144,7 @@ Page                              CLI (Playwright + CDP)
 | `--heap-verbose` | false | Show full URLs with line numbers |
 | `--heap-user-only` | false | Filter to user code only |
 | `--headless` | true | Run headless (`--no-headless` to show browser) |
-| `--chrome-args <flags>` | | Extra Chromium flags (repeatable, e.g. `--chrome-args '--js-flags=--no-turbo-inlining'`) |
+| `--chrome-args=<flag>` | | Extra Chromium flags (repeatable, use `=` for values starting with `--`) |
 | `--timeout <seconds>` | 60 | Max wait time |
 
 Node-only flags (`--cpu`, `--trace-opt`, `--adaptive`, `--collect`, etc.)
@@ -174,7 +174,15 @@ benchforge --url file://$(pwd)/examples/browser-bench/index.html --time 1
 
 # lap mode - heap profiling
 benchforge --url file://$(pwd)/examples/browser-heap/index.html --heap-sample --gc-stats
+
+# heap profiling with inlining disabled (see true allocation sites)
+benchforge --url file://$(pwd)/examples/browser-heap/index.html --heap-sample \
+  --chrome-args='--js-flags=--no-turbo-inlining --no-maglev-inlining'
 ```
+
+Other useful V8 flags for heap profiling (`--js-flags=`):
+- `--no-inline-new` — allocations go through the slow path, so the heap profiler catches every allocation site
+- `--sampling-heap-profiler-suppress-randomness` — deterministic sample intervals for reproducible results
 
 ## Notes
 
