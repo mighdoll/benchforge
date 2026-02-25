@@ -21,7 +21,8 @@
     "test": "pnpm --node-options=--expose-gc vitest --hideSkippedTests --exclude '**/*.e2e.test.ts'",
     "test:e2e": "pnpm --node-options=--expose-gc vitest run '.e2e.'",
     "test:once": "pnpm --node-options=--expose-gc vitest run --exclude '**/*.e2e.test.ts'",
-    "typecheck": "tsgo"
+    "typecheck": "tsgo",
+    "publish:all": "pnpm publish && pnpm -C benchforge-browser publish"
   },
   "publishConfig": {
     "bin": {
