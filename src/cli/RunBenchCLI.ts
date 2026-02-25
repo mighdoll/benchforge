@@ -422,10 +422,18 @@ export async function browserBenchExports(args: DefaultCliArgs): Promise<void> {
   });
 
   const name = new URL(url).pathname.split("/").pop() || "browser";
-  const hasSamples = result.samples && result.samples.length > 0;
   const results = browserResultGroups(name, result);
+  printBrowserReport(result, results, args);
+  await exportReports({ results, args });
+}
 
-  // Combined report table
+/** Print browser benchmark tables and heap reports */
+function printBrowserReport(
+  result: BrowserProfileResult,
+  results: ReportGroup[],
+  args: DefaultCliArgs,
+): void {
+  const hasSamples = result.samples && result.samples.length > 0;
   const sections: ResultsMapper<any>[] = [];
   if (hasSamples || result.wallTimeMs != null) {
     sections.push(timeSection);
@@ -439,16 +447,12 @@ export async function browserBenchExports(args: DefaultCliArgs): Promise<void> {
   if (sections.length > 0) {
     console.log(reportResults(results, sections));
   }
-
-  // Heap allocation report
   if (result.heapProfile) {
     printHeapReports(results, {
       ...cliHeapReportOptions(args),
       isUserCode: isBrowserUserCode,
     });
   }
-
-  await exportReports({ results, args });
 }
 
 /** Wrap browser profile result as ReportGroup[] for the standard pipeline */
