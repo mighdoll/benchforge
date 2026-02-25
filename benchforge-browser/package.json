@@ -1,6 +1,6 @@
 {
   "name": "benchforge-browser",
-  "version": "0.1.5",
+  "version": "0.1.6",
   "type": "module",
   "bin": {
     "benchforge-browser": "./bin.mjs"
