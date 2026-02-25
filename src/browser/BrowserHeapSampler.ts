@@ -1,4 +1,4 @@
-import { type CDPSession, chromium, type Page } from "playwright";
+import { type BrowserServer, type CDPSession, chromium, type Page } from "playwright";
 import type {
   HeapProfile,
   HeapSampleOptions,
@@ -42,7 +42,9 @@ export async function profileBrowser(
   const { gcStats: collectGc } = params;
   const { samplingInterval = 32768 } = params.heapOptions ?? {};
 
-  const browser = await chromium.launch({ headless, args: chromeArgs });
+  const server = await chromium.launchServer({ headless, args: chromeArgs });
+  pipeChromeStderr(server);
+  const browser = await chromium.connect(server.wsEndpoint());
   try {
     const page = await browser.newPage();
     page.setDefaultTimeout(timeout * 1000);
@@ -82,6 +84,7 @@ export async function profileBrowser(
     return result;
   } finally {
     await browser.close();
+    await server.close();
   }
 }
 
@@ -244,6 +247,15 @@ async function collectTracing(
   await cdp.send("Tracing.end");
   await complete;
   return browserGcStats(traceEvents);
+}
+
+/** Forward Chrome's stderr to the terminal so V8 flag warnings are visible. */
+function pipeChromeStderr(server: BrowserServer): void {
+  const proc = server.process();
+  proc.stderr?.on("data", (chunk: Buffer) => {
+    const text = chunk.toString().trim();
+    if (text) process.stderr.write(`[chrome] ${text}\n`);
+  });
 }
 
 export { profileBrowser as profileBrowserHeap };
