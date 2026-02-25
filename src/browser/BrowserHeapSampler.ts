@@ -48,7 +48,7 @@ export async function profileBrowser(
   const { samplingInterval = 32768 } = params.heapOptions ?? {};
 
   const server = await chromium.launchServer({ headless, args: chromeArgs });
-  pipeChromeStderr(server);
+  pipeChromeOutput(server);
   const browser = await chromium.connect(server.wsEndpoint());
   try {
     const page = await browser.newPage();
@@ -254,8 +254,8 @@ async function collectTracing(
   return browserGcStats(traceEvents);
 }
 
-/** Forward Chrome's stderr to the terminal so V8 flag warnings are visible. */
-function pipeChromeStderr(server: BrowserServer): void {
+/** Forward Chrome's stdout/stderr to the terminal so V8 flag output is visible. */
+function pipeChromeOutput(server: BrowserServer): void {
   const proc = server.process();
   const pipe = (stream: NodeJS.ReadableStream | null) =>
     stream?.on("data", (chunk: Buffer) => {

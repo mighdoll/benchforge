@@ -414,6 +414,7 @@ export async function browserBenchExports(args: DefaultCliArgs): Promise<void> {
     headless: args.headless,
     chromeArgs: args["chrome-args"]
       ?.flatMap(a => a.split(/\s+/))
+      .map(stripQuotes)
       .filter(Boolean),
     timeout: args.timeout,
     gcStats: args["gc-stats"],
@@ -850,6 +851,20 @@ export interface MatrixExportOptions {
   sections?: any[];
   currentVersion?: GitVersion;
   baselineVersion?: GitVersion;
+}
+
+/** Strip matching surrounding quotes from a string.
+ *
+ * (Needed because --chrome-args values like --js-flags="--help" pass through
+ * yargs and spawn() without shell processing.)
+ */
+function stripQuotes(s: string): string {
+  /* 
+    (['"]): opening quote
+    (.*): content
+    \1: require the same closing quote 
+  */
+  return s.replace(/^(['"])(.*)\1$/s, "$2");
 }
 
 /** Sequential map - like Promise.all(arr.map(fn)) but runs one at a time */
