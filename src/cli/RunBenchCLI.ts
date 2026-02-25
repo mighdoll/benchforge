@@ -7,7 +7,7 @@ import type {
 } from "../BenchMatrix.ts";
 import { runMatrix } from "../BenchMatrix.ts";
 import type { BenchGroup, BenchmarkSpec, BenchSuite } from "../Benchmark.ts";
-import type { BenchmarkReport, ReportGroup } from "../BenchmarkReport.ts";
+import type { BenchmarkReport, ReportGroup, ResultsMapper } from "../BenchmarkReport.ts";
 import { reportResults } from "../BenchmarkReport.ts";
 import type { BrowserProfileResult } from "../browser/BrowserHeapSampler.ts";
 import { exportBenchmarkJson } from "../export/JsonExport.ts";
@@ -418,14 +418,19 @@ export async function browserBenchExports(args: DefaultCliArgs): Promise<void> {
   const hasSamples = result.samples && result.samples.length > 0;
   const results = browserResultGroups(name, result);
 
-  // Time report
+  // Combined report table
+  const sections: ResultsMapper<any>[] = [];
   if (hasSamples || result.wallTimeMs != null) {
-    console.log(reportResults(results, [timeSection, runsSection]));
+    sections.push(timeSection);
   }
-
-  // GC stats table
   if (result.gcStats) {
-    console.log(reportResults(results, [browserGcStatsSection]));
+    sections.push(browserGcStatsSection);
+  }
+  if (hasSamples || result.wallTimeMs != null) {
+    sections.push(runsSection);
+  }
+  if (sections.length > 0) {
+    console.log(reportResults(results, sections));
   }
 
   // Heap allocation report
