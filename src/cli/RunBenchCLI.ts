@@ -7,7 +7,11 @@ import type {
 } from "../BenchMatrix.ts";
 import { runMatrix } from "../BenchMatrix.ts";
 import type { BenchGroup, BenchmarkSpec, BenchSuite } from "../Benchmark.ts";
-import type { BenchmarkReport, ReportGroup, ResultsMapper } from "../BenchmarkReport.ts";
+import type {
+  BenchmarkReport,
+  ReportGroup,
+  ResultsMapper,
+} from "../BenchmarkReport.ts";
 import { reportResults } from "../BenchmarkReport.ts";
 import type { BrowserProfileResult } from "../browser/BrowserHeapSampler.ts";
 import { exportBenchmarkJson } from "../export/JsonExport.ts";
@@ -408,7 +412,9 @@ export async function browserBenchExports(args: DefaultCliArgs): Promise<void> {
       stackDepth: args["heap-depth"],
     },
     headless: args.headless,
-    chromeArgs: args["chrome-args"]?.flatMap(a => a.split(/\s+/)).filter(Boolean),
+    chromeArgs: args["chrome-args"]
+      ?.flatMap(a => a.split(/\s+/))
+      .filter(Boolean),
     timeout: args.timeout,
     gcStats: args["gc-stats"],
     maxTime: iterations ? Number.MAX_SAFE_INTEGER : time * 1000,

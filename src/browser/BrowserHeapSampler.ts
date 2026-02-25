@@ -1,4 +1,9 @@
-import { type BrowserServer, type CDPSession, chromium, type Page } from "playwright";
+import {
+  type BrowserServer,
+  type CDPSession,
+  chromium,
+  type Page,
+} from "playwright";
 import type {
   HeapProfile,
   HeapSampleOptions,
