@@ -359,12 +359,13 @@ function buildReportSections(
   hasOptData: boolean,
 ) {
   const sections = adaptive
-    ? [adaptiveSection, runsSection, totalTimeSection]
-    : [timeSection, runsSection];
+    ? [adaptiveSection, totalTimeSection]
+    : [timeSection];
 
   if (gcStats) sections.push(gcStatsSection);
   if (hasCpuData) sections.push(cpuSection);
   if (hasOptData) sections.push(optSection);
+  sections.push(runsSection);
 
   return sections;
 }
