@@ -43,7 +43,7 @@ const cliOptions = {
   url:              { type: "string",  requiresArg: true, describe: "page URL for browser profiling (enables browser mode)" },
   headless:         { type: "boolean", default: true, describe: "run browser in headless mode" },
   timeout:          { type: "number",  default: 60, describe: "browser page timeout in seconds" },
-  "chrome-args":    { type: "string",  requiresArg: true, describe: "extra Chromium flags (space-separated)" },
+  "chrome-args":    { type: "string",  array: true, requiresArg: true, describe: "extra Chromium flags" },
 } as const;
 
 /** @return yargs with standard benchmark options */
