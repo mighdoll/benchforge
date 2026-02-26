@@ -1,3 +1,5 @@
+import { basename, resolve } from "node:path";
+import { pathToFileURL } from "node:url";
 import pico from "picocolors";
 import { hideBin } from "yargs/helpers";
 import type {
@@ -534,9 +536,36 @@ export async function runDefaultBench(
     await browserBenchExports(args);
   } else if (suite) {
     await benchExports(suite, args);
+  } else if (args.file) {
+    await fileBenchExports(args.file, args);
   } else {
-    throw new Error("Either --url or a BenchSuite is required.");
+    throw new Error(
+      "Provide a benchmark file, --url for browser mode, or pass a BenchSuite directly.",
+    );
   }
+}
+
+/** Import a file and run it as a benchmark based on what it exports */
+async function fileBenchExports(
+  filePath: string,
+  args: DefaultCliArgs,
+): Promise<void> {
+  const fileUrl = pathToFileURL(resolve(filePath)).href;
+  const mod = await import(fileUrl);
+  const candidate = mod.default;
+
+  if (candidate && Array.isArray(candidate.groups)) {
+    // BenchSuite export
+    await benchExports(candidate as BenchSuite, args);
+  } else if (typeof candidate === "function") {
+    // Default function export: wrap as a single benchmark
+    const name = basename(filePath).replace(/\.[^.]+$/, "");
+    await benchExports(
+      { name, groups: [{ name, benchmarks: [{ name, fn: candidate }] }] },
+      args,
+    );
+  }
+  // else: self-executing file already ran on import
 }
 
 /** Convert CLI args to runner options */

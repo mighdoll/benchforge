@@ -5,8 +5,10 @@ export const defaultAdaptiveMaxTime = 20;
 
 export type Configure<T> = (yargs: Argv) => Argv<T>;
 
-/** CLI args type inferred from cliOptions */
-export type DefaultCliArgs = InferredOptionTypes<typeof cliOptions>;
+/** CLI args type inferred from cliOptions, plus optional file positional */
+export type DefaultCliArgs = InferredOptionTypes<typeof cliOptions> & {
+  file?: string;
+};
 
 // biome-ignore format: compact option definitions
 const cliOptions = {
@@ -48,7 +50,16 @@ const cliOptions = {
 
 /** @return yargs with standard benchmark options */
 export function defaultCliArgs(yargsInstance: Argv): Argv<DefaultCliArgs> {
-  return yargsInstance.options(cliOptions).help().strict();
+  return yargsInstance
+    .command("$0 [file]", "run benchmarks", y => {
+      y.positional("file", {
+        type: "string",
+        describe: "benchmark file to run",
+      });
+    })
+    .options(cliOptions)
+    .help()
+    .strict() as Argv<DefaultCliArgs>;
 }
 
 /** @return parsed command line arguments */

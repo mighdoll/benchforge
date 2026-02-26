@@ -1,10 +1,4 @@
-#!/usr/bin/env -S node --expose-gc --allow-natives-syntax
-import {
-  type BenchGroup,
-  type BenchSuite,
-  benchExports,
-  parseBenchArgs,
-} from "../src/index.ts";
+import type { BenchGroup, BenchSuite } from "../src/index.ts";
 
 const stringGroup: BenchGroup<void> = {
   name: "String Operations",
@@ -29,8 +23,7 @@ const suite: BenchSuite = {
   groups: [stringGroup, sortingGroup],
 };
 
-const args = parseBenchArgs();
-await benchExports(suite, args);
+export default suite;
 
 /** Immutable quicksort implementation */
 function quickSort(arr: number[]): number[] {
@@ -57,7 +50,7 @@ function insertionSort(arr: number[]): number[] {
   return result;
 }
 
-/** immmutable native sort */
+/** Immutable native sort */
 function nativeSort(arr: number[]): number[] {
   return [...arr].sort((a, b) => a - b);
 }

@@ -98,6 +98,13 @@ function executeTestScript(args = ""): string {
   });
 }
 
+/** Run a fixture file via bin/benchforge and return output */
+function executeBenchforgeFile(file: string, args = ""): string {
+  const bin = path.join(import.meta.dirname!, "../../bin/benchforge");
+  const fixture = path.join(import.meta.dirname!, "fixtures", file);
+  return execSync(`${bin} ${fixture} ${args}`, { encoding: "utf8" });
+}
+
 test("e2e: runs user script", { timeout: 30000 }, () => {
   const output = executeTestScript("--time 0.1");
 
@@ -164,3 +171,21 @@ test(
     expect(output).toContain("mean");
   },
 );
+
+test("file mode: BenchSuite export", { timeout: 30000 }, () => {
+  const output = executeBenchforgeFile(
+    "suite-export-bench.ts",
+    "--iterations 5",
+  );
+
+  expect(output).toContain("plus");
+  expect(output).toContain("multiply");
+  expect(output).toContain("runs");
+});
+
+test("file mode: function export", { timeout: 30000 }, () => {
+  const output = executeBenchforgeFile("fn-export-bench.ts", "--iterations 5");
+
+  expect(output).toContain("fn-export-bench");
+  expect(output).toContain("runs");
+});

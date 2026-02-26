@@ -16,39 +16,31 @@ pnpm add benchforge
 
 ## Quick Start
 
+The simplest way to benchmark a function: export it as the default export and pass the file to `benchforge`.
+
 ```typescript
-import { parseBenchArgs, runBenchmarks, reportResults, timeSection, runsSection, type BenchSuite } from 'benchforge';
-
-const suite: BenchSuite = {
-  name: "String Operations",
-  groups: [
-    {
-      name: "Concatenation",
-      benchmarks: [
-        { name: "plus", fn: () => "a" + "b" },
-        { name: "template", fn: () => `a${"b"}` },
-      ],
-    },
-  ],
-};
-
-const args = parseBenchArgs();
-const results = await runBenchmarks(suite, args);
-const table = reportResults(results, [timeSection, runsSection]);
-console.log(table);
+// my-bench.ts
+export default function (): string {
+  return "a" + "b";
+}
 ```
 
-### Setup and Baseline Example
+```bash
+benchforge my-bench.ts --gc-stats
+```
 
-Here's a more comprehensive example with shared setup data and baseline comparison:
+### BenchSuite Export
+
+For multiple benchmarks with groups, setup data, and baseline comparison, export a `BenchSuite`:
 
 ```typescript
-import { parseBenchArgs, runBenchmarks, defaultReport, type BenchGroup, type BenchSuite } from 'benchforge';
+// sorting.ts
+import type { BenchGroup, BenchSuite } from 'benchforge';
 
 const sortingGroup: BenchGroup<number[]> = {
   name: "Array Sorting (1000 numbers)",
   setup: () => Array.from({ length: 1000 }, () => Math.random()),
-  baseline: { name: "native sort", fn: nativeSort },
+  baseline: { name: "native sort", fn: (arr) => [...arr].sort((a, b) => a - b) },
   benchmarks: [
     { name: "quicksort", fn: quickSort },
     { name: "insertion sort", fn: insertionSort },
@@ -60,10 +52,11 @@ const suite: BenchSuite = {
   groups: [sortingGroup],
 };
 
-const args = parseBenchArgs();
-const results = await runBenchmarks(suite, args);
-const report = defaultReport(results, args);
-console.log(report);
+export default suite;
+```
+
+```bash
+benchforge sorting.ts --gc-stats
 ```
 
 See `examples/simple-cli.ts` for a complete runnable example.
@@ -122,8 +115,8 @@ This eliminates manual caching boilerplate in worker modules.
 ### Filter benchmarks by name
 
 ```bash
-simple-cli.ts --filter "concat"
-simple-cli.ts --filter "^parse" --time 2
+benchforge my-bench.ts --filter "concat"
+benchforge my-bench.ts --filter "^parse" --time 2
 ```
 
 ### Profiling with external debuggers
@@ -132,10 +125,10 @@ Use `--profile` to run benchmarks once for attaching external profilers:
 
 ```bash
 # Use with Chrome DevTools profiler
-node --inspect-brk simple-cli.ts --profile
+node --inspect-brk $(which benchforge) my-bench.ts --profile
 
 # Use with other profiling tools
-node --prof simple-cli.ts --profile
+node --prof $(which benchforge) my-bench.ts --profile
 ```
 
 The `--profile` flag executes exactly one iteration with no warmup, making it ideal for debugging and performance profiling.
@@ -172,7 +165,7 @@ The HTML report displays:
 
 ```bash
 # Generate HTML report, start server, and open in browser
-simple-cli.ts --html
+benchforge my-bench.ts --html
 # Press Ctrl+C to exit when done viewing
 ```
 
@@ -182,11 +175,11 @@ Export benchmark data as a Perfetto-compatible trace file for detailed analysis:
 
 ```bash
 # Export trace file
-simple-cli.ts --perfetto trace.json
+benchforge my-bench.ts --perfetto trace.json
 
 # With V8 GC events (automatically merged after exit)
 node --expose-gc --trace-events-enabled --trace-event-categories=v8,v8.gc \
-  simple-cli.ts --perfetto trace.json
+  benchforge my-bench.ts --perfetto trace.json
 ```
 
 View the trace at https://ui.perfetto.dev by dragging the JSON file.
@@ -203,7 +196,7 @@ Collect detailed garbage collection statistics via V8's `--trace-gc-nvp`:
 
 ```bash
 # Collect GC allocation/collection stats (requires worker mode)
-simple-cli.ts --gc-stats
+benchforge my-bench.ts --gc-stats
 ```
 
 Adds these columns to the output table:
@@ -219,16 +212,16 @@ For allocation profiling including garbage (short-lived objects), use `--heap-sa
 
 ```bash
 # Basic heap sampling
-simple-cli.ts --heap-sample --iterations 100
+benchforge my-bench.ts --heap-sample --iterations 100
 
 # Smaller interval = more samples = better coverage of rare allocations
-simple-cli.ts --heap-sample --heap-interval 4096 --iterations 100
+benchforge my-bench.ts --heap-sample --heap-interval 4096 --iterations 100
 
 # Verbose output with clickable file:// paths
-simple-cli.ts --heap-sample --heap-verbose
+benchforge my-bench.ts --heap-sample --heap-verbose
 
 # Control call stack display depth
-simple-cli.ts --heap-sample --heap-stack 5
+benchforge my-bench.ts --heap-sample --heap-stack 5
 ```
 
 **CLI Options:**
