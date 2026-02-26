@@ -59,6 +59,8 @@ export default suite;
 benchforge sorting.ts --gc-stats
 ```
 
+A `MatrixSuite` export (`.matrices`) is also recognized and runs via `matrixBenchExports`.
+
 See `examples/simple-cli.ts` for a complete runnable example.
 
 ### Worker Mode with Module Imports

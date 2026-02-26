@@ -554,7 +554,10 @@ async function fileBenchExports(
   const mod = await import(fileUrl);
   const candidate = mod.default;
 
-  if (candidate && Array.isArray(candidate.groups)) {
+  if (candidate && Array.isArray(candidate.matrices)) {
+    // MatrixSuite export
+    await matrixBenchExports(candidate as MatrixSuite, args);
+  } else if (candidate && Array.isArray(candidate.groups)) {
     // BenchSuite export
     await benchExports(candidate as BenchSuite, args);
   } else if (typeof candidate === "function") {
