@@ -2,6 +2,9 @@
   "name": "benchforge-browser",
   "version": "0.1.8",
   "type": "module",
+  "files": [
+    "bin.mjs"
+  ],
   "bin": {
     "benchforge-browser": "./bin.mjs"
   },
