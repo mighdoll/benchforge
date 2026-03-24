@@ -1,55 +1,66 @@
 import pc from "picocolors";
-import type { HeapProfile, ProfileNode } from "./HeapSampler.ts";
+
+import { formatBytes } from "../table-util/Formatters.ts";
+import type { HeapProfile, HeapSample } from "./HeapSampler.ts";
+import {
+  type ResolvedFrame,
+  type ResolvedProfile,
+  resolveProfile,
+} from "./ResolvedProfile.ts";
 
 /** Sum selfSize across all nodes in profile (before any filtering) */
 export function totalProfileBytes(profile: HeapProfile): number {
-  let total = 0;
-  function walk(node: ProfileNode): void {
-    total += node.selfSize;
-    for (const child of node.children || []) walk(child);
-  }
-  walk(profile.head);
-  return total;
+  return resolveProfile(profile).totalBytes;
 }
 
 export interface CallFrame {
   fn: string;
   url: string;
   line: number; // 1-indexed for display
-  col: number;
+  col?: number; // 1-indexed for display
 }
 
 export interface HeapSite {
   fn: string;
   url: string;
   line: number; // 1-indexed for display
-  col: number;
+  col?: number;
   bytes: number;
   stack?: CallFrame[]; // call stack from root to this frame
+  samples?: HeapSample[]; // individual allocation samples at this site
+  callers?: { stack: CallFrame[]; bytes: number }[]; // distinct caller paths
 }
 
-/** Flatten profile tree into sorted list of allocation sites with call stacks */
-export function flattenProfile(profile: HeapProfile): HeapSite[] {
+function toCallFrame(f: ResolvedFrame): CallFrame {
+  return { fn: f.name, url: f.url, line: f.line, col: f.col };
+}
+
+/** Flatten resolved profile into sorted list of allocation sites with call stacks.
+ *  When raw samples are available, attaches them to corresponding sites. */
+export function flattenProfile(resolved: ResolvedProfile): HeapSite[] {
   const sites: HeapSite[] = [];
+  const nodeIdToSites = new Map<number, HeapSite[]>();
 
-  function walk(node: ProfileNode, stack: CallFrame[]): void {
-    const { functionName, url, lineNumber, columnNumber } = node.callFrame;
-    const fn = functionName || "(anonymous)";
-    const col = columnNumber ?? 0;
-    const frame: CallFrame = { fn, url: url || "", line: lineNumber + 1, col };
-    const newStack = [...stack, frame];
-
-    if (node.selfSize > 0) {
-      sites.push({
-        ...frame,
-        bytes: node.selfSize,
-        stack: newStack,
-      });
-    }
-    for (const child of node.children || []) walk(child, newStack);
+  for (const node of resolved.allocationNodes) {
+    const frame = toCallFrame(node.frame);
+    const stack = node.stack.map(toCallFrame);
+    const site: HeapSite = { ...frame, bytes: node.selfSize, stack };
+    sites.push(site);
+    const existing = nodeIdToSites.get(node.nodeId);
+    if (existing) existing.push(site);
+    else nodeIdToSites.set(node.nodeId, [site]);
   }
 
-  walk(profile.head, []);
+  // Attach raw samples to their corresponding sites
+  for (const sample of resolved.sortedSamples ?? []) {
+    const matchingSites = nodeIdToSites.get(sample.nodeId);
+    if (!matchingSites) continue;
+    for (const site of matchingSites) {
+      if (!site.samples) site.samples = [];
+      site.samples.push(sample);
+    }
+  }
+
   return sites.sort((a, b) => b.bytes - a.bytes);
 }
 
@@ -81,33 +92,75 @@ export function filterSites(
   return sites.filter(isUser);
 }
 
-/** Aggregate sites by location (combine same file:line:col) */
+/** Aggregate sites by location (combine same file:line:col).
+ *  Tracks distinct caller stacks with byte weights when merging. */
 export function aggregateSites(sites: HeapSite[]): HeapSite[] {
   const byLocation = new Map<string, HeapSite>();
 
   for (const site of sites) {
-    const key = `${site.url}:${site.line}:${site.col}`;
+    // When column is unknown, include fn name to avoid merging distinct sites
+    const key =
+      site.col != null
+        ? `${site.url}:${site.line}:${site.col}`
+        : `${site.url}:${site.line}:?:${site.fn}`;
     const existing = byLocation.get(key);
     if (existing) {
       existing.bytes += site.bytes;
+      addCaller(existing, site);
     } else {
-      byLocation.set(key, { ...site });
+      const entry = { ...site };
+      if (site.stack) {
+        entry.callers = [{ stack: site.stack, bytes: site.bytes }];
+      }
+      byLocation.set(key, entry);
+    }
+  }
+
+  // Sort callers by bytes descending, use top caller as primary stack
+  for (const site of byLocation.values()) {
+    if (site.callers && site.callers.length > 1) {
+      site.callers.sort((a, b) => b.bytes - a.bytes);
+      site.stack = site.callers[0].stack;
     }
   }
 
   return [...byLocation.values()].sort((a, b) => b.bytes - a.bytes);
 }
 
+/** Serialize a call stack for dedup comparison */
+function callerKey(stack: CallFrame[]): string {
+  return stack.map(f => `${f.url}:${f.line}:${f.col}`).join("|");
+}
+
+/** Add a caller stack to an aggregated site, merging if the same path exists */
+function addCaller(existing: HeapSite, site: HeapSite): void {
+  if (!site.stack) return;
+  if (!existing.callers) {
+    existing.callers = [];
+  }
+  const key = callerKey(site.stack);
+  const match = existing.callers.find(c => callerKey(c.stack) === key);
+  if (match) {
+    match.bytes += site.bytes;
+  } else {
+    existing.callers.push({ stack: site.stack, bytes: site.bytes });
+  }
+}
+
+/** Format location, omitting column when unknown */
+function fmtLoc(url: string, line: number, col?: number): string {
+  return col != null ? `${url}:${line}:${col}` : `${url}:${line}`;
+}
+
 function fmtBytes(bytes: number): string {
-  if (bytes >= 1024 * 1024) return `${(bytes / 1024 / 1024).toFixed(2)} MB`;
-  if (bytes >= 1024) return `${(bytes / 1024).toFixed(1)} KB`;
-  return `${bytes} B`;
+  return formatBytes(bytes, { space: true }) ?? `${bytes} B`;
 }
 
 export interface HeapReportOptions {
   topN: number;
   stackDepth?: number;
   verbose?: boolean;
+  raw?: boolean; // dump every raw sample
   userOnly?: boolean; // filter to user code only (hide node internals)
   isUserCode?: UserCodeFilter; // predicate for user vs internal code
   totalAll?: number; // total across all nodes (before filtering)
@@ -175,7 +228,7 @@ function formatVerboseSite(
   isUser: UserCodeFilter,
 ): void {
   const bytes = fmtBytes(site.bytes).padStart(10);
-  const loc = site.url ? `${site.url}:${site.line}:${site.col}` : "(unknown)";
+  const loc = site.url ? fmtLoc(site.url, site.line, site.col) : "(unknown)";
   const dimFn = isUser(site) ? (s: string) => s : pc.dim;
 
   lines.push(dimFn(`${bytes}  ${site.fn}  ${loc}`));
@@ -184,13 +237,34 @@ function formatVerboseSite(
     const callers = site.stack.slice(0, -1).reverse().slice(0, stackDepth);
     for (const frame of callers) {
       if (!frame.url || !isUser(frame)) continue;
-      const callerLoc = `${frame.url}:${frame.line}:${frame.col}`;
+      const callerLoc = fmtLoc(frame.url, frame.line, frame.col);
       lines.push(dimFn(`            <- ${frame.fn}  ${callerLoc}`));
     }
   }
+
 }
 
 /** Get total bytes from sites */
 export function totalBytes(sites: HeapSite[]): number {
   return sites.reduce((sum, s) => sum + s.bytes, 0);
+}
+
+/** Format every raw sample as one line, ordered by ordinal (time).
+ *  Output is tab-separated for easy piping/grep/diff. */
+export function formatRawSamples(resolved: ResolvedProfile): string {
+  if (!resolved.sortedSamples || resolved.sortedSamples.length === 0) {
+    return "No raw samples available.";
+  }
+
+  const lines: string[] = ["ordinal\tsize\tfunction\tlocation"];
+  for (const s of resolved.sortedSamples) {
+    const node = resolved.nodeMap.get(s.nodeId);
+    const fn = node?.frame.name || "(unknown)";
+    const url = node?.frame.url || "";
+    const loc = url
+      ? fmtLoc(url, node!.frame.line, node!.frame.col)
+      : "(unknown)";
+    lines.push(`${s.ordinal}\t${s.size}\t${fn}\t${loc}`);
+  }
+  return lines.join("\n");
 }

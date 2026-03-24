@@ -14,10 +14,14 @@ import type {
   ReportGroup,
   ResultsMapper,
 } from "../BenchmarkReport.ts";
-import { reportResults } from "../BenchmarkReport.ts";
+import { groupReports, reportResults } from "../BenchmarkReport.ts";
 import type { BrowserProfileResult } from "../browser/BrowserHeapSampler.ts";
 import { exportBenchmarkJson } from "../export/JsonExport.ts";
 import { exportPerfettoTrace } from "../export/PerfettoExport.ts";
+import {
+  exportAndLaunchSpeedscope,
+  exportSpeedscope,
+} from "../export/SpeedscopeExport.ts";
 import type { GitVersion } from "../GitUtils.ts";
 import { prepareHtmlData } from "../HtmlDataPrep.ts";
 import {
@@ -25,10 +29,11 @@ import {
   filterSites,
   flattenProfile,
   formatHeapReport,
+  formatRawSamples,
   type HeapReportOptions,
   isBrowserUserCode,
-  totalProfileBytes,
 } from "../heap-sample/HeapSampleReport.ts";
+import { resolveProfile } from "../heap-sample/ResolvedProfile.ts";
 import { generateHtmlReport } from "../html/index.ts";
 import type { MeasuredResults } from "../MeasuredResults.ts";
 import { loadCasesModule } from "../matrix/CaseLoader.ts";
@@ -502,26 +507,26 @@ export function printHeapReports(
   options: HeapReportOptions,
 ): void {
   for (const group of groups) {
-    const allReports = group.baseline
-      ? [...group.reports, group.baseline]
-      : group.reports;
-
-    for (const report of allReports) {
+    for (const report of groupReports(group)) {
       const { heapProfile } = report.measuredResults;
       if (!heapProfile) continue;
 
       console.log(dim(`\n─── Heap profile: ${report.name} ───`));
-      const totalAll = totalProfileBytes(heapProfile);
-      const sites = flattenProfile(heapProfile);
+      const resolved = resolveProfile(heapProfile);
+      const sites = flattenProfile(resolved);
       const userSites = filterSites(sites, options.isUserCode);
       const totalUserCode = userSites.reduce((sum, s) => sum + s.bytes, 0);
       const aggregated = aggregateSites(options.userOnly ? userSites : sites);
       const extra = {
-        totalAll,
+        totalAll: resolved.totalBytes,
         totalUserCode,
-        sampleCount: heapProfile.samples?.length,
+        sampleCount: resolved.sortedSamples?.length,
       };
       console.log(formatHeapReport(aggregated, { ...options, ...extra }));
+      if (options.raw) {
+        console.log(dim(`\n─── Raw samples: ${report.name} ───`));
+        console.log(formatRawSamples(resolved));
+      }
     }
   }
 }
@@ -602,7 +607,9 @@ function cliCommonOptions(args: DefaultCliArgs) {
   const { "trace-opt": traceOpt, "skip-settle": noSettle } = args;
   const { "pause-first": pauseFirst, "pause-interval": pauseInterval } = args;
   const { "pause-duration": pauseDuration, "gc-stats": gcStats } = args;
-  const { "heap-sample": heapSample, "heap-interval": heapInterval } = args;
+  const heapSample =
+    args["heap-sample"] || args.speedscope || !!args["export-speedscope"];
+  const { "heap-interval": heapInterval } = args;
   const { "heap-depth": heapDepth } = args;
   return {
     collect,
@@ -627,9 +634,8 @@ const { yellow, dim } = isTest
 
 /** Log V8 optimization tier distribution and deoptimizations */
 export function reportOptStatus(groups: ReportGroup[]): void {
-  const optData = groups.flatMap(({ reports, baseline }) => {
-    const all = baseline ? [...reports, baseline] : reports;
-    return all
+  const optData = groups.flatMap(group => {
+    return groupReports(group)
       .filter(r => r.measuredResults.optStatus)
       .map(r => ({
         name: r.name,
@@ -666,12 +672,11 @@ export function hasField(
   results: ReportGroup[],
   field: keyof MeasuredResults,
 ): boolean {
-  return results.some(({ reports, baseline }) => {
-    const all = baseline ? [...reports, baseline] : reports;
-    return all.some(
+  return results.some(group =>
+    groupReports(group).some(
       ({ measuredResults }) => measuredResults[field] !== undefined,
-    );
-  });
+    ),
+  );
 }
 
 export interface ExportOptions {
@@ -690,7 +695,7 @@ async function finishReports(
   suiteName?: string,
   exportOptions?: MatrixExportOptions,
 ): Promise<void> {
-  if (args["heap-sample"]) {
+  if (args["heap-sample"] || args.speedscope || args["export-speedscope"]) {
     printHeapReports(results, cliHeapReportOptions(args));
   }
   await exportReports({ results, args, suiteName, ...exportOptions });
@@ -722,8 +727,16 @@ export async function exportReports(options: ExportOptions): Promise<void> {
     await exportBenchmarkJson(results, args.json, args, suiteName);
   }
 
-  if (args.perfetto) {
-    exportPerfettoTrace(results, args.perfetto, args);
+  if (args["export-perfetto"]) {
+    exportPerfettoTrace(results, args["export-perfetto"], args);
+  }
+
+  if (args["export-speedscope"]) {
+    exportSpeedscope(results, args["export-speedscope"]);
+  }
+
+  if (args.speedscope) {
+    exportAndLaunchSpeedscope(results);
   }
 
   // Keep process running when HTML report is opened in browser
@@ -816,6 +829,7 @@ function cliHeapReportOptions(args: DefaultCliArgs): HeapReportOptions {
     topN: args["heap-rows"],
     stackDepth: args["heap-stack"],
     verbose: args["heap-verbose"],
+    raw: args["heap-raw"],
     userOnly: args["heap-user-only"],
   };
 }

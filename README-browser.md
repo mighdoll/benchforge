@@ -130,22 +130,16 @@ Page                              CLI (Playwright + CDP)
 
 ## CLI Options
 
+Browser-specific options:
+
 | Option | Default | Description |
 |--------|---------|-------------|
 | `--url <url>` | | Page URL (enables browser mode) |
-| `--time <seconds>` | 0.642 | Iteration time limit (bench function mode) |
-| `--iterations <n>` | | Exact iteration count (bench function mode) |
-| `--gc-stats` | false | Collect GC stats via CDP tracing |
-| `--heap-sample` | false | Enable heap allocation profiling |
-| `--heap-interval <bytes>` | 32768 | Sampling interval in bytes |
-| `--heap-depth <frames>` | 64 | Stack depth to capture |
-| `--heap-rows <n>` | 20 | Top allocation sites to show |
-| `--heap-stack <n>` | 3 | Call stack depth to display |
-| `--heap-verbose` | false | Show full URLs with line numbers |
-| `--heap-user-only` | false | Filter to user code only |
 | `--headless` | true | Run headless (`--no-headless` to show browser) |
 | `--chrome-args=<flag>` | | Extra Chromium flags (repeatable, use `=` for values starting with `--`) |
 | `--timeout <seconds>` | 60 | Max wait time |
+
+See [CLI Options](README.md#cli-options) for shared options (`--time`, `--iterations`, `--heap-sample`, `--gc-stats`, `--speedscope`, etc.).
 
 Node-only flags (`--cpu`, `--trace-opt`, `--adaptive`, `--collect`, etc.)
 are warned and ignored in browser mode.

@@ -1,26 +1,68 @@
 import { Session } from "node:inspector/promises";
 
 export interface HeapSampleOptions {
-  samplingInterval?: number; // bytes between samples, default 32768
-  stackDepth?: number; // max stack frames, default 64
-  includeMinorGC?: boolean; // keep objects collected by minor GC, default true
-  includeMajorGC?: boolean; // keep objects collected by major GC, default true
+  /** Bytes between samples (default 32768) */
+  samplingInterval?: number;
+
+  /** Max stack frames (default 64) */
+  stackDepth?: number;
+
+  /** Keep objects collected by minor GC (default true) */
+  includeMinorGC?: boolean;
+
+  /** Keep objects collected by major GC (default true) */
+  includeMajorGC?: boolean;
 }
 
+/** V8 call frame location within a profiled script */
+export interface CallFrame {
+  /** Function name (empty string for anonymous) */
+  functionName: string;
+
+  /** Script URL or file path */
+  url: string;
+
+  /** Zero-based line number */
+  lineNumber: number;
+
+  /** Zero-based column number */
+  columnNumber?: number;
+}
+
+/** Node in the V8 sampling heap profile tree */
 export interface ProfileNode {
-  callFrame: {
-    functionName: string;
-    url: string;
-    lineNumber: number;
-    columnNumber?: number;
-  };
+  /** Call site for this allocation node */
+  callFrame: CallFrame;
+
+  /** Bytes allocated directly at this node (not children) */
   selfSize: number;
+
+  /** Unique node ID, links to {@link HeapSample.nodeId} */
+  id: number;
+
+  /** Child nodes in the call tree */
   children?: ProfileNode[];
 }
 
+/** Individual heap allocation sample from V8's SamplingHeapProfiler */
+export interface HeapSample {
+  /** Links to {@link ProfileNode.id} for stack lookup */
+  nodeId: number;
+
+  /** Allocation size in bytes */
+  size: number;
+
+  /** Monotonically increasing, gives temporal ordering */
+  ordinal: number;
+}
+
+/** V8 sampling heap profile tree with optional per-allocation samples */
 export interface HeapProfile {
+  /** Root of the profile call tree */
   head: ProfileNode;
-  samples?: number[]; // sample IDs (length = number of samples taken)
+
+  /** Per-allocation samples, if collected */
+  samples?: HeapSample[];
 }
 
 const defaultOptions: Required<HeapSampleOptions> = {
@@ -74,5 +116,6 @@ async function startSampling(
 
 async function stopSampling(session: Session): Promise<HeapProfile> {
   const { profile } = await session.post("HeapProfiler.stopSampling");
-  return profile as HeapProfile;
+  // V8 returns id/samples fields not in @types/node's incomplete SamplingHeapProfile
+  return profile as unknown as HeapProfile;
 }

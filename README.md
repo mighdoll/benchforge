@@ -1,10 +1,23 @@
 # Benchforge
 
-A TypeScript benchmarking library with CLI support for running performance tests.
+Traditional benchmarking tools either ignore GC or try to avoid it.
+Benchforge captures GC impact.
 
-## Browser Profiling
+Garbage collection makes benchmarks noisy — statistics like mean and max
+stabilize poorly when collection is intermittent. Most tools work around
+this by isolating microbenchmarks from GC, but that hides a key part of
+real-world performance. And heap snapshots are useful for finding leaks,
+but they can't show you where garbage is being generated.
 
-See [Browser Heap Profiling](README-browser.md) for profiling code running in a browser.
+- **Heap allocation profiling** — attribute allocations to call sites, including short-lived objects already collected by GC.
+- **GC-aware statistics** — bootstrap confidence intervals and baseline comparison that account for GC variance instead of hiding it.
+- **GC collection reports** — allocation rates, scavenge/full GC counts, promotion %, and pause times per iteration.
+
+Also:
+- **Zero-config CLI** — export a function, run `benchforge file.ts`.
+- **Multiple export formats** — HTML reports, Perfetto traces, Speedscope flame charts, JSON.
+- **Worker isolation** — node benchmarks run in child processes by default.
+- **Browser support** — benchmark in Chromium via [Playwright + CDP](README-browser.md).
 
 ## Installation
 
@@ -110,7 +123,9 @@ This eliminates manual caching boilerplate in worker modules.
 - `--html` - Generate HTML report, start server, and open in browser
 - `--export-html <file>` - Export HTML report to file
 - `--json <file>` - Export benchmark data to JSON
-- `--perfetto <file>` - Export Perfetto trace file
+- `--export-perfetto <file>` - Export Perfetto trace file
+- `--speedscope` - Open heap profile in speedscope viewer (via npx)
+- `--export-speedscope <file>` - Export heap profile as speedscope JSON
 
 ## CLI Usage
 
@@ -177,11 +192,11 @@ Export benchmark data as a Perfetto-compatible trace file for detailed analysis:
 
 ```bash
 # Export trace file
-benchforge my-bench.ts --perfetto trace.json
+benchforge my-bench.ts --export-perfetto trace.json
 
 # With V8 GC events (automatically merged after exit)
 node --expose-gc --trace-events-enabled --trace-event-categories=v8,v8.gc \
-  benchforge my-bench.ts --perfetto trace.json
+  benchforge my-bench.ts --export-perfetto trace.json
 ```
 
 View the trace at https://ui.perfetto.dev by dragging the JSON file.
@@ -191,6 +206,20 @@ The trace includes:
 - **Sample markers**: Each benchmark iteration with timing
 - **Pause markers**: V8 optimization pause points
 - **V8 GC events**: Automatically merged after process exit (when run with `--trace-events-enabled`)
+
+### Speedscope Export
+
+View heap allocation profiles as flame charts in speedscope:
+
+```bash
+# Open directly in speedscope (launches via npx)
+benchforge my-bench.ts --heap-sample --speedscope
+
+# Export to file
+benchforge my-bench.ts --heap-sample --export-speedscope profile.json
+```
+
+Each benchmark with a heap profile becomes a separate speedscope profile, with samples ordered temporally and weighted by allocation size in bytes.
 
 ### GC Statistics
 
@@ -233,6 +262,8 @@ benchforge my-bench.ts --heap-sample --heap-stack 5
 - `--heap-rows <n>` - Number of top allocation sites to show (default: 20)
 - `--heap-stack <n>` - Call stack depth to display (default: 3)
 - `--heap-verbose` - Show full file:// paths with line numbers (cmd-clickable)
+- `--heap-raw` - Dump every raw heap sample (ordinal, size, stack)
+- `--heap-user-only` - Filter to user code only (hide node internals)
 
 **Output (default compact):**
 ```
@@ -263,6 +294,7 @@ V8's sampling profiler uses Poisson-distributed sampling. When an allocation occ
 
 **Limitations:**
 - **Function-level attribution only**: V8 reports the function where allocation occurred, not the specific line. The line:column shown is where the function is *defined*.
+- **Inlining shifts attribution**: V8 may inline a function into its caller, causing allocations to be reported against the caller instead. If attribution looks wrong, disable inlining to isolate: `node --js-flags='--no-turbo-inlining --no-maglev-inlining' benchforge ...` (or `--jitless` to disable JIT entirely, though this changes performance characteristics).
 - **Statistical sampling**: Results vary between runs. More iterations = more stable results.
 - **~50% filtered**: Node.js internals account for roughly half of allocations. Use "Total (all)" to see the full picture.
 
