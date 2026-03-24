@@ -27,6 +27,7 @@ export interface HeapSite {
   bytes: number;
   stack?: CallFrame[]; // call stack from root to this frame
   samples?: HeapSample[]; // individual allocation samples at this site
+  callers?: { stack: CallFrame[]; bytes: number }[]; // distinct caller paths
 }
 
 /** Flatten profile tree into sorted list of allocation sites with call stacks.
@@ -103,7 +104,8 @@ export function filterSites(
   return sites.filter(isUser);
 }
 
-/** Aggregate sites by location (combine same file:line:col) */
+/** Aggregate sites by location (combine same file:line:col).
+ *  Tracks distinct caller stacks with byte weights when merging. */
 export function aggregateSites(sites: HeapSite[]): HeapSite[] {
   const byLocation = new Map<string, HeapSite>();
 
@@ -115,12 +117,44 @@ export function aggregateSites(sites: HeapSite[]): HeapSite[] {
     const existing = byLocation.get(key);
     if (existing) {
       existing.bytes += site.bytes;
+      addCaller(existing, site);
     } else {
-      byLocation.set(key, { ...site });
+      const entry = { ...site };
+      if (site.stack) {
+        entry.callers = [{ stack: site.stack, bytes: site.bytes }];
+      }
+      byLocation.set(key, entry);
+    }
+  }
+
+  // Sort callers by bytes descending, use top caller as primary stack
+  for (const site of byLocation.values()) {
+    if (site.callers && site.callers.length > 1) {
+      site.callers.sort((a, b) => b.bytes - a.bytes);
+      site.stack = site.callers[0].stack;
     }
   }
 
   return [...byLocation.values()].sort((a, b) => b.bytes - a.bytes);
+}
+
+/** Add a caller stack to an aggregated site, merging if the same path exists */
+function addCaller(existing: HeapSite, site: HeapSite): void {
+  if (!site.stack) return;
+  if (!existing.callers) {
+    existing.callers = [];
+  }
+  const stackKey = site.stack
+    .map(f => `${f.url}:${f.line}:${f.col}`)
+    .join("|");
+  const match = existing.callers.find(
+    c => c.stack.map(f => `${f.url}:${f.line}:${f.col}`).join("|") === stackKey,
+  );
+  if (match) {
+    match.bytes += site.bytes;
+  } else {
+    existing.callers.push({ stack: site.stack, bytes: site.bytes });
+  }
 }
 
 /** Format location, omitting column when unknown (-1) */
@@ -218,6 +252,16 @@ function formatVerboseSite(
       const callerLoc = fmtLoc(frame.url, frame.line, frame.col);
       lines.push(dimFn(`            <- ${frame.fn}  ${callerLoc}`));
     }
+  }
+
+  if (site.callers && site.callers.length > 1) {
+    const others = site.callers.slice(1);
+    const pcts = others.map(c => {
+      const pct = ((c.bytes / site.bytes) * 100).toFixed(0);
+      const name = c.stack[c.stack.length - 1]?.fn ?? "(unknown)";
+      return `${name} (${pct}%)`;
+    });
+    lines.push(dimFn(`            Also called from: ${pcts.join(", ")}`));
   }
 
   if (site.samples && site.samples.length > 0) {
