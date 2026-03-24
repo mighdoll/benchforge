@@ -38,7 +38,7 @@ export function flattenProfile(profile: HeapProfile): HeapSite[] {
   function walk(node: ProfileNode, stack: CallFrame[]): void {
     const { functionName, url, lineNumber, columnNumber } = node.callFrame;
     const fn = functionName || "(anonymous)";
-    const col = columnNumber ?? 0;
+    const col = columnNumber ?? -1;
     const frame: CallFrame = { fn, url: url || "", line: lineNumber + 1, col };
     const newStack = [...stack, frame];
 
@@ -108,7 +108,10 @@ export function aggregateSites(sites: HeapSite[]): HeapSite[] {
   const byLocation = new Map<string, HeapSite>();
 
   for (const site of sites) {
-    const key = `${site.url}:${site.line}:${site.col}`;
+    // When column is unknown (-1), include fn name to avoid merging distinct sites
+    const key = site.col >= 0
+      ? `${site.url}:${site.line}:${site.col}`
+      : `${site.url}:${site.line}:?:${site.fn}`;
     const existing = byLocation.get(key);
     if (existing) {
       existing.bytes += site.bytes;
@@ -118,6 +121,11 @@ export function aggregateSites(sites: HeapSite[]): HeapSite[] {
   }
 
   return [...byLocation.values()].sort((a, b) => b.bytes - a.bytes);
+}
+
+/** Format location, omitting column when unknown (-1) */
+function fmtLoc(url: string, line: number, col: number): string {
+  return col >= 0 ? `${url}:${line}:${col}` : `${url}:${line}`;
 }
 
 function fmtBytes(bytes: number): string {
@@ -198,7 +206,7 @@ function formatVerboseSite(
   isUser: UserCodeFilter,
 ): void {
   const bytes = fmtBytes(site.bytes).padStart(10);
-  const loc = site.url ? `${site.url}:${site.line}:${site.col}` : "(unknown)";
+  const loc = site.url ? fmtLoc(site.url, site.line, site.col) : "(unknown)";
   const dimFn = isUser(site) ? (s: string) => s : pc.dim;
 
   lines.push(dimFn(`${bytes}  ${site.fn}  ${loc}`));
@@ -207,7 +215,7 @@ function formatVerboseSite(
     const callers = site.stack.slice(0, -1).reverse().slice(0, stackDepth);
     for (const frame of callers) {
       if (!frame.url || !isUser(frame)) continue;
-      const callerLoc = `${frame.url}:${frame.line}:${frame.col}`;
+      const callerLoc = fmtLoc(frame.url, frame.line, frame.col);
       lines.push(dimFn(`            <- ${frame.fn}  ${callerLoc}`));
     }
   }
@@ -254,8 +262,8 @@ export function formatRawSamples(profile: HeapProfile): string {
     const fn = node?.callFrame.functionName || "(unknown)";
     const url = node?.callFrame.url || "";
     const line = node ? node.callFrame.lineNumber + 1 : 0;
-    const col = node?.callFrame.columnNumber ?? 0;
-    const loc = url ? `${url}:${line}:${col}` : "(unknown)";
+    const col = node?.callFrame.columnNumber ?? -1;
+    const loc = url ? fmtLoc(url, line, col) : "(unknown)";
     lines.push(`${s.ordinal}\t${s.size}\t${fn}\t${loc}`);
   }
   return lines.join("\n");
