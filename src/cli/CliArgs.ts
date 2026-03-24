@@ -41,6 +41,7 @@ const cliOptions = {
   "heap-rows":      { type: "number",  default: 20, describe: "top allocation sites to show" },
   "heap-stack":     { type: "number",  default: 3, describe: "call stack depth to display" },
   "heap-verbose":   { type: "boolean", default: false, describe: "verbose output with file:// paths and line numbers" },
+  "heap-raw":       { type: "boolean", default: false, describe: "dump every raw heap sample (ordinal, size, stack)" },
   "heap-user-only": { type: "boolean", default: false, describe: "filter to user code only (hide node internals)" },
   url:              { type: "string",  requiresArg: true, describe: "page URL for browser profiling (enables browser mode)" },
   headless:         { type: "boolean", default: true, describe: "run browser in headless mode" },

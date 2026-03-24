@@ -1,5 +1,5 @@
 import pc from "picocolors";
-import type { HeapProfile, ProfileNode } from "./HeapSampler.ts";
+import type { HeapProfile, HeapSample, ProfileNode } from "./HeapSampler.ts";
 
 /** Sum selfSize across all nodes in profile (before any filtering) */
 export function totalProfileBytes(profile: HeapProfile): number {
@@ -26,11 +26,14 @@ export interface HeapSite {
   col: number;
   bytes: number;
   stack?: CallFrame[]; // call stack from root to this frame
+  samples?: HeapSample[]; // individual allocation samples at this site
 }
 
-/** Flatten profile tree into sorted list of allocation sites with call stacks */
+/** Flatten profile tree into sorted list of allocation sites with call stacks.
+ *  When raw samples are available, attaches them to corresponding sites. */
 export function flattenProfile(profile: HeapProfile): HeapSite[] {
   const sites: HeapSite[] = [];
+  const nodeIdToSites = new Map<number, HeapSite[]>();
 
   function walk(node: ProfileNode, stack: CallFrame[]): void {
     const { functionName, url, lineNumber, columnNumber } = node.callFrame;
@@ -40,16 +43,35 @@ export function flattenProfile(profile: HeapProfile): HeapSite[] {
     const newStack = [...stack, frame];
 
     if (node.selfSize > 0) {
-      sites.push({
+      const site: HeapSite = {
         ...frame,
         bytes: node.selfSize,
         stack: newStack,
-      });
+      };
+      sites.push(site);
+      // Map node id to site for sample attachment
+      const existing = nodeIdToSites.get(node.id);
+      if (existing) existing.push(site);
+      else nodeIdToSites.set(node.id, [site]);
     }
     for (const child of node.children || []) walk(child, newStack);
   }
 
   walk(profile.head, []);
+
+  // Attach raw samples to their corresponding sites
+  if (profile.samples) {
+    for (const sample of profile.samples) {
+      const matchingSites = nodeIdToSites.get(sample.nodeId);
+      if (matchingSites) {
+        for (const site of matchingSites) {
+          if (!site.samples) site.samples = [];
+          site.samples.push(sample);
+        }
+      }
+    }
+  }
+
   return sites.sort((a, b) => b.bytes - a.bytes);
 }
 
@@ -108,6 +130,7 @@ export interface HeapReportOptions {
   topN: number;
   stackDepth?: number;
   verbose?: boolean;
+  raw?: boolean; // dump every raw sample
   userOnly?: boolean; // filter to user code only (hide node internals)
   isUserCode?: UserCodeFilter; // predicate for user vs internal code
   totalAll?: number; // total across all nodes (before filtering)
@@ -188,9 +211,52 @@ function formatVerboseSite(
       lines.push(dimFn(`            <- ${frame.fn}  ${callerLoc}`));
     }
   }
+
+  if (site.samples && site.samples.length > 0) {
+    lines.push(dimFn(`            ${formatSampleSummary(site.samples)}`));
+  }
+}
+
+/** Summarize raw samples for a site: count, largest, median */
+function formatSampleSummary(samples: HeapSample[]): string {
+  const n = samples.length;
+  if (n === 1) return `Samples: 1x ${fmtBytes(samples[0].size)}`;
+  const sorted = samples.map(s => s.size).sort((a, b) => a - b);
+  const median = sorted[Math.floor(n / 2)];
+  const largest = sorted[n - 1];
+  return `Samples: ${n}x, largest ${fmtBytes(largest)}, median ${fmtBytes(median)}`;
 }
 
 /** Get total bytes from sites */
 export function totalBytes(sites: HeapSite[]): number {
   return sites.reduce((sum, s) => sum + s.bytes, 0);
+}
+
+/** Format every raw sample as one line, ordered by ordinal (time).
+ *  Output is tab-separated for easy piping/grep/diff. */
+export function formatRawSamples(profile: HeapProfile): string {
+  if (!profile.samples || profile.samples.length === 0) {
+    return "No raw samples available.";
+  }
+
+  // Build id → node lookup from tree
+  const nodeMap = new Map<number, ProfileNode>();
+  function walk(node: ProfileNode): void {
+    nodeMap.set(node.id, node);
+    for (const child of node.children || []) walk(child);
+  }
+  walk(profile.head);
+
+  const sorted = [...profile.samples].sort((a, b) => a.ordinal - b.ordinal);
+  const lines: string[] = ["ordinal\tsize\tfunction\tlocation"];
+  for (const s of sorted) {
+    const node = nodeMap.get(s.nodeId);
+    const fn = node?.callFrame.functionName || "(unknown)";
+    const url = node?.callFrame.url || "";
+    const line = node ? node.callFrame.lineNumber + 1 : 0;
+    const col = node?.callFrame.columnNumber ?? 0;
+    const loc = url ? `${url}:${line}:${col}` : "(unknown)";
+    lines.push(`${s.ordinal}\t${s.size}\t${fn}\t${loc}`);
+  }
+  return lines.join("\n");
 }

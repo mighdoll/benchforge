@@ -15,12 +15,20 @@ export interface ProfileNode {
     columnNumber?: number;
   };
   selfSize: number;
+  id: number; // unique node ID, links to HeapSample.nodeId
   children?: ProfileNode[];
+}
+
+/** Individual heap allocation sample from V8's SamplingHeapProfiler */
+export interface HeapSample {
+  nodeId: number; // links to ProfileNode.id for stack lookup
+  size: number; // allocation size in bytes
+  ordinal: number; // monotonically increasing, gives temporal ordering
 }
 
 export interface HeapProfile {
   head: ProfileNode;
-  samples?: number[]; // sample IDs (length = number of samples taken)
+  samples?: HeapSample[];
 }
 
 const defaultOptions: Required<HeapSampleOptions> = {
@@ -74,5 +82,6 @@ async function startSampling(
 
 async function stopSampling(session: Session): Promise<HeapProfile> {
   const { profile } = await session.post("HeapProfiler.stopSampling");
-  return profile as HeapProfile;
+  // V8 returns id/samples fields not in @types/node's incomplete SamplingHeapProfile
+  return profile as unknown as HeapProfile;
 }

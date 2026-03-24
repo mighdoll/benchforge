@@ -25,6 +25,7 @@ import {
   filterSites,
   flattenProfile,
   formatHeapReport,
+  formatRawSamples,
   type HeapReportOptions,
   isBrowserUserCode,
   totalProfileBytes,
@@ -522,6 +523,10 @@ export function printHeapReports(
         sampleCount: heapProfile.samples?.length,
       };
       console.log(formatHeapReport(aggregated, { ...options, ...extra }));
+      if (options.raw) {
+        console.log(dim(`\n─── Raw samples: ${report.name} ───`));
+        console.log(formatRawSamples(heapProfile));
+      }
     }
   }
 }
@@ -816,6 +821,7 @@ function cliHeapReportOptions(args: DefaultCliArgs): HeapReportOptions {
     topN: args["heap-rows"],
     stackDepth: args["heap-stack"],
     verbose: args["heap-verbose"],
+    raw: args["heap-raw"],
     userOnly: args["heap-user-only"],
   };
 }
