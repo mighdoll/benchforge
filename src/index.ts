@@ -44,6 +44,10 @@ export {
 } from "./cli/RunBenchCLI.ts";
 export * from "./export/JsonFormat.ts";
 export { exportPerfettoTrace } from "./export/PerfettoExport.ts";
+export {
+  exportSpeedscope,
+  heapProfileToSpeedscope,
+} from "./export/SpeedscopeExport.ts";
 export type { GitVersion } from "./GitUtils.ts";
 export {
   formatDateWithTimezone,

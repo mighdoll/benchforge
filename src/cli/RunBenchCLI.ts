@@ -18,6 +18,7 @@ import { reportResults } from "../BenchmarkReport.ts";
 import type { BrowserProfileResult } from "../browser/BrowserHeapSampler.ts";
 import { exportBenchmarkJson } from "../export/JsonExport.ts";
 import { exportPerfettoTrace } from "../export/PerfettoExport.ts";
+import { exportSpeedscope } from "../export/SpeedscopeExport.ts";
 import type { GitVersion } from "../GitUtils.ts";
 import { prepareHtmlData } from "../HtmlDataPrep.ts";
 import {
@@ -729,6 +730,10 @@ export async function exportReports(options: ExportOptions): Promise<void> {
 
   if (args.perfetto) {
     exportPerfettoTrace(results, args.perfetto, args);
+  }
+
+  if (args.speedscope) {
+    exportSpeedscope(results, args.speedscope);
   }
 
   // Keep process running when HTML report is opened in browser

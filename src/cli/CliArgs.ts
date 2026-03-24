@@ -28,6 +28,7 @@ const cliOptions = {
   "export-html":  { type: "string",  requiresArg: true, describe: "export HTML report to specified file" },
   json:           { type: "string",  requiresArg: true, describe: "export benchmark data to JSON file" },
   perfetto:       { type: "string",  requiresArg: true, describe: "export Perfetto trace file (view at ui.perfetto.dev)" },
+  speedscope:     { type: "string",  requiresArg: true, describe: "export heap profile as speedscope JSON (view at speedscope.app)" },
   "trace-opt":    { type: "boolean", default: false, describe: "trace V8 optimization tiers (requires --allow-natives-syntax)" },
   "skip-settle":  { type: "boolean", default: false, describe: "skip post-warmup settle time (see V8 optimization cold start)" },
   "pause-first":  { type: "number",  describe: "iterations before first pause (then pause-interval applies)" },
