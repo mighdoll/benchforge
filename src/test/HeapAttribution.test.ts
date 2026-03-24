@@ -150,6 +150,37 @@ test("aggregation preserves distinct caller stacks", () => {
   expect(aggregated[0].callers![1].bytes).toBe(200);
 });
 
+test("named function attribution is consistent across runs", async () => {
+  // With interval=1 + includeCollected flags, V8's profiler is deterministic
+  // under --jitless (verified in Node + browser, see heap-jitless-fixture.mjs).
+  // With JIT, optimization can change site count between runs, but named
+  // target functions should still get attributed bytes consistently.
+  const regexByRun: number[] = [];
+  const concatByRun: number[] = [];
+
+  for (let run = 0; run < 3; run++) {
+    const { profile } = await withHeapSampling({ samplingInterval: 1 }, () => {
+      allocateViaRegex();
+      allocateViaConcat();
+    });
+    const sites = flattenProfile(profile);
+    const userSites = filterSites(sites, isNodeUserCode);
+    const agg = aggregateSites(userSites);
+
+    const regex = agg.find(s => s.fn === "allocateViaRegex");
+    const concat = agg.find(s => s.fn === "allocateViaConcat");
+    regexByRun.push(regex?.bytes ?? 0);
+    concatByRun.push(concat?.bytes ?? 0);
+  }
+
+  // Both should be attributed in every run
+  for (const b of regexByRun) expect(b).toBeGreaterThan(0);
+  for (const b of concatByRun) expect(b).toBeGreaterThan(0);
+  // And reasonably stable (CV < 1.0 — JIT adds variance vs --jitless)
+  expect(cv(regexByRun)).toBeLessThan(1.0);
+  expect(cv(concatByRun)).toBeLessThan(1.0);
+}, 30_000);
+
 // --- Helpers ---
 
 function cv(arr: number[]): number {
