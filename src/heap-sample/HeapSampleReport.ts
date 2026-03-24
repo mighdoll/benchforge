@@ -258,8 +258,13 @@ function formatVerboseSite(
     const others = site.callers.slice(1);
     const pcts = others.map(c => {
       const pct = ((c.bytes / site.bytes) * 100).toFixed(0);
-      const name = c.stack[c.stack.length - 1]?.fn ?? "(unknown)";
-      return `${name} (${pct}%)`;
+      // Show the caller frame (second-to-last), not the leaf (which is the site itself)
+      const callerFrame = c.stack.length >= 2
+        ? c.stack[c.stack.length - 2]
+        : c.stack[c.stack.length - 1];
+      const name = callerFrame?.fn ?? "(unknown)";
+      const loc = callerFrame?.url ? fmtLoc(callerFrame.url, callerFrame.line, callerFrame.col) : "";
+      return loc ? `${name} ${loc} (${pct}%)` : `${name} (${pct}%)`;
     });
     lines.push(dimFn(`            Also called from: ${pcts.join(", ")}`));
   }
