@@ -26,6 +26,7 @@ export interface HeapSample {
   ordinal: number; // monotonically increasing, gives temporal ordering
 }
 
+/** V8 sampling heap profile tree with optional per-allocation samples */
 export interface HeapProfile {
   head: ProfileNode;
   samples?: HeapSample[];
