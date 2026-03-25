@@ -39,7 +39,10 @@ export function flattenProfile(profile: HeapProfile): HeapSite[] {
 
   function walk(node: ProfileNode, stack: CallFrame[]): void {
     const { functionName, url, lineNumber, columnNumber } = node.callFrame;
-    const fn = functionName || "(anonymous)";
+    const fn =
+      (!url && functionName && qualifyBuiltin(functionName)) ||
+      functionName ||
+      "(anonymous)";
     const col = columnNumber ?? -1;
     const frame: CallFrame = { fn, url: url || "", line: lineNumber + 1, col };
     const newStack = [...stack, frame];
@@ -306,12 +309,40 @@ export function formatRawSamples(profile: HeapProfile): string {
   const lines: string[] = ["ordinal\tsize\tfunction\tlocation"];
   for (const s of sorted) {
     const node = nodeMap.get(s.nodeId);
-    const fn = node?.callFrame.functionName || "(unknown)";
     const url = node?.callFrame.url || "";
+    const rawName = node?.callFrame.functionName || "";
+    const fn =
+      (!url && rawName && qualifyBuiltin(rawName)) || rawName || "(unknown)";
     const line = node ? node.callFrame.lineNumber + 1 : 0;
     const col = node?.callFrame.columnNumber ?? -1;
     const loc = url ? fmtLoc(url, line, col) : "(unknown)";
     lines.push(`${s.ordinal}\t${s.size}\t${fn}\t${loc}`);
   }
   return lines.join("\n");
+}
+
+// biome-ignore format: compact lookup table
+const builtinOwner: Record<string, string> = {
+  // String
+  replace: "String", replaceAll: "String", repeat: "String", split: "String",
+  substring: "String", substr: "String", trim: "String", trimStart: "String",
+  trimEnd: "String", padStart: "String", padEnd: "String",
+  toLowerCase: "String", toUpperCase: "String",
+  match: "String", matchAll: "String", normalize: "String",
+
+  // Array
+  push: "Array", pop: "Array", shift: "Array", unshift: "Array",
+  join: "Array", map: "Array", filter: "Array", reduce: "Array",
+  reduceRight: "Array", find: "Array", findIndex: "Array",
+  some: "Array", every: "Array", flat: "Array", flatMap: "Array",
+  sort: "Array", reverse: "Array", splice: "Array", fill: "Array",
+
+  // JSON
+  stringify: "JSON",
+};
+
+/** Qualify bare V8 builtin names (e.g. "replace" → "String.replace") */
+function qualifyBuiltin(name: string): string | undefined {
+  const owner = builtinOwner[name];
+  return owner ? `${owner}.${name}` : undefined;
 }
