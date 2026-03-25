@@ -136,16 +136,19 @@ export function aggregateSites(sites: HeapSite[]): HeapSite[] {
   return [...byLocation.values()].sort((a, b) => b.bytes - a.bytes);
 }
 
+/** Serialize a call stack for dedup comparison */
+function callerKey(stack: CallFrame[]): string {
+  return stack.map(f => `${f.url}:${f.line}:${f.col}`).join("|");
+}
+
 /** Add a caller stack to an aggregated site, merging if the same path exists */
 function addCaller(existing: HeapSite, site: HeapSite): void {
   if (!site.stack) return;
   if (!existing.callers) {
     existing.callers = [];
   }
-  const stackKey = site.stack.map(f => `${f.url}:${f.line}:${f.col}`).join("|");
-  const match = existing.callers.find(
-    c => c.stack.map(f => `${f.url}:${f.line}:${f.col}`).join("|") === stackKey,
-  );
+  const key = callerKey(site.stack);
+  const match = existing.callers.find(c => callerKey(c.stack) === key);
   if (match) {
     match.bytes += site.bytes;
   } else {
