@@ -74,23 +74,6 @@ export function diffPercentBenchmark(main: unknown, base: unknown): string {
   return coloredPercent(diff, base, false); // negative is good for benchmarks
 }
 
-/** Format fraction as colored +/- percentage */
-function coloredPercent(
-  numerator: number,
-  denominator: number,
-  positiveIsGreen = true,
-): string {
-  const fraction = numerator / denominator;
-  if (Number.isNaN(fraction) || !Number.isFinite(fraction)) {
-    return " ";
-  }
-  const positive = fraction >= 0;
-  const sign = positive ? "+" : "-";
-  const percentStr = `${sign}${percent(fraction)}`;
-  const isGood = positive === positiveIsGreen;
-  return isGood ? green(percentStr) : red(percentStr);
-}
-
 /** Format memory size in KB with appropriate units */
 export function memoryKB(kb: unknown): string | null {
   if (typeof kb !== "number") return null;
@@ -128,9 +111,31 @@ export function formatDiffWithCIHigherIsBetter(value: unknown): string | null {
   return colorByDirection(diffCIText(-percent, [-ci[1], -ci[0]]), direction);
 }
 
-/** @return formatted "pct [lo, hi]" text for a diff with CI */
-function diffCIText(pct: number, ci: [number, number]): string {
-  return `${formatBound(pct)} [${formatBound(ci[0])}, ${formatBound(ci[1])}]`;
+/** @return truncated string with ellipsis if over maxLen */
+export function truncate(str: string, maxLen = 30): string {
+  return str.length > maxLen ? str.slice(0, maxLen - 3) + "..." : str;
+}
+
+/** Format fraction as colored +/- percentage */
+function coloredPercent(
+  numerator: number,
+  denominator: number,
+  positiveIsGreen = true,
+): string {
+  const fraction = numerator / denominator;
+  if (Number.isNaN(fraction) || !Number.isFinite(fraction)) {
+    return " ";
+  }
+  const positive = fraction >= 0;
+  const sign = positive ? "+" : "-";
+  const percentStr = `${sign}${percent(fraction)}`;
+  const isGood = positive === positiveIsGreen;
+  return isGood ? green(percentStr) : red(percentStr);
+}
+
+/** @return true if value is a DifferenceCI object */
+function isDifferenceCI(x: unknown): x is DifferenceCI {
+  return typeof x === "object" && x !== null && "ci" in x && "direction" in x;
 }
 
 /** @return text colored green for faster, red for slower */
@@ -140,18 +145,13 @@ function colorByDirection(text: string, direction: CIDirection): string {
   return text;
 }
 
+/** @return formatted "pct [lo, hi]" text for a diff with CI */
+function diffCIText(pct: number, ci: [number, number]): string {
+  return `${formatBound(pct)} [${formatBound(ci[0])}, ${formatBound(ci[1])}]`;
+}
+
 /** @return signed percentage string (e.g. "+1.2%", "-3.4%") */
 function formatBound(v: number): string {
   const sign = v >= 0 ? "+" : "";
   return `${sign}${v.toFixed(1)}%`;
-}
-
-/** @return true if value is a DifferenceCI object */
-function isDifferenceCI(x: unknown): x is DifferenceCI {
-  return typeof x === "object" && x !== null && "ci" in x && "direction" in x;
-}
-
-/** @return truncated string with ellipsis if over maxLen */
-export function truncate(str: string, maxLen = 30): string {
-  return str.length > maxLen ? str.slice(0, maxLen - 3) + "..." : str;
 }

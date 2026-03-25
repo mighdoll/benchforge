@@ -20,21 +20,11 @@ export interface PrepareHtmlOptions {
   baselineVersion?: GitVersion;
 }
 
-/** Find higherIsBetter from first comparable column in sections */
-function findHigherIsBetter(sections?: ResultsMapper[]): boolean {
-  const cols = sections?.flatMap(s => s.columns().flatMap(g => g.columns));
-  return cols?.find(c => c.comparable)?.higherIsBetter ?? false;
-}
-
-/** Flip CI percent for metrics where higher is better (e.g., lines/sec) */
-function flipCI(ci: DifferenceCI): DifferenceCI {
-  return {
-    percent: -ci.percent,
-    ci: [-ci.ci[1], -ci.ci[0]],
-    direction: ci.direction,
-    histogram: ci.histogram?.map(bin => ({ x: -bin.x, count: bin.count })),
-  };
-}
+type ColumnLike = {
+  key: string;
+  title: string;
+  formatter?: (v: unknown) => string | null;
+};
 
 /** Prepare ReportData from benchmark results for HTML rendering */
 export function prepareHtmlData(
@@ -56,6 +46,12 @@ export function prepareHtmlData(
       baselineVersion,
     },
   };
+}
+
+/** Find higherIsBetter from first comparable column in sections */
+function findHigherIsBetter(sections?: ResultsMapper[]): boolean {
+  const cols = sections?.flatMap(s => s.columns().flatMap(g => g.columns));
+  return cols?.find(c => c.comparable)?.higherIsBetter ?? false;
 }
 
 /** @return group data with bootstrap CI comparisons against baseline */
@@ -107,6 +103,16 @@ function prepareBenchmarkData(
   };
 }
 
+/** Flip CI percent for metrics where higher is better (e.g., lines/sec) */
+function flipCI(ci: DifferenceCI): DifferenceCI {
+  return {
+    percent: -ci.percent,
+    ci: [-ci.ci[1], -ci.ci[0]],
+    direction: ci.direction,
+    histogram: ci.histogram?.map(bin => ({ x: -bin.x, count: bin.count })),
+  };
+}
+
 /** @return formatted stats from all sections for tooltip display */
 function extractSectionStats(
   report: { measuredResults: any; metadata?: Record<string, unknown> },
@@ -127,12 +133,6 @@ function formatGroupStats(
     .map(c => formatColumnStat(values, c, group.groupTitle))
     .filter((s): s is FormattedStat => s !== undefined);
 }
-
-type ColumnLike = {
-  key: string;
-  title: string;
-  formatter?: (v: unknown) => string | null;
-};
 
 /** @return formatted stat for a single column, or undefined if empty/placeholder */
 function formatColumnStat(

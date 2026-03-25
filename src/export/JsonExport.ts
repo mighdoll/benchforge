@@ -47,6 +47,16 @@ function prepareJsonData(
   };
 }
 
+/** Clean CLI args for JSON export (remove undefined values) */
+function cleanCliArgs(args: DefaultCliArgs): Record<string, any> {
+  const toCamel = (k: string) =>
+    k.replace(/-([a-z])/g, (_, l) => l.toUpperCase());
+  const entries = Object.entries(args)
+    .filter(([, v]) => v !== undefined && v !== null)
+    .map(([k, v]) => [toCamel(k), v]);
+  return Object.fromEntries(entries);
+}
+
 /** Convert a report group, mapping each report to the JSON result format */
 function convertGroup(group: ReportGroup): BenchmarkGroup {
   return {
@@ -90,14 +100,4 @@ function convertReport(report: any): BenchmarkResult {
       warmupRuns: undefined, // Not available in current data structure
     },
   };
-}
-
-/** Clean CLI args for JSON export (remove undefined values) */
-function cleanCliArgs(args: DefaultCliArgs): Record<string, any> {
-  const toCamel = (k: string) =>
-    k.replace(/-([a-z])/g, (_, l) => l.toUpperCase());
-  const entries = Object.entries(args)
-    .filter(([, v]) => v !== undefined && v !== null)
-    .map(([k, v]) => [toCamel(k), v]);
-  return Object.fromEntries(entries);
 }

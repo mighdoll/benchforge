@@ -55,15 +55,6 @@ function getGroupColumnIndex(
   );
 }
 
-/** Count total columns in groups before the target group index. */
-function countColumnsBeforeGroup(
-  headers: string[],
-  groupIndex: number,
-): number {
-  const perGroup = headers.map(col => splitColumns(col).length);
-  return perGroup.slice(0, groupIndex).reduce((sum, n) => sum + n, 0);
-}
-
 /** Find a column's position index in a header line. */
 function getColumnIndex(
   header: string | undefined,
@@ -89,6 +80,15 @@ function parseCell(row: string, index: number): number | undefined {
 /** split column groups along '│' borders */
 function splitColumnGroups(line: string): string[] {
   return line.split("│").map(col => col.trim());
+}
+
+/** Count total columns in groups before the target group index. */
+function countColumnsBeforeGroup(
+  headers: string[],
+  groupIndex: number,
+): number {
+  const perGroup = headers.map(col => splitColumns(col).length);
+  return perGroup.slice(0, groupIndex).reduce((sum, n) => sum + n, 0);
 }
 
 /** Split on 2+ whitespace or '│' borders, so single-space titles like "L1 miss" survive. */

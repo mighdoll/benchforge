@@ -8,28 +8,15 @@ import type {
 import type { BenchRunner, RunnerOptions } from "./BenchRunner.ts";
 import { executeBenchmark } from "./BenchRunner.ts";
 
-/**
- * Wait time after gc() for V8 to stabilize (ms).
- *
- * V8 has 4 compilation tiers: Ignition (interpreter) -> Sparkplug (baseline) ->
- * Maglev (mid-tier optimizer) -> TurboFan (full optimizer). Tiering thresholds:
- *   - Ignition -> Sparkplug: 8 invocations
- *   - Sparkplug -> Maglev: 500 invocations
- *   - Maglev -> TurboFan: 6000 invocations
- *
- * Optimization compilation happens on background threads and requires idle time
- * on the main thread to complete. Without sufficient warmup + settle time,
- * benchmarks exhibit bimodal timing: slow Sparkplug samples (~30% slower) mixed
- * with fast optimized samples.
- *
- * The warmup iterations trigger the optimization decision, then gcSettleTime
- * provides idle time for background compilation to finish before measurement.
- *
- * @see https://v8.dev/blog/sparkplug
- * @see https://v8.dev/blog/maglev
- * @see https://v8.dev/blog/background-compilation
- */
-const gcSettleTime = 1000;
+export type SampleTimeStats = {
+  min: number;
+  max: number;
+  avg: number;
+  p50: number;
+  p75: number;
+  p99: number;
+  p999: number;
+};
 
 type CollectParams<T = unknown> = {
   benchmark: BenchmarkSpec<T>;
@@ -56,14 +43,68 @@ type CollectResult = {
   pausePoints: PausePoint[]; // where pauses occurred
 };
 
-export type SampleTimeStats = {
-  min: number;
-  max: number;
-  avg: number;
-  p50: number;
-  p75: number;
-  p99: number;
-  p999: number;
+type SampleLoopResult = {
+  samples: number[];
+  heapSamples?: number[];
+  timestamps?: number[];
+  optStatuses: number[];
+  pausePoints: PausePoint[];
+};
+
+type SampleArrays = {
+  samples: number[];
+  timestamps: number[];
+  heapSamples: number[];
+  optStatuses: number[];
+  pausePoints: PausePoint[];
+};
+
+/**
+ * Wait time after gc() for V8 to stabilize (ms).
+ *
+ * V8 has 4 compilation tiers: Ignition (interpreter) -> Sparkplug (baseline) ->
+ * Maglev (mid-tier optimizer) -> TurboFan (full optimizer). Tiering thresholds:
+ *   - Ignition -> Sparkplug: 8 invocations
+ *   - Sparkplug -> Maglev: 500 invocations
+ *   - Maglev -> TurboFan: 6000 invocations
+ *
+ * Optimization compilation happens on background threads and requires idle time
+ * on the main thread to complete. Without sufficient warmup + settle time,
+ * benchmarks exhibit bimodal timing: slow Sparkplug samples (~30% slower) mixed
+ * with fast optimized samples.
+ *
+ * The warmup iterations trigger the optimization decision, then gcSettleTime
+ * provides idle time for background compilation to finish before measurement.
+ *
+ * @see https://v8.dev/blog/sparkplug
+ * @see https://v8.dev/blog/maglev
+ * @see https://v8.dev/blog/background-compilation
+ */
+const gcSettleTime = 1000;
+
+const defaultCollectOptions = {
+  maxTime: 5000,
+  maxIterations: 1000000,
+  warmup: 0,
+  traceOpt: false,
+  noSettle: false,
+};
+
+/**
+ * V8 optimization status bit meanings:
+ *   Bit 0 (1): is_function
+ *   Bit 4 (16): is_optimized (TurboFan)
+ *   Bit 5 (32): is_optimized (Maglev)
+ *   Bit 7 (128): is_baseline (Sparkplug)
+ *   Bit 3 (8): maybe_deoptimized
+ */
+const statusNames: Record<number, string> = {
+  1: "interpreted",
+  129: "sparkplug", // 1 + 128
+  17: "turbofan", // 1 + 16
+  33: "maglev", // 1 + 32
+  49: "turbofan+maglev", // 1 + 16 + 32
+  32769: "optimized", // common optimized status
 };
 
 /** @return runner with time and iteration limits */
@@ -79,27 +120,18 @@ export class BasicRunner implements BenchRunner {
   }
 }
 
-const defaultCollectOptions = {
-  maxTime: 5000,
-  maxIterations: 1000000,
-  warmup: 0,
-  traceOpt: false,
-  noSettle: false,
-};
-
-function buildMeasuredResults(name: string, c: CollectResult): MeasuredResults {
-  const time = computeStats(c.samples);
+/** @return percentiles and basic statistics */
+export function computeStats(samples: number[]): SampleTimeStats {
+  const sorted = [...samples].sort((a, b) => a - b);
+  const avg = samples.reduce((sum, s) => sum + s, 0) / samples.length;
   return {
-    name,
-    samples: c.samples,
-    warmupSamples: c.warmupSamples,
-    heapSamples: c.heapSamples,
-    timestamps: c.timestamps,
-    time,
-    heapSize: { avg: c.heapGrowth, min: c.heapGrowth, max: c.heapGrowth },
-    optStatus: c.optStatus,
-    optSamples: c.optSamples,
-    pausePoints: c.pausePoints,
+    min: sorted[0],
+    max: sorted[sorted.length - 1],
+    avg,
+    p50: percentile(sorted, 0.5),
+    p75: percentile(sorted, 0.75),
+    p99: percentile(sorted, 0.99),
+    p999: percentile(sorted, 0.999),
   };
 }
 
@@ -136,6 +168,34 @@ async function collectSamples<T>(p: CollectParams<T>): Promise<CollectResult> {
   };
 }
 
+function buildMeasuredResults(name: string, c: CollectResult): MeasuredResults {
+  const time = computeStats(c.samples);
+  return {
+    name,
+    samples: c.samples,
+    warmupSamples: c.warmupSamples,
+    heapSamples: c.heapSamples,
+    timestamps: c.timestamps,
+    time,
+    heapSize: { avg: c.heapGrowth, min: c.heapGrowth, max: c.heapGrowth },
+    optStatus: c.optStatus,
+    optSamples: c.optSamples,
+    pausePoints: c.pausePoints,
+  };
+}
+
+/** @return percentile value with linear interpolation */
+function percentile(sortedArray: number[], p: number): number {
+  const index = (sortedArray.length - 1) * p;
+  const lower = Math.floor(index);
+  const upper = Math.ceil(index);
+  const weight = index % 1;
+
+  if (upper >= sortedArray.length) return sortedArray[sortedArray.length - 1];
+
+  return sortedArray[lower] * (1 - weight) + sortedArray[upper] * weight;
+}
+
 /** Run warmup iterations with gc + settle time for V8 optimization */
 async function runWarmup<T>(p: CollectParams<T>): Promise<number[]> {
   const gc = gcFunction();
@@ -151,55 +211,6 @@ async function runWarmup<T>(p: CollectParams<T>): Promise<number[]> {
     gc();
   }
   return samples;
-}
-
-type SampleLoopResult = {
-  samples: number[];
-  heapSamples?: number[];
-  timestamps?: number[];
-  optStatuses: number[];
-  pausePoints: PausePoint[];
-};
-
-/** Estimate sample count for pre-allocation */
-function estimateSampleCount(maxTime: number, maxIterations: number): number {
-  return maxIterations || Math.ceil(maxTime / 0.1); // assume 0.1ms per iteration minimum
-}
-
-type SampleArrays = {
-  samples: number[];
-  timestamps: number[];
-  heapSamples: number[];
-  optStatuses: number[];
-  pausePoints: PausePoint[];
-};
-
-/** Pre-allocate arrays to reduce GC pressure during measurement */
-function createSampleArrays(
-  n: number,
-  trackHeap: boolean,
-  trackOpt: boolean,
-): SampleArrays {
-  const arr = (track: boolean) => (track ? new Array<number>(n) : []);
-  return {
-    samples: new Array<number>(n),
-    timestamps: new Array<number>(n),
-    heapSamples: arr(trackHeap),
-    optStatuses: arr(trackOpt),
-    pausePoints: [],
-  };
-}
-
-/** Trim arrays to actual sample count */
-function trimArrays(
-  a: SampleArrays,
-  count: number,
-  trackHeap: boolean,
-  trackOpt: boolean,
-): void {
-  a.samples.length = a.timestamps.length = count;
-  if (trackHeap) a.heapSamples.length = count;
-  if (trackOpt) a.optStatuses.length = count;
 }
 
 /** Collect timing samples with periodic pauses for V8 optimization */
@@ -255,82 +266,6 @@ async function runSampleLoop<T>(
   };
 }
 
-/** Check if we should pause at this iteration for V8 optimization */
-function shouldPause(
-  iter: number,
-  first: number | undefined,
-  interval: number,
-): boolean {
-  if (first !== undefined && iter === first) return true;
-  if (interval <= 0) return false;
-  if (first === undefined) return iter % interval === 0;
-  return (iter - first) % interval === 0;
-}
-
-/** @return percentiles and basic statistics */
-export function computeStats(samples: number[]): SampleTimeStats {
-  const sorted = [...samples].sort((a, b) => a - b);
-  const avg = samples.reduce((sum, s) => sum + s, 0) / samples.length;
-  return {
-    min: sorted[0],
-    max: sorted[sorted.length - 1],
-    avg,
-    p50: percentile(sorted, 0.5),
-    p75: percentile(sorted, 0.75),
-    p99: percentile(sorted, 0.99),
-    p999: percentile(sorted, 0.999),
-  };
-}
-
-/** @return percentile value with linear interpolation */
-function percentile(sortedArray: number[], p: number): number {
-  const index = (sortedArray.length - 1) * p;
-  const lower = Math.floor(index);
-  const upper = Math.ceil(index);
-  const weight = index % 1;
-
-  if (upper >= sortedArray.length) return sortedArray[sortedArray.length - 1];
-
-  return sortedArray[lower] * (1 - weight) + sortedArray[upper] * weight;
-}
-
-/** @return runtime gc() function, or no-op if unavailable */
-function gcFunction(): () => void {
-  const gc = globalThis.gc || (globalThis as any).__gc;
-  if (gc) return gc;
-  console.warn("gc() not available, run node/bun with --expose-gc");
-  return () => {};
-}
-
-/** @return function to get V8 optimization status (requires --allow-natives-syntax) */
-function createOptStatusGetter(): ((fn: unknown) => number) | undefined {
-  try {
-    // %GetOptimizationStatus returns a bitmask
-    const getter = new Function("f", "return %GetOptimizationStatus(f)");
-    getter(() => {});
-    return getter as (fn: unknown) => number;
-  } catch {
-    return undefined;
-  }
-}
-
-/**
- * V8 optimization status bit meanings:
- *   Bit 0 (1): is_function
- *   Bit 4 (16): is_optimized (TurboFan)
- *   Bit 5 (32): is_optimized (Maglev)
- *   Bit 7 (128): is_baseline (Sparkplug)
- *   Bit 3 (8): maybe_deoptimized
- */
-const statusNames: Record<number, string> = {
-  1: "interpreted",
-  129: "sparkplug", // 1 + 128
-  17: "turbofan", // 1 + 16
-  33: "maglev", // 1 + 32
-  49: "turbofan+maglev", // 1 + 16 + 32
-  32769: "optimized", // common optimized status
-};
-
 /** @return analysis of V8 optimization status per sample */
 function analyzeOptStatus(
   samples: number[],
@@ -361,4 +296,69 @@ function analyzeOptStatus(
   }
 
   return { byTier, deoptCount };
+}
+
+/** @return runtime gc() function, or no-op if unavailable */
+function gcFunction(): () => void {
+  const gc = globalThis.gc || (globalThis as any).__gc;
+  if (gc) return gc;
+  console.warn("gc() not available, run node/bun with --expose-gc");
+  return () => {};
+}
+
+/** @return function to get V8 optimization status (requires --allow-natives-syntax) */
+function createOptStatusGetter(): ((fn: unknown) => number) | undefined {
+  try {
+    // %GetOptimizationStatus returns a bitmask
+    const getter = new Function("f", "return %GetOptimizationStatus(f)");
+    getter(() => {});
+    return getter as (fn: unknown) => number;
+  } catch {
+    return undefined;
+  }
+}
+
+/** Estimate sample count for pre-allocation */
+function estimateSampleCount(maxTime: number, maxIterations: number): number {
+  return maxIterations || Math.ceil(maxTime / 0.1); // assume 0.1ms per iteration minimum
+}
+
+/** Pre-allocate arrays to reduce GC pressure during measurement */
+function createSampleArrays(
+  n: number,
+  trackHeap: boolean,
+  trackOpt: boolean,
+): SampleArrays {
+  const arr = (track: boolean) => (track ? new Array<number>(n) : []);
+  return {
+    samples: new Array<number>(n),
+    timestamps: new Array<number>(n),
+    heapSamples: arr(trackHeap),
+    optStatuses: arr(trackOpt),
+    pausePoints: [],
+  };
+}
+
+/** Check if we should pause at this iteration for V8 optimization */
+function shouldPause(
+  iter: number,
+  first: number | undefined,
+  interval: number,
+): boolean {
+  if (first !== undefined && iter === first) return true;
+  if (interval <= 0) return false;
+  if (first === undefined) return iter % interval === 0;
+  return (iter - first) % interval === 0;
+}
+
+/** Trim arrays to actual sample count */
+function trimArrays(
+  a: SampleArrays,
+  count: number,
+  trackHeap: boolean,
+  trackOpt: boolean,
+): void {
+  a.samples.length = a.timestamps.length = count;
+  if (trackHeap) a.heapSamples.length = count;
+  if (trackOpt) a.optStatuses.length = count;
 }

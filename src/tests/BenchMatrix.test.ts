@@ -4,6 +4,18 @@ import { isStatefulVariant, runMatrix } from "../BenchMatrix.ts";
 import { loadCaseData, loadCasesModule } from "../matrix/CaseLoader.ts";
 import { discoverVariants, loadVariant } from "../matrix/VariantLoader.ts";
 
+const discoverUrl = `file://${import.meta.dirname}/fixtures/discover/`;
+
+const workerFixturesUrl = `file://${import.meta.dirname}/fixtures/worker/`;
+
+const casesFixturesUrl = `file://${import.meta.dirname}/fixtures/cases`;
+const casesModuleUrl = `${casesFixturesUrl}/cases.ts`;
+const asyncCasesUrl = `${casesFixturesUrl}/asyncCases.ts`;
+const casesVariantDirUrl = `${casesFixturesUrl}/variants/`;
+
+const variantsDirUrl = `file://${import.meta.dirname}/fixtures/variants/`;
+const baselineDirUrl = `file://${import.meta.dirname}/fixtures/baseline/`;
+
 test("inline variants, no cases", async () => {
   const matrix: BenchMatrix = {
     name: "Test",
@@ -92,8 +104,6 @@ test("error when no variants provided", async () => {
   );
 });
 
-const discoverUrl = `file://${import.meta.dirname}/fixtures/discover/`;
-
 test("discoverVariants finds .ts files", async () => {
   const variants = await discoverVariants(discoverUrl);
   expect(variants.sort()).toEqual(["fast", "slow"]);
@@ -118,8 +128,6 @@ test("loadVariant throws when run is missing", async () => {
     "must export 'run'",
   );
 });
-
-const workerFixturesUrl = `file://${import.meta.dirname}/fixtures/worker/`;
 
 test("runMatrix with variantDir discovers and runs variants", async () => {
   const matrix: BenchMatrix = {
@@ -146,11 +154,6 @@ test("runMatrix with variantDir runs each variant in isolated worker", async () 
     expect(variant.cases[0].measured.samples.length).toBeGreaterThan(0);
   }
 });
-
-const casesFixturesUrl = `file://${import.meta.dirname}/fixtures/cases`;
-const casesModuleUrl = `${casesFixturesUrl}/cases.ts`;
-const asyncCasesUrl = `${casesFixturesUrl}/asyncCases.ts`;
-const casesVariantDirUrl = `${casesFixturesUrl}/variants/`;
 
 test("loadCasesModule loads cases array", async () => {
   const mod = await loadCasesModule(casesModuleUrl);
@@ -295,9 +298,6 @@ test("baselineVariant skips when variant not found", async () => {
   // No deltaPercent since baseline variant wasn't found
   expect(result.variants[0].cases[0].deltaPercent).toBeUndefined();
 });
-
-const variantsDirUrl = `file://${import.meta.dirname}/fixtures/variants/`;
-const baselineDirUrl = `file://${import.meta.dirname}/fixtures/baseline/`;
 
 test("baselineDir comparison", async () => {
   const matrix: BenchMatrix = {

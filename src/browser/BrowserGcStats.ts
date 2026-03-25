@@ -32,13 +32,13 @@ export function parseGcTraceEvents(traceEvents: TraceEvent[]): GcEvent[] {
   });
 }
 
+/** Parse CDP trace events and aggregate into GcStats */
+export function browserGcStats(traceEvents: TraceEvent[]): GcStats {
+  return aggregateGcStats(parseGcTraceEvents(traceEvents));
+}
+
 function gcType(name: string): GcEvent["type"] | undefined {
   if (name === "MinorGC") return "scavenge";
   if (name === "MajorGC") return "mark-compact";
   return undefined;
-}
-
-/** Parse CDP trace events and aggregate into GcStats */
-export function browserGcStats(traceEvents: TraceEvent[]): GcStats {
-  return aggregateGcStats(parseGcTraceEvents(traceEvents));
 }

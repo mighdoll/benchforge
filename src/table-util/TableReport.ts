@@ -3,9 +3,6 @@ import type { Alignment, SpanningCellConfig, TableUserConfig } from "table";
 import { table } from "table";
 import { diffPercent } from "./Formatters.ts";
 
-const isTest = process.env.NODE_ENV === "test" || process.env.VITEST === "true";
-const { bold } = isTest ? { bold: (str: string) => str } : pico;
-
 /** Related table columns */
 export interface ColumnGroup<T> {
   groupTitle?: string;
@@ -18,6 +15,19 @@ export type AnyColumn<T> = Column<T> | DiffColumn<T>;
 export interface Column<T> extends ColumnFormat<T> {
   formatter?: (value: unknown) => string | null;
   diffKey?: undefined;
+}
+
+/** Table headers and configuration */
+export interface TableSetup {
+  headerRows: string[][];
+  config: TableUserConfig;
+}
+
+/** Data rows with optional baseline */
+export interface ResultGroup<T extends Record<string, any>> {
+  results: T[];
+
+  baseline?: T;
 }
 
 /** Comparison column against baseline */
@@ -38,18 +48,19 @@ interface ColumnFormat<T> {
   width?: number;
 }
 
-/** Table headers and configuration */
-export interface TableSetup {
-  headerRows: string[][];
-  config: TableUserConfig;
+interface Lines {
+  drawHorizontalLine: (index: number, size: number) => boolean;
+  drawVerticalLine: (index: number, size: number) => boolean;
 }
 
-/** Data rows with optional baseline */
-export interface ResultGroup<T extends Record<string, any>> {
-  results: T[];
+const isTest = process.env.NODE_ENV === "test" || process.env.VITEST === "true";
+const { bold } = isTest ? { bold: (str: string) => str } : pico;
 
-  baseline?: T;
-}
+// Regex to strip ANSI escape codes (ESC [ ... m sequences)
+const ansiEscapeRegex = new RegExp(
+  String.fromCharCode(27) + "\\[[0-9;]*m",
+  "g",
+);
 
 /** Build formatted table with column groups and baselines */
 export function buildTable<T extends Record<string, any>>(
@@ -59,73 +70,6 @@ export function buildTable<T extends Record<string, any>>(
 ): string {
   const allRecords = flattenGroups(columnGroups, resultGroups, nameKey);
   return createTable(columnGroups, allRecords);
-}
-
-/** Convert columns and records to formatted table */
-function createTable<T extends Record<string, any>>(
-  groups: ColumnGroup<T>[],
-  records: T[],
-): string {
-  const dataRows = toRows(records, groups);
-  const { headerRows, config } = setup(groups, dataRows);
-  const allRows = [...headerRows, ...dataRows];
-  return table(allRows, config);
-}
-
-/** Create header rows with group titles */
-function createGroupHeaders<T>(
-  groups: ColumnGroup<T>[],
-  numColumns: number,
-): string[][] {
-  if (!groups.some(g => g.groupTitle)) return [];
-
-  const sectionRow = groups.flatMap(g => {
-    const title = g.groupTitle ? [bold(g.groupTitle)] : [];
-    return padWithBlanks(title, g.columns.length);
-  });
-  const blankRow = padWithBlanks([], numColumns);
-  return [sectionRow, blankRow];
-}
-
-interface Lines {
-  drawHorizontalLine: (index: number, size: number) => boolean;
-  drawVerticalLine: (index: number, size: number) => boolean;
-}
-
-/** @return draw functions for horizontal/vertical table borders */
-function createLines<T>(groups: ColumnGroup<T>[]): Lines {
-  const { sectionBorders, headerBottom } = calcBorders(groups);
-
-  function drawVerticalLine(index: number, size: number): boolean {
-    return index === 0 || index === size || sectionBorders.includes(index);
-  }
-  function drawHorizontalLine(index: number, size: number): boolean {
-    return index === 0 || index === size || index === headerBottom;
-  }
-  return { drawHorizontalLine, drawVerticalLine };
-}
-
-/** @return spanning cell configs for group title headers */
-function createSectionSpans<T>(groups: ColumnGroup<T>[]): SpanningCellConfig[] {
-  let col = 0;
-  const alignment: Alignment = "center";
-  return groups.map(g => {
-    const colSpan = g.columns.length;
-    const span = { row: 0, col, colSpan, alignment };
-    col += colSpan;
-    return span;
-  });
-}
-
-/** @return bolded column title strings */
-function getTitles<T>(groups: ColumnGroup<T>[]): string[] {
-  return groups.flatMap(g => g.columns.map(c => bold(c.title || " ")));
-}
-
-/** @return array padded with blank strings to the given length */
-function padWithBlanks(arr: string[], length: number): string[] {
-  if (arr.length >= length) return arr;
-  return [...arr, ...Array(length - arr.length).fill(" ")];
 }
 
 /** Convert records to string arrays for table */
@@ -145,28 +89,6 @@ export function toRows<T extends Record<string, any>>(
   return rawRows.map(row => row.map(cell => cell ?? " "));
 }
 
-/** Add comparison values for diff columns */
-function addComparisons<T extends Record<string, any>>(
-  groups: ColumnGroup<T>[],
-  mainRecord: T,
-  baselineRecord: T,
-): T {
-  const diffColumns = groups.flatMap(g => g.columns).filter(col => col.diffKey);
-  const updatedMain = { ...mainRecord };
-
-  for (const col of diffColumns) {
-    const dcol = col as DiffColumn<T>;
-    const diffKey = dcol.diffKey;
-    const mainValue = mainRecord[diffKey];
-    const baselineValue = baselineRecord[diffKey];
-    const diffFormat = dcol.diffFormatter ?? diffPercent;
-    const diffStr = diffFormat(mainValue, baselineValue);
-    (updatedMain as any)[col.key] = diffStr;
-  }
-
-  return updatedMain;
-}
-
 /** Flatten groups with spacing */
 function flattenGroups<T extends Record<string, any>>(
   columnGroups: ColumnGroup<T>[],
@@ -179,6 +101,17 @@ function flattenGroups<T extends Record<string, any>>(
     const isLast = i === resultGroups.length - 1;
     return isLast ? groupRecords : [...groupRecords, {} as T];
   });
+}
+
+/** Convert columns and records to formatted table */
+function createTable<T extends Record<string, any>>(
+  groups: ColumnGroup<T>[],
+  records: T[],
+): string {
+  const dataRows = toRows(records, groups);
+  const { headerRows, config } = setup(groups, dataRows);
+  const allRows = [...headerRows, ...dataRows];
+  return table(allRows, config);
 }
 
 /** Process results with baseline comparisons */
@@ -203,22 +136,6 @@ function addBaseline<T extends Record<string, any>>(
   return [...diffResults, markedBaseline];
 }
 
-/** Calculate vertical lines between sections and header bottom position */
-function calcBorders<T>(groups: ColumnGroup<T>[]): {
-  sectionBorders: number[];
-  headerBottom: number;
-} {
-  if (groups.length === 0) return { sectionBorders: [], headerBottom: 1 };
-
-  const sectionBorders: number[] = [];
-  let border = 0;
-  for (const g of groups) {
-    border += g.columns.length;
-    sectionBorders.push(border);
-  }
-  return { sectionBorders, headerBottom: 3 };
-}
-
 /** Create headers and table configuration */
 function setup<T>(groups: ColumnGroup<T>[], dataRows: string[][]): TableSetup {
   const titles = getTitles(groups);
@@ -235,6 +152,60 @@ function setup<T>(groups: ColumnGroup<T>[], dataRows: string[][]): TableSetup {
   };
 
   return { headerRows, config };
+}
+
+/** Add comparison values for diff columns */
+function addComparisons<T extends Record<string, any>>(
+  groups: ColumnGroup<T>[],
+  mainRecord: T,
+  baselineRecord: T,
+): T {
+  const diffColumns = groups.flatMap(g => g.columns).filter(col => col.diffKey);
+  const updatedMain = { ...mainRecord };
+
+  for (const col of diffColumns) {
+    const dcol = col as DiffColumn<T>;
+    const diffKey = dcol.diffKey;
+    const mainValue = mainRecord[diffKey];
+    const baselineValue = baselineRecord[diffKey];
+    const diffFormat = dcol.diffFormatter ?? diffPercent;
+    const diffStr = diffFormat(mainValue, baselineValue);
+    (updatedMain as any)[col.key] = diffStr;
+  }
+
+  return updatedMain;
+}
+
+/** @return bolded column title strings */
+function getTitles<T>(groups: ColumnGroup<T>[]): string[] {
+  return groups.flatMap(g => g.columns.map(c => bold(c.title || " ")));
+}
+
+/** Create header rows with group titles */
+function createGroupHeaders<T>(
+  groups: ColumnGroup<T>[],
+  numColumns: number,
+): string[][] {
+  if (!groups.some(g => g.groupTitle)) return [];
+
+  const sectionRow = groups.flatMap(g => {
+    const title = g.groupTitle ? [bold(g.groupTitle)] : [];
+    return padWithBlanks(title, g.columns.length);
+  });
+  const blankRow = padWithBlanks([], numColumns);
+  return [sectionRow, blankRow];
+}
+
+/** @return spanning cell configs for group title headers */
+function createSectionSpans<T>(groups: ColumnGroup<T>[]): SpanningCellConfig[] {
+  let col = 0;
+  const alignment: Alignment = "center";
+  return groups.map(g => {
+    const colSpan = g.columns.length;
+    const span = { row: 0, col, colSpan, alignment };
+    col += colSpan;
+    return span;
+  });
 }
 
 /** Calculate column widths based on content, including group titles */
@@ -279,15 +250,44 @@ function calcColumnWidths<T>(
   );
 }
 
-// Regex to strip ANSI escape codes (ESC [ ... m sequences)
-const ansiEscapeRegex = new RegExp(
-  String.fromCharCode(27) + "\\[[0-9;]*m",
-  "g",
-);
+/** @return draw functions for horizontal/vertical table borders */
+function createLines<T>(groups: ColumnGroup<T>[]): Lines {
+  const { sectionBorders, headerBottom } = calcBorders(groups);
+
+  function drawVerticalLine(index: number, size: number): boolean {
+    return index === 0 || index === size || sectionBorders.includes(index);
+  }
+  function drawHorizontalLine(index: number, size: number): boolean {
+    return index === 0 || index === size || index === headerBottom;
+  }
+  return { drawHorizontalLine, drawVerticalLine };
+}
+
+/** @return array padded with blank strings to the given length */
+function padWithBlanks(arr: string[], length: number): string[] {
+  if (arr.length >= length) return arr;
+  return [...arr, ...Array(length - arr.length).fill(" ")];
+}
 
 /** Get visible length of a cell value (strips ANSI escape codes) */
 function cellWidth(value: unknown): number {
   if (value == null) return 0;
   const str = String(value);
   return str.replace(ansiEscapeRegex, "").length;
+}
+
+/** Calculate vertical lines between sections and header bottom position */
+function calcBorders<T>(groups: ColumnGroup<T>[]): {
+  sectionBorders: number[];
+  headerBottom: number;
+} {
+  if (groups.length === 0) return { sectionBorders: [], headerBottom: 1 };
+
+  const sectionBorders: number[] = [];
+  let border = 0;
+  for (const g of groups) {
+    border += g.columns.length;
+    sectionBorders.push(border);
+  }
+  return { sectionBorders, headerBottom: 3 };
 }

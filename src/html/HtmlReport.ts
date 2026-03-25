@@ -44,6 +44,39 @@ export async function generateHtmlReport(
   return { reportDir, server, closeServer };
 }
 
+/** Create a timestamped report directory under ./bench-report/ */
+async function createReportDir(): Promise<string> {
+  const base = "./bench-report";
+  await mkdir(base, { recursive: true });
+  const ts = new Date().toISOString().replace(/[:.]/g, "-").slice(0, 19);
+  return join(base, `report-${ts}`);
+}
+
+/** Read the pre-built browser plots bundle from dist/ */
+async function loadPlotsBundle(): Promise<string> {
+  const thisDir = dirname(fileURLToPath(import.meta.url));
+  const builtPath = join(thisDir, "browser/index.js");
+  const devPath = join(thisDir, "../../dist/browser/index.js");
+  try {
+    return await readFile(builtPath, "utf-8");
+  } catch {}
+  return readFile(devPath, "utf-8");
+}
+
+/** Write an index.html in the parent dir that redirects to this report */
+async function writeLatestRedirect(reportDir: string): Promise<void> {
+  const baseDir = dirname(reportDir);
+  const reportName = reportDir.split("/").pop();
+  const html = `<!DOCTYPE html>
+<html><head>
+  <meta http-equiv="refresh" content="0; url=./${reportName}/">
+  <script>location.href = "./${reportName}/";</script>
+</head><body>
+  <a href="./${reportName}/">Latest report</a>
+</body></html>`;
+  await writeFile(join(baseDir, "index.html"), html, "utf-8");
+}
+
 /** Start HTTP server for report directory, trying fallback ports if needed */
 async function startReportServer(
   baseDir: string,
@@ -95,37 +128,4 @@ function tryListen(
       resolve({ server, port: actualPort });
     });
   });
-}
-
-/** Create a timestamped report directory under ./bench-report/ */
-async function createReportDir(): Promise<string> {
-  const base = "./bench-report";
-  await mkdir(base, { recursive: true });
-  const ts = new Date().toISOString().replace(/[:.]/g, "-").slice(0, 19);
-  return join(base, `report-${ts}`);
-}
-
-/** Read the pre-built browser plots bundle from dist/ */
-async function loadPlotsBundle(): Promise<string> {
-  const thisDir = dirname(fileURLToPath(import.meta.url));
-  const builtPath = join(thisDir, "browser/index.js");
-  const devPath = join(thisDir, "../../dist/browser/index.js");
-  try {
-    return await readFile(builtPath, "utf-8");
-  } catch {}
-  return readFile(devPath, "utf-8");
-}
-
-/** Write an index.html in the parent dir that redirects to this report */
-async function writeLatestRedirect(reportDir: string): Promise<void> {
-  const baseDir = dirname(reportDir);
-  const reportName = reportDir.split("/").pop();
-  const html = `<!DOCTYPE html>
-<html><head>
-  <meta http-equiv="refresh" content="0; url=./${reportName}/">
-  <script>location.href = "./${reportName}/";</script>
-</head><body>
-  <a href="./${reportName}/">Latest report</a>
-</body></html>`;
-  await writeFile(join(baseDir, "index.html"), html, "utf-8");
 }

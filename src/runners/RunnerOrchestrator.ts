@@ -18,9 +18,16 @@ import type {
   RunMessage,
 } from "./WorkerScript.ts";
 
-const logTiming = debugWorkerTiming
-  ? (message: string) => console.log(`[RunnerOrchestrator] ${message}`)
-  : () => {};
+/** Parameters for running a matrix variant in worker */
+export interface RunMatrixVariantParams {
+  variantDir: string;
+  variantId: string;
+  caseId: string;
+  caseData?: unknown;
+  casesModule?: string;
+  runner: KnownRunner;
+  options: RunnerOptions;
+}
 
 type WorkerParams<T = unknown> = {
   spec: BenchmarkSpec<T>;
@@ -41,6 +48,10 @@ interface RunBenchmarkParams<T = unknown> {
   useWorker?: boolean;
   params?: T;
 }
+
+const logTiming = debugWorkerTiming
+  ? (message: string) => console.log(`[RunnerOrchestrator] ${message}`)
+  : () => {};
 
 /** Execute benchmarks directly or in worker process */
 export async function runBenchmark<T = unknown>({
@@ -67,6 +78,34 @@ export async function runBenchmark<T = unknown>({
   }
 
   return runInWorker({ spec, runner, options, params });
+}
+
+/** Run a matrix variant benchmark in isolated worker process */
+export async function runMatrixVariant(
+  params: RunMatrixVariantParams,
+): Promise<MeasuredResults[]> {
+  const {
+    variantDir,
+    variantId,
+    caseId,
+    caseData,
+    casesModule,
+    runner,
+    options,
+  } = params;
+  const name = `${variantId}/${caseId}`;
+  const message: RunMessage = {
+    type: "run",
+    spec: { name, fn: () => {} },
+    runnerName: runner,
+    options,
+    variantDir,
+    variantId,
+    caseId,
+    caseData,
+    casesModule,
+  };
+  return runWorkerWithMessage(name, options, message);
 }
 
 /** Resolve modulePath/exportName to a real function for non-worker mode */
@@ -109,38 +148,6 @@ async function runInWorker<T>(
   return runWorkerWithMessage(spec.name, options, msg);
 }
 
-/** Create worker process with timing logs */
-function createWorkerWithTiming(gcStats: boolean) {
-  const workerStart = getPerfNow();
-  const gcEvents: GcEvent[] = [];
-  const worker = createWorkerProcess(gcStats);
-  const createTime = getPerfNow();
-  if (gcStats && worker.stdout) setupGcCapture(worker, gcEvents);
-  logTiming(
-    `Worker process created in ${getElapsed(workerStart, createTime).toFixed(1)}ms`,
-  );
-  return { worker, createTime, gcEvents };
-}
-
-/** Capture and parse GC lines from stdout (V8's --trace-gc-nvp outputs to stdout) */
-function setupGcCapture(worker: ChildProcess, gcEvents: GcEvent[]): void {
-  let buffer = "";
-  worker.stdout!.on("data", (data: Buffer) => {
-    buffer += data.toString();
-    const lines = buffer.split("\n");
-    buffer = lines.pop() || ""; // Keep incomplete line in buffer
-    for (const line of lines) {
-      const event = parseGcLine(line);
-      if (event) {
-        gcEvents.push(event);
-      } else if (line.trim()) {
-        // Forward non-GC stdout to console (worker status messages)
-        process.stdout.write(line + "\n");
-      }
-    }
-  });
-}
-
 /** Spawn worker, wire handlers, send message, return results */
 function runWorkerWithMessage(
   name: string,
@@ -166,17 +173,69 @@ function runWorkerWithMessage(
   });
 }
 
-/** Send message to worker with timing log */
-function sendWorkerMessage(
-  worker: ReturnType<typeof createWorkerProcess>,
-  message: RunMessage,
-  createTime: number,
-): void {
-  const messageTime = getPerfNow();
-  worker.send(message);
+/** Create message for worker execution */
+function createRunMessage<T>(
+  spec: BenchmarkSpec<T>,
+  runnerName: KnownRunner,
+  options: RunnerOptions,
+  params?: T,
+): RunMessage {
+  const { fn, ...rest } = spec;
+  const message: RunMessage = {
+    type: "run",
+    spec: rest as BenchmarkSpec,
+    runnerName,
+    options,
+    params,
+  };
+  if (spec.modulePath) {
+    message.modulePath = spec.modulePath;
+    message.exportName = spec.exportName;
+    if (spec.setupExportName) message.setupExportName = spec.setupExportName;
+  } else {
+    message.fnCode = fn.toString();
+  }
+  return message;
+}
+
+/** Create worker process with timing logs */
+function createWorkerWithTiming(gcStats: boolean) {
+  const workerStart = getPerfNow();
+  const gcEvents: GcEvent[] = [];
+  const worker = createWorkerProcess(gcStats);
+  const createTime = getPerfNow();
+  if (gcStats && worker.stdout) setupGcCapture(worker, gcEvents);
   logTiming(
-    `Message sent to worker in ${getElapsed(createTime, messageTime).toFixed(1)}ms`,
+    `Worker process created in ${getElapsed(workerStart, createTime).toFixed(1)}ms`,
   );
+  return { worker, createTime, gcEvents };
+}
+
+// Consider: --no-compilation-cache, --max-old-space-size=512, --no-lazy
+// for consistency (less realistic)
+
+/** @return handlers that attach GC stats and heap profile to results */
+function createWorkerHandlers(
+  specName: string,
+  startTime: number,
+  gcEvents: GcEvent[] | undefined,
+  resolve: (results: MeasuredResults[]) => void,
+  reject: (error: Error) => void,
+): WorkerHandlers {
+  return {
+    resolve: (results: MeasuredResults[], heapProfile?: HeapProfile) => {
+      logTiming(
+        `Total worker time for ${specName}: ${getElapsed(startTime).toFixed(1)}ms`,
+      );
+      if (gcEvents?.length) {
+        const gcStats = aggregateGcStats(gcEvents);
+        for (const r of results) r.gcStats = gcStats;
+      }
+      if (heapProfile) for (const r of results) r.heapProfile = heapProfile;
+      resolve(results);
+    },
+    reject,
+  };
 }
 
 /** Setup worker event handlers with cleanup */
@@ -193,6 +252,71 @@ function setupWorkerHandlers(
   );
   worker.on("error", createErrorHandler(specName, cleanup, reject));
   worker.on("exit", createExitHandler(specName, cleanup, reject));
+}
+
+/** Send message to worker with timing log */
+function sendWorkerMessage(
+  worker: ReturnType<typeof createWorkerProcess>,
+  message: RunMessage,
+  createTime: number,
+): void {
+  const messageTime = getPerfNow();
+  worker.send(message);
+  logTiming(
+    `Message sent to worker in ${getElapsed(createTime, messageTime).toFixed(1)}ms`,
+  );
+}
+
+/** Create worker process with configuration */
+function createWorkerProcess(gcStats: boolean) {
+  const workerPath = resolveWorkerPath();
+  const execArgv = ["--expose-gc", "--allow-natives-syntax"];
+  if (gcStats) execArgv.push("--trace-gc-nvp");
+
+  return fork(workerPath, [], {
+    execArgv,
+    silent: gcStats, // Capture stdout/stderr when collecting GC stats
+    env: {
+      ...process.env,
+      NODE_OPTIONS: "",
+    },
+  });
+}
+
+/** Capture and parse GC lines from stdout (V8's --trace-gc-nvp outputs to stdout) */
+function setupGcCapture(worker: ChildProcess, gcEvents: GcEvent[]): void {
+  let buffer = "";
+  worker.stdout!.on("data", (data: Buffer) => {
+    buffer += data.toString();
+    const lines = buffer.split("\n");
+    buffer = lines.pop() || ""; // Keep incomplete line in buffer
+    for (const line of lines) {
+      const event = parseGcLine(line);
+      if (event) {
+        gcEvents.push(event);
+      } else if (line.trim()) {
+        // Forward non-GC stdout to console (worker status messages)
+        process.stdout.write(line + "\n");
+      }
+    }
+  });
+}
+
+/** Create cleanup for timeout and termination */
+function createCleanup(
+  worker: ReturnType<typeof createWorkerProcess>,
+  specName: string,
+  reject: (error: Error) => void,
+) {
+  const timeoutId = setTimeout(() => {
+    cleanup();
+    reject(new Error(`Benchmark "${specName}" timed out after 60 seconds`));
+  }, 60000);
+  const cleanup = () => {
+    clearTimeout(timeoutId);
+    if (!worker.killed) worker.kill("SIGTERM");
+  };
+  return cleanup;
 }
 
 /** Handle worker messages (results or errors) */
@@ -245,134 +369,10 @@ function createExitHandler(
   };
 }
 
-/** Create cleanup for timeout and termination */
-function createCleanup(
-  worker: ReturnType<typeof createWorkerProcess>,
-  specName: string,
-  reject: (error: Error) => void,
-) {
-  const timeoutId = setTimeout(() => {
-    cleanup();
-    reject(new Error(`Benchmark "${specName}" timed out after 60 seconds`));
-  }, 60000);
-  const cleanup = () => {
-    clearTimeout(timeoutId);
-    if (!worker.killed) worker.kill("SIGTERM");
-  };
-  return cleanup;
-}
-
-/** Create worker process with configuration */
-function createWorkerProcess(gcStats: boolean) {
-  const workerPath = resolveWorkerPath();
-  const execArgv = ["--expose-gc", "--allow-natives-syntax"];
-  if (gcStats) execArgv.push("--trace-gc-nvp");
-
-  return fork(workerPath, [], {
-    execArgv,
-    silent: gcStats, // Capture stdout/stderr when collecting GC stats
-    env: {
-      ...process.env,
-      NODE_OPTIONS: "",
-    },
-  });
-}
-
 /** Resolve WorkerScript path for dev (.ts) or dist (.mjs) */
 function resolveWorkerPath(): string {
   const dir = import.meta.dirname!;
   const tsPath = path.join(dir, "WorkerScript.ts");
   if (existsSync(tsPath)) return tsPath;
   return path.join(dir, "runners", "WorkerScript.mjs");
-}
-
-// Consider: --no-compilation-cache, --max-old-space-size=512, --no-lazy
-// for consistency (less realistic)
-
-/** @return handlers that attach GC stats and heap profile to results */
-function createWorkerHandlers(
-  specName: string,
-  startTime: number,
-  gcEvents: GcEvent[] | undefined,
-  resolve: (results: MeasuredResults[]) => void,
-  reject: (error: Error) => void,
-): WorkerHandlers {
-  return {
-    resolve: (results: MeasuredResults[], heapProfile?: HeapProfile) => {
-      logTiming(
-        `Total worker time for ${specName}: ${getElapsed(startTime).toFixed(1)}ms`,
-      );
-      if (gcEvents?.length) {
-        const gcStats = aggregateGcStats(gcEvents);
-        for (const r of results) r.gcStats = gcStats;
-      }
-      if (heapProfile) for (const r of results) r.heapProfile = heapProfile;
-      resolve(results);
-    },
-    reject,
-  };
-}
-
-/** Create message for worker execution */
-function createRunMessage<T>(
-  spec: BenchmarkSpec<T>,
-  runnerName: KnownRunner,
-  options: RunnerOptions,
-  params?: T,
-): RunMessage {
-  const { fn, ...rest } = spec;
-  const message: RunMessage = {
-    type: "run",
-    spec: rest as BenchmarkSpec,
-    runnerName,
-    options,
-    params,
-  };
-  if (spec.modulePath) {
-    message.modulePath = spec.modulePath;
-    message.exportName = spec.exportName;
-    if (spec.setupExportName) message.setupExportName = spec.setupExportName;
-  } else {
-    message.fnCode = fn.toString();
-  }
-  return message;
-}
-
-/** Parameters for running a matrix variant in worker */
-export interface RunMatrixVariantParams {
-  variantDir: string;
-  variantId: string;
-  caseId: string;
-  caseData?: unknown;
-  casesModule?: string;
-  runner: KnownRunner;
-  options: RunnerOptions;
-}
-
-/** Run a matrix variant benchmark in isolated worker process */
-export async function runMatrixVariant(
-  params: RunMatrixVariantParams,
-): Promise<MeasuredResults[]> {
-  const {
-    variantDir,
-    variantId,
-    caseId,
-    caseData,
-    casesModule,
-    runner,
-    options,
-  } = params;
-  const name = `${variantId}/${caseId}`;
-  const message: RunMessage = {
-    type: "run",
-    spec: { name, fn: () => {} },
-    runnerName: runner,
-    options,
-    variantDir,
-    variantId,
-    caseId,
-    caseData,
-    casesModule,
-  };
-  return runWorkerWithMessage(name, options, message);
 }

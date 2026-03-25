@@ -2,6 +2,19 @@ import type { GitVersion, GroupData, ReportData } from "./Types.ts";
 
 const skipArgs = new Set(["_", "$0", "html", "export-html"]);
 
+const badgeLabels = {
+  faster: "Faster",
+  slower: "Slower",
+  uncertain: "Inconclusive",
+};
+const defaultArgs: Record<string, unknown> = {
+  worker: true,
+  time: 5,
+  warmup: 500,
+  "pause-interval": 0,
+  "pause-duration": 100,
+};
+
 /** Format ISO date as local time with UTC: "Jan 9, 2026, 3:45 PM (2026-01-09T23:45:00Z)" */
 export function formatDateWithTimezone(isoDate: string): string {
   const date = new Date(isoDate);
@@ -31,73 +44,6 @@ export function formatRelativeTime(isoDate: string): string {
   if (diffDays === 1) return "yesterday";
   if (diffDays < 30) return `${diffDays} days ago`;
   return date.toLocaleDateString("en-US", { month: "short", day: "numeric" });
-}
-
-/** Format git version for display: "abc1234* (5m ago)" */
-function formatVersion(version?: GitVersion): string {
-  if (!version || version.hash === "unknown") return "unknown";
-  const hashDisplay = version.dirty ? `${version.hash}*` : version.hash;
-  const timeDisplay = version.date ? formatRelativeTime(version.date) : "";
-  return timeDisplay ? `${hashDisplay} (${timeDisplay})` : hashDisplay;
-}
-
-/** Render current/baseline version info as an HTML div */
-function versionInfoHtml(data: ReportData): string {
-  const { currentVersion, baselineVersion } = data.metadata;
-  if (!currentVersion && !baselineVersion) return "";
-  const parts: string[] = [];
-  if (currentVersion) parts.push(`Current: ${formatVersion(currentVersion)}`);
-  if (baselineVersion)
-    parts.push(`Baseline: ${formatVersion(baselineVersion)}`);
-  return `<div class="version-info">${parts.join(" | ")}</div>`;
-}
-
-const badgeLabels = {
-  faster: "Faster",
-  slower: "Slower",
-  uncertain: "Inconclusive",
-};
-
-/** Render faster/slower/uncertain badge with CI plot container */
-function comparisonBadge(group: GroupData, groupIndex: number): string {
-  const ci = group.benchmarks[0]?.comparisonCI;
-  if (!ci) return "";
-  const label = badgeLabels[ci.direction];
-  return `
-    <span class="badge badge-${ci.direction}">${label}</span>
-    <div id="ci-plot-${groupIndex}" class="ci-plot-container"></div>
-  `;
-}
-const defaultArgs: Record<string, unknown> = {
-  worker: true,
-  time: 5,
-  warmup: 500,
-  "pause-interval": 0,
-  "pause-duration": 100,
-};
-
-/** @return true if this CLI arg should be hidden from the report header */
-function shouldSkipArg(
-  key: string,
-  value: unknown,
-  adaptive: unknown,
-): boolean {
-  if (skipArgs.has(key) || value === undefined || value === false) return true;
-  if (defaultArgs[key] === value) return true;
-  if (!key.includes("-") && key !== key.toLowerCase()) return true; // skip yargs camelCase aliases
-  if (key === "convergence" && !adaptive) return true;
-  return false;
-}
-
-/** Reconstruct the CLI invocation string, omitting default/internal args */
-function formatCliArgs(args?: Record<string, unknown>): string {
-  if (!args) return "bb bench";
-  const parts = ["bb bench"];
-  for (const [key, value] of Object.entries(args)) {
-    if (shouldSkipArg(key, value, args.adaptive)) continue;
-    parts.push(value === true ? `--${key}` : `--${key} ${value}`);
-  }
-  return parts.join(" ");
 }
 
 /** Generate complete HTML document with embedded data and visualizations */
@@ -281,4 +227,58 @@ export function generateHtmlDocument(data: ReportData): string {
   </script>
 </body>
 </html>`;
+}
+
+/** Reconstruct the CLI invocation string, omitting default/internal args */
+function formatCliArgs(args?: Record<string, unknown>): string {
+  if (!args) return "bb bench";
+  const parts = ["bb bench"];
+  for (const [key, value] of Object.entries(args)) {
+    if (shouldSkipArg(key, value, args.adaptive)) continue;
+    parts.push(value === true ? `--${key}` : `--${key} ${value}`);
+  }
+  return parts.join(" ");
+}
+
+/** Render current/baseline version info as an HTML div */
+function versionInfoHtml(data: ReportData): string {
+  const { currentVersion, baselineVersion } = data.metadata;
+  if (!currentVersion && !baselineVersion) return "";
+  const parts: string[] = [];
+  if (currentVersion) parts.push(`Current: ${formatVersion(currentVersion)}`);
+  if (baselineVersion)
+    parts.push(`Baseline: ${formatVersion(baselineVersion)}`);
+  return `<div class="version-info">${parts.join(" | ")}</div>`;
+}
+
+/** Render faster/slower/uncertain badge with CI plot container */
+function comparisonBadge(group: GroupData, groupIndex: number): string {
+  const ci = group.benchmarks[0]?.comparisonCI;
+  if (!ci) return "";
+  const label = badgeLabels[ci.direction];
+  return `
+    <span class="badge badge-${ci.direction}">${label}</span>
+    <div id="ci-plot-${groupIndex}" class="ci-plot-container"></div>
+  `;
+}
+
+/** @return true if this CLI arg should be hidden from the report header */
+function shouldSkipArg(
+  key: string,
+  value: unknown,
+  adaptive: unknown,
+): boolean {
+  if (skipArgs.has(key) || value === undefined || value === false) return true;
+  if (defaultArgs[key] === value) return true;
+  if (!key.includes("-") && key !== key.toLowerCase()) return true; // skip yargs camelCase aliases
+  if (key === "convergence" && !adaptive) return true;
+  return false;
+}
+
+/** Format git version for display: "abc1234* (5m ago)" */
+function formatVersion(version?: GitVersion): string {
+  if (!version || version.hash === "unknown") return "unknown";
+  const hashDisplay = version.dirty ? `${version.hash}*` : version.hash;
+  const timeDisplay = version.date ? formatRelativeTime(version.date) : "";
+  return timeDisplay ? `${hashDisplay} (${timeDisplay})` : hashDisplay;
 }

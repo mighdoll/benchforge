@@ -73,54 +73,6 @@ function buildTraceEvents(
   return events;
 }
 
-function instant(
-  ts: number,
-  name: string,
-  args: Record<string, unknown>,
-): TraceEvent {
-  return { ph: "i", ts, pid, tid, cat: "bench", name, s: "t", args };
-}
-
-function counter(
-  ts: number,
-  name: string,
-  args: Record<string, unknown>,
-): TraceEvent {
-  return { ph: "C", ts, pid, tid, cat: "bench", name, args };
-}
-
-/** Build events for a single benchmark run */
-function buildBenchmarkEvents(results: MeasuredResults): TraceEvent[] {
-  const { samples, heapSamples, timestamps, pausePoints } = results;
-  if (!timestamps?.length) return [];
-
-  const events: TraceEvent[] = [];
-  for (let i = 0; i < samples.length; i++) {
-    const ts = timestamps[i];
-    const ms = Math.round(samples[i] * 100) / 100;
-    events.push(instant(ts, results.name, { n: i, ms }));
-    events.push(counter(ts, "duration", { ms }));
-    if (heapSamples?.[i] !== undefined) {
-      const MB = Math.round((heapSamples[i] / 1024 / 1024) * 10) / 10;
-      events.push(counter(ts, "heap", { MB }));
-    }
-  }
-
-  for (const pause of pausePoints ?? []) {
-    const ts = timestamps[pause.sampleIndex];
-    if (ts) events.push(instant(ts, "pause", { ms: pause.durationMs }));
-  }
-  return events;
-}
-
-/** Normalize timestamps so events start at 0 */
-function normalizeTimestamps(events: TraceEvent[]): void {
-  const times = events.filter(e => e.ts > 0).map(e => e.ts);
-  if (times.length === 0) return;
-  const minTs = Math.min(...times);
-  for (const e of events) if (e.ts > 0) e.ts -= minTs;
-}
-
 /** Merge V8 trace events from a previous run, aligning timestamps */
 function mergeV8Trace(customEvents: TraceEvent[]): TraceEvent[] {
   const traceFiles = readdirSync(".").filter(
@@ -135,36 +87,10 @@ function mergeV8Trace(customEvents: TraceEvent[]): TraceEvent[] {
   return [...v8Events, ...customEvents];
 }
 
-/** Load V8 trace events from file, or undefined if unavailable */
-function loadV8Events(
-  v8TracePath: string | undefined,
-): TraceEvent[] | undefined {
-  if (!v8TracePath) return undefined;
-  try {
-    const v8Data = JSON.parse(readFileSync(v8TracePath, "utf-8")) as TraceFile;
-    console.log(
-      `Merged ${v8Data.traceEvents.length} V8 events from ${v8TracePath}`,
-    );
-    return v8Data.traceEvents;
-  } catch {
-    console.warn(`Could not parse V8 trace file: ${v8TracePath}`);
-    return undefined;
-  }
-}
-
 /** Write trace events to JSON file */
 function writeTraceFile(outputPath: string, events: TraceEvent[]): void {
   const traceFile: TraceFile = { traceEvents: events };
   writeFileSync(outputPath, JSON.stringify(traceFile));
-}
-
-/** Clean CLI args for metadata */
-function cleanArgs(args: DefaultCliArgs): Record<string, unknown> {
-  const skip = new Set(["_", "$0"]);
-  const entries = Object.entries(args).filter(
-    ([k, v]) => v !== undefined && !skip.has(k),
-  );
-  return Object.fromEntries(entries);
 }
 
 /** Spawn a detached child to merge V8 trace after process exit */
@@ -200,4 +126,78 @@ function scheduleDeferredMerge(outputPath: string): void {
     });
     child.unref();
   });
+}
+
+/** Clean CLI args for metadata */
+function cleanArgs(args: DefaultCliArgs): Record<string, unknown> {
+  const skip = new Set(["_", "$0"]);
+  const entries = Object.entries(args).filter(
+    ([k, v]) => v !== undefined && !skip.has(k),
+  );
+  return Object.fromEntries(entries);
+}
+
+/** Build events for a single benchmark run */
+function buildBenchmarkEvents(results: MeasuredResults): TraceEvent[] {
+  const { samples, heapSamples, timestamps, pausePoints } = results;
+  if (!timestamps?.length) return [];
+
+  const events: TraceEvent[] = [];
+  for (let i = 0; i < samples.length; i++) {
+    const ts = timestamps[i];
+    const ms = Math.round(samples[i] * 100) / 100;
+    events.push(instant(ts, results.name, { n: i, ms }));
+    events.push(counter(ts, "duration", { ms }));
+    if (heapSamples?.[i] !== undefined) {
+      const MB = Math.round((heapSamples[i] / 1024 / 1024) * 10) / 10;
+      events.push(counter(ts, "heap", { MB }));
+    }
+  }
+
+  for (const pause of pausePoints ?? []) {
+    const ts = timestamps[pause.sampleIndex];
+    if (ts) events.push(instant(ts, "pause", { ms: pause.durationMs }));
+  }
+  return events;
+}
+
+/** Load V8 trace events from file, or undefined if unavailable */
+function loadV8Events(
+  v8TracePath: string | undefined,
+): TraceEvent[] | undefined {
+  if (!v8TracePath) return undefined;
+  try {
+    const v8Data = JSON.parse(readFileSync(v8TracePath, "utf-8")) as TraceFile;
+    console.log(
+      `Merged ${v8Data.traceEvents.length} V8 events from ${v8TracePath}`,
+    );
+    return v8Data.traceEvents;
+  } catch {
+    console.warn(`Could not parse V8 trace file: ${v8TracePath}`);
+    return undefined;
+  }
+}
+
+/** Normalize timestamps so events start at 0 */
+function normalizeTimestamps(events: TraceEvent[]): void {
+  const times = events.filter(e => e.ts > 0).map(e => e.ts);
+  if (times.length === 0) return;
+  const minTs = Math.min(...times);
+  for (const e of events) if (e.ts > 0) e.ts -= minTs;
+}
+
+function instant(
+  ts: number,
+  name: string,
+  args: Record<string, unknown>,
+): TraceEvent {
+  return { ph: "i", ts, pid, tid, cat: "bench", name, s: "t", args };
+}
+
+function counter(
+  ts: number,
+  name: string,
+  args: Record<string, unknown>,
+): TraceEvent {
+  return { ph: "C", ts, pid, tid, cat: "bench", name, args };
 }

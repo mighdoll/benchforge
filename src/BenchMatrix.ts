@@ -74,13 +74,6 @@ export interface MatrixResults {
   variants: VariantResult[];
 }
 
-/** @return true if variant is a StatefulVariant (has setup + run) */
-export function isStatefulVariant<T, S>(
-  v: Variant<T, S>,
-): v is StatefulVariant<T, S> {
-  return typeof v === "object" && "setup" in v && "run" in v;
-}
-
 /** Options for runMatrix */
 export interface RunMatrixOptions {
   iterations?: number;
@@ -101,6 +94,22 @@ export interface RunMatrixOptions {
   heapSample?: boolean;
   heapInterval?: number;
   heapDepth?: number;
+}
+
+/** Context for running matrix benchmarks in worker mode */
+interface DirMatrixContext<T> {
+  matrix: BenchMatrix<T>;
+  casesModule?: import("./matrix/CaseLoader.ts").CasesModule<T>;
+  baselineIds: string[];
+  caseIds: string[];
+  runnerOpts: RunnerOptions;
+}
+
+/** @return true if variant is a StatefulVariant (has setup + run) */
+export function isStatefulVariant<T, S>(
+  v: Variant<T, S>,
+): v is StatefulVariant<T, S> {
+  return typeof v === "object" && "setup" in v && "run" in v;
 }
 
 /** Run a BenchMatrix with inline variants or variantDir */
@@ -127,36 +136,24 @@ function validateBaseline<T>(matrix: BenchMatrix<T>): void {
   if (matrix.baselineDir && matrix.baselineVariant) throw new Error(msg);
 }
 
-function buildRunnerOptions(options: RunMatrixOptions): RunnerOptions {
-  return {
-    maxIterations: options.iterations,
-    maxTime: options.maxTime ?? 1000,
-    warmup: options.warmup ?? 0,
-    collect: options.collect,
-    cpuCounters: options.cpuCounters,
-    traceOpt: options.traceOpt,
-    noSettle: options.noSettle,
-    pauseFirst: options.pauseFirst,
-    pauseInterval: options.pauseInterval,
-    pauseDuration: options.pauseDuration,
-    gcStats: options.gcStats,
-    heapSample: options.heapSample,
-    heapInterval: options.heapInterval,
-    heapDepth: options.heapDepth,
-  };
-}
-
-/** Load cases module and resolve filtered case IDs */
-async function resolveCases<T>(
+/** Run matrix with variantDir (worker mode for memory isolation) */
+async function runMatrixWithDir<T>(
   matrix: BenchMatrix<T>,
   options: RunMatrixOptions,
-) {
-  const casesModule = matrix.casesModule
-    ? await loadCasesModule<T>(matrix.casesModule)
-    : undefined;
-  const allCaseIds = casesModule?.cases ?? matrix.cases ?? ["default"];
-  const caseIds = options.filteredCases ?? allCaseIds;
-  return { casesModule, caseIds };
+): Promise<MatrixResults> {
+  const allVariantIds = await discoverVariants(matrix.variantDir!);
+  if (allVariantIds.length === 0) {
+    throw new Error(`No variants found in ${matrix.variantDir}`);
+  }
+  const variantIds = options.filteredVariants ?? allVariantIds;
+
+  const ctx = await createDirContext(matrix, options);
+  const variants = await runDirVariants(variantIds, ctx);
+
+  if (matrix.baselineVariant) {
+    applyBaselineVariant(variants, matrix.baselineVariant);
+  }
+  return { name: matrix.name, variants };
 }
 
 /** Run matrix with inline variants (non-worker mode) */
@@ -205,35 +202,6 @@ async function runMatrixInline<T>(
   return { name: matrix.name, variants };
 }
 
-/** Context for running matrix benchmarks in worker mode */
-interface DirMatrixContext<T> {
-  matrix: BenchMatrix<T>;
-  casesModule?: import("./matrix/CaseLoader.ts").CasesModule<T>;
-  baselineIds: string[];
-  caseIds: string[];
-  runnerOpts: RunnerOptions;
-}
-
-/** Run matrix with variantDir (worker mode for memory isolation) */
-async function runMatrixWithDir<T>(
-  matrix: BenchMatrix<T>,
-  options: RunMatrixOptions,
-): Promise<MatrixResults> {
-  const allVariantIds = await discoverVariants(matrix.variantDir!);
-  if (allVariantIds.length === 0) {
-    throw new Error(`No variants found in ${matrix.variantDir}`);
-  }
-  const variantIds = options.filteredVariants ?? allVariantIds;
-
-  const ctx = await createDirContext(matrix, options);
-  const variants = await runDirVariants(variantIds, ctx);
-
-  if (matrix.baselineVariant) {
-    applyBaselineVariant(variants, matrix.baselineVariant);
-  }
-  return { name: matrix.name, variants };
-}
-
 /** Create context for directory-based matrix execution */
 async function createDirContext<T>(
   matrix: BenchMatrix<T>,
@@ -258,6 +226,89 @@ async function runDirVariants<T>(
     variants.push({ id: variantId, cases });
   }
   return variants;
+}
+
+/** Apply baselineVariant comparison - one variant is the reference for all others */
+function applyBaselineVariant(
+  variants: VariantResult[],
+  baselineVariantId: string,
+): void {
+  const baselineVariant = variants.find(v => v.id === baselineVariantId);
+  if (!baselineVariant) return;
+
+  const baselineByCase = new Map<string, MeasuredResults>();
+  for (const c of baselineVariant.cases) {
+    baselineByCase.set(c.caseId, c.measured);
+  }
+
+  for (const variant of variants) {
+    if (variant.id === baselineVariantId) continue;
+    for (const caseResult of variant.cases) {
+      const baseline = baselineByCase.get(caseResult.caseId);
+      if (baseline) {
+        caseResult.baseline = baseline;
+        caseResult.deltaPercent = computeDeltaPercent(
+          baseline,
+          caseResult.measured,
+        );
+      }
+    }
+  }
+}
+
+/** Load cases module and resolve filtered case IDs */
+async function resolveCases<T>(
+  matrix: BenchMatrix<T>,
+  options: RunMatrixOptions,
+) {
+  const casesModule = matrix.casesModule
+    ? await loadCasesModule<T>(matrix.casesModule)
+    : undefined;
+  const allCaseIds = casesModule?.cases ?? matrix.cases ?? ["default"];
+  const caseIds = options.filteredCases ?? allCaseIds;
+  return { casesModule, caseIds };
+}
+
+function buildRunnerOptions(options: RunMatrixOptions): RunnerOptions {
+  return {
+    maxIterations: options.iterations,
+    maxTime: options.maxTime ?? 1000,
+    warmup: options.warmup ?? 0,
+    collect: options.collect,
+    cpuCounters: options.cpuCounters,
+    traceOpt: options.traceOpt,
+    noSettle: options.noSettle,
+    pauseFirst: options.pauseFirst,
+    pauseInterval: options.pauseInterval,
+    pauseDuration: options.pauseDuration,
+    gcStats: options.gcStats,
+    heapSample: options.heapSample,
+    heapInterval: options.heapInterval,
+    heapDepth: options.heapDepth,
+  };
+}
+
+/** Run a single variant with case data */
+async function runVariant<T>(
+  variant: AnyVariant<T>,
+  caseData: T,
+  name: string,
+  runner: BasicRunner,
+  options: RunnerOptions,
+): Promise<MeasuredResults> {
+  if (isStatefulVariant(variant)) {
+    const state = await variant.setup(caseData);
+    const [result] = await runner.runBench(
+      { name, fn: () => variant.run(state) },
+      options,
+    );
+    return result;
+  }
+  const [result] = await runner.runBench(
+    { name, fn: () => variant(caseData) },
+    options,
+  );
+  return result;
 }
 
 /** Run all cases for a single variant */
@@ -296,6 +347,16 @@ async function runDirVariantCases<T>(
   return cases;
 }
 
+/** Compute delta percentage: (current - baseline) / baseline * 100 */
+function computeDeltaPercent(
+  baseline: MeasuredResults,
+  current: MeasuredResults,
+): number {
+  const baseAvg = average(baseline.samples);
+  if (baseAvg === 0) return 0;
+  return ((average(current.samples) - baseAvg) / baseAvg) * 100;
+}
+
 /** Run baseline variant if it exists in baselineDir */
 async function runBaselineIfExists<T>(
   variantId: string,
@@ -316,65 +377,4 @@ async function runBaselineIfExists<T>(
     options: runnerOpts,
   });
   return measured;
-}
-
-/** Compute delta percentage: (current - baseline) / baseline * 100 */
-function computeDeltaPercent(
-  baseline: MeasuredResults,
-  current: MeasuredResults,
-): number {
-  const baseAvg = average(baseline.samples);
-  if (baseAvg === 0) return 0;
-  return ((average(current.samples) - baseAvg) / baseAvg) * 100;
-}
-
-/** Apply baselineVariant comparison - one variant is the reference for all others */
-function applyBaselineVariant(
-  variants: VariantResult[],
-  baselineVariantId: string,
-): void {
-  const baselineVariant = variants.find(v => v.id === baselineVariantId);
-  if (!baselineVariant) return;
-
-  const baselineByCase = new Map<string, MeasuredResults>();
-  for (const c of baselineVariant.cases) {
-    baselineByCase.set(c.caseId, c.measured);
-  }
-
-  for (const variant of variants) {
-    if (variant.id === baselineVariantId) continue;
-    for (const caseResult of variant.cases) {
-      const baseline = baselineByCase.get(caseResult.caseId);
-      if (baseline) {
-        caseResult.baseline = baseline;
-        caseResult.deltaPercent = computeDeltaPercent(
-          baseline,
-          caseResult.measured,
-        );
-      }
-    }
-  }
-}
-
-/** Run a single variant with case data */
-async function runVariant<T>(
-  variant: AnyVariant<T>,
-  caseData: T,
-  name: string,
-  runner: BasicRunner,
-  options: RunnerOptions,
-): Promise<MeasuredResults> {
-  if (isStatefulVariant(variant)) {
-    const state = await variant.setup(caseData);
-    const [result] = await runner.runBench(
-      { name, fn: () => variant.run(state) },
-      options,
-    );
-    return result;
-  }
-  const [result] = await runner.runBench(
-    { name, fn: () => variant(caseData) },
-    options,
-  );
-  return result;
 }

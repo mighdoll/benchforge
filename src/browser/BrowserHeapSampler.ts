@@ -93,6 +93,32 @@ export async function profileBrowser(
   }
 }
 
+/** Forward Chrome's stdout/stderr to the terminal so V8 flag output is visible. */
+function pipeChromeOutput(server: BrowserServer): void {
+  const proc = server.process();
+  const pipe = (stream: NodeJS.ReadableStream | null) =>
+    stream?.on("data", (chunk: Buffer) => {
+      for (const line of chunk.toString().split("\n")) {
+        const text = line.trim();
+        if (text) process.stderr.write(`[chrome] ${text}\n`);
+      }
+    });
+  pipe(proc.stdout);
+  pipe(proc.stderr);
+}
+
+/** Start CDP GC tracing, returns the event collector array. */
+async function startGcTracing(cdp: CDPSession): Promise<TraceEvent[]> {
+  const events: TraceEvent[] = [];
+  cdp.on("Tracing.dataCollected", ({ value }) => {
+    for (const e of value) events.push(e as unknown as TraceEvent);
+  });
+  await cdp.send("Tracing.start", {
+    traceConfig: { includedCategories: ["v8", "v8.gc"] },
+  });
+  return events;
+}
+
 /** Inject __start/__lap as in-page functions, expose __done for results collection.
  *  __start/__lap are pure in-page (zero CDP overhead). First __start() triggers
  *  instrument start. __done() stops instruments and collects timing data. */
@@ -145,57 +171,6 @@ async function setupLapMode(
   }, timeout * 1000);
 
   return { promise, cancel: () => clearTimeout(timer) };
-}
-
-/** In-page timing functions injected via addInitScript (zero CDP overhead).
- *  __start/__lap collect timestamps, __done delegates to exposed __benchCollect. */
-function injectLapFunctions(): void {
-  const g = globalThis as any;
-  g.__benchSamples = [];
-  g.__benchLastTime = 0;
-  g.__benchFirstStart = 0;
-
-  g.__start = () => {
-    const now = performance.now();
-    g.__benchLastTime = now;
-    if (!g.__benchFirstStart) {
-      g.__benchFirstStart = now;
-      return g.__benchInstrumentStart();
-    }
-  };
-
-  g.__lap = () => {
-    const now = performance.now();
-    g.__benchSamples.push(now - g.__benchLastTime);
-    g.__benchLastTime = now;
-  };
-
-  g.__done = () => {
-    const wall = g.__benchFirstStart
-      ? performance.now() - g.__benchFirstStart
-      : 0;
-    return g.__benchCollect(g.__benchSamples.slice(), wall);
-  };
-}
-
-function heapSamplingParams(samplingInterval: number) {
-  return {
-    samplingInterval,
-    includeObjectsCollectedByMajorGC: true,
-    includeObjectsCollectedByMinorGC: true,
-  };
-}
-
-/** Start CDP GC tracing, returns the event collector array. */
-async function startGcTracing(cdp: CDPSession): Promise<TraceEvent[]> {
-  const events: TraceEvent[] = [];
-  cdp.on("Tracing.dataCollected", ({ value }) => {
-    for (const e of value) events.push(e as unknown as TraceEvent);
-  });
-  await cdp.send("Tracing.start", {
-    traceConfig: { includedCategories: ["v8", "v8.gc"] },
-  });
-  return events;
 }
 
 /** Bench function mode: run window.__bench in a timed iteration loop. */
@@ -254,18 +229,43 @@ async function collectTracing(
   return browserGcStats(traceEvents);
 }
 
-/** Forward Chrome's stdout/stderr to the terminal so V8 flag output is visible. */
-function pipeChromeOutput(server: BrowserServer): void {
-  const proc = server.process();
-  const pipe = (stream: NodeJS.ReadableStream | null) =>
-    stream?.on("data", (chunk: Buffer) => {
-      for (const line of chunk.toString().split("\n")) {
-        const text = line.trim();
-        if (text) process.stderr.write(`[chrome] ${text}\n`);
-      }
-    });
-  pipe(proc.stdout);
-  pipe(proc.stderr);
+function heapSamplingParams(samplingInterval: number) {
+  return {
+    samplingInterval,
+    includeObjectsCollectedByMajorGC: true,
+    includeObjectsCollectedByMinorGC: true,
+  };
+}
+
+/** In-page timing functions injected via addInitScript (zero CDP overhead).
+ *  __start/__lap collect timestamps, __done delegates to exposed __benchCollect. */
+function injectLapFunctions(): void {
+  const g = globalThis as any;
+  g.__benchSamples = [];
+  g.__benchLastTime = 0;
+  g.__benchFirstStart = 0;
+
+  g.__start = () => {
+    const now = performance.now();
+    g.__benchLastTime = now;
+    if (!g.__benchFirstStart) {
+      g.__benchFirstStart = now;
+      return g.__benchInstrumentStart();
+    }
+  };
+
+  g.__lap = () => {
+    const now = performance.now();
+    g.__benchSamples.push(now - g.__benchLastTime);
+    g.__benchLastTime = now;
+  };
+
+  g.__done = () => {
+    const wall = g.__benchFirstStart
+      ? performance.now() - g.__benchFirstStart
+      : 0;
+    return g.__benchCollect(g.__benchSamples.slice(), wall);
+  };
 }
 
 export { profileBrowser as profileBrowserHeap };

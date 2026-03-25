@@ -68,27 +68,19 @@ import {
 } from "./CliArgs.ts";
 import { filterBenchmarks } from "./FilterBenchmarks.ts";
 
-/** Validate CLI argument combinations */
-function validateArgs(args: DefaultCliArgs): void {
-  if (args["gc-stats"] && !args.worker && !args.url) {
-    throw new Error(
-      "--gc-stats requires worker mode (the default). Remove --no-worker flag.",
-    );
-  }
+export interface ExportOptions {
+  results: ReportGroup[];
+  args: DefaultCliArgs;
+  sections?: any[];
+  suiteName?: string;
+  currentVersion?: GitVersion;
+  baselineVersion?: GitVersion;
 }
 
-/** Warn about Node-only flags that are ignored in browser mode. */
-function warnBrowserFlags(args: DefaultCliArgs): void {
-  const ignored: string[] = [];
-  if (!args.worker) ignored.push("--no-worker");
-  if (args.cpu) ignored.push("--cpu");
-  if (args["trace-opt"]) ignored.push("--trace-opt");
-  if (args.collect) ignored.push("--collect");
-  if (args.adaptive) ignored.push("--adaptive");
-  if (args.batches > 1) ignored.push("--batches");
-  if (ignored.length) {
-    console.warn(yellow(`Ignored in browser mode: ${ignored.join(", ")}`));
-  }
+export interface MatrixExportOptions {
+  sections?: any[];
+  currentVersion?: GitVersion;
+  baselineVersion?: GitVersion;
 }
 
 type RunParams = {
@@ -106,6 +98,11 @@ type SuiteParams = {
   suite: BenchSuite;
   batches: number;
 };
+
+const isTest = process.env.NODE_ENV === "test" || process.env.VITEST === "true";
+const { yellow, dim } = isTest
+  ? { yellow: (s: string) => s, dim: (s: string) => s }
+  : pico;
 
 /** Parse CLI with custom configuration */
 export function parseBenchArgs<T = DefaultCliArgs>(
@@ -134,217 +131,6 @@ export async function runBenchmarks(
   });
 }
 
-/** Execute all groups in suite */
-async function runSuite(params: SuiteParams): Promise<ReportGroup[]> {
-  const { suite, runner, options, useWorker, batches } = params;
-  const results: ReportGroup[] = [];
-  for (const group of suite.groups) {
-    results.push(await runGroup(group, runner, options, useWorker, batches));
-  }
-  return results;
-}
-
-/** Execute group with shared setup, optionally batching to reduce ordering bias */
-async function runGroup(
-  group: BenchGroup,
-  runner: KnownRunner,
-  options: RunnerOptions,
-  useWorker: boolean,
-  batches = 1,
-): Promise<ReportGroup> {
-  const { name, benchmarks, baseline, setup, metadata } = group;
-  const setupParams = await setup?.();
-  validateBenchmarkParameters(group);
-
-  const runParams = {
-    runner,
-    options,
-    useWorker,
-    params: setupParams,
-    metadata,
-  };
-  if (batches === 1) {
-    return runSingleBatch(name, benchmarks, baseline, runParams);
-  }
-  return runMultipleBatches(name, benchmarks, baseline, runParams, batches);
-}
-
-/** Run benchmarks in a single batch */
-async function runSingleBatch(
-  name: string,
-  benchmarks: BenchmarkSpec[],
-  baseline: BenchmarkSpec | undefined,
-  runParams: RunParams,
-): Promise<ReportGroup> {
-  const baselineReport = baseline
-    ? await runSingleBenchmark(baseline, runParams)
-    : undefined;
-  const reports = await serialMap(benchmarks, b =>
-    runSingleBenchmark(b, runParams),
-  );
-  return { name, reports, baseline: baselineReport };
-}
-
-/** Run benchmarks in multiple batches, alternating order to reduce bias */
-async function runMultipleBatches(
-  name: string,
-  benchmarks: BenchmarkSpec[],
-  baseline: BenchmarkSpec | undefined,
-  runParams: RunParams,
-  batches: number,
-): Promise<ReportGroup> {
-  const timePerBatch = (runParams.options.maxTime || 5000) / batches;
-  const batchParams = {
-    ...runParams,
-    options: { ...runParams.options, maxTime: timePerBatch },
-  };
-  const baselineBatches: MeasuredResults[] = [];
-  const benchmarkBatches = new Map<string, MeasuredResults[]>();
-
-  for (let i = 0; i < batches; i++) {
-    const reverseOrder = i % 2 === 1;
-    await runBatchIteration(
-      benchmarks,
-      baseline,
-      batchParams,
-      reverseOrder,
-      baselineBatches,
-      benchmarkBatches,
-    );
-  }
-
-  const meta = runParams.metadata;
-  return mergeBatchResults(
-    name,
-    benchmarks,
-    baseline,
-    baselineBatches,
-    benchmarkBatches,
-    meta,
-  );
-}
-
-/** Run one batch iteration in either order */
-async function runBatchIteration(
-  benchmarks: BenchmarkSpec[],
-  baseline: BenchmarkSpec | undefined,
-  runParams: RunParams,
-  reverseOrder: boolean,
-  baselineBatches: MeasuredResults[],
-  benchmarkBatches: Map<string, MeasuredResults[]>,
-): Promise<void> {
-  const runBaseline = async () => {
-    if (baseline) {
-      const r = await runSingleBenchmark(baseline, runParams);
-      baselineBatches.push(r.measuredResults);
-    }
-  };
-  const runBenches = async () => {
-    for (const b of benchmarks) {
-      const r = await runSingleBenchmark(b, runParams);
-      appendToMap(benchmarkBatches, b.name, r.measuredResults);
-    }
-  };
-
-  if (reverseOrder) {
-    await runBenches();
-    await runBaseline();
-  } else {
-    await runBaseline();
-    await runBenches();
-  }
-}
-
-/** Merge batch results into final ReportGroup */
-function mergeBatchResults(
-  name: string,
-  benchmarks: BenchmarkSpec[],
-  baseline: BenchmarkSpec | undefined,
-  baselineBatches: MeasuredResults[],
-  benchmarkBatches: Map<string, MeasuredResults[]>,
-  metadata?: Record<string, unknown>,
-): ReportGroup {
-  const mergedBaseline = baseline
-    ? {
-        name: baseline.name,
-        measuredResults: mergeResults(baselineBatches),
-        metadata,
-      }
-    : undefined;
-  const reports = benchmarks.map(b => ({
-    name: b.name,
-    measuredResults: mergeResults(benchmarkBatches.get(b.name) || []),
-    metadata,
-  }));
-  return { name, reports, baseline: mergedBaseline };
-}
-
-/** Run single benchmark and create report */
-async function runSingleBenchmark(
-  spec: BenchmarkSpec,
-  runParams: RunParams,
-): Promise<BenchmarkReport> {
-  const { runner, options, useWorker, params, metadata } = runParams;
-  const benchmarkParams = { spec, runner, options, useWorker, params };
-  const [result] = await runBenchmark(benchmarkParams);
-  return { name: spec.name, measuredResults: result, metadata };
-}
-
-/** Warn if parameterized benchmarks lack setup */
-function validateBenchmarkParameters(group: BenchGroup): void {
-  const { name, setup, benchmarks, baseline } = group;
-  if (setup) return;
-
-  const allBenchmarks = baseline ? [...benchmarks, baseline] : benchmarks;
-  for (const benchmark of allBenchmarks) {
-    if (benchmark.fn.length > 0) {
-      console.warn(
-        `Benchmark "${benchmark.name}" in group "${name}" expects parameters but no setup() provided.`,
-      );
-    }
-  }
-}
-
-/** Merge multiple batch results into a single MeasuredResults */
-function mergeResults(results: MeasuredResults[]): MeasuredResults {
-  if (results.length === 0) {
-    throw new Error("Cannot merge empty results array");
-  }
-  if (results.length === 1) return results[0];
-
-  const allSamples = results.flatMap(r => r.samples);
-  const allWarmup = results.flatMap(r => r.warmupSamples || []);
-  const time = computeStats(allSamples);
-
-  let offset = 0;
-  const allPausePoints = results.flatMap(r => {
-    const pts = (r.pausePoints ?? []).map(p => ({
-      sampleIndex: p.sampleIndex + offset,
-      durationMs: p.durationMs,
-    }));
-    offset += r.samples.length;
-    return pts;
-  });
-
-  return {
-    name: results[0].name,
-    samples: allSamples,
-    warmupSamples: allWarmup.length ? allWarmup : undefined,
-    time,
-    totalTime: results.reduce((sum, r) => sum + (r.totalTime || 0), 0),
-    pausePoints: allPausePoints.length ? allPausePoints : undefined,
-  };
-}
-
-function appendToMap(
-  map: Map<string, MeasuredResults[]>,
-  key: string,
-  value: MeasuredResults,
-) {
-  if (!map.has(key)) map.set(key, []);
-  map.get(key)!.push(value);
-}
-
 /** Generate table with standard sections */
 export function defaultReport(
   groups: ReportGroup[],
@@ -360,25 +146,6 @@ export function defaultReport(
     traceOpt && hasOpt,
   );
   return reportResults(groups, sections);
-}
-
-/** Build report sections based on CLI options */
-function buildReportSections(
-  adaptive: boolean,
-  gcStats: boolean,
-  hasCpuData: boolean,
-  hasOptData: boolean,
-) {
-  const sections = adaptive
-    ? [adaptiveSection, totalTimeSection]
-    : [timeSection];
-
-  if (gcStats) sections.push(gcStatsSection);
-  if (hasCpuData) sections.push(cpuSection);
-  if (hasOptData) sections.push(optSection);
-  sections.push(runsSection);
-
-  return sections;
 }
 
 /** Run benchmarks, display table, and optionally generate HTML report */
@@ -435,72 +202,6 @@ export async function browserBenchExports(args: DefaultCliArgs): Promise<void> {
   await exportReports({ results, args });
 }
 
-/** Print browser benchmark tables and heap reports */
-function printBrowserReport(
-  result: BrowserProfileResult,
-  results: ReportGroup[],
-  args: DefaultCliArgs,
-): void {
-  const hasSamples = result.samples && result.samples.length > 0;
-  const sections: ResultsMapper<any>[] = [];
-  if (hasSamples || result.wallTimeMs != null) {
-    sections.push(timeSection);
-  }
-  if (result.gcStats) {
-    sections.push(browserGcStatsSection);
-  }
-  if (hasSamples || result.wallTimeMs != null) {
-    sections.push(runsSection);
-  }
-  if (sections.length > 0) {
-    console.log(reportResults(results, sections));
-  }
-  if (result.heapProfile) {
-    printHeapReports(results, {
-      ...cliHeapReportOptions(args),
-      isUserCode: isBrowserUserCode,
-    });
-  }
-}
-
-/** Wrap browser profile result as ReportGroup[] for the standard pipeline */
-function browserResultGroups(
-  name: string,
-  result: BrowserProfileResult,
-): ReportGroup[] {
-  const { gcStats, heapProfile } = result;
-  let measured: MeasuredResults;
-
-  // Bench function mode: multiple timing samples with real statistics
-  if (result.samples && result.samples.length > 0) {
-    const { samples } = result;
-    const totalTime = result.wallTimeMs ? result.wallTimeMs / 1000 : undefined;
-    measured = {
-      name,
-      samples,
-      time: computeStats(samples),
-      totalTime,
-      gcStats,
-      heapProfile,
-    };
-  } else {
-    // Lap mode: 0 laps = single wall-clock, N laps handled above
-    const wallMs = result.wallTimeMs ?? 0;
-    const time = {
-      min: wallMs,
-      max: wallMs,
-      avg: wallMs,
-      p50: wallMs,
-      p75: wallMs,
-      p99: wallMs,
-      p999: wallMs,
-    };
-    measured = { name, samples: [wallMs], time, gcStats, heapProfile };
-  }
-
-  return [{ name, reports: [{ name, measuredResults: measured }] }];
-}
-
 /** Print heap allocation reports for benchmarks with heap profiles */
 export function printHeapReports(
   groups: ReportGroup[],
@@ -550,32 +251,6 @@ export async function runDefaultBench(
   }
 }
 
-/** Import a file and run it as a benchmark based on what it exports */
-async function fileBenchExports(
-  filePath: string,
-  args: DefaultCliArgs,
-): Promise<void> {
-  const fileUrl = pathToFileURL(resolve(filePath)).href;
-  const mod = await import(fileUrl);
-  const candidate = mod.default;
-
-  if (candidate && Array.isArray(candidate.matrices)) {
-    // MatrixSuite export
-    await matrixBenchExports(candidate as MatrixSuite, args);
-  } else if (candidate && Array.isArray(candidate.groups)) {
-    // BenchSuite export
-    await benchExports(candidate as BenchSuite, args);
-  } else if (typeof candidate === "function") {
-    // Default function export: wrap as a single benchmark
-    const name = basename(filePath).replace(/\.[^.]+$/, "");
-    await benchExports(
-      { name, groups: [{ name, benchmarks: [{ name, fn: candidate }] }] },
-      args,
-    );
-  }
-  // else: self-executing file already ran on import
-}
-
 /** Convert CLI args to runner options */
 export function cliToRunnerOptions(args: DefaultCliArgs): RunnerOptions {
   const { profile, collect, iterations } = args;
@@ -589,59 +264,6 @@ export function cliToRunnerOptions(args: DefaultCliArgs): RunnerOptions {
     ...cliCommonOptions(args),
   };
 }
-
-/** Create options for adaptive mode */
-function createAdaptiveOptions(args: DefaultCliArgs): RunnerOptions {
-  return {
-    minTime: (args["min-time"] ?? 1) * 1000,
-    maxTime: defaultAdaptiveMaxTime * 1000,
-    targetConfidence: args.convergence,
-    adaptive: true,
-    ...cliCommonOptions(args),
-  } as any;
-}
-
-/** @return true if any heap-related flag implies heap sampling */
-function needsHeapSample(args: DefaultCliArgs): boolean {
-  return (
-    args["heap-sample"] ||
-    args.speedscope ||
-    !!args["export-speedscope"] ||
-    args["heap-raw"] ||
-    args["heap-verbose"] ||
-    args["heap-user-only"]
-  );
-}
-
-/** Runner/matrix options shared across all CLI modes */
-function cliCommonOptions(args: DefaultCliArgs) {
-  const { collect, cpu, warmup } = args;
-  const { "trace-opt": traceOpt, "skip-settle": noSettle } = args;
-  const { "pause-first": pauseFirst, "pause-interval": pauseInterval } = args;
-  const { "pause-duration": pauseDuration, "gc-stats": gcStats } = args;
-  const heapSample = needsHeapSample(args);
-  const { "heap-interval": heapInterval } = args;
-  const { "heap-depth": heapDepth } = args;
-  return {
-    collect,
-    cpuCounters: cpu,
-    warmup,
-    traceOpt,
-    noSettle,
-    pauseFirst,
-    pauseInterval,
-    pauseDuration,
-    gcStats,
-    heapSample,
-    heapInterval,
-    heapDepth,
-  };
-}
-
-const isTest = process.env.NODE_ENV === "test" || process.env.VITEST === "true";
-const { yellow, dim } = isTest
-  ? { yellow: (s: string) => s, dim: (s: string) => s }
-  : pico;
 
 /** Log V8 optimization tier distribution and deoptimizations */
 export function reportOptStatus(groups: ReportGroup[]): void {
@@ -690,28 +312,6 @@ export function hasField(
   );
 }
 
-export interface ExportOptions {
-  results: ReportGroup[];
-  args: DefaultCliArgs;
-  sections?: any[];
-  suiteName?: string;
-  currentVersion?: GitVersion;
-  baselineVersion?: GitVersion;
-}
-
-/** Print heap reports (if enabled) and export results */
-async function finishReports(
-  results: ReportGroup[],
-  args: DefaultCliArgs,
-  suiteName?: string,
-  exportOptions?: MatrixExportOptions,
-): Promise<void> {
-  if (needsHeapSample(args)) {
-    printHeapReports(results, cliHeapReportOptions(args));
-  }
-  await exportReports({ results, args, suiteName, ...exportOptions });
-}
-
 /** Export reports (HTML, JSON, Perfetto) based on CLI args */
 export async function exportReports(options: ExportOptions): Promise<void> {
   const { results, args, sections, suiteName } = options;
@@ -755,17 +355,6 @@ export async function exportReports(options: ExportOptions): Promise<void> {
     await waitForCtrlC();
     closeServer?.();
   }
-}
-
-/** Wait for Ctrl+C before exiting */
-function waitForCtrlC(): Promise<void> {
-  return new Promise(resolve => {
-    console.log(dim("\nPress Ctrl+C to exit"));
-    process.on("SIGINT", () => {
-      console.log();
-      resolve();
-    });
-  });
 }
 
 /** Run matrix suite with CLI arguments.
@@ -834,38 +423,6 @@ export function defaultMatrixReport(
   return results.map(r => reportMatrixResults(r, options)).join("\n\n");
 }
 
-/** @return HeapReportOptions from CLI args */
-function cliHeapReportOptions(args: DefaultCliArgs): HeapReportOptions {
-  return {
-    topN: args["heap-rows"],
-    stackDepth: args["heap-stack"],
-    verbose: args["heap-verbose"],
-    raw: args["heap-raw"],
-    userOnly: args["heap-user-only"],
-  };
-}
-
-/** Apply default sections and extra columns for matrix reports */
-function mergeMatrixDefaults(
-  reportOptions: MatrixReportOptions | undefined,
-  args: DefaultCliArgs,
-  results: MatrixResults[],
-): MatrixReportOptions {
-  const result: MatrixReportOptions = { ...reportOptions };
-
-  if (!result.sections?.length) {
-    const groups = matrixToReportGroups(results);
-    result.sections = buildReportSections(
-      args.adaptive,
-      args["gc-stats"],
-      hasField(groups, "cpu"),
-      args["trace-opt"] && hasField(groups, "optStatus"),
-    );
-  }
-
-  return result;
-}
-
 /** Run matrix suite with full CLI handling (parse, run, report, export) */
 export async function runDefaultMatrixBench(
   suite: MatrixSuite,
@@ -904,10 +461,96 @@ export function matrixToReportGroups(results: MatrixResults[]): ReportGroup[] {
   );
 }
 
-export interface MatrixExportOptions {
-  sections?: any[];
-  currentVersion?: GitVersion;
-  baselineVersion?: GitVersion;
+/** Run matrix benchmarks, display table, and generate exports */
+export async function matrixBenchExports(
+  suite: MatrixSuite,
+  args: DefaultCliArgs,
+  reportOptions?: MatrixReportOptions,
+  exportOptions?: MatrixExportOptions,
+): Promise<void> {
+  const results = await runMatrixSuite(suite, args);
+  const report = defaultMatrixReport(results, reportOptions, args);
+  console.log(report);
+
+  const reportGroups = matrixToReportGroups(results);
+  await finishReports(reportGroups, args, suite.name, exportOptions);
+}
+
+/** Validate CLI argument combinations */
+function validateArgs(args: DefaultCliArgs): void {
+  if (args["gc-stats"] && !args.worker && !args.url) {
+    throw new Error(
+      "--gc-stats requires worker mode (the default). Remove --no-worker flag.",
+    );
+  }
+}
+
+/** Execute all groups in suite */
+async function runSuite(params: SuiteParams): Promise<ReportGroup[]> {
+  const { suite, runner, options, useWorker, batches } = params;
+  const results: ReportGroup[] = [];
+  for (const group of suite.groups) {
+    results.push(await runGroup(group, runner, options, useWorker, batches));
+  }
+  return results;
+}
+
+/** Build report sections based on CLI options */
+function buildReportSections(
+  adaptive: boolean,
+  gcStats: boolean,
+  hasCpuData: boolean,
+  hasOptData: boolean,
+) {
+  const sections = adaptive
+    ? [adaptiveSection, totalTimeSection]
+    : [timeSection];
+
+  if (gcStats) sections.push(gcStatsSection);
+  if (hasCpuData) sections.push(cpuSection);
+  if (hasOptData) sections.push(optSection);
+  sections.push(runsSection);
+
+  return sections;
+}
+
+/** Print heap reports (if enabled) and export results */
+async function finishReports(
+  results: ReportGroup[],
+  args: DefaultCliArgs,
+  suiteName?: string,
+  exportOptions?: MatrixExportOptions,
+): Promise<void> {
+  if (needsHeapSample(args)) {
+    printHeapReports(results, cliHeapReportOptions(args));
+  }
+  await exportReports({ results, args, suiteName, ...exportOptions });
+}
+
+/** Warn about Node-only flags that are ignored in browser mode. */
+function warnBrowserFlags(args: DefaultCliArgs): void {
+  const ignored: string[] = [];
+  if (!args.worker) ignored.push("--no-worker");
+  if (args.cpu) ignored.push("--cpu");
+  if (args["trace-opt"]) ignored.push("--trace-opt");
+  if (args.collect) ignored.push("--collect");
+  if (args.adaptive) ignored.push("--adaptive");
+  if (args.batches > 1) ignored.push("--batches");
+  if (ignored.length) {
+    console.warn(yellow(`Ignored in browser mode: ${ignored.join(", ")}`));
+  }
+}
+
+/** @return true if any heap-related flag implies heap sampling */
+function needsHeapSample(args: DefaultCliArgs): boolean {
+  return (
+    args["heap-sample"] ||
+    args.speedscope ||
+    !!args["export-speedscope"] ||
+    args["heap-raw"] ||
+    args["heap-verbose"] ||
+    args["heap-user-only"]
+  );
 }
 
 /** Strip surrounding quotes from a chrome arg token.
@@ -926,6 +569,283 @@ function stripQuotes(s: string): string {
   return valueUnquote;
 }
 
+/** Wrap browser profile result as ReportGroup[] for the standard pipeline */
+function browserResultGroups(
+  name: string,
+  result: BrowserProfileResult,
+): ReportGroup[] {
+  const { gcStats, heapProfile } = result;
+  let measured: MeasuredResults;
+
+  // Bench function mode: multiple timing samples with real statistics
+  if (result.samples && result.samples.length > 0) {
+    const { samples } = result;
+    const totalTime = result.wallTimeMs ? result.wallTimeMs / 1000 : undefined;
+    measured = {
+      name,
+      samples,
+      time: computeStats(samples),
+      totalTime,
+      gcStats,
+      heapProfile,
+    };
+  } else {
+    // Lap mode: 0 laps = single wall-clock, N laps handled above
+    const wallMs = result.wallTimeMs ?? 0;
+    const time = {
+      min: wallMs,
+      max: wallMs,
+      avg: wallMs,
+      p50: wallMs,
+      p75: wallMs,
+      p99: wallMs,
+      p999: wallMs,
+    };
+    measured = { name, samples: [wallMs], time, gcStats, heapProfile };
+  }
+
+  return [{ name, reports: [{ name, measuredResults: measured }] }];
+}
+
+/** Print browser benchmark tables and heap reports */
+function printBrowserReport(
+  result: BrowserProfileResult,
+  results: ReportGroup[],
+  args: DefaultCliArgs,
+): void {
+  const hasSamples = result.samples && result.samples.length > 0;
+  const sections: ResultsMapper<any>[] = [];
+  if (hasSamples || result.wallTimeMs != null) {
+    sections.push(timeSection);
+  }
+  if (result.gcStats) {
+    sections.push(browserGcStatsSection);
+  }
+  if (hasSamples || result.wallTimeMs != null) {
+    sections.push(runsSection);
+  }
+  if (sections.length > 0) {
+    console.log(reportResults(results, sections));
+  }
+  if (result.heapProfile) {
+    printHeapReports(results, {
+      ...cliHeapReportOptions(args),
+      isUserCode: isBrowserUserCode,
+    });
+  }
+}
+
+/** Import a file and run it as a benchmark based on what it exports */
+async function fileBenchExports(
+  filePath: string,
+  args: DefaultCliArgs,
+): Promise<void> {
+  const fileUrl = pathToFileURL(resolve(filePath)).href;
+  const mod = await import(fileUrl);
+  const candidate = mod.default;
+
+  if (candidate && Array.isArray(candidate.matrices)) {
+    // MatrixSuite export
+    await matrixBenchExports(candidate as MatrixSuite, args);
+  } else if (candidate && Array.isArray(candidate.groups)) {
+    // BenchSuite export
+    await benchExports(candidate as BenchSuite, args);
+  } else if (typeof candidate === "function") {
+    // Default function export: wrap as a single benchmark
+    const name = basename(filePath).replace(/\.[^.]+$/, "");
+    await benchExports(
+      { name, groups: [{ name, benchmarks: [{ name, fn: candidate }] }] },
+      args,
+    );
+  }
+  // else: self-executing file already ran on import
+}
+
+/** Create options for adaptive mode */
+function createAdaptiveOptions(args: DefaultCliArgs): RunnerOptions {
+  return {
+    minTime: (args["min-time"] ?? 1) * 1000,
+    maxTime: defaultAdaptiveMaxTime * 1000,
+    targetConfidence: args.convergence,
+    adaptive: true,
+    ...cliCommonOptions(args),
+  } as any;
+}
+
+/** Runner/matrix options shared across all CLI modes */
+function cliCommonOptions(args: DefaultCliArgs) {
+  const { collect, cpu, warmup } = args;
+  const { "trace-opt": traceOpt, "skip-settle": noSettle } = args;
+  const { "pause-first": pauseFirst, "pause-interval": pauseInterval } = args;
+  const { "pause-duration": pauseDuration, "gc-stats": gcStats } = args;
+  const heapSample = needsHeapSample(args);
+  const { "heap-interval": heapInterval } = args;
+  const { "heap-depth": heapDepth } = args;
+  return {
+    collect,
+    cpuCounters: cpu,
+    warmup,
+    traceOpt,
+    noSettle,
+    pauseFirst,
+    pauseInterval,
+    pauseDuration,
+    gcStats,
+    heapSample,
+    heapInterval,
+    heapDepth,
+  };
+}
+
+/** Wait for Ctrl+C before exiting */
+function waitForCtrlC(): Promise<void> {
+  return new Promise(resolve => {
+    console.log(dim("\nPress Ctrl+C to exit"));
+    process.on("SIGINT", () => {
+      console.log();
+      resolve();
+    });
+  });
+}
+
+/** Apply default sections and extra columns for matrix reports */
+function mergeMatrixDefaults(
+  reportOptions: MatrixReportOptions | undefined,
+  args: DefaultCliArgs,
+  results: MatrixResults[],
+): MatrixReportOptions {
+  const result: MatrixReportOptions = { ...reportOptions };
+
+  if (!result.sections?.length) {
+    const groups = matrixToReportGroups(results);
+    result.sections = buildReportSections(
+      args.adaptive,
+      args["gc-stats"],
+      hasField(groups, "cpu"),
+      args["trace-opt"] && hasField(groups, "optStatus"),
+    );
+  }
+
+  return result;
+}
+
+/** Execute group with shared setup, optionally batching to reduce ordering bias */
+async function runGroup(
+  group: BenchGroup,
+  runner: KnownRunner,
+  options: RunnerOptions,
+  useWorker: boolean,
+  batches = 1,
+): Promise<ReportGroup> {
+  const { name, benchmarks, baseline, setup, metadata } = group;
+  const setupParams = await setup?.();
+  validateBenchmarkParameters(group);
+
+  const runParams = {
+    runner,
+    options,
+    useWorker,
+    params: setupParams,
+    metadata,
+  };
+  if (batches === 1) {
+    return runSingleBatch(name, benchmarks, baseline, runParams);
+  }
+  return runMultipleBatches(name, benchmarks, baseline, runParams, batches);
+}
+
+/** @return HeapReportOptions from CLI args */
+function cliHeapReportOptions(args: DefaultCliArgs): HeapReportOptions {
+  return {
+    topN: args["heap-rows"],
+    stackDepth: args["heap-stack"],
+    verbose: args["heap-verbose"],
+    raw: args["heap-raw"],
+    userOnly: args["heap-user-only"],
+  };
+}
+
+/** Warn if parameterized benchmarks lack setup */
+function validateBenchmarkParameters(group: BenchGroup): void {
+  const { name, setup, benchmarks, baseline } = group;
+  if (setup) return;
+
+  const allBenchmarks = baseline ? [...benchmarks, baseline] : benchmarks;
+  for (const benchmark of allBenchmarks) {
+    if (benchmark.fn.length > 0) {
+      console.warn(
+        `Benchmark "${benchmark.name}" in group "${name}" expects parameters but no setup() provided.`,
+      );
+    }
+  }
+}
+
+/** Run benchmarks in a single batch */
+async function runSingleBatch(
+  name: string,
+  benchmarks: BenchmarkSpec[],
+  baseline: BenchmarkSpec | undefined,
+  runParams: RunParams,
+): Promise<ReportGroup> {
+  const baselineReport = baseline
+    ? await runSingleBenchmark(baseline, runParams)
+    : undefined;
+  const reports = await serialMap(benchmarks, b =>
+    runSingleBenchmark(b, runParams),
+  );
+  return { name, reports, baseline: baselineReport };
+}
+
+/** Run benchmarks in multiple batches, alternating order to reduce bias */
+async function runMultipleBatches(
+  name: string,
+  benchmarks: BenchmarkSpec[],
+  baseline: BenchmarkSpec | undefined,
+  runParams: RunParams,
+  batches: number,
+): Promise<ReportGroup> {
+  const timePerBatch = (runParams.options.maxTime || 5000) / batches;
+  const batchParams = {
+    ...runParams,
+    options: { ...runParams.options, maxTime: timePerBatch },
+  };
+  const baselineBatches: MeasuredResults[] = [];
+  const benchmarkBatches = new Map<string, MeasuredResults[]>();
+
+  for (let i = 0; i < batches; i++) {
+    const reverseOrder = i % 2 === 1;
+    await runBatchIteration(
+      benchmarks,
+      baseline,
+      batchParams,
+      reverseOrder,
+      baselineBatches,
+      benchmarkBatches,
+    );
+  }
+
+  const meta = runParams.metadata;
+  return mergeBatchResults(
+    name,
+    benchmarks,
+    baseline,
+    baselineBatches,
+    benchmarkBatches,
+    meta,
+  );
+}
+
+/** Run single benchmark and create report */
+async function runSingleBenchmark(
+  spec: BenchmarkSpec,
+  runParams: RunParams,
+): Promise<BenchmarkReport> {
+  const { runner, options, useWorker, params, metadata } = runParams;
+  const benchmarkParams = { spec, runner, options, useWorker, params };
+  const [result] = await runBenchmark(benchmarkParams);
+  return { name: spec.name, measuredResults: result, metadata };
+}
+
 /** Sequential map - like Promise.all(arr.map(fn)) but runs one at a time */
 async function serialMap<T, R>(
   arr: T[],
@@ -938,17 +858,97 @@ async function serialMap<T, R>(
   return results;
 }
 
-/** Run matrix benchmarks, display table, and generate exports */
-export async function matrixBenchExports(
-  suite: MatrixSuite,
-  args: DefaultCliArgs,
-  reportOptions?: MatrixReportOptions,
-  exportOptions?: MatrixExportOptions,
+/** Run one batch iteration in either order */
+async function runBatchIteration(
+  benchmarks: BenchmarkSpec[],
+  baseline: BenchmarkSpec | undefined,
+  runParams: RunParams,
+  reverseOrder: boolean,
+  baselineBatches: MeasuredResults[],
+  benchmarkBatches: Map<string, MeasuredResults[]>,
 ): Promise<void> {
-  const results = await runMatrixSuite(suite, args);
-  const report = defaultMatrixReport(results, reportOptions, args);
-  console.log(report);
+  const runBaseline = async () => {
+    if (baseline) {
+      const r = await runSingleBenchmark(baseline, runParams);
+      baselineBatches.push(r.measuredResults);
+    }
+  };
+  const runBenches = async () => {
+    for (const b of benchmarks) {
+      const r = await runSingleBenchmark(b, runParams);
+      appendToMap(benchmarkBatches, b.name, r.measuredResults);
+    }
+  };
 
-  const reportGroups = matrixToReportGroups(results);
-  await finishReports(reportGroups, args, suite.name, exportOptions);
+  if (reverseOrder) {
+    await runBenches();
+    await runBaseline();
+  } else {
+    await runBaseline();
+    await runBenches();
+  }
+}
+
+/** Merge batch results into final ReportGroup */
+function mergeBatchResults(
+  name: string,
+  benchmarks: BenchmarkSpec[],
+  baseline: BenchmarkSpec | undefined,
+  baselineBatches: MeasuredResults[],
+  benchmarkBatches: Map<string, MeasuredResults[]>,
+  metadata?: Record<string, unknown>,
+): ReportGroup {
+  const mergedBaseline = baseline
+    ? {
+        name: baseline.name,
+        measuredResults: mergeResults(baselineBatches),
+        metadata,
+      }
+    : undefined;
+  const reports = benchmarks.map(b => ({
+    name: b.name,
+    measuredResults: mergeResults(benchmarkBatches.get(b.name) || []),
+    metadata,
+  }));
+  return { name, reports, baseline: mergedBaseline };
+}
+
+function appendToMap(
+  map: Map<string, MeasuredResults[]>,
+  key: string,
+  value: MeasuredResults,
+) {
+  if (!map.has(key)) map.set(key, []);
+  map.get(key)!.push(value);
+}
+
+/** Merge multiple batch results into a single MeasuredResults */
+function mergeResults(results: MeasuredResults[]): MeasuredResults {
+  if (results.length === 0) {
+    throw new Error("Cannot merge empty results array");
+  }
+  if (results.length === 1) return results[0];
+
+  const allSamples = results.flatMap(r => r.samples);
+  const allWarmup = results.flatMap(r => r.warmupSamples || []);
+  const time = computeStats(allSamples);
+
+  let offset = 0;
+  const allPausePoints = results.flatMap(r => {
+    const pts = (r.pausePoints ?? []).map(p => ({
+      sampleIndex: p.sampleIndex + offset,
+      durationMs: p.durationMs,
+    }));
+    offset += r.samples.length;
+    return pts;
+  });
+
+  return {
+    name: results[0].name,
+    samples: allSamples,
+    warmupSamples: allWarmup.length ? allWarmup : undefined,
+    time,
+    totalTime: results.reduce((sum, r) => sum + (r.totalTime || 0), 0),
+    pausePoints: allPausePoints.length ? allPausePoints : undefined,
+  };
 }

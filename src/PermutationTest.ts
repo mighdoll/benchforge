@@ -10,11 +10,6 @@
 
 import { average, percentile } from "./StatisticalUtils.ts";
 
-const significanceThreshold = 0.05;
-const strongSignificance = 0.001;
-const goodSignificance = 0.01;
-const defaultBootstrapSamples = 10000;
-
 /** Statistical comparison between baseline and current benchmark samples */
 export interface ComparisonResult {
   baselineMedian: number;
@@ -38,6 +33,11 @@ export interface ComparisonResult {
     significance: "strong" | "good" | "weak" | "none";
   };
 }
+
+const significanceThreshold = 0.05;
+const strongSignificance = 0.001;
+const goodSignificance = 0.01;
+const defaultBootstrapSamples = 10000;
 
 /** @return statistical comparison between baseline and current samples */
 export function compareWithBaseline(
@@ -63,25 +63,6 @@ export function compareWithBaseline(
   };
 }
 
-/** @return change statistics for a current vs baseline comparison */
-function changeStats(current: number, base: number, pValue: number) {
-  return {
-    absolute: current - base,
-    percent: ((current - base) / base) * 100,
-    pValue,
-    significant: pValue < significanceThreshold,
-    significance: getSignificance(pValue),
-  };
-}
-
-/** @return significance level based on p-value thresholds */
-function getSignificance(pValue: number): "strong" | "good" | "weak" | "none" {
-  if (pValue < strongSignificance) return "strong";
-  if (pValue < goodSignificance) return "good";
-  if (pValue < significanceThreshold) return "weak";
-  return "none";
-}
-
 /** @return p-value from permutation test for difference in statistics */
 function bootstrapDifferenceTest(
   sample1: number[],
@@ -101,6 +82,17 @@ function bootstrapDifferenceTest(
   return moreExtreme / defaultBootstrapSamples;
 }
 
+/** @return change statistics for a current vs baseline comparison */
+function changeStats(current: number, base: number, pValue: number) {
+  return {
+    absolute: current - base,
+    percent: ((current - base) / base) * 100,
+    pValue,
+    significant: pValue < significanceThreshold,
+    significance: getSignificance(pValue),
+  };
+}
+
 /** @return randomly shuffled samples split at n1 (Fisher-Yates shuffle) */
 function shuffleAndSplit(combined: number[], n1: number) {
   const shuffled = [...combined];
@@ -112,4 +104,12 @@ function shuffleAndSplit(combined: number[], n1: number) {
     resample1: shuffled.slice(0, n1),
     resample2: shuffled.slice(n1),
   };
+}
+
+/** @return significance level based on p-value thresholds */
+function getSignificance(pValue: number): "strong" | "good" | "weak" | "none" {
+  if (pValue < strongSignificance) return "strong";
+  if (pValue < goodSignificance) return "good";
+  if (pValue < significanceThreshold) return "weak";
+  return "none";
 }

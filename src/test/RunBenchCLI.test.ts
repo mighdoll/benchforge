@@ -49,6 +49,24 @@ const suiteWithSetup: BenchSuite = {
   ],
 };
 
+/** Execute test fixture script and return output */
+function executeTestScript(args = ""): string {
+  const script = path.join(
+    import.meta.dirname!,
+    "fixtures/test-bench-script.ts",
+  );
+  return execSync(`node --expose-gc --allow-natives-syntax ${script} ${args}`, {
+    encoding: "utf8",
+  });
+}
+
+/** Run a fixture file via bin/benchforge and return output */
+function executeBenchforgeFile(file: string, args = ""): string {
+  const bin = path.join(import.meta.dirname!, "../../bin/benchforge");
+  const fixture = path.join(import.meta.dirname!, "fixtures", file);
+  return execSync(`${bin} ${fixture} ${args}`, { encoding: "utf8" });
+}
+
 test("runs all benchmarks", { timeout: 30000 }, async () => {
   const output = await runBenchCLITest(testSuite, "--time 0.1");
 
@@ -86,24 +104,6 @@ test("filter preserves suite structure", () => {
   expect(filtered.groups[0].benchmarks[0].name).toBe("concatenation");
   expect(filtered.groups[1].benchmarks).toHaveLength(0);
 });
-
-/** Execute test fixture script and return output */
-function executeTestScript(args = ""): string {
-  const script = path.join(
-    import.meta.dirname!,
-    "fixtures/test-bench-script.ts",
-  );
-  return execSync(`node --expose-gc --allow-natives-syntax ${script} ${args}`, {
-    encoding: "utf8",
-  });
-}
-
-/** Run a fixture file via bin/benchforge and return output */
-function executeBenchforgeFile(file: string, args = ""): string {
-  const bin = path.join(import.meta.dirname!, "../../bin/benchforge");
-  const fixture = path.join(import.meta.dirname!, "fixtures", file);
-  return execSync(`${bin} ${fixture} ${args}`, { encoding: "utf8" });
-}
 
 test("e2e: runs user script", { timeout: 30000 }, () => {
   const output = executeTestScript("--time 0.1");

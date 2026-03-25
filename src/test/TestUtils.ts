@@ -7,6 +7,30 @@ import type { MeasuredResults } from "../MeasuredResults.ts";
 import { average, percentile } from "../StatisticalUtils.ts";
 import { bevy30SamplesMs } from "../tests/fixtures/bevy30-samples.ts";
 
+/** Validation helpers for statistical tests */
+export const assertValid = {
+  pValue: (value: number) => {
+    if (value < 0 || value > 1) {
+      throw new Error(`Expected p-value between 0 and 1, got ${value}`);
+    }
+  },
+
+  percentileOrder: (p25: number, p50: number, p75: number, p99: number) => {
+    if (!(p25 <= p50 && p50 <= p75 && p75 <= p99)) {
+      throw new Error(
+        `Percentiles not ordered: p25=${p25}, p50=${p50}, p75=${p75}, p99=${p99}`,
+      );
+    }
+  },
+
+  significance: (level: string) => {
+    const valid = ["none", "weak", "good", "strong"];
+    if (!valid.includes(level)) {
+      throw new Error(`Invalid significance level: ${level}`);
+    }
+  },
+};
+
 /** @return formatted benchmark output for CLI testing */
 export async function runBenchCLITest<T = DefaultCliArgs>(
   suite: BenchSuite,
@@ -67,27 +91,3 @@ export function createBenchmarkReport(
     measuredResults: createMeasuredResults(sampleRange, overrides),
   };
 }
-
-/** Validation helpers for statistical tests */
-export const assertValid = {
-  pValue: (value: number) => {
-    if (value < 0 || value > 1) {
-      throw new Error(`Expected p-value between 0 and 1, got ${value}`);
-    }
-  },
-
-  percentileOrder: (p25: number, p50: number, p75: number, p99: number) => {
-    if (!(p25 <= p50 && p50 <= p75 && p75 <= p99)) {
-      throw new Error(
-        `Percentiles not ordered: p25=${p25}, p50=${p50}, p75=${p75}, p99=${p99}`,
-      );
-    }
-  },
-
-  significance: (level: string) => {
-    const valid = ["none", "weak", "good", "strong"];
-    if (!valid.includes(level)) {
-      throw new Error(`Invalid significance level: ${level}`);
-    }
-  },
-};

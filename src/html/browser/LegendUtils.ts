@@ -26,6 +26,27 @@ interface LegendPos {
   yMax: number;
 }
 
+/** Build complete legend marks array */
+export function buildLegend(bounds: LegendBounds, items: LegendItem[]): any[] {
+  const xRange = bounds.xMax - bounds.xMin;
+  const legendX = bounds.xMin + xRange * 0.68;
+  const textX = legendX + xRange * 0.04;
+  const getY = (i: number) => bounds.yMax * 0.98 - i * (bounds.yMax * 0.08);
+
+  const marks: any[] = [legendBackground(bounds)];
+  for (let i = 0; i < items.length; i++) {
+    const pos: LegendPos = {
+      legendX,
+      y: getY(i),
+      textX,
+      xRange,
+      yMax: bounds.yMax,
+    };
+    marks.push(symbolMark(pos, items[i]), textMark(pos, items[i].label));
+  }
+  return marks;
+}
+
 /** Draw a semi-transparent white background behind the legend area */
 function legendBackground(bounds: LegendBounds): any {
   const xRange = bounds.xMax - bounds.xMin;
@@ -48,6 +69,33 @@ function legendBackground(bounds: LegendBounds): any {
     strokeWidth: 1,
   };
   return Plot.rect(data, opts);
+}
+
+function symbolMark(pos: LegendPos, item: LegendItem): any {
+  switch (item.style) {
+    case "filled-dot":
+      return dotMark(pos.legendX, pos.y, item.color, true);
+    case "hollow-dot":
+      return dotMark(pos.legendX, pos.y, item.color, false);
+    case "vertical-bar":
+      return verticalBarMark(pos, item.color);
+    case "vertical-line":
+      return verticalLineMark(pos, item.color, item.strokeDash);
+    case "rect":
+      return rectMark(pos, item.color);
+  }
+}
+
+function textMark(pos: LegendPos, label: string): any {
+  const data = [{ x: pos.textX, y: pos.y, text: label }];
+  return Plot.text(data, {
+    x: "x",
+    y: "y",
+    text: "text",
+    fontSize: 11,
+    textAnchor: "start",
+    fill: "#333",
+  });
 }
 
 function dotMark(x: number, y: number, color: string, filled: boolean): any {
@@ -112,52 +160,4 @@ function rectMark(pos: LegendPos, color: string): any {
     strokeWidth: 1,
   };
   return Plot.rect(data, opts);
-}
-
-function symbolMark(pos: LegendPos, item: LegendItem): any {
-  switch (item.style) {
-    case "filled-dot":
-      return dotMark(pos.legendX, pos.y, item.color, true);
-    case "hollow-dot":
-      return dotMark(pos.legendX, pos.y, item.color, false);
-    case "vertical-bar":
-      return verticalBarMark(pos, item.color);
-    case "vertical-line":
-      return verticalLineMark(pos, item.color, item.strokeDash);
-    case "rect":
-      return rectMark(pos, item.color);
-  }
-}
-
-function textMark(pos: LegendPos, label: string): any {
-  const data = [{ x: pos.textX, y: pos.y, text: label }];
-  return Plot.text(data, {
-    x: "x",
-    y: "y",
-    text: "text",
-    fontSize: 11,
-    textAnchor: "start",
-    fill: "#333",
-  });
-}
-
-/** Build complete legend marks array */
-export function buildLegend(bounds: LegendBounds, items: LegendItem[]): any[] {
-  const xRange = bounds.xMax - bounds.xMin;
-  const legendX = bounds.xMin + xRange * 0.68;
-  const textX = legendX + xRange * 0.04;
-  const getY = (i: number) => bounds.yMax * 0.98 - i * (bounds.yMax * 0.08);
-
-  const marks: any[] = [legendBackground(bounds)];
-  for (let i = 0; i < items.length; i++) {
-    const pos: LegendPos = {
-      legendX,
-      y: getY(i),
-      textX,
-      xRange,
-      yMax: bounds.yMax,
-    };
-    marks.push(symbolMark(pos, items[i]), textMark(pos, items[i].label));
-  }
-  return marks;
 }

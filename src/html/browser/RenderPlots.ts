@@ -11,6 +11,18 @@ import type {
   TimeSeriesPoint,
 } from "./Types.ts";
 
+interface PreparedBenchmark extends BenchmarkEntry {
+  name: string;
+}
+
+interface FlattenedData {
+  allSamples: Sample[];
+  timeSeries: TimeSeriesPoint[];
+  heapSeries: HeapPoint[];
+  allGcEvents: GcEvent[];
+  allPausePoints: PausePoint[];
+}
+
 /** Render all plots for the benchmark report */
 export function renderPlots(data: ReportData): void {
   const gcEnabled = data.metadata.gcTrackingEnabled ?? false;
@@ -72,20 +84,9 @@ function renderGroup(
       .join("");
 }
 
-/** Clear a container element and append a freshly created plot */
-function renderToContainer(
-  selector: string,
-  condition: boolean,
-  create: () => SVGSVGElement | HTMLElement,
-): void {
-  const container = document.querySelector(selector);
-  if (!container || !condition) return;
-  container.innerHTML = "";
-  container.appendChild(create());
-}
-
-interface PreparedBenchmark extends BenchmarkEntry {
-  name: string;
+function showError(groupIndex: number, message: string): void {
+  const container = document.querySelector(`#group-${groupIndex}`);
+  if (container) container.innerHTML = `<div class="error">${message}</div>`;
 }
 
 /** Combine baseline and benchmarks into a single list with display names */
@@ -102,14 +103,6 @@ function prepareBenchmarks(
   return benchmarks;
 }
 
-interface FlattenedData {
-  allSamples: Sample[];
-  timeSeries: TimeSeriesPoint[];
-  heapSeries: HeapPoint[];
-  allGcEvents: GcEvent[];
-  allPausePoints: PausePoint[];
-}
-
 function flattenSamples(benchmarks: PreparedBenchmark[]): FlattenedData {
   const result: FlattenedData = {
     allSamples: [],
@@ -123,83 +116,16 @@ function flattenSamples(benchmarks: PreparedBenchmark[]): FlattenedData {
   return result;
 }
 
-/** Extract time series, heap, GC, and pause data from one benchmark */
-function flattenBenchmark(b: PreparedBenchmark, out: FlattenedData): void {
-  const warmupCount = b.warmupSamples?.length || 0;
-  b.warmupSamples?.forEach((value, i) => {
-    out.timeSeries.push({
-      benchmark: b.name,
-      iteration: i - warmupCount,
-      value,
-      isWarmup: true,
-    });
-  });
-
-  const sampleEndTimes = cumulativeSum(b.samples);
-  b.samples.forEach((value, i) => {
-    out.allSamples.push({ benchmark: b.name, value, iteration: i });
-    out.timeSeries.push({
-      benchmark: b.name,
-      iteration: i,
-      value,
-      isWarmup: false,
-      optStatus: b.optSamples?.[i],
-    });
-    if (b.heapSamples?.[i] !== undefined) {
-      out.heapSeries.push({
-        benchmark: b.name,
-        iteration: i,
-        value: b.heapSamples[i],
-      });
-    }
-  });
-
-  b.gcEvents?.forEach(gc => {
-    const idx = sampleEndTimes.findIndex(t => t >= gc.offset);
-    out.allGcEvents.push({
-      benchmark: b.name,
-      sampleIndex: idx >= 0 ? idx : b.samples.length - 1,
-      duration: gc.duration,
-    });
-  });
-  b.pausePoints?.forEach(p => {
-    out.allPausePoints.push({
-      benchmark: b.name,
-      sampleIndex: p.sampleIndex,
-      durationMs: p.durationMs,
-    });
-  });
-}
-
-function cumulativeSum(arr: number[]): number[] {
-  const result: number[] = [];
-  let sum = 0;
-  for (const v of arr) {
-    sum += v;
-    result.push(sum);
-  }
-  return result;
-}
-
-function showError(groupIndex: number, message: string): void {
-  const container = document.querySelector(`#group-${groupIndex}`);
-  if (container) container.innerHTML = `<div class="error">${message}</div>`;
-}
-
-function formatPct(v: number): string {
-  const sign = v >= 0 ? "+" : "";
-  return sign + v.toFixed(1) + "%";
-}
-
-function generateCIHtml(ci: BenchmarkEntry["comparisonCI"]): string {
-  if (!ci) return "";
-  const text = `${formatPct(ci.percent)} [${formatPct(ci.ci[0])}, ${formatPct(ci.ci[1])}]`;
-  return `
-    <div class="stat-item">
-      <div class="stat-label">vs Baseline</div>
-      <div class="stat-value ci-${ci.direction}">${text}</div>
-    </div>
-  `;
+/** Clear a container element and append a freshly created plot */
+function renderToContainer(
+  selector: string,
+  condition: boolean,
+  create: () => SVGSVGElement | HTMLElement,
+): void {
+  const container = document.querySelector(selector);
+  if (!container || !condition) return;
+  container.innerHTML = "";
+  container.appendChild(create());
 }
 
 function generateStatsHtml(b: PreparedBenchmark, gcEnabled: boolean): string {
@@ -260,4 +186,78 @@ function generateStatsHtml(b: PreparedBenchmark, gcEnabled: boolean): string {
       </div>
     </div>
   `;
+}
+
+/** Extract time series, heap, GC, and pause data from one benchmark */
+function flattenBenchmark(b: PreparedBenchmark, out: FlattenedData): void {
+  const warmupCount = b.warmupSamples?.length || 0;
+  b.warmupSamples?.forEach((value, i) => {
+    out.timeSeries.push({
+      benchmark: b.name,
+      iteration: i - warmupCount,
+      value,
+      isWarmup: true,
+    });
+  });
+
+  const sampleEndTimes = cumulativeSum(b.samples);
+  b.samples.forEach((value, i) => {
+    out.allSamples.push({ benchmark: b.name, value, iteration: i });
+    out.timeSeries.push({
+      benchmark: b.name,
+      iteration: i,
+      value,
+      isWarmup: false,
+      optStatus: b.optSamples?.[i],
+    });
+    if (b.heapSamples?.[i] !== undefined) {
+      out.heapSeries.push({
+        benchmark: b.name,
+        iteration: i,
+        value: b.heapSamples[i],
+      });
+    }
+  });
+
+  b.gcEvents?.forEach(gc => {
+    const idx = sampleEndTimes.findIndex(t => t >= gc.offset);
+    out.allGcEvents.push({
+      benchmark: b.name,
+      sampleIndex: idx >= 0 ? idx : b.samples.length - 1,
+      duration: gc.duration,
+    });
+  });
+  b.pausePoints?.forEach(p => {
+    out.allPausePoints.push({
+      benchmark: b.name,
+      sampleIndex: p.sampleIndex,
+      durationMs: p.durationMs,
+    });
+  });
+}
+
+function generateCIHtml(ci: BenchmarkEntry["comparisonCI"]): string {
+  if (!ci) return "";
+  const text = `${formatPct(ci.percent)} [${formatPct(ci.ci[0])}, ${formatPct(ci.ci[1])}]`;
+  return `
+    <div class="stat-item">
+      <div class="stat-label">vs Baseline</div>
+      <div class="stat-value ci-${ci.direction}">${text}</div>
+    </div>
+  `;
+}
+
+function cumulativeSum(arr: number[]): number[] {
+  const result: number[] = [];
+  let sum = 0;
+  for (const v of arr) {
+    sum += v;
+    result.push(sum);
+  }
+  return result;
+}
+
+function formatPct(v: number): string {
+  const sign = v >= 0 ? "+" : "";
+  return sign + v.toFixed(1) + "%";
 }

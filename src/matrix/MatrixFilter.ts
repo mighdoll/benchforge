@@ -8,6 +8,12 @@ export interface MatrixFilter {
   variant?: string;
 }
 
+/** Filtered matrix with explicit case and variant lists */
+export interface FilteredMatrix<T = unknown> extends BenchMatrix<T> {
+  filteredCases?: string[];
+  filteredVariants?: string[];
+}
+
 /** Parse filter string: "case/variant", "case/", "/variant", or "case" */
 export function parseMatrixFilter(filter: string): MatrixFilter {
   if (filter.includes("/")) {
@@ -18,12 +24,6 @@ export function parseMatrixFilter(filter: string): MatrixFilter {
     };
   }
   return { case: filter };
-}
-
-/** Filtered matrix with explicit case and variant lists */
-export interface FilteredMatrix<T = unknown> extends BenchMatrix<T> {
-  filteredCases?: string[];
-  filteredVariants?: string[];
 }
 
 /** Apply filter to a matrix, merging with existing filters via intersection */

@@ -8,11 +8,6 @@ import {
   resolveProfile,
 } from "./ResolvedProfile.ts";
 
-/** Sum selfSize across all nodes in profile (before any filtering) */
-export function totalProfileBytes(profile: HeapProfile): number {
-  return resolveProfile(profile).totalBytes;
-}
-
 export interface CallFrame {
   fn: string;
   url: string;
@@ -31,8 +26,23 @@ export interface HeapSite {
   callers?: { stack: CallFrame[]; bytes: number }[]; // distinct caller paths
 }
 
-function toCallFrame(f: ResolvedFrame): CallFrame {
-  return { fn: f.name, url: f.url, line: f.line, col: f.col };
+export type UserCodeFilter = (site: CallFrame) => boolean;
+
+export interface HeapReportOptions {
+  topN: number;
+  stackDepth?: number;
+  verbose?: boolean;
+  raw?: boolean; // dump every raw sample
+  userOnly?: boolean; // filter to user code only (hide node internals)
+  isUserCode?: UserCodeFilter; // predicate for user vs internal code
+  totalAll?: number; // total across all nodes (before filtering)
+  totalUserCode?: number; // total for user code only
+  sampleCount?: number; // number of samples taken
+}
+
+/** Sum selfSize across all nodes in profile (before any filtering) */
+export function totalProfileBytes(profile: HeapProfile): number {
+  return resolveProfile(profile).totalBytes;
 }
 
 /** Flatten resolved profile into sorted list of allocation sites with call stacks.
@@ -63,8 +73,6 @@ export function flattenProfile(resolved: ResolvedProfile): HeapSite[] {
 
   return sites.sort((a, b) => b.bytes - a.bytes);
 }
-
-export type UserCodeFilter = (site: CallFrame) => boolean;
 
 /** Check if site is user code (not node internals) */
 export function isNodeUserCode(site: CallFrame): boolean {
@@ -127,47 +135,6 @@ export function aggregateSites(sites: HeapSite[]): HeapSite[] {
   return [...byLocation.values()].sort((a, b) => b.bytes - a.bytes);
 }
 
-/** Serialize a call stack for dedup comparison */
-function callerKey(stack: CallFrame[]): string {
-  return stack.map(f => `${f.url}:${f.line}:${f.col}`).join("|");
-}
-
-/** Add a caller stack to an aggregated site, merging if the same path exists */
-function addCaller(existing: HeapSite, site: HeapSite): void {
-  if (!site.stack) return;
-  if (!existing.callers) {
-    existing.callers = [];
-  }
-  const key = callerKey(site.stack);
-  const match = existing.callers.find(c => callerKey(c.stack) === key);
-  if (match) {
-    match.bytes += site.bytes;
-  } else {
-    existing.callers.push({ stack: site.stack, bytes: site.bytes });
-  }
-}
-
-/** Format location, omitting column when unknown */
-function fmtLoc(url: string, line: number, col?: number): string {
-  return col != null ? `${url}:${line}:${col}` : `${url}:${line}`;
-}
-
-function fmtBytes(bytes: number): string {
-  return formatBytes(bytes, { space: true }) ?? `${bytes} B`;
-}
-
-export interface HeapReportOptions {
-  topN: number;
-  stackDepth?: number;
-  verbose?: boolean;
-  raw?: boolean; // dump every raw sample
-  userOnly?: boolean; // filter to user code only (hide node internals)
-  isUserCode?: UserCodeFilter; // predicate for user vs internal code
-  totalAll?: number; // total across all nodes (before filtering)
-  totalUserCode?: number; // total for user code only
-  sampleCount?: number; // number of samples taken
-}
-
 /** Format heap report for console output */
 export function formatHeapReport(
   sites: HeapSite[],
@@ -198,26 +165,48 @@ export function formatHeapReport(
   return lines.join("\n");
 }
 
-/** Compact single-line format: `49 MB  fn1 <- fn2 <- fn3` */
-function formatCompactSite(
-  lines: string[],
-  site: HeapSite,
-  stackDepth: number,
-  isUser: UserCodeFilter,
-): void {
-  const bytes = fmtBytes(site.bytes).padStart(10);
-  const fns = [site.fn];
+/** Get total bytes from sites */
+export function totalBytes(sites: HeapSite[]): number {
+  return sites.reduce((sum, s) => sum + s.bytes, 0);
+}
 
-  if (site.stack && site.stack.length > 1) {
-    const callers = site.stack.slice(0, -1).reverse().slice(0, stackDepth);
-    for (const frame of callers) {
-      if (!frame.url || !isUser(frame)) continue;
-      fns.push(frame.fn);
-    }
+/** Format every raw sample as one line, ordered by ordinal (time).
+ *  Output is tab-separated for easy piping/grep/diff. */
+export function formatRawSamples(resolved: ResolvedProfile): string {
+  if (!resolved.sortedSamples || resolved.sortedSamples.length === 0) {
+    return "No raw samples available.";
   }
 
-  const line = `${bytes}  ${fns.join(" <- ")}`;
-  lines.push(isUser(site) ? line : pc.dim(line));
+  const lines: string[] = ["ordinal\tsize\tfunction\tlocation"];
+  for (const s of resolved.sortedSamples) {
+    const node = resolved.nodeMap.get(s.nodeId);
+    const fn = node?.frame.name || "(unknown)";
+    const url = node?.frame.url || "";
+    const loc = url
+      ? fmtLoc(url, node!.frame.line, node!.frame.col)
+      : "(unknown)";
+    lines.push(`${s.ordinal}\t${s.size}\t${fn}\t${loc}`);
+  }
+  return lines.join("\n");
+}
+
+function toCallFrame(f: ResolvedFrame): CallFrame {
+  return { fn: f.name, url: f.url, line: f.line, col: f.col };
+}
+
+/** Add a caller stack to an aggregated site, merging if the same path exists */
+function addCaller(existing: HeapSite, site: HeapSite): void {
+  if (!site.stack) return;
+  if (!existing.callers) {
+    existing.callers = [];
+  }
+  const key = callerKey(site.stack);
+  const match = existing.callers.find(c => callerKey(c.stack) === key);
+  if (match) {
+    match.bytes += site.bytes;
+  } else {
+    existing.callers.push({ stack: site.stack, bytes: site.bytes });
+  }
 }
 
 /** Verbose multi-line format with file:// paths and line numbers */
@@ -243,27 +232,38 @@ function formatVerboseSite(
   }
 }
 
-/** Get total bytes from sites */
-export function totalBytes(sites: HeapSite[]): number {
-  return sites.reduce((sum, s) => sum + s.bytes, 0);
+/** Compact single-line format: `49 MB  fn1 <- fn2 <- fn3` */
+function formatCompactSite(
+  lines: string[],
+  site: HeapSite,
+  stackDepth: number,
+  isUser: UserCodeFilter,
+): void {
+  const bytes = fmtBytes(site.bytes).padStart(10);
+  const fns = [site.fn];
+
+  if (site.stack && site.stack.length > 1) {
+    const callers = site.stack.slice(0, -1).reverse().slice(0, stackDepth);
+    for (const frame of callers) {
+      if (!frame.url || !isUser(frame)) continue;
+      fns.push(frame.fn);
+    }
+  }
+
+  const line = `${bytes}  ${fns.join(" <- ")}`;
+  lines.push(isUser(site) ? line : pc.dim(line));
 }
 
-/** Format every raw sample as one line, ordered by ordinal (time).
- *  Output is tab-separated for easy piping/grep/diff. */
-export function formatRawSamples(resolved: ResolvedProfile): string {
-  if (!resolved.sortedSamples || resolved.sortedSamples.length === 0) {
-    return "No raw samples available.";
-  }
+function fmtBytes(bytes: number): string {
+  return formatBytes(bytes, { space: true }) ?? `${bytes} B`;
+}
 
-  const lines: string[] = ["ordinal\tsize\tfunction\tlocation"];
-  for (const s of resolved.sortedSamples) {
-    const node = resolved.nodeMap.get(s.nodeId);
-    const fn = node?.frame.name || "(unknown)";
-    const url = node?.frame.url || "";
-    const loc = url
-      ? fmtLoc(url, node!.frame.line, node!.frame.col)
-      : "(unknown)";
-    lines.push(`${s.ordinal}\t${s.size}\t${fn}\t${loc}`);
-  }
-  return lines.join("\n");
+/** Format location, omitting column when unknown */
+function fmtLoc(url: string, line: number, col?: number): string {
+  return col != null ? `${url}:${line}:${col}` : `${url}:${line}`;
+}
+
+/** Serialize a call stack for dedup comparison */
+function callerKey(stack: CallFrame[]): string {
+  return stack.map(f => `${f.url}:${f.line}:${f.col}`).join("|");
 }

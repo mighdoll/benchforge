@@ -55,14 +55,14 @@ function stripCaseSuffix(name: string): string {
   return name.replace(/ \[.*?\]$/, "");
 }
 
-/** Escape regex special characters */
-function escapeRegex(str: string): string {
-  return str.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-}
-
 /** Ensure at least one benchmark matches filter */
 function validateFilteredSuite(groups: BenchGroup[], filter?: string): void {
   if (groups.every(g => g.benchmarks.length === 0)) {
     throw new Error(`No benchmarks match filter: "${filter}"`);
   }
+}
+
+/** Escape regex special characters */
+function escapeRegex(str: string): string {
+  return str.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }

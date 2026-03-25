@@ -8,23 +8,6 @@ import type {
   TimeSeriesPoint,
 } from "./Types.ts";
 
-const OPT_STATUS_NAMES: Record<number, string> = {
-  1: "interpreted",
-  129: "sparkplug",
-  17: "turbofan",
-  33: "maglev",
-  49: "turbofan+maglev",
-  32769: "optimized",
-};
-const OPT_TIER_COLORS: Record<string, string> = {
-  turbofan: "#22c55e",
-  optimized: "#22c55e",
-  "turbofan+maglev": "#22c55e",
-  maglev: "#eab308",
-  sparkplug: "#f97316",
-  interpreted: "#dc3545",
-};
-
 interface SampleData {
   benchmark: string;
   sample: number;
@@ -48,6 +31,23 @@ interface PlotContext {
   optTiers: string[];
   benchmarks: string[];
 }
+
+const OPT_STATUS_NAMES: Record<number, string> = {
+  1: "interpreted",
+  129: "sparkplug",
+  17: "turbofan",
+  33: "maglev",
+  49: "turbofan+maglev",
+  32769: "optimized",
+};
+const OPT_TIER_COLORS: Record<string, string> = {
+  turbofan: "#22c55e",
+  optimized: "#22c55e",
+  "turbofan+maglev": "#22c55e",
+  maglev: "#eab308",
+  sparkplug: "#f97316",
+  interpreted: "#dc3545",
+};
 
 /** Create sample time series showing each sample in order */
 export function createSampleTimeSeries(
@@ -144,68 +144,6 @@ function buildPlotContext(timeSeries: TimeSeriesPoint[]): PlotContext {
     optTiers,
     benchmarks,
   };
-}
-
-function buildSampleData(
-  timeSeries: TimeSeriesPoint[],
-  benchmarks: string[],
-): Omit<SampleData, "displayValue">[] {
-  const result: Omit<SampleData, "displayValue">[] = [];
-  for (const benchmark of benchmarks) {
-    const isBaseline = benchmark.includes("(baseline)");
-    for (const d of timeSeries.filter(t => t.benchmark === benchmark)) {
-      const optTier =
-        d.optStatus !== undefined
-          ? OPT_STATUS_NAMES[d.optStatus] || "unknown"
-          : null;
-      result.push({
-        benchmark,
-        sample: d.iteration,
-        value: d.value,
-        isBaseline,
-        isWarmup: d.isWarmup || false,
-        optTier,
-      });
-    }
-  }
-  return result;
-}
-
-/** Pick display unit (ns/us/ms) based on average value magnitude */
-function getTimeUnit(values: number[]) {
-  const avg = d3.mean(values)!;
-  const fmt0 = (d: number) => d3.format(",.0f")(d);
-  const fmt1 = (d: number) => d3.format(",.1f")(d);
-  if (avg < 0.001)
-    return {
-      unitSuffix: "ns",
-      convertValue: (ms: number) => ms * 1e6,
-      formatValue: fmt0,
-    };
-  if (avg < 1)
-    return {
-      unitSuffix: "μs",
-      convertValue: (ms: number) => ms * 1e3,
-      formatValue: fmt1,
-    };
-  return {
-    unitSuffix: "ms",
-    convertValue: (ms: number) => ms,
-    formatValue: fmt1,
-  };
-}
-
-/** Compute Y axis range with padding, snapping yMin to a round number */
-function computeYRange(values: number[]) {
-  const dataMin = d3.min(values)!;
-  const dataMax = d3.max(values)!;
-  const dataRange = dataMax - dataMin;
-  const padding = dataRange * 0.15;
-  let yMin = dataMin - padding;
-  const magnitude = 10 ** Math.floor(Math.log10(Math.abs(yMin)));
-  yMin = Math.floor(yMin / magnitude) * magnitude;
-  if (dataMin > 0 && yMin < 0) yMin = 0;
-  return { yMin, yMax: dataMax + dataRange * 0.05 };
 }
 
 /** Scale heap byte values into the plot's Y coordinate range */
@@ -386,4 +324,66 @@ function buildLegendItems(
     }
   }
   return items;
+}
+
+function buildSampleData(
+  timeSeries: TimeSeriesPoint[],
+  benchmarks: string[],
+): Omit<SampleData, "displayValue">[] {
+  const result: Omit<SampleData, "displayValue">[] = [];
+  for (const benchmark of benchmarks) {
+    const isBaseline = benchmark.includes("(baseline)");
+    for (const d of timeSeries.filter(t => t.benchmark === benchmark)) {
+      const optTier =
+        d.optStatus !== undefined
+          ? OPT_STATUS_NAMES[d.optStatus] || "unknown"
+          : null;
+      result.push({
+        benchmark,
+        sample: d.iteration,
+        value: d.value,
+        isBaseline,
+        isWarmup: d.isWarmup || false,
+        optTier,
+      });
+    }
+  }
+  return result;
+}
+
+/** Pick display unit (ns/us/ms) based on average value magnitude */
+function getTimeUnit(values: number[]) {
+  const avg = d3.mean(values)!;
+  const fmt0 = (d: number) => d3.format(",.0f")(d);
+  const fmt1 = (d: number) => d3.format(",.1f")(d);
+  if (avg < 0.001)
+    return {
+      unitSuffix: "ns",
+      convertValue: (ms: number) => ms * 1e6,
+      formatValue: fmt0,
+    };
+  if (avg < 1)
+    return {
+      unitSuffix: "μs",
+      convertValue: (ms: number) => ms * 1e3,
+      formatValue: fmt1,
+    };
+  return {
+    unitSuffix: "ms",
+    convertValue: (ms: number) => ms,
+    formatValue: fmt1,
+  };
+}
+
+/** Compute Y axis range with padding, snapping yMin to a round number */
+function computeYRange(values: number[]) {
+  const dataMin = d3.min(values)!;
+  const dataMax = d3.max(values)!;
+  const dataRange = dataMax - dataMin;
+  const padding = dataRange * 0.15;
+  let yMin = dataMin - padding;
+  const magnitude = 10 ** Math.floor(Math.log10(Math.abs(yMin)));
+  yMin = Math.floor(yMin / magnitude) * magnitude;
+  if (dataMin > 0 && yMin < 0) yMin = 0;
+  return { yMin, yMax: dataMax + dataRange * 0.05 };
 }

@@ -1,19 +1,34 @@
-const outlierMultiplier = 1.5; // Tukey's fence multiplier
-const bootstrapSamples = 10000;
-const confidence = 0.95;
-
-/** Options for bootstrap resampling methods */
-type BootstrapOptions = {
-  resamples?: number;
-  confidence?: number;
-};
-
 /** Bootstrap estimate with confidence interval and raw resample data */
 export interface BootstrapResult {
   estimate: number;
   ci: [number, number];
   samples: number[];
 }
+
+export type CIDirection = "faster" | "slower" | "uncertain";
+
+/** Binned histogram for efficient transfer to browser */
+export interface HistogramBin {
+  x: number; // bin center
+  count: number;
+}
+
+/** Bootstrap confidence interval for percentage difference between two samples */
+export interface DifferenceCI {
+  percent: number;
+  ci: [number, number];
+  direction: CIDirection;
+  /** Histogram of bootstrap distribution for visualization */
+  histogram?: HistogramBin[];
+}
+
+/** Options for bootstrap resampling methods */
+type BootstrapOptions = {
+  resamples?: number;
+  confidence?: number;
+};
+const confidence = 0.95;const outlierMultiplier = 1.5; // Tukey's fence multiplier
+const bootstrapSamples = 10000;
 
 /** @return relative standard deviation (coefficient of variation) */
 export function coefficientOfVariation(samples: number[]): number {
@@ -86,62 +101,11 @@ export function percentile(values: number[], p: number): number {
   return sorted[Math.max(0, index)];
 }
 
-/** @return medians from bootstrap resamples */
-function generateMedians(samples: number[], resamples: number): number[] {
-  return Array.from({ length: resamples }, () =>
-    percentile(createResample(samples), 0.5),
-  );
-}
-
 /** @return bootstrap resample with replacement */
 export function createResample(samples: number[]): number[] {
   const n = samples.length;
   const rand = () => samples[Math.floor(Math.random() * n)];
   return Array.from({ length: n }, rand);
-}
-
-/** @return confidence interval [lower, upper] */
-function computeInterval(
-  medians: number[],
-  confidence: number,
-): [number, number] {
-  const alpha = (1 - confidence) / 2;
-  const lower = percentile(medians, alpha);
-  const upper = percentile(medians, 1 - alpha);
-  return [lower, upper];
-}
-
-export type CIDirection = "faster" | "slower" | "uncertain";
-
-/** Binned histogram for efficient transfer to browser */
-export interface HistogramBin {
-  x: number; // bin center
-  count: number;
-}
-
-/** Bootstrap confidence interval for percentage difference between two samples */
-export interface DifferenceCI {
-  percent: number;
-  ci: [number, number];
-  direction: CIDirection;
-  /** Histogram of bootstrap distribution for visualization */
-  histogram?: HistogramBin[];
-}
-
-/** Bin values into histogram for compact visualization */
-function binValues(values: number[], binCount = 30): HistogramBin[] {
-  const sorted = [...values].sort((a, b) => a - b);
-  const min = sorted[0];
-  const max = sorted[sorted.length - 1];
-  if (min === max) return [{ x: min, count: values.length }];
-
-  const step = (max - min) / binCount;
-  const counts = new Array(binCount).fill(0);
-  for (const v of values) {
-    const bin = Math.min(Math.floor((v - min) / step), binCount - 1);
-    counts[bin]++;
-  }
-  return counts.map((count, i) => ({ x: min + (i + 0.5) * step, count }));
 }
 
 /** @return bootstrap CI for percentage difference between baseline and current medians */
@@ -173,4 +137,38 @@ export function bootstrapDifferenceCI(
   if (excludesZero) direction = observedPercent < 0 ? "faster" : "slower";
   const histogram = binValues(diffs);
   return { percent: observedPercent, ci, direction, histogram };
+}
+
+/** @return medians from bootstrap resamples */
+function generateMedians(samples: number[], resamples: number): number[] {
+  return Array.from({ length: resamples }, () =>
+    percentile(createResample(samples), 0.5),
+  );
+}
+
+/** @return confidence interval [lower, upper] */
+function computeInterval(
+  medians: number[],
+  confidence: number,
+): [number, number] {
+  const alpha = (1 - confidence) / 2;
+  const lower = percentile(medians, alpha);
+  const upper = percentile(medians, 1 - alpha);
+  return [lower, upper];
+}
+
+/** Bin values into histogram for compact visualization */
+function binValues(values: number[], binCount = 30): HistogramBin[] {
+  const sorted = [...values].sort((a, b) => a - b);
+  const min = sorted[0];
+  const max = sorted[sorted.length - 1];
+  if (min === max) return [{ x: min, count: values.length }];
+
+  const step = (max - min) / binCount;
+  const counts = new Array(binCount).fill(0);
+  for (const v of values) {
+    const bin = Math.min(Math.floor((v - min) / step), binCount - 1);
+    counts[bin]++;
+  }
+  return counts.map((count, i) => ({ x: min + (i + 0.5) * step, count }));
 }

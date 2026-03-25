@@ -46,28 +46,6 @@ export function parseGcLine(line: string): GcEvent | undefined {
   return { type, pauseMs, allocated, collected, promoted, survived };
 }
 
-/** Parse name=value pairs from trace-gc-nvp line */
-function parseNvpFields(line: string): Record<string, string> {
-  const fields: Record<string, string> = {};
-  // Format: "key=value, key=value, ..." or "key=value key=value"
-  const matches = line.matchAll(/(\w+)=([^\s,]+)/g);
-  for (const [, key, value] of matches) {
-    fields[key] = value;
-  }
-  return fields;
-}
-
-/** Map V8 gc type codes to our types */
-function parseGcType(gcField: string): GcEvent["type"] {
-  // V8 uses: s=scavenge, mc=mark-compact, mmc=minor-mc (young gen mark-compact)
-  if (gcField === "s" || gcField === "scavenge") return "scavenge";
-  if (gcField === "mc" || gcField === "ms" || gcField === "mark-compact")
-    return "mark-compact";
-  if (gcField === "mmc" || gcField === "minor-mc" || gcField === "minor-ms")
-    return "minor-ms";
-  return "unknown";
-}
-
 /** Aggregate GC events into summary stats */
 export function aggregateGcStats(events: GcEvent[]): GcStats {
   let scavenges = 0;
@@ -104,4 +82,26 @@ export function aggregateGcStats(events: GcEvent[]): GcStats {
 /** @return GcStats with all counters zeroed */
 export function emptyGcStats(): GcStats {
   return { scavenges: 0, markCompacts: 0, totalCollected: 0, gcPauseTime: 0 };
+}
+
+/** Parse name=value pairs from trace-gc-nvp line */
+function parseNvpFields(line: string): Record<string, string> {
+  const fields: Record<string, string> = {};
+  // Format: "key=value, key=value, ..." or "key=value key=value"
+  const matches = line.matchAll(/(\w+)=([^\s,]+)/g);
+  for (const [, key, value] of matches) {
+    fields[key] = value;
+  }
+  return fields;
+}
+
+/** Map V8 gc type codes to our types */
+function parseGcType(gcField: string): GcEvent["type"] {
+  // V8 uses: s=scavenge, mc=mark-compact, mmc=minor-mc (young gen mark-compact)
+  if (gcField === "s" || gcField === "scavenge") return "scavenge";
+  if (gcField === "mc" || gcField === "ms" || gcField === "mark-compact")
+    return "mark-compact";
+  if (gcField === "mmc" || gcField === "minor-mc" || gcField === "minor-ms")
+    return "minor-ms";
+  return "unknown";
 }

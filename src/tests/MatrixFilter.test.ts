@@ -2,6 +2,21 @@ import { expect, test } from "vitest";
 import type { BenchMatrix } from "../BenchMatrix.ts";
 import { filterMatrix, parseMatrixFilter } from "../matrix/MatrixFilter.ts";
 
+const inlineMatrix: BenchMatrix<string> = {
+  name: "Test",
+  variants: {
+    fast: (s: string) => s.toUpperCase(),
+    slow: (s: string) => s.toLowerCase(),
+    medium: (s: string) => s,
+  },
+  cases: ["small", "large", "bevy_env_map"],
+};
+
+const noExplicitCases: BenchMatrix = {
+  name: "NoCase",
+  variants: { fast: () => {} },
+};
+
 test("parseMatrixFilter: case/variant", () => {
   expect(parseMatrixFilter("bevy/link")).toEqual({
     case: "bevy",
@@ -33,16 +48,6 @@ test("parseMatrixFilter: empty parts", () => {
     variant: undefined,
   });
 });
-
-const inlineMatrix: BenchMatrix<string> = {
-  name: "Test",
-  variants: {
-    fast: (s: string) => s.toUpperCase(),
-    slow: (s: string) => s.toLowerCase(),
-    medium: (s: string) => s,
-  },
-  cases: ["small", "large", "bevy_env_map"],
-};
 
 test("filterMatrix: no filter returns original", async () => {
   const result = await filterMatrix(inlineMatrix, undefined);
@@ -105,11 +110,6 @@ test("filterMatrix: multiple matching variants", async () => {
   const result = await filterMatrix(inlineMatrix, { variant: "s" }); // matches fast, slow
   expect(result.filteredVariants?.sort()).toEqual(["fast", "slow"]);
 });
-
-const noExplicitCases: BenchMatrix = {
-  name: "NoCase",
-  variants: { fast: () => {} },
-};
 
 test("filterMatrix: implicit default case returns default", async () => {
   const result = await filterMatrix(noExplicitCases, { case: "default" });

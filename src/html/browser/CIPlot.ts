@@ -8,6 +8,15 @@ export interface DistributionPlotOptions {
   direction?: "faster" | "slower" | "uncertain";
 }
 
+type Scales = { x: (v: number) => number; y: (v: number) => number };
+type Layout = {
+  width: number;
+  height: number;
+  margin: typeof defaultMargin;
+  plot: { w: number; h: number };
+};
+const defaultMargin = { top: 22, right: 12, bottom: 22, left: 12 };
+
 const defaultOpts: Required<DistributionPlotOptions> = {
   width: 260,
   height: 85,
@@ -22,14 +31,7 @@ const colors = {
   uncertain: { fill: "#dbeafe", stroke: "#3b82f6" },
 };
 
-type Scales = { x: (v: number) => number; y: (v: number) => number };
-type Layout = {
-  width: number;
-  height: number;
-  margin: typeof defaultMargin;
-  plot: { w: number; h: number };
-};
-const defaultMargin = { top: 22, right: 12, bottom: 22, left: 12 };
+const formatPct = (v: number) => (v >= 0 ? "+" : "") + v.toFixed(0) + "%";
 
 /** Create a small distribution plot showing histogram with CI shading */
 export function createDistributionPlot(
@@ -74,6 +76,14 @@ function buildLayout(width: number, height: number): Layout {
   const w = width - margin.left - margin.right;
   const h = height - margin.top - margin.bottom;
   return { width, height, margin, plot: { w, h } };
+}
+
+function createSvg(w: number, h: number): SVGSVGElement {
+  const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+  svg.setAttribute("width", String(w));
+  svg.setAttribute("height", String(h));
+  if (w && h) svg.setAttribute("viewBox", `0 0 ${w} ${h}`);
+  return svg;
 }
 
 /** Compute x/y scale functions mapping data values to SVG coordinates */
@@ -194,28 +204,24 @@ function drawCILabels(
   );
 }
 
-/** Apply gaussian kernel smoothing to histogram bins */
-function gaussianSmooth(bins: HistogramBin[], sigma: number): HistogramBin[] {
-  return bins.map((bin, i) => {
-    let sum = 0;
-    let wt = 0;
-    for (let j = 0; j < bins.length; j++) {
-      const w = Math.exp(-((i - j) ** 2) / (2 * sigma ** 2));
-      sum += bins[j].count * w;
-      wt += w;
-    }
-    return { x: bin.x, count: sum / wt };
-  });
-}
-
-const formatPct = (v: number) => (v >= 0 ? "+" : "") + v.toFixed(0) + "%";
-
-function createSvg(w: number, h: number): SVGSVGElement {
-  const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
-  svg.setAttribute("width", String(w));
-  svg.setAttribute("height", String(h));
-  if (w && h) svg.setAttribute("viewBox", `0 0 ${w} ${h}`);
-  return svg;
+function text(
+  x: number,
+  y: number,
+  content: string,
+  anchor = "start",
+  size = "9",
+  fill = "#666",
+  weight = "400",
+): SVGTextElement {
+  const el = document.createElementNS("http://www.w3.org/2000/svg", "text");
+  el.setAttribute("x", String(x));
+  el.setAttribute("y", String(y));
+  el.setAttribute("text-anchor", anchor);
+  el.setAttribute("font-size", size);
+  el.setAttribute("font-weight", weight);
+  el.setAttribute("fill", fill);
+  el.textContent = content;
+  return el;
 }
 
 function rect(
@@ -232,6 +238,20 @@ function rect(
   el.setAttribute("height", String(h));
   setAttrs(el, attrs);
   return el;
+}
+
+/** Apply gaussian kernel smoothing to histogram bins */
+function gaussianSmooth(bins: HistogramBin[], sigma: number): HistogramBin[] {
+  return bins.map((bin, i) => {
+    let sum = 0;
+    let wt = 0;
+    for (let j = 0; j < bins.length; j++) {
+      const w = Math.exp(-((i - j) ** 2) / (2 * sigma ** 2));
+      sum += bins[j].count * w;
+      wt += w;
+    }
+    return { x: bin.x, count: sum / wt };
+  });
 }
 
 function path(d: string, attrs: Record<string, string>): SVGPathElement {
@@ -254,26 +274,6 @@ function line(
   el.setAttribute("x2", String(x2));
   el.setAttribute("y2", String(y2));
   setAttrs(el, attrs);
-  return el;
-}
-
-function text(
-  x: number,
-  y: number,
-  content: string,
-  anchor = "start",
-  size = "9",
-  fill = "#666",
-  weight = "400",
-): SVGTextElement {
-  const el = document.createElementNS("http://www.w3.org/2000/svg", "text");
-  el.setAttribute("x", String(x));
-  el.setAttribute("y", String(y));
-  el.setAttribute("text-anchor", anchor);
-  el.setAttribute("font-size", size);
-  el.setAttribute("font-weight", weight);
-  el.setAttribute("fill", fill);
-  el.textContent = content;
   return el;
 }
 

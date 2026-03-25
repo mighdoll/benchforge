@@ -1,14 +1,6 @@
 import type { BenchmarkSpec } from "../Benchmark.ts";
 import type { MeasuredResults } from "../MeasuredResults.ts";
 
-/** Execute benchmark with optional parameters */
-export function executeBenchmark<T>(
-  benchmark: BenchmarkSpec<T>,
-  params?: T,
-): void {
-  (benchmark.fn as (params?: T) => void)(params);
-}
-
 /** Interface for benchmark execution libraries */
 export interface BenchRunner {
   runBench<T = unknown>(
@@ -57,4 +49,12 @@ export interface RunnerOptions {
   heapInterval?: number;
   /** Heap sampling stack depth */
   heapDepth?: number;
+}
+
+/** Execute benchmark with optional parameters */
+export function executeBenchmark<T>(
+  benchmark: BenchmarkSpec<T>,
+  params?: T,
+): void {
+  (benchmark.fn as (params?: T) => void)(params);
 }

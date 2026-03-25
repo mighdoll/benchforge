@@ -100,6 +100,24 @@ export function launchSpeedscope(filePath: string): void {
   });
 }
 
+/** Convert a single HeapProfile to speedscope format (for standalone use) */
+export function heapProfileToSpeedscope(
+  name: string,
+  profile: HeapProfile,
+): SpeedscopeFile {
+  const frames: SpeedscopeFrame[] = [];
+  const frameIndex = new Map<string, number>();
+  const resolved = resolveProfile(profile);
+  const p = buildProfile(name, resolved, frames, frameIndex);
+
+  return {
+    $schema: "https://www.speedscope.app/file-format-schema.json",
+    shared: { frames },
+    profiles: [p],
+    exporter: "benchforge",
+  };
+}
+
 /** Build a single speedscope profile from a resolved heap profile */
 function buildProfile(
   name: string,
@@ -181,22 +199,4 @@ function internFrame(
     frameIndex.set(key, idx);
   }
   return idx;
-}
-
-/** Convert a single HeapProfile to speedscope format (for standalone use) */
-export function heapProfileToSpeedscope(
-  name: string,
-  profile: HeapProfile,
-): SpeedscopeFile {
-  const frames: SpeedscopeFrame[] = [];
-  const frameIndex = new Map<string, number>();
-  const resolved = resolveProfile(profile);
-  const p = buildProfile(name, resolved, frames, frameIndex);
-
-  return {
-    $schema: "https://www.speedscope.app/file-format-schema.json",
-    shared: { frames },
-    profiles: [p],
-    exporter: "benchforge",
-  };
 }

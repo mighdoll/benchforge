@@ -8,15 +8,13 @@ import {
 import type { BenchRunner, RunnerOptions } from "./BenchRunner.ts";
 import { msToNs } from "./RunnerUtils.ts";
 
-const minTime = 1000;
-const maxTime = 10000;
-const targetConfidence = 95;
-const fallbackThreshold = 80;
-const windowSize = 50;
-const stability = 0.05; // 5% drift threshold (was 2%, too strict for real benchmarks)
-const initialBatch = 100;
-const continueBatch = 100;
-const continueIterations = 10;
+export interface AdaptiveOptions extends RunnerOptions {
+  adaptive?: boolean;
+  minTime?: number;
+  maxTime?: number;
+  targetConfidence?: number;
+  convergence?: number; // Confidence threshold (0-100)
+}
 
 type Metrics = {
   medianDrift: number;
@@ -31,13 +29,15 @@ interface ConvergenceResult {
   reason: string;
 }
 
-export interface AdaptiveOptions extends RunnerOptions {
-  adaptive?: boolean;
-  minTime?: number;
-  maxTime?: number;
-  targetConfidence?: number;
-  convergence?: number; // Confidence threshold (0-100)
-}
+const minTime = 1000;
+const maxTime = 10000;
+const targetConfidence = 95;
+const fallbackThreshold = 80;
+const windowSize = 50;
+const stability = 0.05; // 5% drift threshold (was 2%, too strict for real benchmarks)
+const initialBatch = 100;
+const continueBatch = 100;
+const continueIterations = 10;
 
 /** @return adaptive sampling runner wrapper */
 export function createAdaptiveWrapper(
@@ -59,6 +59,19 @@ export function createAdaptiveWrapper(
       );
     },
   };
+}
+
+/** @return convergence based on window stability */
+export function checkConvergence(samples: number[]): ConvergenceResult {
+  const windowSize = getWindowSize(samples);
+  const minSamples = windowSize * 2;
+
+  if (samples.length < minSamples) {
+    return buildProgressResult(samples.length, minSamples);
+  }
+
+  const metrics = getStability(samples, windowSize);
+  return buildConvergence(metrics);
 }
 
 /** @return results using adaptive sampling strategy */
@@ -111,6 +124,82 @@ async function runAdaptiveBench<T>(
     benchmark.name,
     warmup,
   );
+}
+
+/** @return window size scaled to execution time */
+function getWindowSize(samples: number[]): number {
+  if (samples.length < 20) return windowSize; // Default for initial samples
+
+  const recentMs = samples.slice(-20).map(s => s / msToNs);
+  const recentMedian = percentile(recentMs, 0.5);
+
+  // Inverse scaling with execution time
+  if (recentMedian < 0.01) return 200; // <10μs
+  if (recentMedian < 0.1) return 100; // <100μs
+  if (recentMedian < 1) return 50; // <1ms
+  if (recentMedian < 10) return 30; // <10ms
+  return 20; // >10ms
+}
+
+/** @return progress when samples insufficient */
+function buildProgressResult(
+  currentSamples: number,
+  minSamples: number,
+): ConvergenceResult {
+  return {
+    converged: false,
+    confidence: (currentSamples / minSamples) * 100,
+    reason: `Collecting samples: ${currentSamples}/${minSamples}`,
+  };
+}
+
+/** @return stability metrics between windows */
+function getStability(samples: number[], windowSize: number): Metrics {
+  const recent = samples.slice(-windowSize);
+  const previous = samples.slice(-windowSize * 2, -windowSize);
+
+  const recentMs = recent.map(s => s / msToNs);
+  const previousMs = previous.map(s => s / msToNs);
+
+  const medianRecent = percentile(recentMs, 0.5);
+  const medianPrevious = percentile(previousMs, 0.5);
+  const medianDrift = Math.abs(medianRecent - medianPrevious) / medianPrevious;
+
+  const impactRecent = getOutlierImpact(recentMs);
+  const impactPrevious = getOutlierImpact(previousMs);
+  const impactDrift = Math.abs(impactRecent.ratio - impactPrevious.ratio);
+
+  return {
+    medianDrift,
+    impactDrift,
+    medianStable: medianDrift < stability,
+    impactStable: impactDrift < stability,
+  };
+}
+
+/** @return convergence from stability metrics */
+function buildConvergence(metrics: Metrics): ConvergenceResult {
+  const { medianDrift, impactDrift, medianStable, impactStable } = metrics;
+
+  if (medianStable && impactStable) {
+    return {
+      converged: true,
+      confidence: 100,
+      reason: "Stable performance pattern",
+    };
+  }
+
+  const confidence = Math.min(
+    100,
+    (1 - medianDrift / stability) * 50 + (1 - impactDrift / stability) * 50,
+  );
+
+  const reason =
+    medianDrift > impactDrift
+      ? `Median drifting: ${(medianDrift * 100).toFixed(1)}%`
+      : `Outlier impact changing: ${(impactDrift * 100).toFixed(1)}%`;
+
+  return { converged: false, confidence: Math.max(0, confidence), reason };
 }
 
 /** @return warmupSamples from initial batch */
@@ -179,27 +268,6 @@ async function collectAdaptive<T>(
   process.stderr.write("\r" + " ".repeat(60) + "\r");
 }
 
-/** Append samples one-by-one to avoid stack overflow from spread on large arrays */
-function appendSamples(result: MeasuredResults, samples: number[]): void {
-  if (!result.samples?.length) return;
-  for (const sample of result.samples) samples.push(sample);
-}
-
-/** @return true if convergence reached or timeout */
-function shouldStop(
-  convergence: ConvergenceResult,
-  targetConfidence: number,
-  elapsedTime: number,
-  minTime: number,
-): boolean {
-  if (convergence.converged && convergence.confidence >= targetConfidence) {
-    return true;
-  }
-  // After minTime, accept whichever is higher: targetConfidence or fallbackThreshold
-  const threshold = Math.max(targetConfidence, fallbackThreshold);
-  return elapsedTime >= minTime && convergence.confidence >= threshold;
-}
-
 /** @return measured results with convergence metrics */
 function buildResults(
   samplesMs: number[],
@@ -222,6 +290,52 @@ function buildResults(
       convergence,
     },
   ];
+}
+
+/** @return outlier impact as proportion of total time */
+function getOutlierImpact(samples: number[]): { ratio: number; count: number } {
+  if (samples.length === 0) return { ratio: 0, count: 0 };
+
+  const median = percentile(samples, 0.5);
+  const q75 = percentile(samples, 0.75);
+  const threshold = median + 1.5 * (q75 - median);
+
+  let excessTime = 0;
+  let count = 0;
+
+  for (const sample of samples) {
+    if (sample > threshold) {
+      excessTime += sample - median;
+      count++;
+    }
+  }
+
+  const totalTime = samples.reduce((a, b) => a + b, 0);
+  return {
+    ratio: totalTime > 0 ? excessTime / totalTime : 0,
+    count,
+  };
+}
+
+/** Append samples one-by-one to avoid stack overflow from spread on large arrays */
+function appendSamples(result: MeasuredResults, samples: number[]): void {
+  if (!result.samples?.length) return;
+  for (const sample of result.samples) samples.push(sample);
+}
+
+/** @return true if convergence reached or timeout */
+function shouldStop(
+  convergence: ConvergenceResult,
+  targetConfidence: number,
+  elapsedTime: number,
+  minTime: number,
+): boolean {
+  if (convergence.converged && convergence.confidence >= targetConfidence) {
+    return true;
+  }
+  // After minTime, accept whichever is higher: targetConfidence or fallbackThreshold
+  const threshold = Math.max(targetConfidence, fallbackThreshold);
+  return elapsedTime >= minTime && convergence.confidence >= threshold;
 }
 
 /** @return time percentiles and statistics in ms */
@@ -274,118 +388,4 @@ function getRobustMetrics(samplesMs: number[]) {
     mad: medianAbsoluteDeviation(samplesMs),
     outlierRate: impact.ratio,
   };
-}
-
-/** @return outlier impact as proportion of total time */
-function getOutlierImpact(samples: number[]): { ratio: number; count: number } {
-  if (samples.length === 0) return { ratio: 0, count: 0 };
-
-  const median = percentile(samples, 0.5);
-  const q75 = percentile(samples, 0.75);
-  const threshold = median + 1.5 * (q75 - median);
-
-  let excessTime = 0;
-  let count = 0;
-
-  for (const sample of samples) {
-    if (sample > threshold) {
-      excessTime += sample - median;
-      count++;
-    }
-  }
-
-  const totalTime = samples.reduce((a, b) => a + b, 0);
-  return {
-    ratio: totalTime > 0 ? excessTime / totalTime : 0,
-    count,
-  };
-}
-
-/** @return convergence based on window stability */
-export function checkConvergence(samples: number[]): ConvergenceResult {
-  const windowSize = getWindowSize(samples);
-  const minSamples = windowSize * 2;
-
-  if (samples.length < minSamples) {
-    return buildProgressResult(samples.length, minSamples);
-  }
-
-  const metrics = getStability(samples, windowSize);
-  return buildConvergence(metrics);
-}
-
-/** @return progress when samples insufficient */
-function buildProgressResult(
-  currentSamples: number,
-  minSamples: number,
-): ConvergenceResult {
-  return {
-    converged: false,
-    confidence: (currentSamples / minSamples) * 100,
-    reason: `Collecting samples: ${currentSamples}/${minSamples}`,
-  };
-}
-
-/** @return stability metrics between windows */
-function getStability(samples: number[], windowSize: number): Metrics {
-  const recent = samples.slice(-windowSize);
-  const previous = samples.slice(-windowSize * 2, -windowSize);
-
-  const recentMs = recent.map(s => s / msToNs);
-  const previousMs = previous.map(s => s / msToNs);
-
-  const medianRecent = percentile(recentMs, 0.5);
-  const medianPrevious = percentile(previousMs, 0.5);
-  const medianDrift = Math.abs(medianRecent - medianPrevious) / medianPrevious;
-
-  const impactRecent = getOutlierImpact(recentMs);
-  const impactPrevious = getOutlierImpact(previousMs);
-  const impactDrift = Math.abs(impactRecent.ratio - impactPrevious.ratio);
-
-  return {
-    medianDrift,
-    impactDrift,
-    medianStable: medianDrift < stability,
-    impactStable: impactDrift < stability,
-  };
-}
-
-/** @return convergence from stability metrics */
-function buildConvergence(metrics: Metrics): ConvergenceResult {
-  const { medianDrift, impactDrift, medianStable, impactStable } = metrics;
-
-  if (medianStable && impactStable) {
-    return {
-      converged: true,
-      confidence: 100,
-      reason: "Stable performance pattern",
-    };
-  }
-
-  const confidence = Math.min(
-    100,
-    (1 - medianDrift / stability) * 50 + (1 - impactDrift / stability) * 50,
-  );
-
-  const reason =
-    medianDrift > impactDrift
-      ? `Median drifting: ${(medianDrift * 100).toFixed(1)}%`
-      : `Outlier impact changing: ${(impactDrift * 100).toFixed(1)}%`;
-
-  return { converged: false, confidence: Math.max(0, confidence), reason };
-}
-
-/** @return window size scaled to execution time */
-function getWindowSize(samples: number[]): number {
-  if (samples.length < 20) return windowSize; // Default for initial samples
-
-  const recentMs = samples.slice(-20).map(s => s / msToNs);
-  const recentMedian = percentile(recentMs, 0.5);
-
-  // Inverse scaling with execution time
-  if (recentMedian < 0.01) return 200; // <10μs
-  if (recentMedian < 0.1) return 100; // <100μs
-  if (recentMedian < 1) return 50; // <1ms
-  if (recentMedian < 10) return 30; // <10ms
-  return 20; // >10ms
 }

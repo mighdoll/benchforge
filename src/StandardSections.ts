@@ -15,6 +15,40 @@ export interface TimeStats {
   p99?: number;
 }
 
+export interface GcSectionStats {
+  gc?: number; // GC time as fraction of total bench time
+}
+
+export interface GcStatsInfo {
+  allocPerIter?: number;
+  collected?: number;
+  scavenges?: number;
+  fullGCs?: number;
+  promoPercent?: number;
+  pausePerIter?: number;
+}
+
+export interface CpuStats {
+  cpuCacheMiss?: number;
+  cpuStall?: number;
+}
+
+export interface RunStats {
+  runs?: number;
+}
+
+export interface AdaptiveStats {
+  median?: number;
+  mean?: number;
+  p99?: number;
+  convergence?: number;
+}
+
+export interface OptStats {
+  tiers?: string; // tier distribution summary
+  deopt?: number; // deopt count
+}
+
 /** Section: mean, p50, p99 timing */
 export const timeSection: ResultsMapper<TimeStats> = {
   extract: (results: MeasuredResults) => ({
@@ -33,10 +67,6 @@ export const timeSection: ResultsMapper<TimeStats> = {
     },
   ],
 };
-
-export interface GcSectionStats {
-  gc?: number; // GC time as fraction of total bench time
-}
 
 /** Section: GC time as fraction of total benchmark time (Node performance hooks) */
 export const gcSection: ResultsMapper<GcSectionStats> = {
@@ -58,15 +88,6 @@ export const gcSection: ResultsMapper<GcSectionStats> = {
     },
   ],
 };
-
-export interface GcStatsInfo {
-  allocPerIter?: number;
-  collected?: number;
-  scavenges?: number;
-  fullGCs?: number;
-  promoPercent?: number;
-  pausePerIter?: number;
-}
 
 /** Section: detailed GC stats from --trace-gc-nvp (allocation, promotion, pauses) */
 export const gcStatsSection: ResultsMapper<GcStatsInfo> = {
@@ -120,11 +141,6 @@ export const browserGcStatsSection: ResultsMapper<GcStatsInfo> = {
   ],
 };
 
-export interface CpuStats {
-  cpuCacheMiss?: number;
-  cpuStall?: number;
-}
-
 /** Section: CPU L1 cache miss rate and stall rate (requires @mitata/counters) */
 export const cpuSection: ResultsMapper<CpuStats> = {
   extract: (results: MeasuredResults) => ({
@@ -141,10 +157,6 @@ export const cpuSection: ResultsMapper<CpuStats> = {
     },
   ],
 };
-
-export interface RunStats {
-  runs?: number;
-}
 
 /** Section: number of sample iterations */
 export const runsSection: ResultsMapper<RunStats> = {
@@ -177,13 +189,6 @@ export const totalTimeSection: ResultsMapper<{ totalTime?: number }> = {
   ],
 };
 
-export interface AdaptiveStats {
-  median?: number;
-  mean?: number;
-  p99?: number;
-  convergence?: number;
-}
-
 /** Section: median, mean, p99, and convergence for adaptive mode */
 export const adaptiveSection: ResultsMapper<AdaptiveStats> = {
   extract: (results: MeasuredResults) => ({
@@ -208,22 +213,6 @@ export const adaptiveSection: ResultsMapper<AdaptiveStats> = {
     },
   ],
 };
-
-/** Build generic sections based on CLI flags */
-export function buildGenericSections(args: {
-  "gc-stats"?: boolean;
-  "heap-sample"?: boolean;
-}): ResultsMapper[] {
-  const sections: ResultsMapper[] = [];
-  if (args["gc-stats"]) sections.push(gcStatsSection);
-  sections.push(runsSection);
-  return sections;
-}
-
-export interface OptStats {
-  tiers?: string; // tier distribution summary
-  deopt?: number; // deopt count
-}
 
 /** Section: V8 optimization tier distribution and deopt count */
 export const optSection: ResultsMapper<OptStats> = {
@@ -259,3 +248,14 @@ export const optSection: ResultsMapper<OptStats> = {
     },
   ],
 };
+
+/** Build generic sections based on CLI flags */
+export function buildGenericSections(args: {
+  "gc-stats"?: boolean;
+  "heap-sample"?: boolean;
+}): ResultsMapper[] {
+  const sections: ResultsMapper[] = [];
+  if (args["gc-stats"]) sections.push(gcStatsSection);
+  sections.push(runsSection);
+  return sections;
+}

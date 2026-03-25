@@ -1,14 +1,14 @@
 import type { Argv, InferredOptionTypes } from "yargs";
 import yargs from "yargs";
 
-export const defaultAdaptiveMaxTime = 20;
-
 export type Configure<T> = (yargs: Argv) => Argv<T>;
 
 /** CLI args type inferred from cliOptions, plus optional file positional */
 export type DefaultCliArgs = InferredOptionTypes<typeof cliOptions> & {
   file?: string;
 };
+
+export const defaultAdaptiveMaxTime = 20;
 
 // biome-ignore format: compact option definitions
 const cliOptions = {

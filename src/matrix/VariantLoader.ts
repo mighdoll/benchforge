@@ -22,6 +22,11 @@ export async function loadVariant<T = unknown>(
   return extractVariant(module, variantId, moduleUrl);
 }
 
+/** Get module URL for a variant in a directory */
+export function variantModuleUrl(dirUrl: string, variantId: string): string {
+  return new URL(`${variantId}.ts`, dirUrl).href;
+}
+
 /** Extract variant from module exports */
 function extractVariant<T>(
   module: Record<string, unknown>,
@@ -38,9 +43,4 @@ function extractVariant<T>(
     throw new Error(`${loc}: 'setup' must be a function`);
   }
   return { setup: setup as (data: T) => unknown, run: run as () => void };
-}
-
-/** Get module URL for a variant in a directory */
-export function variantModuleUrl(dirUrl: string, variantId: string): string {
-  return new URL(`${variantId}.ts`, dirUrl).href;
 }

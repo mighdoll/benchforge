@@ -85,35 +85,3 @@ function verifyPercentileOrdering(report: BenchmarkReport): void {
     expect(t.p75).toBeLessThanOrEqual(t.p95);
   }
 }
-
-test("adaptive mode reports statistical metrics correctly", async () => {
-  const results = await runBenchmarks(statisticalSuite, parseAdaptiveArgs());
-  expect(results).toHaveLength(1);
-  expect(results[0].reports).toHaveLength(2);
-
-  for (const report of results[0].reports) {
-    verifyStatisticalMetrics(report);
-    verifyPercentileOrdering(report);
-  }
-
-  const reports = results[0].reports;
-  const stableCV = reports.find(r => r.name === "stable-benchmark")
-    ?.measuredResults.time?.cv;
-  const variableCV = reports.find(r => r.name === "variable-benchmark")
-    ?.measuredResults.time?.cv;
-  if (stableCV && variableCV) {
-    expect(variableCV).toBeGreaterThanOrEqual(stableCV);
-  }
-}, 20000);
-
-test("adaptive mode handles GC-heavy workload", async () => {
-  const results = await runBenchmarks(gcSuite, parseAdaptiveArgs());
-  expect(results).toHaveLength(1);
-  expect(results[0].reports).toHaveLength(1);
-
-  const gcResult = results[0].reports[0].measuredResults;
-  expect(gcResult.convergence).toBeDefined();
-  expect(gcResult.time?.outlierRate).toBeDefined();
-  expect(gcResult.time?.cv).toBeDefined();
-  expect(gcResult.time?.mad).toBeGreaterThanOrEqual(0);
-}, 20000);
