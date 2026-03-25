@@ -413,7 +413,7 @@ export async function browserBenchExports(args: DefaultCliArgs): Promise<void> {
   const { iterations, time } = args;
   const result = await profileBrowser({
     url,
-    heapSample: args["heap-sample"],
+    heapSample: needsHeapSample(args),
     heapOptions: {
       samplingInterval: args["heap-interval"],
       stackDepth: args["heap-depth"],
@@ -601,14 +601,25 @@ function createAdaptiveOptions(args: DefaultCliArgs): RunnerOptions {
   } as any;
 }
 
+/** @return true if any heap-related flag implies heap sampling */
+function needsHeapSample(args: DefaultCliArgs): boolean {
+  return (
+    args["heap-sample"] ||
+    args.speedscope ||
+    !!args["export-speedscope"] ||
+    args["heap-raw"] ||
+    args["heap-verbose"] ||
+    args["heap-user-only"]
+  );
+}
+
 /** Runner/matrix options shared across all CLI modes */
 function cliCommonOptions(args: DefaultCliArgs) {
   const { collect, cpu, warmup } = args;
   const { "trace-opt": traceOpt, "skip-settle": noSettle } = args;
   const { "pause-first": pauseFirst, "pause-interval": pauseInterval } = args;
   const { "pause-duration": pauseDuration, "gc-stats": gcStats } = args;
-  const heapSample =
-    args["heap-sample"] || args.speedscope || !!args["export-speedscope"];
+  const heapSample = needsHeapSample(args);
   const { "heap-interval": heapInterval } = args;
   const { "heap-depth": heapDepth } = args;
   return {
@@ -695,7 +706,7 @@ async function finishReports(
   suiteName?: string,
   exportOptions?: MatrixExportOptions,
 ): Promise<void> {
-  if (args["heap-sample"] || args.speedscope || args["export-speedscope"]) {
+  if (needsHeapSample(args)) {
     printHeapReports(results, cliHeapReportOptions(args));
   }
   await exportReports({ results, args, suiteName, ...exportOptions });
