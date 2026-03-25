@@ -342,7 +342,7 @@ const builtinOwner: Record<string, string> = {
 };
 
 /** Qualify bare V8 builtin names (e.g. "replace" → "String.replace") */
-export function qualifyBuiltin(name: string): string | undefined {
+function qualifyBuiltin(name: string): string | undefined {
   const owner = builtinOwner[name];
   return owner ? `${owner}.${name}` : undefined;
 }
