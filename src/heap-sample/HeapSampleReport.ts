@@ -111,9 +111,10 @@ export function aggregateSites(sites: HeapSite[]): HeapSite[] {
 
   for (const site of sites) {
     // When column is unknown (-1), include fn name to avoid merging distinct sites
-    const key = site.col >= 0
-      ? `${site.url}:${site.line}:${site.col}`
-      : `${site.url}:${site.line}:?:${site.fn}`;
+    const key =
+      site.col >= 0
+        ? `${site.url}:${site.line}:${site.col}`
+        : `${site.url}:${site.line}:?:${site.fn}`;
     const existing = byLocation.get(key);
     if (existing) {
       existing.bytes += site.bytes;
@@ -144,9 +145,7 @@ function addCaller(existing: HeapSite, site: HeapSite): void {
   if (!existing.callers) {
     existing.callers = [];
   }
-  const stackKey = site.stack
-    .map(f => `${f.url}:${f.line}:${f.col}`)
-    .join("|");
+  const stackKey = site.stack.map(f => `${f.url}:${f.line}:${f.col}`).join("|");
   const match = existing.callers.find(
     c => c.stack.map(f => `${f.url}:${f.line}:${f.col}`).join("|") === stackKey,
   );
@@ -259,11 +258,14 @@ function formatVerboseSite(
     const pcts = others.map(c => {
       const pct = ((c.bytes / site.bytes) * 100).toFixed(0);
       // Show the caller frame (second-to-last), not the leaf (which is the site itself)
-      const callerFrame = c.stack.length >= 2
-        ? c.stack[c.stack.length - 2]
-        : c.stack[c.stack.length - 1];
+      const callerFrame =
+        c.stack.length >= 2
+          ? c.stack[c.stack.length - 2]
+          : c.stack[c.stack.length - 1];
       const name = callerFrame?.fn ?? "(unknown)";
-      const loc = callerFrame?.url ? fmtLoc(callerFrame.url, callerFrame.line, callerFrame.col) : "";
+      const loc = callerFrame?.url
+        ? fmtLoc(callerFrame.url, callerFrame.line, callerFrame.col)
+        : "";
       return loc ? `${name} ${loc} (${pct}%)` : `${name} (${pct}%)`;
     });
     lines.push(dimFn(`            Also called from: ${pcts.join(", ")}`));

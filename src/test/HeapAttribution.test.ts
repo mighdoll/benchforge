@@ -1,12 +1,12 @@
 import { expect, test } from "vitest";
-import { withHeapSampling } from "../heap-sample/HeapSampler.ts";
 import {
   aggregateSites,
   filterSites,
   flattenProfile,
-  isNodeUserCode,
   type HeapSite,
+  isNodeUserCode,
 } from "../heap-sample/HeapSampleReport.ts";
+import { withHeapSampling } from "../heap-sample/HeapSampler.ts";
 
 // --- Allocation-heavy functions using regex on dynamic strings ---
 

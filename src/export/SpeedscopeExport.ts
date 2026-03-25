@@ -1,7 +1,7 @@
 import { writeFileSync } from "node:fs";
 import { resolve } from "node:path";
-import type { HeapProfile, ProfileNode } from "../heap-sample/HeapSampler.ts";
 import type { ReportGroup } from "../BenchmarkReport.ts";
+import type { HeapProfile, ProfileNode } from "../heap-sample/HeapSampler.ts";
 
 /** speedscope file format (https://www.speedscope.app/file-format-schema.json) */
 interface SpeedscopeFile {
@@ -47,9 +47,7 @@ export function exportSpeedscope(
     for (const report of allReports) {
       const { heapProfile } = report.measuredResults;
       if (!heapProfile) continue;
-      profiles.push(
-        buildProfile(report.name, heapProfile, frames, frameIndex),
-      );
+      profiles.push(buildProfile(report.name, heapProfile, frames, frameIndex));
     }
   }
 
@@ -166,10 +164,9 @@ function internFrame(
     const col1 = col >= 0 ? col + 1 : -1; // 0-indexed → 1-indexed
     // Match speedscope's convention: anonymous functions include location in name
     const shortFile = url ? url.split("/").pop() : undefined;
-    const name = functionName
-      || (shortFile
-        ? `(anonymous ${shortFile}:${line1})`
-        : "(anonymous)");
+    const name =
+      functionName ||
+      (shortFile ? `(anonymous ${shortFile}:${line1})` : "(anonymous)");
     const frame: SpeedscopeFrame = { name };
     if (url) frame.file = url;
     if (lineNumber >= 0) frame.line = line1;
