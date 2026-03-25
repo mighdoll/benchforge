@@ -98,14 +98,19 @@ export function memoryKB(kb: unknown): string | null {
   return `${(kb / 1024).toFixed(1)}MB`;
 }
 
-/** Format bytes with appropriate units (B, KB, MB, GB) */
-export function formatBytes(bytes: unknown): string | null {
+/** Format bytes with appropriate units (B, KB, MB, GB).
+ *  Use `space: true` for human-readable console output (`1.5 KB`). */
+export function formatBytes(
+  bytes: unknown,
+  opts?: { space?: boolean },
+): string | null {
   if (typeof bytes !== "number") return null;
-  if (bytes < 1024) return `${bytes.toFixed(0)}B`;
-  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)}KB`;
+  const s = opts?.space ? " " : "";
+  if (bytes < 1024) return `${bytes.toFixed(0)}${s}B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)}${s}KB`;
   if (bytes < 1024 * 1024 * 1024)
-    return `${(bytes / 1024 / 1024).toFixed(1)}MB`;
-  return `${(bytes / 1024 / 1024 / 1024).toFixed(1)}GB`;
+    return `${(bytes / 1024 / 1024).toFixed(1)}${s}MB`;
+  return `${(bytes / 1024 / 1024 / 1024).toFixed(1)}${s}GB`;
 }
 
 /** Format percentage difference with confidence interval */

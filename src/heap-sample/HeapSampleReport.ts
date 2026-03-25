@@ -1,4 +1,5 @@
 import pc from "picocolors";
+import { formatBytes } from "../table-util/Formatters.ts";
 import type { HeapProfile, HeapSample, ProfileNode } from "./HeapSampler.ts";
 
 /** Sum selfSize across all nodes in profile (before any filtering) */
@@ -162,9 +163,7 @@ function fmtLoc(url: string, line: number, col: number): string {
 }
 
 function fmtBytes(bytes: number): string {
-  if (bytes >= 1024 * 1024) return `${(bytes / 1024 / 1024).toFixed(2)} MB`;
-  if (bytes >= 1024) return `${(bytes / 1024).toFixed(1)} KB`;
-  return `${bytes} B`;
+  return formatBytes(bytes, { space: true }) ?? `${bytes} B`;
 }
 
 export interface HeapReportOptions {
