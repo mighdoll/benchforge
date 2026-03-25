@@ -82,19 +82,21 @@ function buildProfile(
   const samples: number[][] = [];
   const weights: number[] = [];
 
-  if (profile.samples && profile.samples.length > 0) {
-    // Use raw samples ordered by ordinal for temporal view
-    const sorted = [...profile.samples].sort((a, b) => a.ordinal - b.ordinal);
-    for (const sample of sorted) {
-      const stack = nodeStacks.get(sample.nodeId);
-      if (stack) {
-        samples.push(stack);
-        weights.push(sample.size);
-      }
+  if (!profile.samples || profile.samples.length === 0) {
+    console.error(
+      `Speedscope export: no samples in heap profile for "${name}", skipping`,
+    );
+    return { type: "sampled", name, unit: "bytes", startValue: 0, endValue: 0, samples, weights };
+  }
+
+  // Use raw samples ordered by ordinal for temporal view
+  const sorted = [...profile.samples].sort((a, b) => a.ordinal - b.ordinal);
+  for (const sample of sorted) {
+    const stack = nodeStacks.get(sample.nodeId);
+    if (stack) {
+      samples.push(stack);
+      weights.push(sample.size);
     }
-  } else {
-    // Fallback: walk tree and emit nodes with selfSize > 0
-    emitFromTree(profile.head, [], sharedFrames, frameIndex, samples, weights);
   }
 
   const totalBytes = weights.reduce((sum, w) => sum + w, 0);
@@ -123,26 +125,6 @@ function walkTree(
   nodeStacks.set(node.id, stack);
   for (const child of node.children || []) {
     walkTree(child, stack, sharedFrames, frameIndex, nodeStacks);
-  }
-}
-
-/** Fallback: emit samples from tree nodes that have selfSize > 0 */
-function emitFromTree(
-  node: ProfileNode,
-  parentStack: number[],
-  sharedFrames: SpeedscopeFrame[],
-  frameIndex: Map<string, number>,
-  samples: number[][],
-  weights: number[],
-): void {
-  const idx = internFrame(node, sharedFrames, frameIndex);
-  const stack = [...parentStack, idx];
-  if (node.selfSize > 0) {
-    samples.push(stack);
-    weights.push(node.selfSize);
-  }
-  for (const child of node.children || []) {
-    emitFromTree(child, stack, sharedFrames, frameIndex, samples, weights);
   }
 }
 
