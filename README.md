@@ -19,6 +19,9 @@ Also:
 - **Worker isolation** — node benchmarks run in child processes by default.
 - **Browser support** — benchmark in Chromium via [Playwright + CDP](README-browser.md).
 
+## Visualize garbage generation by function
+<img width="4444" height="2706" alt="allocation view" src="https://github.com/user-attachments/assets/6d4e2dee-bb72-41ce-a71d-d036bebedb3d" />
+
 ## Installation
 
 ```bash
