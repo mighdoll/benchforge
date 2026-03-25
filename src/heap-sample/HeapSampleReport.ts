@@ -61,15 +61,12 @@ export function flattenProfile(profile: HeapProfile): HeapSite[] {
   walk(profile.head, []);
 
   // Attach raw samples to their corresponding sites
-  if (profile.samples) {
-    for (const sample of profile.samples) {
-      const matchingSites = nodeIdToSites.get(sample.nodeId);
-      if (matchingSites) {
-        for (const site of matchingSites) {
-          if (!site.samples) site.samples = [];
-          site.samples.push(sample);
-        }
-      }
+  for (const sample of profile.samples ?? []) {
+    const matchingSites = nodeIdToSites.get(sample.nodeId);
+    if (!matchingSites) continue;
+    for (const site of matchingSites) {
+      if (!site.samples) site.samples = [];
+      site.samples.push(sample);
     }
   }
 
@@ -258,10 +255,7 @@ function formatVerboseSite(
     const pcts = others.map(c => {
       const pct = ((c.bytes / site.bytes) * 100).toFixed(0);
       // Show the caller frame (second-to-last), not the leaf (which is the site itself)
-      const callerFrame =
-        c.stack.length >= 2
-          ? c.stack[c.stack.length - 2]
-          : c.stack[c.stack.length - 1];
+      const callerFrame = c.stack.at(-2) ?? c.stack.at(-1);
       const name = callerFrame?.fn ?? "(unknown)";
       const loc = callerFrame?.url
         ? fmtLoc(callerFrame.url, callerFrame.line, callerFrame.col)
