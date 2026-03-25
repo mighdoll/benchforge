@@ -1,6 +1,7 @@
 import { writeFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { groupReports, type ReportGroup } from "../BenchmarkReport.ts";
+import { qualifyBuiltin } from "../heap-sample/HeapSampleReport.ts";
 import type { HeapProfile, ProfileNode } from "../heap-sample/HeapSampler.ts";
 
 /** speedscope file format (https://www.speedscope.app/file-format-schema.json) */
@@ -132,6 +133,15 @@ function walkTree(
   }
 }
 
+/** Build display name for a call frame.
+ *  Qualifies builtins (e.g. "replace" → "String.replace") and labels anonymous functions. */
+function frameName(functionName: string, url: string, line1: number): string {
+  if (!url && functionName) return qualifyBuiltin(functionName) ?? functionName;
+  if (functionName) return functionName;
+  const shortFile = url ? url.split("/").pop() : undefined;
+  return shortFile ? `(anonymous ${shortFile}:${line1})` : "(anonymous)";
+}
+
 /** Intern a call frame, returning its index in the shared frames array */
 function internFrame(
   node: ProfileNode,
@@ -148,11 +158,7 @@ function internFrame(
     idx = sharedFrames.length;
     const line1 = lineNumber + 1; // 0-indexed → 1-indexed
     const col1 = col >= 0 ? col + 1 : -1; // 0-indexed → 1-indexed
-    // Match speedscope's convention: anonymous functions include location in name
-    const shortFile = url ? url.split("/").pop() : undefined;
-    const name =
-      functionName ||
-      (shortFile ? `(anonymous ${shortFile}:${line1})` : "(anonymous)");
+    const name = frameName(functionName, url, line1);
     const frame: SpeedscopeFrame = { name };
     if (url) frame.file = url;
     if (lineNumber >= 0) frame.line = line1;
