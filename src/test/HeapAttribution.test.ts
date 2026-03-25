@@ -151,9 +151,8 @@ test("aggregation preserves distinct caller stacks", () => {
 });
 
 test("named function attribution is consistent across runs", async () => {
-  // With interval=1 + includeCollected flags, V8's profiler is deterministic
-  // under --jitless (verified in Node + browser, see heap-jitless-fixture.mjs).
-  // With JIT, optimization can change site count between runs, but named
+  // With interval=1 + includeCollected flags, V8's profiler is mostly
+  // deterministic. JIT optimization can change site count between runs, but named
   // target functions should still get attributed bytes consistently.
   const regexByRun: number[] = [];
   const concatByRun: number[] = [];
