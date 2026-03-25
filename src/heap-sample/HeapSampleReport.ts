@@ -241,7 +241,6 @@ function formatVerboseSite(
       lines.push(dimFn(`            <- ${frame.fn}  ${callerLoc}`));
     }
   }
-
 }
 
 /** Get total bytes from sites */
