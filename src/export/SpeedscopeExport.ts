@@ -139,15 +139,14 @@ function internFrame(
   frameIndex: Map<string, number>,
 ): number {
   const { functionName, url, lineNumber, columnNumber } = node.callFrame;
-  const col = columnNumber ?? -1;
   // Key uses raw V8 values (0-indexed) for correct deduplication
-  const key = `${functionName}\0${url}\0${lineNumber}\0${col}`;
+  const key = `${functionName}\0${url}\0${lineNumber}\0${columnNumber}`;
 
   let idx = frameIndex.get(key);
   if (idx === undefined) {
     idx = sharedFrames.length;
     const line1 = lineNumber + 1; // 0-indexed → 1-indexed
-    const col1 = col >= 0 ? col + 1 : -1; // 0-indexed → 1-indexed
+    const col1 = columnNumber != null ? columnNumber + 1 : undefined;
     // Match speedscope's convention: anonymous functions include location in name
     const shortFile = url ? url.split("/").pop() : undefined;
     const name =
@@ -156,7 +155,7 @@ function internFrame(
     const frame: SpeedscopeFrame = { name };
     if (url) frame.file = url;
     if (lineNumber >= 0) frame.line = line1;
-    if (col1 >= 0) frame.col = col1;
+    if (col1 != null) frame.col = col1;
     sharedFrames.push(frame);
     frameIndex.set(key, idx);
   }

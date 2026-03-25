@@ -6,8 +6,8 @@ import {
 
 test("unknown column does not merge distinct functions on same line", () => {
   const sites: HeapSite[] = [
-    { fn: "Foo", url: "test.ts", line: 10, col: -1, bytes: 100 },
-    { fn: "Bar", url: "test.ts", line: 10, col: -1, bytes: 200 },
+    { fn: "Foo", url: "test.ts", line: 10, col: undefined, bytes: 100 },
+    { fn: "Bar", url: "test.ts", line: 10, col: undefined, bytes: 200 },
   ];
   const aggregated = aggregateSites(sites);
   expect(aggregated).toHaveLength(2);

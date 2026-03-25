@@ -17,14 +17,14 @@ export interface CallFrame {
   fn: string;
   url: string;
   line: number; // 1-indexed for display
-  col: number;
+  col?: number;
 }
 
 export interface HeapSite {
   fn: string;
   url: string;
   line: number; // 1-indexed for display
-  col: number;
+  col?: number;
   bytes: number;
   stack?: CallFrame[]; // call stack from root to this frame
   samples?: HeapSample[]; // individual allocation samples at this site
@@ -40,8 +40,12 @@ export function flattenProfile(profile: HeapProfile): HeapSite[] {
   function walk(node: ProfileNode, stack: CallFrame[]): void {
     const { functionName, url, lineNumber, columnNumber } = node.callFrame;
     const fn = functionName || "(anonymous)";
-    const col = columnNumber ?? -1;
-    const frame: CallFrame = { fn, url: url || "", line: lineNumber + 1, col };
+    const frame: CallFrame = {
+      fn,
+      url: url || "",
+      line: lineNumber + 1,
+      col: columnNumber,
+    };
     const newStack = [...stack, frame];
 
     if (node.selfSize > 0) {
@@ -108,9 +112,9 @@ export function aggregateSites(sites: HeapSite[]): HeapSite[] {
   const byLocation = new Map<string, HeapSite>();
 
   for (const site of sites) {
-    // When column is unknown (-1), include fn name to avoid merging distinct sites
+    // When column is unknown, include fn name to avoid merging distinct sites
     const key =
-      site.col >= 0
+      site.col != null
         ? `${site.url}:${site.line}:${site.col}`
         : `${site.url}:${site.line}:?:${site.fn}`;
     const existing = byLocation.get(key);
@@ -157,9 +161,9 @@ function addCaller(existing: HeapSite, site: HeapSite): void {
   }
 }
 
-/** Format location, omitting column when unknown (-1) */
-function fmtLoc(url: string, line: number, col: number): string {
-  return col >= 0 ? `${url}:${line}:${col}` : `${url}:${line}`;
+/** Format location, omitting column when unknown */
+function fmtLoc(url: string, line: number, col?: number): string {
+  return col != null ? `${url}:${line}:${col}` : `${url}:${line}`;
 }
 
 function fmtBytes(bytes: number): string {
@@ -309,8 +313,9 @@ export function formatRawSamples(profile: HeapProfile): string {
     const fn = node?.callFrame.functionName || "(unknown)";
     const url = node?.callFrame.url || "";
     const line = node ? node.callFrame.lineNumber + 1 : 0;
-    const col = node?.callFrame.columnNumber ?? -1;
-    const loc = url ? fmtLoc(url, line, col) : "(unknown)";
+    const loc = url
+      ? fmtLoc(url, line, node?.callFrame.columnNumber)
+      : "(unknown)";
     lines.push(`${s.ordinal}\t${s.size}\t${fn}\t${loc}`);
   }
   return lines.join("\n");
