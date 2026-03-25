@@ -1,6 +1,6 @@
 import { writeFileSync } from "node:fs";
 import { resolve } from "node:path";
-import type { ReportGroup } from "../BenchmarkReport.ts";
+import { groupReports, type ReportGroup } from "../BenchmarkReport.ts";
 import type { HeapProfile, ProfileNode } from "../heap-sample/HeapSampler.ts";
 
 /** speedscope file format (https://www.speedscope.app/file-format-schema.json) */
@@ -40,11 +40,7 @@ export function exportSpeedscope(
   const profiles: SpeedscopeProfile[] = [];
 
   for (const group of groups) {
-    const allReports = group.baseline
-      ? [...group.reports, group.baseline]
-      : group.reports;
-
-    for (const report of allReports) {
+    for (const report of groupReports(group)) {
       const { heapProfile } = report.measuredResults;
       if (!heapProfile) continue;
       profiles.push(buildProfile(report.name, heapProfile, frames, frameIndex));
@@ -86,7 +82,15 @@ function buildProfile(
     console.error(
       `Speedscope export: no samples in heap profile for "${name}", skipping`,
     );
-    return { type: "sampled", name, unit: "bytes", startValue: 0, endValue: 0, samples, weights };
+    return {
+      type: "sampled",
+      name,
+      unit: "bytes",
+      startValue: 0,
+      endValue: 0,
+      samples,
+      weights,
+    };
   }
 
   // Use raw samples ordered by ordinal for temporal view

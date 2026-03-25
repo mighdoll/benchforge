@@ -14,7 +14,7 @@ import type {
   ReportGroup,
   ResultsMapper,
 } from "../BenchmarkReport.ts";
-import { reportResults } from "../BenchmarkReport.ts";
+import { groupReports, reportResults } from "../BenchmarkReport.ts";
 import type { BrowserProfileResult } from "../browser/BrowserHeapSampler.ts";
 import { exportBenchmarkJson } from "../export/JsonExport.ts";
 import { exportPerfettoTrace } from "../export/PerfettoExport.ts";
@@ -504,11 +504,7 @@ export function printHeapReports(
   options: HeapReportOptions,
 ): void {
   for (const group of groups) {
-    const allReports = group.baseline
-      ? [...group.reports, group.baseline]
-      : group.reports;
-
-    for (const report of allReports) {
+    for (const report of groupReports(group)) {
       const { heapProfile } = report.measuredResults;
       if (!heapProfile) continue;
 
@@ -633,9 +629,8 @@ const { yellow, dim } = isTest
 
 /** Log V8 optimization tier distribution and deoptimizations */
 export function reportOptStatus(groups: ReportGroup[]): void {
-  const optData = groups.flatMap(({ reports, baseline }) => {
-    const all = baseline ? [...reports, baseline] : reports;
-    return all
+  const optData = groups.flatMap(group => {
+    return groupReports(group)
       .filter(r => r.measuredResults.optStatus)
       .map(r => ({
         name: r.name,
@@ -672,12 +667,11 @@ export function hasField(
   results: ReportGroup[],
   field: keyof MeasuredResults,
 ): boolean {
-  return results.some(({ reports, baseline }) => {
-    const all = baseline ? [...reports, baseline] : reports;
-    return all.some(
+  return results.some(group =>
+    groupReports(group).some(
       ({ measuredResults }) => measuredResults[field] !== undefined,
-    );
-  });
+    ),
+  );
 }
 
 export interface ExportOptions {

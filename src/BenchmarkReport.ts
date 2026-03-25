@@ -20,6 +20,11 @@ export interface ReportGroup {
   baseline?: BenchmarkReport;
 }
 
+/** All reports in a group, including the baseline if present */
+export function groupReports(group: ReportGroup): BenchmarkReport[] {
+  return group.baseline ? [...group.reports, group.baseline] : group.reports;
+}
+
 /** Results from a single benchmark run */
 export interface BenchmarkReport {
   name: string;
