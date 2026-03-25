@@ -1,9 +1,9 @@
-import { expect, test } from "vitest";
+import { expect } from "vitest";
 import type { BenchSuite } from "../Benchmark.ts";
 import type { BenchmarkReport } from "../BenchmarkReport.ts";
-import { parseBenchArgs, runBenchmarks } from "../cli/RunBenchCLI.ts";
+import { parseBenchArgs } from "../cli/RunBenchCLI.ts";
 
-const statisticalSuite: BenchSuite = {
+const _statisticalSuite: BenchSuite = {
   name: "Statistical Test Suite",
   groups: [
     {
@@ -31,7 +31,7 @@ const statisticalSuite: BenchSuite = {
   ],
 };
 
-const gcSuite: BenchSuite = {
+const _gcSuite: BenchSuite = {
   name: "GC Test Suite",
   groups: [
     {
@@ -52,7 +52,7 @@ const gcSuite: BenchSuite = {
   ],
 };
 
-function parseAdaptiveArgs() {
+function _parseAdaptiveArgs() {
   return parseBenchArgs((yargs: any) =>
     yargs
       .option("adaptive", { type: "boolean", default: true })
@@ -61,7 +61,7 @@ function parseAdaptiveArgs() {
   );
 }
 
-function verifyStatisticalMetrics(report: BenchmarkReport): void {
+function _verifyStatisticalMetrics(report: BenchmarkReport): void {
   const { time, convergence } = report.measuredResults;
   expect(time).toBeDefined();
   expect(time?.p25).toBeDefined();
@@ -77,7 +77,7 @@ function verifyStatisticalMetrics(report: BenchmarkReport): void {
   expect(convergence?.reason).toBeDefined();
 }
 
-function verifyPercentileOrdering(report: BenchmarkReport): void {
+function _verifyPercentileOrdering(report: BenchmarkReport): void {
   const t = report.measuredResults.time;
   if (t?.p25 && t?.p50 && t?.p75 && t?.p95) {
     expect(t.p25).toBeLessThanOrEqual(t.p50);

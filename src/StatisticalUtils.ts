@@ -27,7 +27,8 @@ type BootstrapOptions = {
   resamples?: number;
   confidence?: number;
 };
-const confidence = 0.95;const outlierMultiplier = 1.5; // Tukey's fence multiplier
+const confidence = 0.95;
+const outlierMultiplier = 1.5; // Tukey's fence multiplier
 const bootstrapSamples = 10000;
 
 /** @return relative standard deviation (coefficient of variation) */
