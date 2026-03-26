@@ -169,7 +169,7 @@ export async function browserBenchExports(args: DefaultCliArgs): Promise<void> {
   } catch {
     throw new Error(
       "playwright is required for browser benchmarking (--url).\n\n" +
-        "Quick start:  npx benchforge-browser --url <your-url>\n\n" +
+        "Quick start:  npx benchforge-browser <your-url>\n\n" +
         "Or install manually:\n" +
         "  npm install playwright\n" +
         "  npx playwright install chromium",

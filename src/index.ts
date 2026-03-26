@@ -23,7 +23,7 @@ export type {
 } from "./BenchmarkReport.ts";
 export { reportResults } from "./BenchmarkReport.ts";
 export type { Configure, DefaultCliArgs } from "./cli/CliArgs.ts";
-export { defaultCliArgs, parseCliArgs } from "./cli/CliArgs.ts";
+export { browserCliArgs, defaultCliArgs, parseCliArgs } from "./cli/CliArgs.ts";
 export type { ExportOptions, MatrixExportOptions } from "./cli/RunBenchCLI.ts";
 export {
   benchExports,

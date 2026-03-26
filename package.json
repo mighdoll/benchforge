@@ -13,7 +13,7 @@
     "build:plots": "tsdown --config tsdown.plots.config.ts",
     "example:node": "bin/benchforge examples/simple-cli.ts --gc-stats --heap-sample --html",
     "example:bench": "bin/benchforge --url file://$PWD/examples/browser-bench/index.html --gc-stats --heap-sample --html",
-    "example:heap": "bin/benchforge --url file://$PWD/examples/browser-heap/index.html --heap-sample --gc-stats",
+    "example:heap": "node benchforge-browser/bin.mjs file://$PWD/examples/browser-heap/index.html --gc-stats --speedscope",
     "example:lap": "bin/benchforge --url file://$PWD/examples/browser-lap/index.html --gc-stats --heap-sample --html",
     "fix": "biome check --fix --unsafe --error-on-warnings",
     "lint": "biome check --error-on-warnings",

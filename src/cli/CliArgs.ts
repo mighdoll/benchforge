@@ -51,6 +51,22 @@ const cliOptions = {
   "chrome-args":    { type: "string",  array: true, requiresArg: true, describe: "extra Chromium flags" },
 } as const;
 
+const { url: _url, ...browserOnlyOptions } = cliOptions;
+
+/** @return yargs configured for browser benchmarking (url as required positional) */
+export function browserCliArgs(yargsInstance: Argv): Argv<DefaultCliArgs> {
+  return yargsInstance
+    .command("$0 <url>", "run browser benchmarks", y => {
+      y.positional("url", {
+        type: "string",
+        describe: "page URL for browser profiling",
+      });
+    })
+    .options(browserOnlyOptions)
+    .help()
+    .strict() as Argv<DefaultCliArgs>;
+}
+
 /** @return yargs with standard benchmark options */
 export function defaultCliArgs(yargsInstance: Argv): Argv<DefaultCliArgs> {
   return yargsInstance

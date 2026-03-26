@@ -1,4 +1,4 @@
 #!/usr/bin/env node
-import { runDefaultBench } from "benchforge";
+import { browserCliArgs, runDefaultBench } from "benchforge";
 
-await runDefaultBench();
+await runDefaultBench(undefined, browserCliArgs);
