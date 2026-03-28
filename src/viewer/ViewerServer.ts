@@ -4,7 +4,11 @@ import { homedir } from "node:os";
 import { dirname, extname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import open from "open";
-import { collectSources, fetchSource } from "../export/AllocExport.ts";
+import {
+  archiveFileName,
+  collectSources,
+  fetchSource,
+} from "../export/AllocExport.ts";
 
 export interface ViewerServerOptions {
   /** Speedscope JSON profile data */
@@ -165,10 +169,11 @@ async function handleArchiveRequest(
       },
     };
     const body = JSON.stringify(archive);
+    const filename = archiveFileName(parsed, timestamp);
     res.setHeader("Content-Type", "application/json");
     res.setHeader(
       "Content-Disposition",
-      `attachment; filename="benchforge-${timestamp}.benchforge"`,
+      `attachment; filename="${filename}"`,
     );
     res.end(body);
   } catch {

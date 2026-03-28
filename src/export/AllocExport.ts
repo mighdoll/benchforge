@@ -181,11 +181,27 @@ export async function archiveSpeedscope(
     },
   };
 
-  const filename = outputPath || `benchforge-${timestamp}.benchforge`;
+  const filename = outputPath || archiveFileName(file, timestamp);
   const absPath = resolve(filename);
   writeFileSync(absPath, JSON.stringify(archive));
   console.log(`Archive written to: ${filename}`);
   return absPath;
+}
+
+/** Derive an archive filename from the profile name.
+ *  e.g. "http://localhost:8080/my-app" → "localhost-8080-my-app-2026-03-28T17-25.benchforge" */
+export function archiveFileName(
+  file: SpeedscopeFile,
+  timestamp: string,
+): string {
+  const name = file.profiles[0]?.name || "profile";
+  const sanitized = name
+    .replace(/^https?:\/\//, "")
+    .replace(/[^a-zA-Z0-9._-]+/g, "-")
+    .replace(/-+/g, "-")
+    .replace(/^-|-$/g, "");
+  const base = sanitized || "profile";
+  return `${base}-${timestamp}.benchforge`;
 }
 
 /** Build a single speedscope profile from a resolved heap profile */
