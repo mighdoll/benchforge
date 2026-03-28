@@ -118,6 +118,7 @@ body { display: flex; flex-direction: column; }
   flex: 1;
   position: relative;
   min-height: 0;
+  margin-top: 4px;
 }
 
 #speedscope-iframe {
