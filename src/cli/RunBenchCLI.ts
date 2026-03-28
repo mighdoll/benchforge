@@ -16,13 +16,13 @@ import type {
 } from "../BenchmarkReport.ts";
 import { groupReports, reportResults } from "../BenchmarkReport.ts";
 import type { BrowserProfileResult } from "../browser/BrowserHeapSampler.ts";
-import { resolveEditorUri } from "../export/EditorUri.ts";
-import { exportBenchmarkJson } from "../export/JsonExport.ts";
-import { exportPerfettoTrace } from "../export/PerfettoExport.ts";
 import {
   exportAndLaunchSpeedscope,
   exportSpeedscope,
-} from "../export/SpeedscopeExport.ts";
+} from "../export/AllocExport.ts";
+import { resolveEditorUri } from "../export/EditorUri.ts";
+import { exportBenchmarkJson } from "../export/JsonExport.ts";
+import { exportPerfettoTrace } from "../export/PerfettoExport.ts";
 import type { GitVersion } from "../GitUtils.ts";
 import { prepareHtmlData } from "../HtmlDataPrep.ts";
 import {
@@ -317,10 +317,10 @@ export function hasField(
 export async function exportReports(options: ExportOptions): Promise<void> {
   const { results, args, sections, suiteName } = options;
   const { currentVersion, baselineVersion } = options;
-  const openInBrowser = args.html && !args["export-html"];
+  const openInBrowser = args["view-report"] && !args["export-report"];
   let closeServer: (() => void) | undefined;
 
-  if (args.html || args["export-html"]) {
+  if (args["view-report"] || args["export-report"]) {
     const htmlOpts = {
       cliArgs: args,
       sections,
@@ -330,24 +330,24 @@ export async function exportReports(options: ExportOptions): Promise<void> {
     const reportData = prepareHtmlData(results, htmlOpts);
     const result = await generateHtmlReport(reportData, {
       openBrowser: openInBrowser,
-      outputPath: args["export-html"],
+      outputPath: args["export-report"],
     });
     closeServer = result.closeServer;
   }
 
-  if (args.json) {
-    await exportBenchmarkJson(results, args.json, args, suiteName);
+  if (args["export-json"]) {
+    await exportBenchmarkJson(results, args["export-json"], args, suiteName);
   }
 
   if (args["export-perfetto"]) {
     exportPerfettoTrace(results, args["export-perfetto"], args);
   }
 
-  if (args["export-speedscope"]) {
-    exportSpeedscope(results, args["export-speedscope"]);
+  if (args["export-alloc"]) {
+    exportSpeedscope(results, args["export-alloc"]);
   }
 
-  if (args.speedscope) {
+  if (args["view-alloc"]) {
     exportAndLaunchSpeedscope(results, resolveEditorUri(args.editor));
   }
 
@@ -546,8 +546,8 @@ function warnBrowserFlags(args: DefaultCliArgs): void {
 function needsHeapSample(args: DefaultCliArgs): boolean {
   return (
     args["heap-sample"] ||
-    args.speedscope ||
-    !!args["export-speedscope"] ||
+    args["view-alloc"] ||
+    !!args["export-alloc"] ||
     args["heap-raw"] ||
     args["heap-verbose"] ||
     args["heap-user-only"]

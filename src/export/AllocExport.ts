@@ -92,10 +92,7 @@ const speedscopePackage =
   "https://github.com/mighdoll/speedscope/releases/download/v1.26.0-m1/speedscope-1.26.0-m1.tgz";
 
 /** Launch speedscope viewer on a file via npx */
-export function launchSpeedscope(
-  filePath: string,
-  editorUri?: string,
-): void {
+export function launchSpeedscope(filePath: string, editorUri?: string): void {
   console.log("Opening speedscope...");
   const args = [speedscopePackage, filePath];
   if (editorUri) {

@@ -42,14 +42,14 @@ export {
   runDefaultMatrixBench,
   runMatrixSuite,
 } from "./cli/RunBenchCLI.ts";
-export * from "./export/JsonFormat.ts";
-export { exportPerfettoTrace } from "./export/PerfettoExport.ts";
 export {
   exportAndLaunchSpeedscope,
   exportSpeedscope,
   heapProfileToSpeedscope,
   launchSpeedscope,
-} from "./export/SpeedscopeExport.ts";
+} from "./export/AllocExport.ts";
+export * from "./export/JsonFormat.ts";
+export { exportPerfettoTrace } from "./export/PerfettoExport.ts";
 export type { GitVersion } from "./GitUtils.ts";
 export {
   formatDateWithTimezone,

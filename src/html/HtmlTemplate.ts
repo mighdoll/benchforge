@@ -1,6 +1,6 @@
 import type { GitVersion, GroupData, ReportData } from "./Types.ts";
 
-const skipArgs = new Set(["_", "$0", "html", "export-html"]);
+const skipArgs = new Set(["_", "$0", "view-report", "export-report"]);
 
 const badgeLabels = {
   faster: "Faster",

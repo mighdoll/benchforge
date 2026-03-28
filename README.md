@@ -15,7 +15,7 @@ but they can't show you where garbage is being generated.
 
 Also:
 - **Zero-config CLI** — export a function, run `benchforge file.ts`.
-- **Multiple export formats** — HTML reports, Perfetto traces, Speedscope flame charts, JSON.
+- **Multiple export formats** — HTML reports, allocation flame charts, Perfetto traces, JSON.
 - **Worker isolation** — node benchmarks run in child processes by default.
 - **Browser support** — benchmark in Chromium via [Playwright + CDP](README-browser.md).
 
@@ -123,12 +123,12 @@ This eliminates manual caching boilerplate in worker modules.
 - `--heap-rows <n>` - Number of top allocation sites to show (default: 20)
 
 ### Output Options
-- `--html` - Generate HTML report, start server, and open in browser
-- `--export-html <file>` - Export HTML report to file
-- `--json <file>` - Export benchmark data to JSON
+- `--view-report` - Open HTML report in browser
+- `--export-report <file>` - Export HTML report to file
+- `--export-json <file>` - Export benchmark data to JSON
 - `--export-perfetto <file>` - Export Perfetto trace file
-- `--speedscope` - Open heap profile in speedscope viewer (via npx)
-- `--export-speedscope <file>` - Export heap profile as speedscope JSON
+- `--view-alloc` - Open allocation profile in viewer
+- `--export-alloc <file>` - Export allocation profile (speedscope JSON format)
 
 ## CLI Usage
 
@@ -184,8 +184,8 @@ The HTML report displays:
 - Allocation Series: Per-sample heap allocation (requires `--heap-sample`)
 
 ```bash
-# Generate HTML report, start server, and open in browser
-benchforge my-bench.ts --html
+# Open HTML report in browser
+benchforge my-bench.ts --view-report
 # Press Ctrl+C to exit when done viewing
 ```
 
@@ -210,19 +210,19 @@ The trace includes:
 - **Pause markers**: V8 optimization pause points
 - **V8 GC events**: Automatically merged after process exit (when run with `--trace-events-enabled`)
 
-### Speedscope Export
+### Allocation Profile Export
 
-View heap allocation profiles as flame charts in speedscope:
+View heap allocation profiles as flame charts:
 
 ```bash
-# Open directly in speedscope (launches via npx)
-benchforge my-bench.ts --heap-sample --speedscope
+# Open allocation profile in viewer
+benchforge my-bench.ts --heap-sample --view-alloc
 
 # Export to file
-benchforge my-bench.ts --heap-sample --export-speedscope profile.json
+benchforge my-bench.ts --heap-sample --export-alloc profile.json
 ```
 
-Each benchmark with a heap profile becomes a separate speedscope profile, with samples ordered temporally and weighted by allocation size in bytes.
+Each benchmark with a heap profile becomes a separate profile, with samples ordered temporally and weighted by allocation size in bytes.
 
 ### GC Statistics
 
