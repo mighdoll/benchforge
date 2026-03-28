@@ -2,6 +2,7 @@
 import type { BenchmarkFunction, BenchmarkSpec } from "../Benchmark.ts";
 import type { HeapProfile } from "../heap-sample/HeapSampler.ts";
 import type { MeasuredResults } from "../MeasuredResults.ts";
+import type { TimeProfile } from "../time-sample/TimeSampler.ts";
 import { variantModuleUrl } from "../matrix/VariantLoader.ts";
 import {
   type AdaptiveOptions,
@@ -35,6 +36,7 @@ export interface ResultMessage {
   type: "result";
   results: MeasuredResults[];
   heapProfile?: HeapProfile;
+  timeProfile?: TimeProfile;
 }
 
 /** Message returned from worker process when benchmark fails. */
@@ -210,28 +212,53 @@ process.on("message", async (message: RunMessage) => {
 
     const benchStart = getPerfNow();
 
-    // Run with heap sampling if enabled (covers module import + execution)
-    if (message.options.heapSample) {
-      const { withHeapSampling } = await import(
-        "../heap-sample/HeapSampler.ts"
-      );
-      const heapOpts = {
-        samplingInterval: message.options.heapInterval,
-        stackDepth: message.options.heapDepth,
+    const { heapSample, timeSample } = message.options;
+
+    // Run with profiling if either sampler is enabled
+    if (heapSample || timeSample) {
+      let heapProfile: HeapProfile | undefined;
+      let timeProfile: TimeProfile | undefined;
+
+      const run = async () => {
+        const { fn, params } = await resolveBenchmarkFn(message);
+        return runner.runBench(
+          { ...message.spec, fn },
+          message.options,
+          params,
+        );
       };
-      const { result: results, profile: heapProfile } = await withHeapSampling(
-        heapOpts,
-        async () => {
-          const { fn, params } = await resolveBenchmarkFn(message);
-          return runner.runBench(
-            { ...message.spec, fn },
-            message.options,
-            params,
-          );
-        },
-      );
+
+      // Nest: outer heap, inner time (independent V8 subsystems)
+      const runMaybeWithTime = timeSample
+        ? async () => {
+            const { withTimeProfiling } = await import(
+              "../time-sample/TimeSampler.ts"
+            );
+            const timeOpts = { interval: message.options.timeInterval };
+            const r = await withTimeProfiling(timeOpts, run);
+            timeProfile = r.profile;
+            return r.result;
+          }
+        : run;
+
+      let results: MeasuredResults[];
+      if (heapSample) {
+        const { withHeapSampling } = await import(
+          "../heap-sample/HeapSampler.ts"
+        );
+        const heapOpts = {
+          samplingInterval: message.options.heapInterval,
+          stackDepth: message.options.heapDepth,
+        };
+        const r = await withHeapSampling(heapOpts, runMaybeWithTime);
+        heapProfile = r.profile;
+        results = r.result;
+      } else {
+        results = await runMaybeWithTime();
+      }
+
       logTiming("Benchmark execution took", getElapsed(benchStart));
-      sendAndExit({ type: "result", results, heapProfile }, 0);
+      sendAndExit({ type: "result", results, heapProfile, timeProfile }, 0);
     } else {
       const { fn, params } = await resolveBenchmarkFn(message);
       const results = await runner.runBench(

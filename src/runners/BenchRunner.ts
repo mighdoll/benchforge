@@ -47,6 +47,10 @@ export interface RunnerOptions {
   heapInterval?: number;
   /** Heap sampling stack depth */
   heapDepth?: number;
+  /** V8 CPU time sampling */
+  timeSample?: boolean;
+  /** CPU sampling interval in microseconds (default 1000) */
+  timeInterval?: number;
 }
 
 /** Execute benchmark with optional parameters */

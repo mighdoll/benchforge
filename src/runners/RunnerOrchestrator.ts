@@ -4,6 +4,7 @@ import path from "node:path";
 import type { BenchmarkSpec } from "../Benchmark.ts";
 import type { HeapProfile } from "../heap-sample/HeapSampler.ts";
 import type { MeasuredResults } from "../MeasuredResults.ts";
+import type { TimeProfile } from "../time-sample/TimeSampler.ts";
 import {
   type AdaptiveOptions,
   createAdaptiveWrapper,
@@ -37,7 +38,11 @@ type WorkerParams<T = unknown> = {
 };
 
 type WorkerHandlers = {
-  resolve: (results: MeasuredResults[], heapProfile?: HeapProfile) => void;
+  resolve: (
+    results: MeasuredResults[],
+    heapProfile?: HeapProfile,
+    timeProfile?: TimeProfile,
+  ) => void;
   reject: (error: Error) => void;
 };
 
@@ -223,7 +228,11 @@ function createWorkerHandlers(
   reject: (error: Error) => void,
 ): WorkerHandlers {
   return {
-    resolve: (results: MeasuredResults[], heapProfile?: HeapProfile) => {
+    resolve: (
+      results: MeasuredResults[],
+      heapProfile?: HeapProfile,
+      timeProfile?: TimeProfile,
+    ) => {
       logTiming(
         `Total worker time for ${specName}: ${getElapsed(startTime).toFixed(1)}ms`,
       );
@@ -232,6 +241,7 @@ function createWorkerHandlers(
         for (const r of results) r.gcStats = gcStats;
       }
       if (heapProfile) for (const r of results) r.heapProfile = heapProfile;
+      if (timeProfile) for (const r of results) r.timeProfile = timeProfile;
       resolve(results);
     },
     reject,
@@ -323,13 +333,17 @@ function createCleanup(
 function createMessageHandler(
   specName: string,
   cleanup: () => void,
-  resolve: (results: MeasuredResults[], heapProfile?: HeapProfile) => void,
+  resolve: (
+    results: MeasuredResults[],
+    heapProfile?: HeapProfile,
+    timeProfile?: TimeProfile,
+  ) => void,
   reject: (error: Error) => void,
 ) {
   return (msg: ResultMessage | ErrorMessage) => {
     cleanup();
     if (msg.type === "result") {
-      resolve(msg.results, msg.heapProfile);
+      resolve(msg.results, msg.heapProfile, msg.timeProfile);
     } else if (msg.type === "error") {
       const error = new Error(`Benchmark "${specName}" failed: ${msg.error}`);
       if (msg.stack) error.stack = msg.stack;

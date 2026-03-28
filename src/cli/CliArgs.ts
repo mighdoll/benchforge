@@ -42,6 +42,8 @@ const cliOptions = {
   "heap-verbose":   { type: "boolean", default: false, describe: "verbose output with file:// paths and line numbers" },
   "heap-raw":       { type: "boolean", default: false, describe: "dump every raw heap sample (ordinal, size, stack)" },
   "heap-user-only": { type: "boolean", default: false, describe: "filter to user code only (hide node internals)" },
+  "time-sample":    { type: "boolean", default: false, describe: "V8 CPU time sampling profiler" },
+  "time-interval":  { type: "number",  default: 1000, describe: "CPU sampling interval in microseconds" },
   editor:           { type: "string",  default: "vscode", describe: "editor for source links: vscode, cursor, or custom://scheme" },
   url:              { type: "string",  requiresArg: true, describe: "page URL for browser profiling (enables browser mode)" },
   headless:         { type: "boolean", default: true, describe: "run browser in headless mode" },

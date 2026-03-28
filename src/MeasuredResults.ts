@@ -1,6 +1,7 @@
 import type { HeapProfile } from "./heap-sample/HeapSampler.ts";
 import type { NodeGCTime } from "./NodeGC.ts";
 import type { GcStats } from "./runners/GcStats.ts";
+import type { TimeProfile } from "./time-sample/TimeSampler.ts";
 
 /** Benchmark results: times in milliseconds, sizes in kilobytes */
 export interface MeasuredResults {
@@ -86,6 +87,9 @@ export interface MeasuredResults {
 
   /** Heap sampling allocation profile (requires --heap-sample and worker mode) */
   heapProfile?: HeapProfile;
+
+  /** V8 CPU time sampling profile (requires --time-sample and worker mode) */
+  timeProfile?: TimeProfile;
 }
 
 /** A pause point during sample collection for V8 optimization */

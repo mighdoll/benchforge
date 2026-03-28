@@ -20,6 +20,7 @@ import {
   archiveBenchmark,
   buildSpeedscopeFile,
 } from "../export/AllocExport.ts";
+import { timeProfileToSpeedscope } from "../export/TimeExport.ts";
 import { resolveEditorUri } from "../export/EditorUri.ts";
 import { exportBenchmarkJson } from "../export/JsonExport.ts";
 import { exportPerfettoTrace } from "../export/PerfettoExport.ts";
@@ -348,8 +349,10 @@ export async function exportReports(options: ExportOptions): Promise<void> {
   if (args.view) {
     const profileFile = buildSpeedscopeFile(results);
     const profileData = profileFile ? JSON.stringify(profileFile) : undefined;
+    const timeProfileData = buildTimeProfileData(results);
     const viewer = await startViewerServer({
       profileData,
+      timeProfileData,
       reportData: reportData ? JSON.stringify(reportData) : undefined,
       editorUri: resolveEditorUri(args.editor),
     });
@@ -554,6 +557,25 @@ function needsHeapSample(args: DefaultCliArgs): boolean {
   );
 }
 
+/** @return true if time sampling should be enabled */
+function needsTimeSample(args: DefaultCliArgs): boolean {
+  return args["time-sample"];
+}
+
+/** Build time profile SpeedScope JSON from results, or undefined if none */
+function buildTimeProfileData(results: ReportGroup[]): string | undefined {
+  for (const group of results) {
+    for (const report of groupReports(group)) {
+      const { timeProfile } = report.measuredResults;
+      if (timeProfile) {
+        const file = timeProfileToSpeedscope(report.name, timeProfile);
+        return JSON.stringify(file);
+      }
+    }
+  }
+  return undefined;
+}
+
 /** Strip surrounding quotes from a chrome arg token.
  *
  * (Needed because --chrome-args values pass through yargs and spawn() without
@@ -682,6 +704,8 @@ function cliCommonOptions(args: DefaultCliArgs) {
   const heapSample = needsHeapSample(args);
   const { "heap-interval": heapInterval } = args;
   const { "heap-depth": heapDepth } = args;
+  const timeSample = needsTimeSample(args);
+  const { "time-interval": timeInterval } = args;
   return {
     collect,
     warmup,
@@ -694,6 +718,8 @@ function cliCommonOptions(args: DefaultCliArgs) {
     heapSample,
     heapInterval,
     heapDepth,
+    timeSample,
+    timeInterval,
   };
 }
 

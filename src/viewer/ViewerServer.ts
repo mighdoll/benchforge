@@ -11,8 +11,10 @@ import {
 } from "../export/AllocExport.ts";
 
 export interface ViewerServerOptions {
-  /** Speedscope JSON profile data */
+  /** Speedscope JSON profile data (allocation) */
   profileData?: string;
+  /** Speedscope JSON profile data (time/CPU) */
+  timeProfileData?: string;
   /** HTML report JSON data */
   reportData?: string;
   /** Editor URI prefix for Cmd+Shift+click (e.g. "vscode://file") */
@@ -64,7 +66,7 @@ async function loadPlotsBundle(): Promise<string> {
 export async function startViewerServer(
   options: ViewerServerOptions,
 ): Promise<{ server: Server; port: number; close: () => void }> {
-  const { profileData, reportData, editorUri } = options;
+  const { profileData, timeProfileData, reportData, editorUri } = options;
   const port = options.port ?? 3939;
   const shellDir = viewerDir();
 
@@ -116,6 +118,7 @@ export async function startViewerServer(
         editorUri: editorUri || null,
         hasReport: !!reportData,
         hasProfile: !!profileData,
+        hasTimeProfile: !!timeProfileData,
       }));
       return;
     }
@@ -132,8 +135,8 @@ export async function startViewerServer(
       return;
     }
 
-    // Profile API
-    if (pathname === "/api/profile") {
+    // Allocation profile API
+    if (pathname === "/api/profile" || pathname === "/api/profile/alloc") {
       if (!profileData) {
         res.statusCode = 404;
         res.end("No profile data");
@@ -145,6 +148,19 @@ export async function startViewerServer(
       return;
     }
 
+    // Time profile API
+    if (pathname === "/api/profile/time") {
+      if (!timeProfileData) {
+        res.statusCode = 404;
+        res.end("No time profile data");
+        return;
+      }
+      res.setHeader("Content-Type", "application/json");
+      res.setHeader("Access-Control-Allow-Origin", "*");
+      res.end(timeProfileData);
+      return;
+    }
+
     // Source fetch API
     if (pathname === "/api/source") {
       await handleSourceRequest(res, query, sourceCache);
@@ -153,7 +169,7 @@ export async function startViewerServer(
 
     // Archive API
     if (pathname === "/api/archive" && req.method === "POST") {
-      await handleArchiveRequest(res, profileData, reportData, sourceCache);
+      await handleArchiveRequest(res, profileData, timeProfileData, reportData, sourceCache);
       return;
     }
 
@@ -212,18 +228,25 @@ async function handleSourceRequest(
 async function handleArchiveRequest(
   res: Res,
   profileData: string | undefined,
+  timeProfileData: string | undefined,
   reportData: string | undefined,
   sourceCache: Map<string, string>,
 ): Promise<void> {
   try {
     const profile = profileData ? JSON.parse(profileData) : null;
+    const timeProfile = timeProfileData ? JSON.parse(timeProfileData) : null;
     const report = reportData ? JSON.parse(reportData) : null;
-    const sources = profile
-      ? await collectSources(profile.shared.frames, sourceCache)
+    const allFrames = [
+      ...(profile?.shared?.frames ?? []),
+      ...(timeProfile?.shared?.frames ?? []),
+    ];
+    const sources = allFrames.length
+      ? await collectSources(allFrames, sourceCache)
       : Object.fromEntries(sourceCache);
     const timestamp = new Date().toISOString().replace(/[:.]/g, "-");
     const archive = {
       profile,
+      timeProfile,
       report,
       sources,
       metadata: {
@@ -271,6 +294,9 @@ export async function viewArchive(filePath: string): Promise<void> {
   const profileData = archive.profile
     ? JSON.stringify(archive.profile)
     : undefined;
+  const timeProfileData = archive.timeProfile
+    ? JSON.stringify(archive.timeProfile)
+    : undefined;
   const reportData = archive.report
     ? JSON.stringify(archive.report)
     : undefined;
@@ -278,6 +304,7 @@ export async function viewArchive(filePath: string): Promise<void> {
 
   const { close } = await startViewerServer({
     profileData,
+    timeProfileData,
     reportData,
     sources,
   });
