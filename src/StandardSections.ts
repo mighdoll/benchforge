@@ -5,7 +5,6 @@ import {
   formatBytes,
   integer,
   percent,
-  percentPrecision,
   timeMs,
 } from "./table-util/Formatters.ts";
 
@@ -26,11 +25,6 @@ export interface GcStatsInfo {
   fullGCs?: number;
   promoPercent?: number;
   pausePerIter?: number;
-}
-
-export interface CpuStats {
-  cpuCacheMiss?: number;
-  cpuStall?: number;
 }
 
 export interface RunStats {
@@ -136,23 +130,6 @@ export const browserGcStatsSection: ResultsMapper<GcStatsInfo> = {
         { key: "scavenges", title: "scav", formatter: integer },
         { key: "fullGCs", title: "full", formatter: integer },
         { key: "pausePerIter", title: "pause", formatter: timeMs },
-      ],
-    },
-  ],
-};
-
-/** Section: CPU L1 cache miss rate and stall rate (requires @mitata/counters) */
-export const cpuSection: ResultsMapper<CpuStats> = {
-  extract: (results: MeasuredResults) => ({
-    cpuCacheMiss: results.cpuCacheMiss,
-    cpuStall: results.cpuStall,
-  }),
-  columns: (): ReportColumnGroup<CpuStats>[] => [
-    {
-      groupTitle: "cpu",
-      columns: [
-        { key: "cpuCacheMiss", title: "L1 miss", formatter: percent },
-        { key: "cpuStall", title: "stalls", formatter: percentPrecision(2) },
       ],
     },
   ],

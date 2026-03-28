@@ -80,7 +80,6 @@ export type { RunnerOptions } from "./runners/BenchRunner.ts";
 export {
   adaptiveSection,
   buildGenericSections,
-  cpuSection,
   gcSection,
   gcStatsSection,
   optSection,

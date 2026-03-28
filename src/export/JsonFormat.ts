@@ -55,13 +55,6 @@ export interface BenchmarkResult {
     mean: number;
   };
 
-  cpu?: {
-    instructions?: number;
-    cycles?: number;
-    cacheMisses?: number;
-    branchMisses?: number;
-  };
-
   /** Execution metadata */
   execution: {
     iterations: number;

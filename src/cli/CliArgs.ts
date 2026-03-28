@@ -13,7 +13,6 @@ export const defaultAdaptiveMaxTime = 20;
 // biome-ignore format: compact option definitions
 const cliOptions = {
   time:           { type: "number",  default: 0.642, requiresArg: true, describe: "test duration in seconds" },
-  cpu:            { type: "boolean", default: false, describe: "CPU counter measurements (requires root)" },
   collect:        { type: "boolean", default: false, describe: "force GC after each iteration" },
   "gc-stats":     { type: "boolean", default: false, describe: "collect GC statistics (Node: --trace-gc-nvp, browser: CDP tracing)" },
   profile:        { type: "boolean", default: false, describe: "run once for profiling" },

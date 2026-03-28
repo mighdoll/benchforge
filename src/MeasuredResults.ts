@@ -2,13 +2,6 @@ import type { HeapProfile } from "./heap-sample/HeapSampler.ts";
 import type { NodeGCTime } from "./NodeGC.ts";
 import type { GcStats } from "./runners/GcStats.ts";
 
-/** CPU performance counter stats */
-export interface CpuCounts {
-  instructions?: number;
-  cycles?: number;
-  branchMisses?: number;
-}
-
 /** Benchmark results: times in milliseconds, sizes in kilobytes */
 export interface MeasuredResults {
   name: string;
@@ -61,15 +54,6 @@ export interface MeasuredResults {
     min: number;
     max: number;
   };
-
-  /** CPU counter stats from @mitata/counters (requires root access) */
-  cpu?: CpuCounts;
-
-  /** L1 cache miss rate */
-  cpuCacheMiss?: number;
-
-  /** CPU stall rate (macOS only) */
-  cpuStall?: number;
 
   /**
    * Stop-the-world GC time blocking main thread (milliseconds).

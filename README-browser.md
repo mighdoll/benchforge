@@ -141,7 +141,7 @@ Browser-specific options:
 
 See [CLI Options](README.md#cli-options) for shared options (`--time`, `--iterations`, `--heap-sample`, `--gc-stats`, `--view-alloc`, etc.).
 
-Node-only flags (`--cpu`, `--trace-opt`, `--adaptive`, `--collect`, etc.)
+Node-only flags (`--trace-opt`, `--adaptive`, `--collect`, etc.)
 are warned and ignored in browser mode.
 
 ## GC Stats (--gc-stats)

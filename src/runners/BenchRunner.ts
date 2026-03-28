@@ -29,8 +29,6 @@ export interface RunnerOptions {
   minSamples?: number;
   /** Force GC after each iteration (requires --expose-gc) */
   collect?: boolean;
-  /** Enable CPU performance counters (requires root access) */
-  cpuCounters?: boolean;
   /** Trace V8 optimization tiers (requires --allow-natives-syntax) */
   traceOpt?: boolean;
   /** Skip post-warmup settle time (default: false) */

@@ -84,7 +84,6 @@ export interface RunMatrixOptions {
   filteredVariants?: string[]; // run only these variants (from filter)
   // Runner options passthrough
   collect?: boolean;
-  cpuCounters?: boolean;
   traceOpt?: boolean;
   noSettle?: boolean;
   pauseFirst?: number;
@@ -275,7 +274,6 @@ function buildRunnerOptions(options: RunMatrixOptions): RunnerOptions {
     maxTime: options.maxTime ?? 1000,
     warmup: options.warmup ?? 0,
     collect: options.collect,
-    cpuCounters: options.cpuCounters,
     traceOpt: options.traceOpt,
     noSettle: options.noSettle,
     pauseFirst: options.pauseFirst,

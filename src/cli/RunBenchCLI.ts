@@ -54,7 +54,6 @@ import { runBenchmark } from "../runners/RunnerOrchestrator.ts";
 import {
   adaptiveSection,
   browserGcStatsSection,
-  cpuSection,
   gcStatsSection,
   optSection,
   runsSection,
@@ -138,12 +137,10 @@ export function defaultReport(
   args: DefaultCliArgs,
 ): string {
   const { adaptive, "gc-stats": gcStats, "trace-opt": traceOpt } = args;
-  const hasCpu = hasField(groups, "cpu");
   const hasOpt = hasField(groups, "optStatus");
   const sections = buildReportSections(
     adaptive,
     gcStats,
-    hasCpu,
     traceOpt && hasOpt,
   );
   return reportResults(groups, sections);
@@ -500,7 +497,6 @@ async function runSuite(params: SuiteParams): Promise<ReportGroup[]> {
 function buildReportSections(
   adaptive: boolean,
   gcStats: boolean,
-  hasCpuData: boolean,
   hasOptData: boolean,
 ) {
   const sections = adaptive
@@ -508,7 +504,6 @@ function buildReportSections(
     : [timeSection];
 
   if (gcStats) sections.push(gcStatsSection);
-  if (hasCpuData) sections.push(cpuSection);
   if (hasOptData) sections.push(optSection);
   sections.push(runsSection);
 
@@ -532,7 +527,6 @@ async function finishReports(
 function warnBrowserFlags(args: DefaultCliArgs): void {
   const ignored: string[] = [];
   if (!args.worker) ignored.push("--no-worker");
-  if (args.cpu) ignored.push("--cpu");
   if (args["trace-opt"]) ignored.push("--trace-opt");
   if (args.collect) ignored.push("--collect");
   if (args.adaptive) ignored.push("--adaptive");
@@ -675,7 +669,7 @@ function createAdaptiveOptions(args: DefaultCliArgs): RunnerOptions {
 
 /** Runner/matrix options shared across all CLI modes */
 function cliCommonOptions(args: DefaultCliArgs) {
-  const { collect, cpu, warmup } = args;
+  const { collect, warmup } = args;
   const { "trace-opt": traceOpt, "skip-settle": noSettle } = args;
   const { "pause-first": pauseFirst, "pause-interval": pauseInterval } = args;
   const { "pause-duration": pauseDuration, "gc-stats": gcStats } = args;
@@ -684,7 +678,6 @@ function cliCommonOptions(args: DefaultCliArgs) {
   const { "heap-depth": heapDepth } = args;
   return {
     collect,
-    cpuCounters: cpu,
     warmup,
     traceOpt,
     noSettle,
@@ -722,7 +715,6 @@ function mergeMatrixDefaults(
     result.sections = buildReportSections(
       args.adaptive,
       args["gc-stats"],
-      hasField(groups, "cpu"),
       args["trace-opt"] && hasField(groups, "optStatus"),
     );
   }

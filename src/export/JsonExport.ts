@@ -69,7 +69,7 @@ function convertGroup(group: ReportGroup): BenchmarkGroup {
 /** Extract measured stats and optional metrics into JSON result shape */
 function convertReport(report: any): BenchmarkResult {
   const { name, measuredResults: m } = report;
-  const { time, heapSize, gcTime, cpu } = m;
+  const { time, heapSize, gcTime } = m;
   const minMaxMean = (s: any) =>
     s ? { min: s.min, max: s.max, mean: s.avg } : undefined;
 
@@ -86,14 +86,6 @@ function convertReport(report: any): BenchmarkResult {
     },
     heapSize: minMaxMean(heapSize),
     gcTime: minMaxMean(gcTime),
-    cpu: cpu
-      ? {
-          instructions: cpu.instructions,
-          cycles: cpu.cycles,
-          cacheMisses: m.cpuCacheMiss,
-          branchMisses: cpu.branchMisses,
-        }
-      : undefined,
     execution: {
       iterations: m.samples?.length || 0,
       totalTime: m.totalTime || 0,
