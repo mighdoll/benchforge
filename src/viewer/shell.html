@@ -20,6 +20,7 @@
 <div class="tab-bar">
   <button class="tab" data-tab="report" id="tab-report" disabled>Report</button>
   <button class="tab" data-tab="flamechart" id="tab-flamechart" disabled>Allocation</button>
+  <button class="tab" data-tab="time-flamechart" id="tab-time-flamechart" disabled>Timing</button>
   <div class="tab-spacer"></div>
   <button class="tab archive-btn" data-action="archive">Archive &#8595;</button>
 </div>
@@ -27,6 +28,7 @@
 <div class="tab-content">
   <div id="report-panel" class="report-panel"></div>
   <iframe id="speedscope-iframe"></iframe>
+  <iframe id="time-speedscope-iframe"></iframe>
 </div>
 
 <script type="module" src="/viewer/shell.js"></script>

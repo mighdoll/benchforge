@@ -142,25 +142,37 @@ export async function collectSources(
   return sources;
 }
 
+export interface ArchiveOptions {
+  groups: ReportGroup[];
+  reportData?: ReportData;
+  timeProfileData?: string;
+  outputPath?: string;
+}
+
 /** Build a .benchforge archive containing profile + report + sources.
  *  @returns resolved output path, or undefined if nothing to archive */
 export async function archiveBenchmark(
-  groups: ReportGroup[],
-  reportData?: ReportData,
-  outputPath?: string,
+  options: ArchiveOptions,
 ): Promise<string | undefined> {
+  const { groups, reportData, timeProfileData, outputPath } = options;
   const file = buildSpeedscopeFile(groups);
-  if (!file && !reportData) {
+  const timeProfile = timeProfileData ? JSON.parse(timeProfileData) : null;
+  if (!file && !timeProfile && !reportData) {
     console.log("No data to archive.");
     return undefined;
   }
 
-  const sources = file
-    ? await collectSources(file.shared.frames)
+  const allFrames = [
+    ...(file?.shared?.frames ?? []),
+    ...(timeProfile?.shared?.frames ?? []),
+  ];
+  const sources = allFrames.length
+    ? await collectSources(allFrames)
     : {};
   const timestamp = new Date().toISOString().replace(/[:.]/g, "-");
   const archive = {
     profile: file ?? null,
+    timeProfile,
     report: reportData ?? null,
     sources,
     metadata: {

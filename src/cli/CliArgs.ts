@@ -44,6 +44,7 @@ const cliOptions = {
   "heap-user-only": { type: "boolean", default: false, describe: "filter to user code only (hide node internals)" },
   "time-sample":    { type: "boolean", default: false, describe: "V8 CPU time sampling profiler" },
   "time-interval":  { type: "number",  default: 1000, describe: "CPU sampling interval in microseconds" },
+  "export-time":    { type: "string",  requiresArg: true, describe: "export time profile as .cpuprofile (V8/Chrome DevTools format)" },
   editor:           { type: "string",  default: "vscode", describe: "editor for source links: vscode, cursor, or custom://scheme" },
   url:              { type: "string",  requiresArg: true, describe: "page URL for browser profiling (enables browser mode)" },
   headless:         { type: "boolean", default: true, describe: "run browser in headless mode" },

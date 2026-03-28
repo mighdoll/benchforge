@@ -1,3 +1,4 @@
+import { writeFileSync } from "node:fs";
 import { basename, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 import pico from "picocolors";
@@ -337,12 +338,24 @@ export async function exportReports(options: ExportOptions): Promise<void> {
     exportPerfettoTrace(results, args["export-perfetto"], args);
   }
 
+  if (args["export-time"]) {
+    const profile = findTimeProfile(results);
+    if (profile) {
+      const absPath = resolve(args["export-time"]);
+      writeFileSync(absPath, JSON.stringify(profile));
+      console.log(`Time profile exported to: ${args["export-time"]}`);
+    } else {
+      console.log("No time profiles to export.");
+    }
+  }
+
   if (args.archive != null) {
     const archivePath =
       typeof args.archive === "string" && args.archive
         ? args.archive
         : undefined;
-    await archiveBenchmark(results, reportData, archivePath);
+    const timeProfileData = buildTimeProfileData(results);
+    await archiveBenchmark({ groups: results, reportData, timeProfileData, outputPath: archivePath });
   }
 
   let closeViewer: (() => void) | undefined;
@@ -559,7 +572,7 @@ function needsHeapSample(args: DefaultCliArgs): boolean {
 
 /** @return true if time sampling should be enabled */
 function needsTimeSample(args: DefaultCliArgs): boolean {
-  return args["time-sample"];
+  return args["time-sample"] || !!args["export-time"];
 }
 
 /** Build time profile SpeedScope JSON from results, or undefined if none */
@@ -571,6 +584,16 @@ function buildTimeProfileData(results: ReportGroup[]): string | undefined {
         const file = timeProfileToSpeedscope(report.name, timeProfile);
         return JSON.stringify(file);
       }
+    }
+  }
+  return undefined;
+}
+
+/** Find the first raw V8 TimeProfile in results */
+function findTimeProfile(results: ReportGroup[]): import("../time-sample/TimeSampler.ts").TimeProfile | undefined {
+  for (const group of results) {
+    for (const report of groupReports(group)) {
+      if (report.measuredResults.timeProfile) return report.measuredResults.timeProfile;
     }
   }
   return undefined;

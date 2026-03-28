@@ -1,9 +1,11 @@
 const tabBar = document.querySelector(".tab-bar");
 const tabContent = document.querySelector(".tab-content");
 const iframe = document.getElementById("speedscope-iframe");
+const timeIframe = document.getElementById("time-speedscope-iframe");
 const reportPanel = document.getElementById("report-panel");
 const reportTab = document.getElementById("tab-report");
 const allocTab = document.getElementById("tab-flamechart");
+const timeTab = document.getElementById("tab-time-flamechart");
 
 let activeTabId = null;
 let reportLoaded = false;
@@ -16,12 +18,18 @@ const config = await fetch("/api/config").then(r => r.json());
 // Enable tabs based on available data
 if (config.hasReport) reportTab.disabled = false;
 if (config.hasProfile) allocTab.disabled = false;
+if (config.hasTimeProfile) timeTab.disabled = false;
 
-// Set up speedscope iframe if profile data available
+// Set up speedscope iframes for available profiles
 if (config.hasProfile) {
   const hashParts = ["profileURL=/api/profile"];
   if (config.editorUri) hashParts.push("editorUri=" + encodeURIComponent(config.editorUri));
   iframe.src = "/speedscope/index.html#" + hashParts.join("&");
+}
+if (config.hasTimeProfile) {
+  const hashParts = ["profileURL=/api/profile/time"];
+  if (config.editorUri) hashParts.push("editorUri=" + encodeURIComponent(config.editorUri));
+  timeIframe.src = "/speedscope/index.html#" + hashParts.join("&");
 }
 
 // Auto-activate first available tab
@@ -30,6 +38,8 @@ if (config.hasReport) {
   loadReport();
 } else if (config.hasProfile) {
   activateTab("flamechart");
+} else if (config.hasTimeProfile) {
+  activateTab("time-flamechart");
 }
 
 // --- Shiki (lazy singleton) ---
@@ -58,6 +68,7 @@ function activateTab(tabId) {
   });
 
   iframe.style.display = tabId === "flamechart" ? "block" : "none";
+  timeIframe.style.display = tabId === "time-flamechart" ? "block" : "none";
   reportPanel.classList.toggle("active", tabId === "report");
 
   sourceTabs.forEach((tab, id) => {
@@ -310,6 +321,7 @@ function closeSourceTab(tabId) {
     // Fall back to first enabled fixed tab
     if (config.hasReport) activateTab("report");
     else if (config.hasProfile) activateTab("flamechart");
+    else if (config.hasTimeProfile) activateTab("time-flamechart");
   }
 }
 

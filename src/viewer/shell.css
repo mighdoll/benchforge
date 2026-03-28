@@ -125,7 +125,8 @@ body { display: flex; flex-direction: column; }
   min-height: 0;
 }
 
-#speedscope-iframe {
+#speedscope-iframe,
+#time-speedscope-iframe {
   width: 100%;
   height: calc(100% - 20px);
   border: none;
