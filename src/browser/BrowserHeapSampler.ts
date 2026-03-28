@@ -9,12 +9,15 @@ import type {
   HeapSampleOptions,
 } from "../heap-sample/HeapSampler.ts";
 import type { GcStats } from "../runners/GcStats.ts";
+import type { TimeProfile } from "../time-sample/TimeSampler.ts";
 import { browserGcStats, type TraceEvent } from "./BrowserGcStats.ts";
 
 export interface BrowserProfileParams {
   url: string;
   heapSample?: boolean;
   heapOptions?: HeapSampleOptions;
+  timeSample?: boolean;
+  timeInterval?: number; // microseconds (default 1000)
   gcStats?: boolean;
   headless?: boolean;
   chromeArgs?: string[];
@@ -25,6 +28,7 @@ export interface BrowserProfileParams {
 
 export interface BrowserProfileResult {
   heapProfile?: HeapProfile;
+  timeProfile?: TimeProfile;
   gcStats?: GcStats;
   /** Wall-clock ms (lap mode: first start to done, bench function: total loop) */
   wallTimeMs?: number;
@@ -135,6 +139,8 @@ async function setupLapMode(
     Promise.withResolvers<BrowserProfileResult>();
   let instrumentsStarted = false;
 
+  const { timeSample } = params;
+
   await page.exposeFunction("__benchInstrumentStart", async () => {
     if (instrumentsStarted) return;
     instrumentsStarted = true;
@@ -143,6 +149,9 @@ async function setupLapMode(
         "HeapProfiler.startSampling",
         heapSamplingParams(samplingInterval),
       );
+    }
+    if (timeSample) {
+      await startTimeProfiling(cdp, params.timeInterval);
     }
   });
 
@@ -154,7 +163,11 @@ async function setupLapMode(
         const result = await cdp.send("HeapProfiler.stopSampling");
         heapProfile = result.profile as unknown as HeapProfile;
       }
-      resolve({ samples, heapProfile, wallTimeMs });
+      let timeProfile: TimeProfile | undefined;
+      if (timeSample && instrumentsStarted) {
+        timeProfile = await stopTimeProfiling(cdp);
+      }
+      resolve({ samples, heapProfile, timeProfile, wallTimeMs });
     },
   );
 
@@ -180,7 +193,7 @@ async function runBenchLoop(
   params: BrowserProfileParams,
   samplingInterval: number,
 ): Promise<BrowserProfileResult> {
-  const { heapSample } = params;
+  const { heapSample, timeSample } = params;
   const maxTime = params.maxTime ?? 642;
   const maxIter = params.maxIterations ?? Number.MAX_SAFE_INTEGER;
 
@@ -189,6 +202,9 @@ async function runBenchLoop(
       "HeapProfiler.startSampling",
       heapSamplingParams(samplingInterval),
     );
+  }
+  if (timeSample) {
+    await startTimeProfiling(cdp, params.timeInterval);
   }
 
   const { samples, totalMs } = await page.evaluate(
@@ -213,7 +229,12 @@ async function runBenchLoop(
     heapProfile = result.profile as unknown as HeapProfile;
   }
 
-  return { samples, heapProfile, wallTimeMs: totalMs };
+  let timeProfile: TimeProfile | undefined;
+  if (timeSample) {
+    timeProfile = await stopTimeProfiling(cdp);
+  }
+
+  return { samples, heapProfile, timeProfile, wallTimeMs: totalMs };
 }
 
 /** Stop CDP tracing and parse GC events into GcStats. */
@@ -266,6 +287,25 @@ function injectLapFunctions(): void {
       : 0;
     return g.__benchCollect(g.__benchSamples.slice(), wall);
   };
+}
+
+/** Start CDP Profiler for time sampling */
+async function startTimeProfiling(
+  cdp: CDPSession,
+  interval?: number,
+): Promise<void> {
+  await cdp.send("Profiler.enable");
+  if (interval) {
+    await cdp.send("Profiler.setSamplingInterval", { interval });
+  }
+  await cdp.send("Profiler.start");
+}
+
+/** Stop CDP Profiler and return the profile */
+async function stopTimeProfiling(cdp: CDPSession): Promise<TimeProfile> {
+  const { profile } = await cdp.send("Profiler.stop");
+  await cdp.send("Profiler.disable");
+  return profile as unknown as TimeProfile;
 }
 
 export { profileBrowser as profileBrowserHeap };

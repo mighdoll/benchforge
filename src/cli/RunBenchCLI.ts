@@ -186,6 +186,8 @@ export async function browserBenchExports(args: DefaultCliArgs): Promise<void> {
       samplingInterval: args["heap-interval"],
       stackDepth: args["heap-depth"],
     },
+    timeSample: needsTimeSample(args),
+    timeInterval: args["time-interval"],
     headless: args.headless,
     chromeArgs: args["chrome-args"]
       ?.flatMap(a => a.split(/\s+/))
@@ -620,7 +622,7 @@ function browserResultGroups(
   name: string,
   result: BrowserProfileResult,
 ): ReportGroup[] {
-  const { gcStats, heapProfile } = result;
+  const { gcStats, heapProfile, timeProfile } = result;
   let measured: MeasuredResults;
 
   // Bench function mode: multiple timing samples with real statistics
@@ -634,6 +636,7 @@ function browserResultGroups(
       totalTime,
       gcStats,
       heapProfile,
+      timeProfile,
     };
   } else {
     // Lap mode: 0 laps = single wall-clock, N laps handled above
@@ -647,7 +650,7 @@ function browserResultGroups(
       p99: wallMs,
       p999: wallMs,
     };
-    measured = { name, samples: [wallMs], time, gcStats, heapProfile };
+    measured = { name, samples: [wallMs], time, gcStats, heapProfile, timeProfile };
   }
 
   return [{ name, reports: [{ name, measuredResults: measured }] }];
