@@ -123,12 +123,10 @@ This eliminates manual caching boilerplate in worker modules.
 - `--heap-rows <n>` - Number of top allocation sites to show (default: 20)
 
 ### Output Options
-- `--view-report` - Open HTML report in browser
-- `--export-report <file>` - Export HTML report to file
+- `--view` - Open viewer in browser (report + allocation tabs)
 - `--export-json <file>` - Export benchmark data to JSON
 - `--export-perfetto <file>` - Export Perfetto trace file
-- `--view-alloc` - Open allocation profile in viewer
-- `--export-alloc <file>` - Export allocation profile (speedscope JSON format)
+- `--archive [file]` - Archive profile + report + sources to `.benchforge` file
 
 ## CLI Usage
 
@@ -184,8 +182,8 @@ The HTML report displays:
 - Allocation Series: Per-sample heap allocation (requires `--heap-sample`)
 
 ```bash
-# Open HTML report in browser
-benchforge my-bench.ts --view-report
+# Open viewer in browser (report + allocation tabs)
+benchforge my-bench.ts --view
 # Press Ctrl+C to exit when done viewing
 ```
 
@@ -210,16 +208,16 @@ The trace includes:
 - **Pause markers**: V8 optimization pause points
 - **V8 GC events**: Automatically merged after process exit (when run with `--trace-events-enabled`)
 
-### Allocation Profile Export
+### Allocation Profile
 
-View heap allocation profiles as flame charts:
+View heap allocation profiles as flame charts in the unified viewer:
 
 ```bash
-# Open allocation profile in viewer
-benchforge my-bench.ts --heap-sample --view-alloc
+# Open viewer with allocation tab
+benchforge my-bench.ts --heap-sample --view
 
-# Export to file
-benchforge my-bench.ts --heap-sample --export-alloc profile.json
+# Archive profile + sources for sharing
+benchforge my-bench.ts --heap-sample --archive
 ```
 
 Each benchmark with a heap profile becomes a separate profile, with samples ordered temporally and weighted by allocation size in bytes.

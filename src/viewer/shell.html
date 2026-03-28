@@ -3,21 +3,32 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Benchforge Allocation Viewer</title>
+<title>Benchforge Viewer</title>
 <link rel="stylesheet" href="/viewer/shell.css">
+<link rel="stylesheet" href="/viewer/report.css">
+<script type="importmap">
+{
+  "imports": {
+    "d3": "https://cdn.jsdelivr.net/npm/d3@7/+esm",
+    "@observablehq/plot": "https://cdn.jsdelivr.net/npm/@observablehq/plot@0.6/+esm"
+  }
+}
+</script>
 </head>
 <body>
 
 <div class="tab-bar">
-  <button class="tab active" data-tab="flamechart">Allocation</button>
+  <button class="tab" data-tab="report" id="tab-report" disabled>Report</button>
+  <button class="tab" data-tab="flamechart" id="tab-flamechart" disabled>Allocation</button>
   <div class="tab-spacer"></div>
-  <button class="tab archive-btn" data-action="archive">Archive ↓</button>
+  <button class="tab archive-btn" data-action="archive">Archive &#8595;</button>
 </div>
 
 <div class="tab-content">
+  <div id="report-panel" class="report-panel"></div>
   <iframe id="speedscope-iframe"></iframe>
 </div>
 
-<script src="/viewer/shell.js"></script>
+<script type="module" src="/viewer/shell.js"></script>
 </body>
 </html>

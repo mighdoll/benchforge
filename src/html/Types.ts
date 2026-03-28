@@ -75,14 +75,3 @@ export interface DifferenceCI {
   direction: CIDirection;
   histogram?: HistogramBin[];
 }
-
-export interface HtmlReportOptions {
-  openBrowser: boolean;
-  outputPath?: string;
-}
-
-export interface HtmlReportResult {
-  reportDir: string;
-  server?: import("node:http").Server;
-  closeServer?: () => void;
-}

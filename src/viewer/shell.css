@@ -74,7 +74,12 @@ body { display: flex; flex-direction: column; }
   white-space: nowrap;
 }
 
-.tab:hover { color: var(--tab-active-color); }
+.tab:hover:not(:disabled) { color: var(--tab-active-color); }
+
+.tab:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
 
 .tab.active {
   color: var(--tab-accent);

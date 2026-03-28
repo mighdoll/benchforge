@@ -12,7 +12,9 @@ import {
 
 export interface ViewerServerOptions {
   /** Speedscope JSON profile data */
-  profileData: string;
+  profileData?: string;
+  /** HTML report JSON data */
+  reportData?: string;
   /** Editor URI prefix for Cmd+Shift+click (e.g. "vscode://file") */
   editorUri?: string;
   /** Port to listen on (default 3939) */
@@ -45,11 +47,24 @@ function viewerDir(): string {
   return thisDir;
 }
 
-/** Start the allocation viewer server and open in browser */
+/** Load the pre-built browser plots bundle (for report tab) */
+async function loadPlotsBundle(): Promise<string> {
+  const thisDir = dirname(fileURLToPath(import.meta.url));
+  // In dist: dist/viewer/ → ../html/browser/index.js
+  const builtPath = join(thisDir, "../html/browser/index.js");
+  // In dev: src/viewer/ → ../../dist/browser/index.js
+  const devPath = join(thisDir, "../../dist/browser/index.js");
+  try {
+    return await readFile(builtPath, "utf-8");
+  } catch {}
+  return readFile(devPath, "utf-8");
+}
+
+/** Start the viewer server and open in browser */
 export async function startViewerServer(
   options: ViewerServerOptions,
 ): Promise<{ server: Server; port: number; close: () => void }> {
-  const { profileData, editorUri } = options;
+  const { profileData, reportData, editorUri } = options;
   const port = options.port ?? 3939;
   const shellDir = viewerDir();
 
@@ -59,6 +74,8 @@ export async function startViewerServer(
       sourceCache.set(url, source);
     }
   }
+
+  let plotsBundleCache: string | undefined;
 
   const server = createServer(async (req, res) => {
     const url = req.url || "/";
@@ -72,22 +89,56 @@ export async function startViewerServer(
       return;
     }
 
-    // Viewer static files (shell.css, shell.js)
+    // Plots bundle (for report tab)
+    if (pathname === "/viewer/plots.js") {
+      try {
+        plotsBundleCache ??= await loadPlotsBundle();
+        res.setHeader("Content-Type", "application/javascript");
+        res.end(plotsBundleCache);
+      } catch {
+        res.statusCode = 404;
+        res.end("Not found");
+      }
+      return;
+    }
+
+    // Viewer static files (shell.css, shell.js, report.css)
     if (pathname.startsWith("/viewer/")) {
       const relPath = pathname.slice("/viewer/".length);
       await serveFile(res, join(shellDir, relPath));
       return;
     }
 
-    // Config API (editor URI, etc.)
+    // Config API (editor URI, data availability)
     if (pathname === "/api/config") {
       res.setHeader("Content-Type", "application/json");
-      res.end(JSON.stringify({ editorUri: editorUri || null }));
+      res.end(JSON.stringify({
+        editorUri: editorUri || null,
+        hasReport: !!reportData,
+        hasProfile: !!profileData,
+      }));
+      return;
+    }
+
+    // Report data API
+    if (pathname === "/api/report-data") {
+      if (!reportData) {
+        res.statusCode = 404;
+        res.end("No report data");
+        return;
+      }
+      res.setHeader("Content-Type", "application/json");
+      res.end(reportData);
       return;
     }
 
     // Profile API
     if (pathname === "/api/profile") {
+      if (!profileData) {
+        res.statusCode = 404;
+        res.end("No profile data");
+        return;
+      }
       res.setHeader("Content-Type", "application/json");
       res.setHeader("Access-Control-Allow-Origin", "*");
       res.end(profileData);
@@ -102,7 +153,7 @@ export async function startViewerServer(
 
     // Archive API
     if (pathname === "/api/archive" && req.method === "POST") {
-      await handleArchiveRequest(res, profileData, sourceCache);
+      await handleArchiveRequest(res, profileData, reportData, sourceCache);
       return;
     }
 
@@ -120,7 +171,7 @@ export async function startViewerServer(
   const result = await tryListen(server, port);
   const openUrl = `http://localhost:${result.port}`;
   await open(openUrl);
-  console.log(`Allocation viewer: ${openUrl}`);
+  console.log(`Viewer: ${openUrl}`);
 
   return {
     server: result.server,
@@ -160,15 +211,20 @@ async function handleSourceRequest(
 
 async function handleArchiveRequest(
   res: Res,
-  profileData: string,
+  profileData: string | undefined,
+  reportData: string | undefined,
   sourceCache: Map<string, string>,
 ): Promise<void> {
   try {
-    const parsed = JSON.parse(profileData);
-    const sources = await collectSources(parsed.shared.frames, sourceCache);
+    const profile = profileData ? JSON.parse(profileData) : null;
+    const report = reportData ? JSON.parse(reportData) : null;
+    const sources = profile
+      ? await collectSources(profile.shared.frames, sourceCache)
+      : Object.fromEntries(sourceCache);
     const timestamp = new Date().toISOString().replace(/[:.]/g, "-");
     const archive = {
-      profile: parsed,
+      profile,
+      report,
       sources,
       metadata: {
         timestamp,
@@ -176,7 +232,9 @@ async function handleArchiveRequest(
       },
     };
     const body = JSON.stringify(archive);
-    const filename = archiveFileName(parsed, timestamp);
+    const filename = profile
+      ? archiveFileName(profile, timestamp)
+      : `benchforge-${timestamp}.benchforge`;
     res.setHeader("Content-Type", "application/json");
     res.setHeader(
       "Content-Disposition",
@@ -210,10 +268,19 @@ export async function viewArchive(filePath: string): Promise<void> {
   const content = await readFile(absPath, "utf-8");
   const archive = JSON.parse(content);
 
-  const profileData = JSON.stringify(archive.profile);
+  const profileData = archive.profile
+    ? JSON.stringify(archive.profile)
+    : undefined;
+  const reportData = archive.report
+    ? JSON.stringify(archive.report)
+    : undefined;
   const sources = archive.sources as Record<string, string> | undefined;
 
-  const { close } = await startViewerServer({ profileData, sources });
+  const { close } = await startViewerServer({
+    profileData,
+    reportData,
+    sources,
+  });
 
   await new Promise<void>(resolve => {
     console.log("\nPress Ctrl+C to exit");

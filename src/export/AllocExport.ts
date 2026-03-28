@@ -11,7 +11,7 @@ import {
   type ResolvedProfile,
   resolveProfile,
 } from "../heap-sample/ResolvedProfile.ts";
-import { startViewerServer } from "../viewer/ViewerServer.ts";
+import type { ReportData } from "../html/Types.ts";
 
 /** speedscope file format (https://www.speedscope.app/file-format-schema.json) */
 interface SpeedscopeFile {
@@ -58,22 +58,6 @@ export function exportSpeedscope(
   return absPath;
 }
 
-/** Export to speedscope format and launch the allocation viewer server */
-export async function exportAndLaunchSpeedscope(
-  groups: ReportGroup[],
-  editorUri?: string,
-): Promise<{ close: () => void }> {
-  const file = buildSpeedscopeFile(groups);
-  if (!file) {
-    console.log("No heap profiles to export.");
-    return { close: () => {} };
-  }
-
-  const profileData = JSON.stringify(file);
-  const result = await startViewerServer({ profileData, editorUri });
-  return { close: result.close };
-}
-
 /** Convert a single HeapProfile to speedscope format (for standalone use) */
 export function heapProfileToSpeedscope(
   name: string,
@@ -92,8 +76,8 @@ export function heapProfileToSpeedscope(
   };
 }
 
-/** Build SpeedscopeFile from report groups (shared by export, launch, archive) */
-function buildSpeedscopeFile(groups: ReportGroup[]): SpeedscopeFile | undefined {
+/** Build SpeedscopeFile from report groups. Returns undefined if no heap profiles. */
+export function buildSpeedscopeFile(groups: ReportGroup[]): SpeedscopeFile | undefined {
   const frames: SpeedscopeFrame[] = [];
   const frameIndex = new Map<string, number>();
   const profiles: SpeedscopeProfile[] = [];
@@ -158,22 +142,26 @@ export async function collectSources(
   return sources;
 }
 
-/** Build a .benchforge archive containing profile + sources.
- *  @returns resolved output path, or undefined if no profiles found */
-export async function archiveSpeedscope(
+/** Build a .benchforge archive containing profile + report + sources.
+ *  @returns resolved output path, or undefined if nothing to archive */
+export async function archiveBenchmark(
   groups: ReportGroup[],
+  reportData?: ReportData,
   outputPath?: string,
 ): Promise<string | undefined> {
   const file = buildSpeedscopeFile(groups);
-  if (!file) {
-    console.log("No heap profiles to archive.");
+  if (!file && !reportData) {
+    console.log("No data to archive.");
     return undefined;
   }
 
-  const sources = await collectSources(file.shared.frames);
+  const sources = file
+    ? await collectSources(file.shared.frames)
+    : {};
   const timestamp = new Date().toISOString().replace(/[:.]/g, "-");
   const archive = {
-    profile: file,
+    profile: file ?? null,
+    report: reportData ?? null,
     sources,
     metadata: {
       timestamp,
@@ -181,7 +169,9 @@ export async function archiveSpeedscope(
     },
   };
 
-  const filename = outputPath || archiveFileName(file, timestamp);
+  const filename = outputPath || (file
+    ? archiveFileName(file, timestamp)
+    : `benchforge-${timestamp}.benchforge`);
   const absPath = resolve(filename);
   writeFileSync(absPath, JSON.stringify(archive));
   console.log(`Archive written to: ${filename}`);

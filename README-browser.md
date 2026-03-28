@@ -139,7 +139,7 @@ Browser-specific options:
 | `--chrome-args=<flag>` | | Extra Chromium flags (repeatable, use `=` for values starting with `--`) |
 | `--timeout <seconds>` | 60 | Max wait time |
 
-See [CLI Options](README.md#cli-options) for shared options (`--time`, `--iterations`, `--heap-sample`, `--gc-stats`, `--view-alloc`, etc.).
+See [CLI Options](README.md#cli-options) for shared options (`--time`, `--iterations`, `--heap-sample`, `--gc-stats`, `--view`, etc.).
 
 Node-only flags (`--trace-opt`, `--adaptive`, `--collect`, etc.)
 are warned and ignored in browser mode.

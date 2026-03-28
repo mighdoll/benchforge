@@ -17,15 +17,15 @@ import type {
 import { groupReports, reportResults } from "../BenchmarkReport.ts";
 import type { BrowserProfileResult } from "../browser/BrowserHeapSampler.ts";
 import {
-  archiveSpeedscope,
-  exportAndLaunchSpeedscope,
-  exportSpeedscope,
+  archiveBenchmark,
+  buildSpeedscopeFile,
 } from "../export/AllocExport.ts";
 import { resolveEditorUri } from "../export/EditorUri.ts";
 import { exportBenchmarkJson } from "../export/JsonExport.ts";
 import { exportPerfettoTrace } from "../export/PerfettoExport.ts";
 import type { GitVersion } from "../GitUtils.ts";
 import { prepareHtmlData } from "../HtmlDataPrep.ts";
+import { startViewerServer } from "../viewer/ViewerServer.ts";
 import {
   aggregateSites,
   filterSites,
@@ -36,7 +36,7 @@ import {
   isBrowserUserCode,
 } from "../heap-sample/HeapSampleReport.ts";
 import { resolveProfile } from "../heap-sample/ResolvedProfile.ts";
-import { generateHtmlReport } from "../html/index.ts";
+import type { ReportData } from "../html/Types.ts";
 import type { MeasuredResults } from "../MeasuredResults.ts";
 import { loadCasesModule } from "../matrix/CaseLoader.ts";
 import {
@@ -311,26 +311,21 @@ export function hasField(
   );
 }
 
-/** Export reports (HTML, JSON, Perfetto) based on CLI args */
+/** Export reports (JSON, Perfetto, archive, viewer) based on CLI args */
 export async function exportReports(options: ExportOptions): Promise<void> {
   const { results, args, sections, suiteName } = options;
   const { currentVersion, baselineVersion } = options;
-  const openInBrowser = args["view-report"] && !args["export-report"];
-  let closeServer: (() => void) | undefined;
 
-  if (args["view-report"] || args["export-report"]) {
+  // Prepare report data (needed for --view and --archive)
+  let reportData: ReportData | undefined;
+  if (args.view || args.archive != null) {
     const htmlOpts = {
       cliArgs: args,
       sections,
       currentVersion,
       baselineVersion,
     };
-    const reportData = prepareHtmlData(results, htmlOpts);
-    const result = await generateHtmlReport(reportData, {
-      openBrowser: openInBrowser,
-      outputPath: args["export-report"],
-    });
-    closeServer = result.closeServer;
+    reportData = prepareHtmlData(results, htmlOpts);
   }
 
   if (args["export-json"]) {
@@ -341,32 +336,29 @@ export async function exportReports(options: ExportOptions): Promise<void> {
     exportPerfettoTrace(results, args["export-perfetto"], args);
   }
 
-  if (args["export-alloc"]) {
-    exportSpeedscope(results, args["export-alloc"]);
-  }
-
   if (args.archive != null) {
     const archivePath =
       typeof args.archive === "string" && args.archive
         ? args.archive
         : undefined;
-    await archiveSpeedscope(results, archivePath);
+    await archiveBenchmark(results, reportData, archivePath);
   }
 
-  let closeAllocViewer: (() => void) | undefined;
-  if (args["view-alloc"]) {
-    const viewer = await exportAndLaunchSpeedscope(
-      results,
-      resolveEditorUri(args.editor),
-    );
-    closeAllocViewer = viewer.close;
+  let closeViewer: (() => void) | undefined;
+  if (args.view) {
+    const profileFile = buildSpeedscopeFile(results);
+    const profileData = profileFile ? JSON.stringify(profileFile) : undefined;
+    const viewer = await startViewerServer({
+      profileData,
+      reportData: reportData ? JSON.stringify(reportData) : undefined,
+      editorUri: resolveEditorUri(args.editor),
+    });
+    closeViewer = viewer.close;
   }
 
-  // Keep process running when a viewer is opened in browser
-  if (openInBrowser || closeAllocViewer) {
+  if (closeViewer) {
     await waitForCtrlC();
-    closeServer?.();
-    closeAllocViewer?.();
+    closeViewer();
   }
 }
 
@@ -555,8 +547,6 @@ function warnBrowserFlags(args: DefaultCliArgs): void {
 function needsHeapSample(args: DefaultCliArgs): boolean {
   return (
     args["heap-sample"] ||
-    args["view-alloc"] ||
-    !!args["export-alloc"] ||
     args.archive != null ||
     args["heap-raw"] ||
     args["heap-verbose"] ||

@@ -1,8 +1,7 @@
-export { generateHtmlReport } from "./HtmlReport.ts";
 export {
   formatDateWithTimezone,
   formatRelativeTime,
-} from "./HtmlTemplate.ts";
+} from "./DateFormat.ts";
 export type {
   BenchmarkData,
   DifferenceCI,
@@ -10,8 +9,6 @@ export type {
   GcEvent,
   GitVersion,
   GroupData,
-  HtmlReportOptions,
-  HtmlReportResult,
   PausePoint,
   ReportData,
 } from "./Types.ts";

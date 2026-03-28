@@ -43,7 +43,8 @@ export {
   runMatrixSuite,
 } from "./cli/RunBenchCLI.ts";
 export {
-  exportAndLaunchSpeedscope,
+  archiveBenchmark,
+  buildSpeedscopeFile,
   exportSpeedscope,
   heapProfileToSpeedscope,
 } from "./export/AllocExport.ts";
@@ -58,8 +59,7 @@ export {
 } from "./GitUtils.ts";
 export type { PrepareHtmlOptions } from "./HtmlDataPrep.ts";
 export { prepareHtmlData } from "./HtmlDataPrep.ts";
-export type { HtmlReportOptions, ReportData } from "./html/index.ts";
-export { generateHtmlReport } from "./html/index.ts";
+export type { ReportData } from "./html/index.ts";
 export type { MeasuredResults } from "./MeasuredResults.ts";
 export type { CasesModule } from "./matrix/CaseLoader.ts";
 export { loadCaseData, loadCasesModule } from "./matrix/CaseLoader.ts";
