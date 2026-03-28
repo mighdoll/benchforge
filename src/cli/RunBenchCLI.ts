@@ -344,14 +344,20 @@ export async function exportReports(options: ExportOptions): Promise<void> {
     exportSpeedscope(results, args["export-alloc"]);
   }
 
+  let closeAllocViewer: (() => void) | undefined;
   if (args["view-alloc"]) {
-    exportAndLaunchSpeedscope(results, resolveEditorUri(args.editor));
+    const viewer = await exportAndLaunchSpeedscope(
+      results,
+      resolveEditorUri(args.editor),
+    );
+    closeAllocViewer = viewer.close;
   }
 
-  // Keep process running when HTML report is opened in browser
-  if (openInBrowser) {
+  // Keep process running when a viewer is opened in browser
+  if (openInBrowser || closeAllocViewer) {
     await waitForCtrlC();
     closeServer?.();
+    closeAllocViewer?.();
   }
 }
 

@@ -46,7 +46,6 @@ export {
   exportAndLaunchSpeedscope,
   exportSpeedscope,
   heapProfileToSpeedscope,
-  launchSpeedscope,
 } from "./export/AllocExport.ts";
 export * from "./export/JsonFormat.ts";
 export { exportPerfettoTrace } from "./export/PerfettoExport.ts";

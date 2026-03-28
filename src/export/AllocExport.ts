@@ -1,4 +1,3 @@
-import { spawn } from "node:child_process";
 import { writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
@@ -10,6 +9,7 @@ import {
   type ResolvedProfile,
   resolveProfile,
 } from "../heap-sample/ResolvedProfile.ts";
+import { startViewerServer } from "../viewer/ViewerServer.ts";
 
 /** speedscope file format (https://www.speedscope.app/file-format-schema.json) */
 interface SpeedscopeFile {
@@ -75,39 +75,39 @@ export function exportSpeedscope(
   return absPath;
 }
 
-/** Export to a temp file and open in speedscope via npx */
-export function exportAndLaunchSpeedscope(
+/** Export to speedscope format and launch the allocation viewer server */
+export async function exportAndLaunchSpeedscope(
   groups: ReportGroup[],
   editorUri?: string,
-): void {
-  const timestamp = new Date().toISOString().replace(/[:.]/g, "-");
-  const outputPath = join(tmpdir(), `benchforge-${timestamp}.speedscope.json`);
-  const absPath = exportSpeedscope(groups, outputPath);
-  if (absPath) {
-    launchSpeedscope(absPath, editorUri);
-  }
-}
+): Promise<{ close: () => void }> {
+  const frames: SpeedscopeFrame[] = [];
+  const frameIndex = new Map<string, number>();
+  const profiles: SpeedscopeProfile[] = [];
 
-const speedscopePackage =
-  "https://github.com/mighdoll/speedscope/releases/download/v1.26.0-m1/speedscope-1.26.0-m1.tgz";
-
-/** Launch speedscope viewer on a file via npx */
-export function launchSpeedscope(filePath: string, editorUri?: string): void {
-  console.log("Opening speedscope...");
-  const args = [speedscopePackage, filePath];
-  if (editorUri) {
-    args.push("--editor-uri", editorUri);
+  for (const group of groups) {
+    for (const report of groupReports(group)) {
+      const { heapProfile } = report.measuredResults;
+      if (!heapProfile) continue;
+      const resolved = resolveProfile(heapProfile);
+      profiles.push(buildProfile(report.name, resolved, frames, frameIndex));
+    }
   }
-  const child = spawn("npx", args, {
-    detached: true,
-    stdio: "inherit",
-  });
-  child.unref();
-  child.on("error", () => {
-    console.error(
-      `Failed to launch speedscope. Run manually:\n  npx speedscope ${filePath}`,
-    );
-  });
+
+  if (profiles.length === 0) {
+    console.log("No heap profiles to export.");
+    return { close: () => {} };
+  }
+
+  const file: SpeedscopeFile = {
+    $schema: "https://www.speedscope.app/file-format-schema.json",
+    shared: { frames },
+    profiles,
+    exporter: "benchforge",
+  };
+
+  const profileData = JSON.stringify(file);
+  const result = await startViewerServer({ profileData, editorUri });
+  return { close: result.close };
 }
 
 /** Convert a single HeapProfile to speedscope format (for standalone use) */
