@@ -29,6 +29,7 @@ const cliOptions = {
   "export-perfetto":    { type: "string",  requiresArg: true, describe: "export Perfetto trace file (view at ui.perfetto.dev)" },
   "view-alloc":         { type: "boolean", default: false, describe: "open allocation profile in viewer" },
   "export-alloc":       { type: "string",  requiresArg: true, describe: "export allocation profile (speedscope JSON format)" },
+  "archive":            { type: "string",  describe: "archive profile + sources to .benchforge file" },
   "trace-opt":    { type: "boolean", default: false, describe: "trace V8 optimization tiers (requires --allow-natives-syntax)" },
   "skip-settle":  { type: "boolean", default: false, describe: "skip post-warmup settle time (see V8 optimization cold start)" },
   "pause-first":  { type: "number",  describe: "iterations before first pause (then pause-interval applies)" },

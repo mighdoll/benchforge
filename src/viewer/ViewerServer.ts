@@ -4,6 +4,7 @@ import { homedir } from "node:os";
 import { dirname, extname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import open from "open";
+import { collectSources, fetchSource } from "../export/AllocExport.ts";
 
 export interface ViewerServerOptions {
   /** Speedscope JSON profile data */
@@ -46,9 +47,13 @@ export async function startViewerServer(
   const port = options.port ?? 3939;
   const shellDir = viewerDir();
 
+  const sourceCache = new Map<string, string>();
+
   const server = createServer(async (req, res) => {
     const url = req.url || "/";
-    const [pathname] = url.split("?");
+    const qIdx = url.indexOf("?");
+    const pathname = qIdx >= 0 ? url.slice(0, qIdx) : url;
+    const query = qIdx >= 0 ? url.slice(qIdx + 1) : "";
 
     // Viewer shell at root
     if (pathname === "/") {
@@ -78,6 +83,18 @@ export async function startViewerServer(
       return;
     }
 
+    // Source fetch API
+    if (pathname === "/api/source") {
+      await handleSourceRequest(res, query, sourceCache);
+      return;
+    }
+
+    // Archive API
+    if (pathname === "/api/archive" && req.method === "POST") {
+      await handleArchiveRequest(res, profileData, sourceCache);
+      return;
+    }
+
     // Speedscope static files
     if (pathname.startsWith("/speedscope/")) {
       const relPath = pathname.slice("/speedscope/".length) || "index.html";
@@ -101,8 +118,67 @@ export async function startViewerServer(
   };
 }
 
+type Res = import("node:http").ServerResponse;
+
+async function handleSourceRequest(
+  res: Res,
+  query: string,
+  cache: Map<string, string>,
+): Promise<void> {
+  const params = new URLSearchParams(query);
+  const sourceUrl = params.get("url");
+  if (!sourceUrl) {
+    res.statusCode = 400;
+    res.end("Missing url parameter");
+    return;
+  }
+  try {
+    let source = cache.get(sourceUrl);
+    if (source === undefined) {
+      source = await fetchSource(sourceUrl);
+      if (source === undefined) throw new Error("not found");
+      cache.set(sourceUrl, source);
+    }
+    res.setHeader("Content-Type", "text/plain; charset=utf-8");
+    res.end(source);
+  } catch {
+    res.statusCode = 404;
+    res.end("Source unavailable");
+  }
+}
+
+async function handleArchiveRequest(
+  res: Res,
+  profileData: string,
+  sourceCache: Map<string, string>,
+): Promise<void> {
+  try {
+    const parsed = JSON.parse(profileData);
+    const sources = await collectSources(parsed.shared.frames, sourceCache);
+    const timestamp = new Date().toISOString().replace(/[:.]/g, "-");
+    const archive = {
+      profile: parsed,
+      sources,
+      metadata: {
+        timestamp,
+        benchforgeVersion: process.env.npm_package_version || "unknown",
+      },
+    };
+    const body = JSON.stringify(archive);
+    res.setHeader("Content-Type", "application/json");
+    res.setHeader(
+      "Content-Disposition",
+      `attachment; filename="benchforge-${timestamp}.benchforge"`,
+    );
+    res.end(body);
+  } catch {
+    res.statusCode = 500;
+    res.end("Archive failed");
+  }
+}
+
 async function serveFile(
-  res: import("node:http").ServerResponse,
+  res: Res,
   filePath: string,
 ): Promise<void> {
   try {

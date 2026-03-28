@@ -17,6 +17,7 @@ import type {
 import { groupReports, reportResults } from "../BenchmarkReport.ts";
 import type { BrowserProfileResult } from "../browser/BrowserHeapSampler.ts";
 import {
+  archiveSpeedscope,
   exportAndLaunchSpeedscope,
   exportSpeedscope,
 } from "../export/AllocExport.ts";
@@ -344,6 +345,14 @@ export async function exportReports(options: ExportOptions): Promise<void> {
     exportSpeedscope(results, args["export-alloc"]);
   }
 
+  if (args.archive != null) {
+    const archivePath =
+      typeof args.archive === "string" && args.archive
+        ? args.archive
+        : undefined;
+    await archiveSpeedscope(results, archivePath);
+  }
+
   let closeAllocViewer: (() => void) | undefined;
   if (args["view-alloc"]) {
     const viewer = await exportAndLaunchSpeedscope(
@@ -548,6 +557,7 @@ function needsHeapSample(args: DefaultCliArgs): boolean {
     args["heap-sample"] ||
     args["view-alloc"] ||
     !!args["export-alloc"] ||
+    args.archive != null ||
     args["heap-raw"] ||
     args["heap-verbose"] ||
     args["heap-user-only"]

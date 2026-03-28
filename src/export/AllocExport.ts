@@ -1,6 +1,8 @@
+import { readFile, writeFile } from "node:fs/promises";
 import { writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 
 import { groupReports, type ReportGroup } from "../BenchmarkReport.ts";
 import type { HeapProfile } from "../heap-sample/HeapSampler.ts";
@@ -44,30 +46,11 @@ export function exportSpeedscope(
   groups: ReportGroup[],
   outputPath: string,
 ): string | undefined {
-  const frames: SpeedscopeFrame[] = [];
-  const frameIndex = new Map<string, number>();
-  const profiles: SpeedscopeProfile[] = [];
-
-  for (const group of groups) {
-    for (const report of groupReports(group)) {
-      const { heapProfile } = report.measuredResults;
-      if (!heapProfile) continue;
-      const resolved = resolveProfile(heapProfile);
-      profiles.push(buildProfile(report.name, resolved, frames, frameIndex));
-    }
-  }
-
-  if (profiles.length === 0) {
+  const file = buildSpeedscopeFile(groups);
+  if (!file) {
     console.log("No heap profiles to export.");
     return undefined;
   }
-
-  const file: SpeedscopeFile = {
-    $schema: "https://www.speedscope.app/file-format-schema.json",
-    shared: { frames },
-    profiles,
-    exporter: "benchforge",
-  };
 
   const absPath = resolve(outputPath);
   writeFileSync(absPath, JSON.stringify(file));
@@ -80,30 +63,11 @@ export async function exportAndLaunchSpeedscope(
   groups: ReportGroup[],
   editorUri?: string,
 ): Promise<{ close: () => void }> {
-  const frames: SpeedscopeFrame[] = [];
-  const frameIndex = new Map<string, number>();
-  const profiles: SpeedscopeProfile[] = [];
-
-  for (const group of groups) {
-    for (const report of groupReports(group)) {
-      const { heapProfile } = report.measuredResults;
-      if (!heapProfile) continue;
-      const resolved = resolveProfile(heapProfile);
-      profiles.push(buildProfile(report.name, resolved, frames, frameIndex));
-    }
-  }
-
-  if (profiles.length === 0) {
+  const file = buildSpeedscopeFile(groups);
+  if (!file) {
     console.log("No heap profiles to export.");
     return { close: () => {} };
   }
-
-  const file: SpeedscopeFile = {
-    $schema: "https://www.speedscope.app/file-format-schema.json",
-    shared: { frames },
-    profiles,
-    exporter: "benchforge",
-  };
 
   const profileData = JSON.stringify(file);
   const result = await startViewerServer({ profileData, editorUri });
@@ -126,6 +90,102 @@ export function heapProfileToSpeedscope(
     profiles: [p],
     exporter: "benchforge",
   };
+}
+
+/** Build SpeedscopeFile from report groups (shared by export, launch, archive) */
+function buildSpeedscopeFile(groups: ReportGroup[]): SpeedscopeFile | undefined {
+  const frames: SpeedscopeFrame[] = [];
+  const frameIndex = new Map<string, number>();
+  const profiles: SpeedscopeProfile[] = [];
+
+  for (const group of groups) {
+    for (const report of groupReports(group)) {
+      const { heapProfile } = report.measuredResults;
+      if (!heapProfile) continue;
+      const resolved = resolveProfile(heapProfile);
+      profiles.push(buildProfile(report.name, resolved, frames, frameIndex));
+    }
+  }
+
+  if (profiles.length === 0) return undefined;
+
+  return {
+    $schema: "https://www.speedscope.app/file-format-schema.json",
+    shared: { frames },
+    profiles,
+    exporter: "benchforge",
+  };
+}
+
+/** Fetch a single source URL. Supports file:// (fs read) and http(s):// (fetch). */
+export async function fetchSource(url: string): Promise<string | undefined> {
+  try {
+    if (url.startsWith("file://")) {
+      return await readFile(fileURLToPath(url), "utf-8");
+    }
+    const resp = await fetch(url, { signal: AbortSignal.timeout(5000) });
+    if (!resp.ok) return undefined;
+    return await resp.text();
+  } catch {
+    return undefined;
+  }
+}
+
+/** Fetch source code for all unique file URLs in profile frames.
+ *  Skips URLs that fail to fetch. */
+export async function collectSources(
+  frames: { file?: string }[],
+  cache?: Map<string, string>,
+): Promise<Record<string, string>> {
+  const urls = new Set<string>();
+  for (const frame of frames) {
+    if (frame.file) urls.add(frame.file);
+  }
+
+  const sources: Record<string, string> = {};
+  for (const url of urls) {
+    if (cache?.has(url)) {
+      sources[url] = cache.get(url)!;
+      continue;
+    }
+    const text = await fetchSource(url);
+    if (text !== undefined) {
+      sources[url] = text;
+      cache?.set(url, text);
+    }
+  }
+
+  return sources;
+}
+
+/** Build a .benchforge archive containing profile + sources.
+ *  @returns resolved output path, or undefined if no profiles found */
+export async function archiveSpeedscope(
+  groups: ReportGroup[],
+  outputPath?: string,
+): Promise<string | undefined> {
+  const file = buildSpeedscopeFile(groups);
+  if (!file) {
+    console.log("No heap profiles to archive.");
+    return undefined;
+  }
+
+  const sources = await collectSources(file.shared.frames);
+  const timestamp = new Date().toISOString().replace(/[:.]/g, "-");
+  const archive = {
+    profile: file,
+    sources,
+    metadata: {
+      timestamp,
+      benchforgeVersion: process.env.npm_package_version || "unknown",
+    },
+  };
+
+  const filename = outputPath || `benchforge-${timestamp}.benchforge`;
+  const absPath = resolve(filename);
+  writeFileSync(absPath, JSON.stringify(archive));
+  console.log(`Archive written to: ${filename}`);
+  return absPath;
 }
 
 /** Build a single speedscope profile from a resolved heap profile */
