@@ -173,6 +173,11 @@ body { display: flex; flex-direction: column; }
   font-family: ui-monospace, "SF Mono", "Cascadia Code", Menlo, Consolas, monospace;
   font-size: 13px;
   line-height: 1.6;
+  white-space: normal;
+}
+
+.source-code code {
+  white-space: normal;
 }
 
 .source-code .line {
@@ -180,7 +185,7 @@ body { display: flex; flex-direction: column; }
   counter-increment: line;
   padding: 0 16px 0 60px;
   position: relative;
-  min-height: 1.6em;
+  white-space: pre;
 }
 
 .source-code .line::before {
