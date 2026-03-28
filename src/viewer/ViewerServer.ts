@@ -1,7 +1,7 @@
 import { readFile } from "node:fs/promises";
 import { createServer, type Server } from "node:http";
 import { homedir } from "node:os";
-import { dirname, extname, join } from "node:path";
+import { dirname, extname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import open from "open";
 import {
@@ -17,6 +17,8 @@ export interface ViewerServerOptions {
   editorUri?: string;
   /** Port to listen on (default 3939) */
   port?: number;
+  /** Pre-loaded sources (e.g. from an archive) to seed the source cache */
+  sources?: Record<string, string>;
 }
 
 const speedscopeDir = join(homedir(), "lib/speedscope/dist/release");
@@ -52,6 +54,11 @@ export async function startViewerServer(
   const shellDir = viewerDir();
 
   const sourceCache = new Map<string, string>();
+  if (options.sources) {
+    for (const [url, source] of Object.entries(options.sources)) {
+      sourceCache.set(url, source);
+    }
+  }
 
   const server = createServer(async (req, res) => {
     const url = req.url || "/";
@@ -195,6 +202,27 @@ async function serveFile(
     res.statusCode = 404;
     res.end("Not found");
   }
+}
+
+/** Open a .benchforge archive in the viewer */
+export async function viewArchive(filePath: string): Promise<void> {
+  const absPath = resolve(filePath);
+  const content = await readFile(absPath, "utf-8");
+  const archive = JSON.parse(content);
+
+  const profileData = JSON.stringify(archive.profile);
+  const sources = archive.sources as Record<string, string> | undefined;
+
+  const { close } = await startViewerServer({ profileData, sources });
+
+  await new Promise<void>(resolve => {
+    console.log("\nPress Ctrl+C to exit");
+    process.on("SIGINT", () => {
+      console.log();
+      close();
+      resolve();
+    });
+  });
 }
 
 function tryListen(
