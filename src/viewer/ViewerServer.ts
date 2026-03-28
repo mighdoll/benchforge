@@ -228,14 +228,26 @@ export async function viewArchive(filePath: string): Promise<void> {
 function tryListen(
   server: Server,
   port: number,
+  maxRetries = 10,
 ): Promise<{ server: Server; port: number }> {
   return new Promise((resolve, reject) => {
-    server.once("error", reject);
-    server.listen(port, () => {
-      server.removeListener("error", reject);
-      const addr = server.address();
-      const actualPort = typeof addr === "object" && addr ? addr.port : port;
-      resolve({ server, port: actualPort });
-    });
+    let attempt = 0;
+    const listen = (p: number) => {
+      server.once("error", (err: NodeJS.ErrnoException) => {
+        if (err.code === "EADDRINUSE" && attempt < maxRetries) {
+          attempt++;
+          listen(p + 1);
+        } else {
+          reject(err);
+        }
+      });
+      server.listen(p, () => {
+        server.removeAllListeners("error");
+        const addr = server.address();
+        const actualPort = typeof addr === "object" && addr ? addr.port : p;
+        resolve({ server, port: actualPort });
+      });
+    };
+    listen(port);
   });
 }
