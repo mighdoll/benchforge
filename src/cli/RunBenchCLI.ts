@@ -16,6 +16,7 @@ import type {
 } from "../BenchmarkReport.ts";
 import { groupReports, reportResults } from "../BenchmarkReport.ts";
 import type { BrowserProfileResult } from "../browser/BrowserHeapSampler.ts";
+import { resolveEditorUri } from "../export/EditorUri.ts";
 import { exportBenchmarkJson } from "../export/JsonExport.ts";
 import { exportPerfettoTrace } from "../export/PerfettoExport.ts";
 import {
@@ -347,7 +348,7 @@ export async function exportReports(options: ExportOptions): Promise<void> {
   }
 
   if (args.speedscope) {
-    exportAndLaunchSpeedscope(results);
+    exportAndLaunchSpeedscope(results, resolveEditorUri(args.editor));
   }
 
   // Keep process running when HTML report is opened in browser

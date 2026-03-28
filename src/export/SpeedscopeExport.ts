@@ -76,21 +76,34 @@ export function exportSpeedscope(
 }
 
 /** Export to a temp file and open in speedscope via npx */
-export function exportAndLaunchSpeedscope(groups: ReportGroup[]): void {
+export function exportAndLaunchSpeedscope(
+  groups: ReportGroup[],
+  editorUri?: string,
+): void {
   const timestamp = new Date().toISOString().replace(/[:.]/g, "-");
   const outputPath = join(tmpdir(), `benchforge-${timestamp}.speedscope.json`);
   const absPath = exportSpeedscope(groups, outputPath);
   if (absPath) {
-    launchSpeedscope(absPath);
+    launchSpeedscope(absPath, editorUri);
   }
 }
 
+const speedscopePackage =
+  "https://github.com/mighdoll/speedscope/releases/download/v1.26.0-m1/speedscope-1.26.0-m1.tgz";
+
 /** Launch speedscope viewer on a file via npx */
-export function launchSpeedscope(filePath: string): void {
+export function launchSpeedscope(
+  filePath: string,
+  editorUri?: string,
+): void {
   console.log("Opening speedscope...");
-  const child = spawn("npx", ["speedscope", filePath], {
+  const args = [speedscopePackage, filePath];
+  if (editorUri) {
+    args.push("--editor-uri", editorUri);
+  }
+  const child = spawn("npx", args, {
     detached: true,
-    stdio: "ignore",
+    stdio: "inherit",
   });
   child.unref();
   child.on("error", () => {
