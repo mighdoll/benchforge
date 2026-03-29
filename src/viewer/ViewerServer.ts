@@ -1,6 +1,5 @@
 import { readFile } from "node:fs/promises";
 import { createServer, type Server } from "node:http";
-import { homedir } from "node:os";
 import { dirname, extname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import open from "open";
@@ -25,7 +24,27 @@ export interface ViewerServerOptions {
   sources?: Record<string, string>;
 }
 
-const speedscopeDir = join(homedir(), "lib/speedscope/dist/release");
+/** Resolve the package root directory.
+ *  In dev: src/viewer/ViewerServer.ts → dirname is "viewer" → up 2.
+ *  In dist: dist/ViewerServer-*.mjs   → dirname is "dist"   → up 1. */
+function packageRoot(): string {
+  const thisDir = dirname(fileURLToPath(import.meta.url));
+  const base = thisDir.split("/").pop() || "";
+  if (base === "viewer") return join(thisDir, "../..");
+  return join(thisDir, "..");
+}
+
+function speedscopeDir(): string {
+  return join(packageRoot(), "vendor/speedscope");
+}
+
+function viewerDir(): string {
+  return join(packageRoot(), "src/viewer");
+}
+
+function browserBundleDir(): string {
+  return join(packageRoot(), "dist/browser");
+}
 
 const mimeTypes: Record<string, string> = {
   ".html": "text/html",
@@ -40,27 +59,6 @@ const mimeTypes: Record<string, string> = {
   ".map": "application/json",
   ".md": "text/plain",
 };
-
-/** Resolve the viewer shell directory (works from dist/ and src/) */
-function viewerDir(): string {
-  const thisDir = dirname(fileURLToPath(import.meta.url));
-  // In dist: dist/viewer/ViewerServer.js → shell files are siblings
-  // In src (dev): src/viewer/ViewerServer.ts → shell files are siblings
-  return thisDir;
-}
-
-/** Load the pre-built browser plots bundle (for report tab) */
-async function loadPlotsBundle(): Promise<string> {
-  const thisDir = dirname(fileURLToPath(import.meta.url));
-  // In dist: dist/viewer/ → ../html/browser/index.js
-  const builtPath = join(thisDir, "../html/browser/index.js");
-  // In dev: src/viewer/ → ../../dist/browser/index.js
-  const devPath = join(thisDir, "../../dist/browser/index.js");
-  try {
-    return await readFile(builtPath, "utf-8");
-  } catch {}
-  return readFile(devPath, "utf-8");
-}
 
 /** Start the viewer server and open in browser */
 export async function startViewerServer(
@@ -77,7 +75,7 @@ export async function startViewerServer(
     }
   }
 
-  let plotsBundleCache: string | undefined;
+  const bundleDir = browserBundleDir();
 
   const server = createServer(async (req, res) => {
     const url = req.url || "/";
@@ -91,20 +89,14 @@ export async function startViewerServer(
       return;
     }
 
-    // Plots bundle (for report tab)
-    if (pathname === "/viewer/plots.js") {
-      try {
-        plotsBundleCache ??= await loadPlotsBundle();
-        res.setHeader("Content-Type", "application/javascript");
-        res.end(plotsBundleCache);
-      } catch {
-        res.statusCode = 404;
-        res.end("Not found");
-      }
+    // Built browser bundles (shell.js, plots.js, shiki chunk files)
+    if (pathname.startsWith("/viewer/") && pathname.endsWith(".js")) {
+      const relPath = pathname.slice("/viewer/".length);
+      await serveFile(res, join(bundleDir, relPath));
       return;
     }
 
-    // Viewer static files (shell.css, shell.js, report.css)
+    // Viewer static files (shell.css, report.css, shell.html)
     if (pathname.startsWith("/viewer/")) {
       const relPath = pathname.slice("/viewer/".length);
       await serveFile(res, join(shellDir, relPath));
@@ -176,7 +168,7 @@ export async function startViewerServer(
     // Speedscope static files
     if (pathname.startsWith("/speedscope/")) {
       const relPath = pathname.slice("/speedscope/".length) || "index.html";
-      await serveFile(res, join(speedscopeDir, relPath));
+      await serveFile(res, join(speedscopeDir(), relPath));
       return;
     }
 
@@ -245,6 +237,7 @@ async function handleArchiveRequest(
       : Object.fromEntries(sourceCache);
     const timestamp = new Date().toISOString().replace(/[:.]/g, "-");
     const archive = {
+      schema: 1,
       profile,
       timeProfile,
       report,
@@ -290,6 +283,16 @@ export async function viewArchive(filePath: string): Promise<void> {
   const absPath = resolve(filePath);
   const content = await readFile(absPath, "utf-8");
   const archive = JSON.parse(content);
+
+  const KNOWN_SCHEMA = 1;
+  const schema = archive.schema ?? 0;
+  if (schema > KNOWN_SCHEMA) {
+    console.error(
+      `Archive schema version ${schema} is newer than supported (${KNOWN_SCHEMA}). ` +
+      `Please update benchforge to view this archive.`,
+    );
+    process.exit(1);
+  }
 
   const profileData = archive.profile
     ? JSON.stringify(archive.profile)

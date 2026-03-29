@@ -27,6 +27,7 @@
     "**/dist",
     "src/tests/fixtures",
     "src/html/browser",
+    "src/viewer/shell.ts",
     "*.config.ts"
   ]
 }

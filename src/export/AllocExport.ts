@@ -171,6 +171,7 @@ export async function archiveBenchmark(
     : {};
   const timestamp = new Date().toISOString().replace(/[:.]/g, "-");
   const archive = {
+    schema: 1,
     profile: file ?? null,
     timeProfile,
     report: reportData ?? null,

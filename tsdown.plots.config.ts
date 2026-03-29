@@ -1,12 +1,15 @@
 import { defineConfig } from "tsdown";
 
 export default defineConfig({
-  entry: ["src/html/browser/index.ts"],
+  entry: {
+    plots: "src/html/browser/index.ts",
+    shell: "src/viewer/shell.ts",
+  },
   format: "esm",
   outDir: "dist/browser",
   platform: "browser",
   target: "es2022",
-  external: ["d3", "@observablehq/plot"],
+  noExternal: [/.*/],
   clean: true,
   logLevel: "warn",
 });

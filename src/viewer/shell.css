@@ -231,3 +231,51 @@ body { display: flex; flex-direction: column; }
   border-radius: 3px;
   font-size: 13px;
 }
+
+/* Drop zone (hosted viewer mode) */
+
+.drop-zone {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--body-bg);
+  z-index: 100;
+}
+
+.drop-zone.drag-over { background: var(--tab-bar-bg); }
+
+.drop-zone-content {
+  text-align: center;
+  color: var(--source-color);
+}
+
+.drop-zone-content h2 { margin: 16px 0 8px; font-size: 24px; }
+.drop-zone-content p { color: var(--tab-color); margin: 8px 0; }
+
+.drop-zone-content code {
+  background: var(--tab-border);
+  padding: 2px 6px;
+  border-radius: 3px;
+  font-size: 13px;
+}
+
+.drop-zone-divider {
+  color: var(--tab-color);
+  margin: 16px 0;
+  font-size: 13px;
+}
+
+.drop-zone-browse {
+  display: inline-block;
+  padding: 8px 20px;
+  background: var(--tab-accent);
+  color: white;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 14px;
+}
+
+.drop-zone-browse:hover { opacity: 0.9; }
+.drop-zone-error { color: #ef4444; margin-top: 16px; }
