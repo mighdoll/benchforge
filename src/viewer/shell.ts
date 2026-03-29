@@ -398,6 +398,26 @@ function openSourceTab(file: string, line: number, col: number): void {
   activateTab(id);
 }
 
+function buildSourceHeader(file: string, line: number, col: number): string {
+  let header = '<div class="source-header">';
+  header += '<span class="source-path">' + escapeHtml(file) + "</span>";
+  if (provider.config.editorUri) {
+    const editorHref =
+      provider.config.editorUri +
+      filePathFromUrl(file) +
+      ":" +
+      (line || 1) +
+      ":" +
+      (col || 1);
+    header +=
+      ' <a class="source-editor-link" href="' +
+      escapeHtml(editorHref) +
+      '">Open in Editor</a>';
+  }
+  header += "</div>";
+  return header;
+}
+
 async function updateSourcePanel(
   tabData: SourceTabData,
   file: string,
@@ -427,23 +447,7 @@ async function updateSourcePanel(
       themes: { light: "github-light", dark: "github-dark" },
     });
 
-    let header = '<div class="source-header">';
-    header += '<span class="source-path">' + escapeHtml(file) + "</span>";
-    if (provider.config.editorUri) {
-      const editorHref =
-        provider.config.editorUri +
-        filePathFromUrl(file) +
-        ":" +
-        (line || 1) +
-        ":" +
-        (col || 1);
-      header +=
-        ' <a class="source-editor-link" href="' +
-        escapeHtml(editorHref) +
-        '">Open in Editor</a>';
-    }
-    header += "</div>";
-
+    const header = buildSourceHeader(file, line, col);
     panel.innerHTML = header + '<div class="source-code">' + html + "</div>";
 
     if (line) {

@@ -45,105 +45,22 @@ function viewerDistDir(): string {
 export async function startViewerServer(
   options: ViewerServerOptions,
 ): Promise<{ server: Server; port: number; close: () => void }> {
-  const { profileData, timeProfileData, reportData, editorUri } = options;
   const port = options.port ?? 3939;
 
   const sourceCache = new Map<string, string>();
   if (options.sources) {
-    for (const [url, source] of Object.entries(options.sources)) {
+    for (const [url, source] of Object.entries(options.sources))
       sourceCache.set(url, source);
-    }
   }
 
   const assets = sirv(viewerDistDir(), { single: true });
-
-  const server = createServer(async (req, res) => {
-    const url = req.url || "/";
-    const qIdx = url.indexOf("?");
-    const pathname = qIdx >= 0 ? url.slice(0, qIdx) : url;
-    const query = qIdx >= 0 ? url.slice(qIdx + 1) : "";
-
-    // Config API (editor URI, data availability)
-    if (pathname === "/api/config") {
-      res.setHeader("Content-Type", "application/json");
-      res.end(
-        JSON.stringify({
-          editorUri: editorUri || null,
-          hasReport: !!reportData,
-          hasProfile: !!profileData,
-          hasTimeProfile: !!timeProfileData,
-        }),
-      );
-      return;
-    }
-
-    // Report data API
-    if (pathname === "/api/report-data") {
-      if (!reportData) {
-        res.statusCode = 404;
-        res.end("No report data");
-        return;
-      }
-      res.setHeader("Content-Type", "application/json");
-      res.end(reportData);
-      return;
-    }
-
-    // Allocation profile API
-    if (pathname === "/api/profile" || pathname === "/api/profile/alloc") {
-      if (!profileData) {
-        res.statusCode = 404;
-        res.end("No profile data");
-        return;
-      }
-      res.setHeader("Content-Type", "application/json");
-      res.setHeader("Access-Control-Allow-Origin", "*");
-      res.end(profileData);
-      return;
-    }
-
-    // Time profile API
-    if (pathname === "/api/profile/time") {
-      if (!timeProfileData) {
-        res.statusCode = 404;
-        res.end("No time profile data");
-        return;
-      }
-      res.setHeader("Content-Type", "application/json");
-      res.setHeader("Access-Control-Allow-Origin", "*");
-      res.end(timeProfileData);
-      return;
-    }
-
-    // Source fetch API
-    if (pathname === "/api/source") {
-      await handleSourceRequest(res, query, sourceCache);
-      return;
-    }
-
-    // Archive API
-    if (pathname === "/api/archive" && req.method === "POST") {
-      await handleArchiveRequest(
-        res,
-        profileData,
-        timeProfileData,
-        reportData,
-        sourceCache,
-      );
-      return;
-    }
-
-    // All static files (viewer assets + speedscope) served by sirv
-    assets(req, res, () => {
-      res.statusCode = 404;
-      res.end("Not found");
-    });
-  });
+  const handler = createRequestHandler(options, sourceCache, assets);
+  const server = createServer(handler);
 
   const result = await tryListen(server, port);
   const openUrl = `http://localhost:${result.port}`;
-  const shouldOpen = options.open !== false && !process.env.BENCHFORGE_NO_OPEN;
-  if (shouldOpen) await open(openUrl);
+  if (options.open !== false && !process.env.BENCHFORGE_NO_OPEN)
+    await open(openUrl);
   console.log(`Viewer: ${openUrl}`);
 
   return {
@@ -154,6 +71,94 @@ export async function startViewerServer(
 }
 
 type Res = import("node:http").ServerResponse;
+type RouteHandler = (
+  res: Res,
+  query: string,
+  method: string,
+) => Promise<void> | void;
+
+function sendJson(res: Res, data: string | undefined, label: string): void {
+  if (!data) {
+    res.statusCode = 404;
+    res.end(`No ${label}`);
+    return;
+  }
+  res.setHeader("Content-Type", "application/json");
+  res.end(data);
+}
+
+function sendProfile(
+  res: Res,
+  data: string | undefined,
+  label = "profile data",
+): void {
+  if (!data) {
+    res.statusCode = 404;
+    res.end(`No ${label}`);
+    return;
+  }
+  res.setHeader("Content-Type", "application/json");
+  res.setHeader("Access-Control-Allow-Origin", "*");
+  res.end(data);
+}
+
+function createRequestHandler(
+  ctx: ViewerServerOptions,
+  sourceCache: Map<string, string>,
+  assets: ReturnType<typeof sirv>,
+): (req: import("node:http").IncomingMessage, res: Res) => void {
+  const routes: Record<string, RouteHandler> = {
+    "/api/config": res => {
+      res.setHeader("Content-Type", "application/json");
+      res.end(
+        JSON.stringify({
+          editorUri: ctx.editorUri || null,
+          hasReport: !!ctx.reportData,
+          hasProfile: !!ctx.profileData,
+          hasTimeProfile: !!ctx.timeProfileData,
+        }),
+      );
+    },
+    "/api/report-data": res => sendJson(res, ctx.reportData, "report data"),
+    "/api/profile": res => sendProfile(res, ctx.profileData),
+    "/api/profile/alloc": res => sendProfile(res, ctx.profileData),
+    "/api/profile/time": res =>
+      sendProfile(res, ctx.timeProfileData, "time profile data"),
+    "/api/source": (res, query) => handleSourceRequest(res, query, sourceCache),
+    "/api/archive": (res, _q, method) => {
+      if (method !== "POST") {
+        res.statusCode = 405;
+        res.end("Method not allowed");
+        return;
+      }
+      return handleArchiveRequest(
+        res,
+        ctx.profileData,
+        ctx.timeProfileData,
+        ctx.reportData,
+        sourceCache,
+      );
+    },
+  };
+
+  return async (req, res) => {
+    const url = req.url || "/";
+    const qIdx = url.indexOf("?");
+    const pathname = qIdx >= 0 ? url.slice(0, qIdx) : url;
+    const query = qIdx >= 0 ? url.slice(qIdx + 1) : "";
+
+    const handler = routes[pathname];
+    if (handler) {
+      await handler(res, query, req.method || "GET");
+      return;
+    }
+
+    assets(req, res, () => {
+      res.statusCode = 404;
+      res.end("Not found");
+    });
+  };
+}
 
 async function handleSourceRequest(
   res: Res,

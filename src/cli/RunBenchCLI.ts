@@ -344,14 +344,7 @@ export async function exportReports(options: ExportOptions): Promise<void> {
   }
 
   if (args["export-time"]) {
-    const profile = findTimeProfile(results);
-    if (profile) {
-      const absPath = resolve(args["export-time"]);
-      writeFileSync(absPath, JSON.stringify(profile));
-      console.log(`Time profile exported to: ${args["export-time"]}`);
-    } else {
-      console.log("No time profiles to export.");
-    }
+    exportTimeProfile(results, args["export-time"]);
   }
 
   if (args.archive != null) {
@@ -368,7 +361,6 @@ export async function exportReports(options: ExportOptions): Promise<void> {
     });
   }
 
-  let closeViewer: (() => void) | undefined;
   if (args.view) {
     const profileFile = buildSpeedscopeFile(results);
     const profileData = profileFile ? JSON.stringify(profileFile) : undefined;
@@ -379,12 +371,8 @@ export async function exportReports(options: ExportOptions): Promise<void> {
       reportData: reportData ? JSON.stringify(reportData) : undefined,
       editorUri: resolveEditorUri(args.editor),
     });
-    closeViewer = viewer.close;
-  }
-
-  if (closeViewer) {
     await waitForCtrlC();
-    closeViewer();
+    viewer.close();
   }
 }
 
@@ -610,6 +598,18 @@ function findTimeProfile(
     }
   }
   return undefined;
+}
+
+/** Export the first raw V8 TimeProfile to a JSON file */
+function exportTimeProfile(results: ReportGroup[], path: string): void {
+  const profile = findTimeProfile(results);
+  if (profile) {
+    const absPath = resolve(path);
+    writeFileSync(absPath, JSON.stringify(profile));
+    console.log(`Time profile exported to: ${path}`);
+  } else {
+    console.log("No time profiles to export.");
+  }
 }
 
 /** Strip surrounding quotes from a chrome arg token.

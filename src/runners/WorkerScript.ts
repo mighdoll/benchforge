@@ -8,7 +8,7 @@ import {
   type AdaptiveOptions,
   createAdaptiveWrapper,
 } from "./AdaptiveWrapper.ts";
-import type { RunnerOptions } from "./BenchRunner.ts";
+import type { BenchRunner, RunnerOptions } from "./BenchRunner.ts";
 import { createRunner, type KnownRunner } from "./CreateRunner.ts";
 import { debugWorkerTiming, getElapsed, getPerfNow } from "./TimingUtils.ts"; // 5 minutes
 
@@ -191,6 +191,52 @@ function createErrorMessage(error: unknown): ErrorMessage {
   };
 }
 
+/** Run benchmark with heap and/or time profiling enabled. */
+async function runWithProfiling(
+  message: RunMessage,
+  runner: BenchRunner,
+): Promise<ResultMessage> {
+  const { alloc, timeSample } = message.options;
+  let heapProfile: HeapProfile | undefined;
+  let timeProfile: TimeProfile | undefined;
+
+  const run = async () => {
+    const { fn, params } = await resolveBenchmarkFn(message);
+    return runner.runBench({ ...message.spec, fn }, message.options, params);
+  };
+
+  // Nest: outer heap, inner time (independent V8 subsystems)
+  const runMaybeWithTime = timeSample
+    ? async () => {
+        const { withTimeProfiling } = await import(
+          "../profiling/time/TimeSampler.ts"
+        );
+        const timeOpts = { interval: message.options.timeInterval };
+        const r = await withTimeProfiling(timeOpts, run);
+        timeProfile = r.profile;
+        return r.result;
+      }
+    : run;
+
+  let results: MeasuredResults[];
+  if (alloc) {
+    const { withHeapSampling } = await import(
+      "../profiling/heap/HeapSampler.ts"
+    );
+    const heapOpts = {
+      samplingInterval: message.options.allocInterval,
+      stackDepth: message.options.allocDepth,
+    };
+    const r = await withHeapSampling(heapOpts, runMaybeWithTime);
+    heapProfile = r.profile;
+    results = r.result;
+  } else {
+    results = await runMaybeWithTime();
+  }
+
+  return { type: "result", results, heapProfile, timeProfile };
+}
+
 /**
  * Worker process for isolated benchmark execution.
  * Uses eval() safely in isolated child process with trusted code.
@@ -211,54 +257,12 @@ process.on("message", async (message: RunMessage) => {
     logTiming("Runner created in", getElapsed(start));
 
     const benchStart = getPerfNow();
-
     const { alloc, timeSample } = message.options;
 
-    // Run with profiling if either sampler is enabled
     if (alloc || timeSample) {
-      let heapProfile: HeapProfile | undefined;
-      let timeProfile: TimeProfile | undefined;
-
-      const run = async () => {
-        const { fn, params } = await resolveBenchmarkFn(message);
-        return runner.runBench(
-          { ...message.spec, fn },
-          message.options,
-          params,
-        );
-      };
-
-      // Nest: outer heap, inner time (independent V8 subsystems)
-      const runMaybeWithTime = timeSample
-        ? async () => {
-            const { withTimeProfiling } = await import(
-              "../profiling/time/TimeSampler.ts"
-            );
-            const timeOpts = { interval: message.options.timeInterval };
-            const r = await withTimeProfiling(timeOpts, run);
-            timeProfile = r.profile;
-            return r.result;
-          }
-        : run;
-
-      let results: MeasuredResults[];
-      if (alloc) {
-        const { withHeapSampling } = await import(
-          "../profiling/heap/HeapSampler.ts"
-        );
-        const heapOpts = {
-          samplingInterval: message.options.allocInterval,
-          stackDepth: message.options.allocDepth,
-        };
-        const r = await withHeapSampling(heapOpts, runMaybeWithTime);
-        heapProfile = r.profile;
-        results = r.result;
-      } else {
-        results = await runMaybeWithTime();
-      }
-
+      const result = await runWithProfiling(message, runner);
       logTiming("Benchmark execution took", getElapsed(benchStart));
-      sendAndExit({ type: "result", results, heapProfile, timeProfile }, 0);
+      sendAndExit(result, 0);
     } else {
       const { fn, params } = await resolveBenchmarkFn(message);
       const results = await runner.runBench(
