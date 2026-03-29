@@ -37,10 +37,10 @@ const coverage: CoverageData = {
 };
 
 test("buildCoverageMap resolves offsets to lines", () => {
-  const map = buildCoverageMap(coverage, { "file:///test.js": source });
+  const result = buildCoverageMap(coverage, { "file:///test.js": source });
 
-  expect(map.has("file:///test.js")).toBe(true);
-  const entries = map.get("file:///test.js")!;
+  expect(result.map.has("file:///test.js")).toBe(true);
+  const entries = result.map.get("file:///test.js")!;
   expect(entries).toHaveLength(3);
 
   const foo = entries.find(e => e.functionName === "foo");
@@ -52,10 +52,14 @@ test("buildCoverageMap resolves offsets to lines", () => {
   expect(bar).toBeDefined();
   expect(bar!.startLine).toBe(4);
   expect(bar!.count).toBe(5);
+
+  // byName aggregates across all scripts
+  expect(result.byName.get("foo")).toBe(10);
+  expect(result.byName.get("bar")).toBe(5);
 });
 
 test("annotateFramesWithCounts appends [N] to matched frames", () => {
-  const map = buildCoverageMap(coverage, { "file:///test.js": source });
+  const result = buildCoverageMap(coverage, { "file:///test.js": source });
 
   const frames = [
     { name: "foo", file: "file:///test.js", line: 1 },
@@ -63,11 +67,27 @@ test("annotateFramesWithCounts appends [N] to matched frames", () => {
     { name: "unmatched", file: "file:///other.js", line: 1 },
   ];
 
-  annotateFramesWithCounts(frames, map);
+  annotateFramesWithCounts(frames, result);
 
   expect(frames[0].name).toBe("foo [10]");
   expect(frames[1].name).toBe("bar [5]");
   expect(frames[2].name).toBe("unmatched"); // no coverage data for this file
+});
+
+test("annotateFramesWithCounts falls back to name-only for frames without file", () => {
+  const result = buildCoverageMap(coverage, { "file:///test.js": source });
+
+  const frames = [
+    { name: "foo" }, // no file — should match by name
+    { name: "bar" },
+    { name: "(anonymous)" }, // anonymous — should not match by name
+  ];
+
+  annotateFramesWithCounts(frames, result);
+
+  expect(frames[0].name).toBe("foo [10]");
+  expect(frames[1].name).toBe("bar [5]");
+  expect(frames[2].name).toBe("(anonymous)");
 });
 
 test("annotateFramesWithCounts formats large counts", () => {
@@ -84,12 +104,12 @@ test("annotateFramesWithCounts formats large counts", () => {
       },
     ],
   };
-  const map = buildCoverageMap(bigCoverage, {
+  const result = buildCoverageMap(bigCoverage, {
     "file:///big.js": "function hot() {}",
   });
   const frames = [{ name: "hot", file: "file:///big.js", line: 1 }];
 
-  annotateFramesWithCounts(frames, map);
+  annotateFramesWithCounts(frames, result);
 
   expect(frames[0].name).toBe("hot [1.5M]");
 });

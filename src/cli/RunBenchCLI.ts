@@ -657,11 +657,11 @@ async function annotateCoverage(
   // Collect sources keyed by coverage script URLs for offset→line resolution
   const coverageUrls = coverage.scripts.map(s => ({ file: s.url }));
   const sources = await collectSources(coverageUrls);
-  const coverageMap = buildCoverageMap(coverage, sources);
+  const coverageResult = buildCoverageMap(coverage, sources);
   if (profileFile)
-    annotateFramesWithCounts(profileFile.shared.frames, coverageMap);
+    annotateFramesWithCounts(profileFile.shared.frames, coverageResult);
   if (timeProfileFile)
-    annotateFramesWithCounts(timeProfileFile.shared.frames, coverageMap);
+    annotateFramesWithCounts(timeProfileFile.shared.frames, coverageResult);
 }
 
 /** Export the first raw V8 TimeProfile to a JSON file */

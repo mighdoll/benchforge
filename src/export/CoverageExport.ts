@@ -34,28 +34,46 @@ function offsetToLine(offset: number, lineOffsets: number[]): number {
   return lo + 1; // 1-indexed
 }
 
-/** Build a coverage map from raw CDP/inspector coverage data and source texts.
+/** Result of building coverage data: per-URL entries + name-only lookup */
+export interface CoverageResult {
+  /** Per-URL coverage entries (for frames with matching file URLs) */
+  map: CoverageMap;
+  /** Name → count lookup across all scripts (for frames without file URLs) */
+  byName: Map<string, number>;
+}
+
+/** Build coverage data from raw CDP/inspector coverage and source texts.
  *  For each function, the first range's count is the invocation count. */
 export function buildCoverageMap(
   coverage: CoverageData,
   sources: Record<string, string>,
-): CoverageMap {
+): CoverageResult {
   const map: CoverageMap = new Map();
+  const byName = new Map<string, number>();
 
   for (const script of coverage.scripts) {
-    const { url, functions } = script;
-    if (!url) continue;
-    const source = sources[url];
-    if (!source) continue;
+    processScript(script, sources, map, byName);
+  }
 
-    const lineOffsets = buildLineOffsets(source);
-    const entries: LineCoverage[] = [];
+  return { map, byName };
+}
 
-    for (const fn of functions) {
-      // The first range is the enclosing range; its count = invocation count
-      const range = fn.ranges[0];
-      if (!range) continue;
+function processScript(
+  script: CoverageData["scripts"][number],
+  sources: Record<string, string>,
+  map: CoverageMap,
+  byName: Map<string, number>,
+): void {
+  const { url, functions } = script;
+  const source = url ? sources[url] : undefined;
+  const lineOffsets = source ? buildLineOffsets(source) : undefined;
+  const entries: LineCoverage[] = [];
 
+  for (const fn of functions) {
+    const range = fn.ranges[0];
+    if (!range) continue;
+
+    if (lineOffsets && url) {
       entries.push({
         startLine: offsetToLine(range.startOffset, lineOffsets),
         functionName: fn.functionName,
@@ -63,26 +81,37 @@ export function buildCoverageMap(
       });
     }
 
-    if (entries.length > 0) {
-      map.set(url, entries);
+    if (fn.functionName && range.count > 0) {
+      byName.set(
+        fn.functionName,
+        (byName.get(fn.functionName) ?? 0) + range.count,
+      );
     }
   }
 
-  return map;
+  if (entries.length > 0 && url) map.set(url, entries);
 }
 
-/** Annotate speedscope frame names with execution counts from a coverage map.
- *  Appends " [N]" to each matched frame name. */
+/** Annotate speedscope frame names with execution counts.
+ *  Uses file+name matching when available, falls back to name-only. */
 export function annotateFramesWithCounts(
   frames: { name: string; file?: string; line?: number }[],
-  coverageMap: CoverageMap,
+  coverage: CoverageResult,
 ): void {
+  const { map, byName } = coverage;
   for (const frame of frames) {
-    if (!frame.file) continue;
-    const entries = coverageMap.get(frame.file);
-    if (!entries) continue;
+    let count: number | undefined;
 
-    const count = findCount(frame.name, frame.line, entries);
+    if (frame.file) {
+      const entries = map.get(frame.file);
+      if (entries) count = findCount(frame.name, frame.line, entries);
+    }
+
+    // Fall back to name-only lookup (handles eval'd / inline functions)
+    if (count === undefined && !frame.name.startsWith("(anonymous")) {
+      count = byName.get(frame.name);
+    }
+
     if (count !== undefined && count > 0) {
       frame.name = `${frame.name} [${formatCount(count)}]`;
     }
