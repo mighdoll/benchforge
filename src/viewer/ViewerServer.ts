@@ -21,6 +21,8 @@ export interface ViewerServerOptions {
   editorUri?: string;
   /** Port to listen on (default 3939) */
   port?: number;
+  /** Open browser on start (default true) */
+  open?: boolean;
   /** Pre-loaded sources (e.g. from an archive) to seed the source cache */
   sources?: Record<string, string>;
 }
@@ -64,12 +66,14 @@ export async function startViewerServer(
     // Config API (editor URI, data availability)
     if (pathname === "/api/config") {
       res.setHeader("Content-Type", "application/json");
-      res.end(JSON.stringify({
-        editorUri: editorUri || null,
-        hasReport: !!reportData,
-        hasProfile: !!profileData,
-        hasTimeProfile: !!timeProfileData,
-      }));
+      res.end(
+        JSON.stringify({
+          editorUri: editorUri || null,
+          hasReport: !!reportData,
+          hasProfile: !!profileData,
+          hasTimeProfile: !!timeProfileData,
+        }),
+      );
       return;
     }
 
@@ -119,7 +123,13 @@ export async function startViewerServer(
 
     // Archive API
     if (pathname === "/api/archive" && req.method === "POST") {
-      await handleArchiveRequest(res, profileData, timeProfileData, reportData, sourceCache);
+      await handleArchiveRequest(
+        res,
+        profileData,
+        timeProfileData,
+        reportData,
+        sourceCache,
+      );
       return;
     }
 
@@ -132,7 +142,8 @@ export async function startViewerServer(
 
   const result = await tryListen(server, port);
   const openUrl = `http://localhost:${result.port}`;
-  await open(openUrl);
+  const shouldOpen = options.open !== false && !process.env.BENCHFORGE_NO_OPEN;
+  if (shouldOpen) await open(openUrl);
   console.log(`Viewer: ${openUrl}`);
 
   return {
@@ -206,10 +217,7 @@ async function handleArchiveRequest(
       ? archiveFileName(profile, timestamp)
       : `benchforge-${timestamp}.benchforge`;
     res.setHeader("Content-Type", "application/json");
-    res.setHeader(
-      "Content-Disposition",
-      `attachment; filename="${filename}"`,
-    );
+    res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
     res.end(body);
   } catch {
     res.statusCode = 500;
@@ -228,7 +236,7 @@ export async function viewArchive(filePath: string): Promise<void> {
   if (schema > KNOWN_SCHEMA) {
     console.error(
       `Archive schema version ${schema} is newer than supported (${KNOWN_SCHEMA}). ` +
-      `Please update benchforge to view this archive.`,
+        `Please update benchforge to view this archive.`,
     );
     process.exit(1);
   }
