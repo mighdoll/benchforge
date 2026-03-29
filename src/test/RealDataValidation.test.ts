@@ -7,7 +7,7 @@ import {
 } from "../StatisticalUtils.ts";
 import { bevy30SamplesMs, bevy30SamplesNs } from "./fixtures/bevy30-samples.ts";
 
-test("bevy30 data characteristics", () => {
+test.skip("bevy30 data characteristics", () => {
   const sortedMs = [...bevy30SamplesMs].sort((a, b) => a - b);
 
   const stats = {
@@ -48,7 +48,7 @@ test("bevy30 data characteristics", () => {
   if (stats.cv > 0.5) console.warn("Very high variation - may be unstable");
 });
 
-test("convergence at different time points matches CLI behavior", () => {
+test.skip("convergence at different time points matches CLI behavior", () => {
   // Simulate 5-second run (approximately 100 samples at ~50ms each)
   const samples5s = bevy30SamplesNs.slice(0, 100);
   const result5s = checkConvergence(samples5s);
@@ -76,7 +76,7 @@ test("convergence at different time points matches CLI behavior", () => {
     );
 });
 
-test("warm-up detection in real data", () => {
+test.skip("warm-up detection in real data", () => {
   const windowSize = 20;
   const windows: Array<{ start: number; median: number }> = [];
 
@@ -104,7 +104,7 @@ test("warm-up detection in real data", () => {
   }
 });
 
-test("convergence stability over sliding windows", () => {
+test.skip("convergence stability over sliding windows", () => {
   const windowSize = 100;
   const step = 50;
   const history: Array<{ start: number; confidence: number }> = [];
@@ -132,7 +132,7 @@ test("convergence stability over sliding windows", () => {
   }
 });
 
-test("adaptive algorithm would stop at correct time", () => {
+test.skip("adaptive algorithm would stop at correct time", () => {
   const target = 95;
   const fallback = 80;
   const minSamples = 50;

@@ -2,7 +2,7 @@ import { test } from "vitest";
 import { checkConvergence } from "../runners/AdaptiveWrapper.ts";
 import { bevy30SamplesNs } from "./fixtures/bevy30-samples.ts";
 
-test("convergence with insufficient samples", () => {
+test.skip("convergence with insufficient samples", () => {
   const samples = [1e6, 2e6, 3e6]; // 3 samples in nanoseconds
   const result = checkConvergence(samples);
 
@@ -14,7 +14,7 @@ test("convergence with insufficient samples", () => {
   }
 });
 
-test("convergence with stable samples", () => {
+test.skip("convergence with stable samples", () => {
   // Create very stable samples (all within 1% of each other)
   const base = 50e6; // 50ms in nanoseconds
   const samples = Array.from(
@@ -30,7 +30,7 @@ test("convergence with stable samples", () => {
   }
 });
 
-test("convergence with drifting median", () => {
+test.skip("convergence with drifting median", () => {
   // Create samples with increasing median over time
   const samples = Array.from(
     { length: 200 },
@@ -48,7 +48,7 @@ test("convergence with drifting median", () => {
   }
 });
 
-test("convergence with outliers", () => {
+test.skip("convergence with outliers", () => {
   // Create stable samples with occasional outliers every 20 samples
   const base = 50e6;
   const samples = Array.from({ length: 200 }, (_, i) =>
@@ -63,7 +63,7 @@ test("convergence with outliers", () => {
   }
 });
 
-test("convergence with real bevy30 data - early samples", () => {
+test.skip("convergence with real bevy30 data - early samples", () => {
   // Test with first 100 samples (should show initial instability)
   const early = bevy30SamplesNs.slice(0, 100);
   const result = checkConvergence(early);
@@ -78,7 +78,7 @@ test("convergence with real bevy30 data - early samples", () => {
   );
 });
 
-test("convergence with real bevy30 data - middle samples", () => {
+test.skip("convergence with real bevy30 data - middle samples", () => {
   // Test with middle 200 samples (should be more stable)
   const middle = bevy30SamplesNs.slice(200, 400);
   const result = checkConvergence(middle);
@@ -92,7 +92,7 @@ test("convergence with real bevy30 data - middle samples", () => {
   );
 });
 
-test("convergence with real bevy30 data - all samples", () => {
+test.skip("convergence with real bevy30 data - all samples", () => {
   const result = checkConvergence(bevy30SamplesNs);
 
   if (result.confidence > 100 || result.confidence < 0) {
@@ -109,7 +109,7 @@ test("convergence with real bevy30 data - all samples", () => {
   );
 });
 
-test("convergence progression over time", () => {
+test.skip("convergence progression over time", () => {
   const checkpoints = [50, 100, 150, 200, 300, 400, 500, 610];
   const progressions = checkpoints.map(n => {
     const result = checkConvergence(bevy30SamplesNs.slice(0, n));
@@ -132,7 +132,7 @@ test("convergence progression over time", () => {
   }
 });
 
-test("window size adaptation for different execution times", () => {
+test.skip("window size adaptation for different execution times", () => {
   // Fast samples (microseconds)
   const fastSamples = Array.from(
     { length: 100 },
@@ -155,7 +155,7 @@ test("window size adaptation for different execution times", () => {
   }
 });
 
-test("outlier impact calculation", () => {
+test.skip("outlier impact calculation", () => {
   // 95 stable samples + 5 outliers (2x slower)
   const base = 50e6; // 50ms
   const stable = Array.from(

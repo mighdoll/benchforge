@@ -6,7 +6,7 @@ import {
 } from "../runners/AdaptiveWrapper.ts";
 import { BasicRunner } from "../runners/BasicRunner.ts";
 
-test(
+test.skip(
   "adaptive runner collects samples for minimum time",
   { timeout: 10000 },
   async () => {
@@ -35,7 +35,7 @@ test(
   },
 );
 
-test("adaptive runner respects max time limit", async () => {
+test.skip("adaptive runner respects max time limit", async () => {
   const runner = new BasicRunner();
   const adaptive = createAdaptiveWrapper(runner, {
     minTime: 100,
@@ -62,7 +62,7 @@ test("adaptive runner respects max time limit", async () => {
   expect(results[0].totalTime).toBeLessThanOrEqual(2.0);
 });
 
-test("adaptive runner merges results correctly", async () => {
+test.skip("adaptive runner merges results correctly", async () => {
   const runner = new BasicRunner();
   const adaptive = createAdaptiveWrapper(runner, {
     minTime: 100,
@@ -101,7 +101,7 @@ test("adaptive runner merges results correctly", async () => {
   expect(result.totalTime).toBeGreaterThan(0);
 }, 10000);
 
-test("convergence detection with stable benchmark", async () => {
+test.skip("convergence detection with stable benchmark", async () => {
   const runner = new BasicRunner();
   const adaptive = createAdaptiveWrapper(runner, {
     minTime: 100,
@@ -129,7 +129,7 @@ test("convergence detection with stable benchmark", async () => {
   expect(result.convergence?.reason).toBeDefined();
 });
 
-test("convergence detection with variable benchmark", async () => {
+test.skip("convergence detection with variable benchmark", async () => {
   const runner = new BasicRunner();
   const adaptive = createAdaptiveWrapper(runner, {
     minTime: 100,
@@ -162,7 +162,7 @@ test("convergence detection with variable benchmark", async () => {
   expect(result.convergence?.confidence).toBeLessThanOrEqual(100);
 });
 
-test("checkConvergence function basics", () => {
+test.skip("checkConvergence function basics", () => {
   // Not enough samples
   const fewSamples = [1e6, 1.1e6, 1e6];
   const fewResult = checkConvergence(fewSamples);

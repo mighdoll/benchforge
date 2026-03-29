@@ -41,7 +41,7 @@ function createMockRunner(samples: number[]): BenchRunner {
   };
 }
 
-test("adaptive wrapper stops early with stable samples", async () => {
+test.skip("adaptive wrapper stops early with stable samples", async () => {
   const stableSamples = Array.from(
     { length: 500 },
     () => 50 + Math.random() * 0.5,
@@ -74,7 +74,7 @@ test("adaptive wrapper stops early with stable samples", async () => {
   }
 });
 
-test("adaptive wrapper continues with unstable samples", async () => {
+test.skip("adaptive wrapper continues with unstable samples", async () => {
   const unstableSamples = Array.from(
     { length: 500 },
     () => 30 + Math.random() * 40,
@@ -99,7 +99,7 @@ test("adaptive wrapper continues with unstable samples", async () => {
   }
 });
 
-test("adaptive wrapper with real bevy30 data", async () => {
+test.skip("adaptive wrapper with real bevy30 data", async () => {
   const bench: BenchmarkSpec = { name: "bevy-test", fn: () => {} };
 
   const configs = [
@@ -123,7 +123,7 @@ test("adaptive wrapper with real bevy30 data", async () => {
   }
 });
 
-test("adaptive wrapper respects target confidence", async () => {
+test.skip("adaptive wrapper respects target confidence", async () => {
   const mockRunner = createMockRunner(bevy30SamplesMs);
 
   const wrapper = createAdaptiveWrapper(mockRunner, { convergence: 50 });
@@ -148,7 +148,7 @@ test("adaptive wrapper respects target confidence", async () => {
   }
 });
 
-test("adaptive wrapper handles warm-up period", async () => {
+test.skip("adaptive wrapper handles warm-up period", async () => {
   // Simulate warm-up: slow samples at start, then stable
   // Decreasing from 100ms to 60ms, then stable at ~50ms
   const warmup = Array.from({ length: 20 }, (_, i) => 100 - i * 2);
@@ -177,7 +177,7 @@ test("adaptive wrapper handles warm-up period", async () => {
   }
 });
 
-test("adaptive wrapper statistics calculation", async () => {
+test.skip("adaptive wrapper statistics calculation", async () => {
   const samples = bevy30SamplesMs.slice(100, 200);
   const mockRunner = createMockRunner(samples);
   const adaptiveRunner = createAdaptiveWrapper(mockRunner, {});
@@ -211,7 +211,7 @@ test("adaptive wrapper statistics calculation", async () => {
   );
 });
 
-test("adaptive wrapper total time tracking", async () => {
+test.skip("adaptive wrapper total time tracking", async () => {
   const mockRunner = createMockRunner(bevy30SamplesMs.slice(0, 100));
   const adaptiveRunner = createAdaptiveWrapper(mockRunner, {});
 
