@@ -68,7 +68,7 @@ function executeBenchforgeFile(file: string, args = ""): string {
 }
 
 test("runs all benchmarks", { timeout: 30000 }, async () => {
-  const output = await runBenchCLITest(testSuite, "--duration 0.1");
+  const output = await runBenchCLITest(testSuite, "--duration 0.1 --skip-settle");
 
   expect(output).toContain("concatenation");
   expect(output).toContain("template literal");
@@ -79,7 +79,7 @@ test("runs all benchmarks", { timeout: 30000 }, async () => {
 });
 
 test("filters by substring", { timeout: 15000 }, async () => {
-  const output = await runBenchCLITest(testSuite, "--filter concat --duration 0.1");
+  const output = await runBenchCLITest(testSuite, "--filter concat --duration 0.1 --skip-settle");
 
   expect(output).toContain("concatenation");
   expect(output).not.toContain("addition");
@@ -88,7 +88,7 @@ test("filters by substring", { timeout: 15000 }, async () => {
 test("filters by regex", { timeout: 15000 }, async () => {
   const output = await runBenchCLITest(
     testSuite,
-    "--filter ^template --duration 0.1",
+    "--filter ^template --duration 0.1 --skip-settle",
   );
   expect(output).toContain("template literal");
   expect(output).not.toContain("addition");
@@ -106,7 +106,7 @@ test("filter preserves suite structure", () => {
 });
 
 test("e2e: runs user script", { timeout: 30000 }, () => {
-  const output = executeTestScript("--duration 0.1");
+  const output = executeTestScript("--duration 0.1 --skip-settle");
 
   expect(output).toContain("plus");
   expect(output).toContain("multiply");
@@ -122,14 +122,14 @@ test("e2e: runs user script", { timeout: 30000 }, () => {
 });
 
 test("e2e: filter flag", { timeout: 30000 }, () => {
-  const output = executeTestScript('--filter "plus" --duration 0.1');
+  const output = executeTestScript('--filter "plus" --duration 0.1 --skip-settle');
 
   expect(output).toContain("plus");
   expect(output).not.toContain("multiply");
 });
 
 test("runs benchmarks with setup function", { timeout: 30000 }, async () => {
-  const output = await runBenchCLITest(suiteWithSetup, "--duration 0.1");
+  const output = await runBenchCLITest(suiteWithSetup, "--duration 0.1 --skip-settle");
 
   expect(output).toContain("sum numbers");
   expect(output).toContain("join strings");
@@ -163,7 +163,7 @@ test(
       ],
     };
 
-    const output = await runBenchCLITest(suiteWithBaseline, "--duration 0.01");
+    const output = await runBenchCLITest(suiteWithBaseline, "--iterations 20 --skip-settle");
 
     expect(output).toContain("baseline sort");
     expect(output).toContain("optimized sort");
@@ -175,7 +175,7 @@ test(
 test("file mode: BenchSuite export", { timeout: 30000 }, () => {
   const output = executeBenchforgeFile(
     "suite-export-bench.ts",
-    "--iterations 5",
+    "--iterations 5 --skip-settle",
   );
 
   expect(output).toContain("plus");
@@ -184,7 +184,7 @@ test("file mode: BenchSuite export", { timeout: 30000 }, () => {
 });
 
 test("file mode: function export", { timeout: 30000 }, () => {
-  const output = executeBenchforgeFile("fn-export-bench.ts", "--iterations 5");
+  const output = executeBenchforgeFile("fn-export-bench.ts", "--iterations 5 --skip-settle");
 
   expect(output).toContain("fn-export-bench");
   expect(output).toContain("runs");

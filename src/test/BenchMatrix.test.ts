@@ -16,6 +16,9 @@ const casesVariantDirUrl = `${casesFixturesUrl}/variants/`;
 const variantsDirUrl = `file://${import.meta.dirname}/fixtures/variants/`;
 const baselineDirUrl = `file://${import.meta.dirname}/fixtures/baseline/`;
 
+/** Skip V8 settle time and cap maxTime — tests verify correctness, not perf. */
+const fast = { noSettle: true, maxTime: 100 } as const;
+
 test("inline variants, no cases", async () => {
   const matrix: BenchMatrix = {
     name: "Test",
@@ -27,7 +30,7 @@ test("inline variants, no cases", async () => {
       },
     },
   };
-  const results = await runMatrix(matrix, { iterations: 10 });
+  const results = await runMatrix(matrix, { iterations: 10, ...fast });
   expect(results.name).toBe("Test");
   expect(results.variants).toHaveLength(2);
   expect(results.variants.map(v => v.id).sort()).toEqual(["fast", "slow"]);
@@ -47,7 +50,7 @@ test("inline variants with cases", async () => {
     },
     cases: ["Hello", "World"],
   };
-  const results = await runMatrix(matrix, { iterations: 10 });
+  const results = await runMatrix(matrix, { iterations: 10, ...fast });
   expect(results.variants).toHaveLength(2);
   for (const variant of results.variants) {
     expect(variant.cases).toHaveLength(2);
@@ -65,7 +68,7 @@ test("stateful variant", async () => {
     variants: { stateful },
     cases: ["a", "b"],
   };
-  const results = await runMatrix(matrix, { iterations: 10 });
+  const results = await runMatrix(matrix, { iterations: 10, ...fast });
   expect(results.variants).toHaveLength(1);
   expect(results.variants[0].id).toBe("stateful");
   expect(results.variants[0].cases).toHaveLength(2);
@@ -84,7 +87,7 @@ test("async setup in stateful variant", async () => {
     variants: { asyncSetup },
     cases: ["1", "2"],
   };
-  const results = await runMatrix(matrix, { iterations: 10 });
+  const results = await runMatrix(matrix, { iterations: 10, ...fast });
   expect(results.variants).toHaveLength(1);
   expect(results.variants[0].cases).toHaveLength(2);
 });
@@ -135,7 +138,7 @@ test("runMatrix with variantDir discovers and runs variants", async () => {
     variantDir: workerFixturesUrl,
     cases: ["a"],
   };
-  const results = await runMatrix(matrix, { iterations: 5 });
+  const results = await runMatrix(matrix, { iterations: 5, ...fast });
   expect(results.name).toBe("DirTest");
   const variantIds = results.variants.map(v => v.id).sort();
   expect(variantIds).toEqual(["fast", "slow"]);
@@ -147,7 +150,7 @@ test("runMatrix with variantDir runs each variant in isolated worker", async () 
     variantDir: workerFixturesUrl,
     cases: ["test"],
   };
-  const results = await runMatrix(matrix, { iterations: 3 });
+  const results = await runMatrix(matrix, { iterations: 3, ...fast });
   expect(results.variants).toHaveLength(2);
   for (const variant of results.variants) {
     expect(variant.cases).toHaveLength(1);
@@ -201,7 +204,7 @@ test("inline variants with casesModule", async () => {
     },
     casesModule: casesModuleUrl,
   };
-  const results = await runMatrix(matrix, { iterations: 5 });
+  const results = await runMatrix(matrix, { iterations: 5, ...fast });
   expect(results.variants).toHaveLength(2);
   expect(results.variants[0].cases).toHaveLength(2);
   const cases = results.variants[0].cases;
@@ -218,7 +221,7 @@ test("inline variants with async casesModule", async () => {
     },
     casesModule: asyncCasesUrl,
   };
-  const results = await runMatrix(matrix, { iterations: 5 });
+  const results = await runMatrix(matrix, { iterations: 5, ...fast });
   expect(results.variants).toHaveLength(1);
   expect(results.variants[0].cases).toHaveLength(2);
   expect(results.variants[0].cases.map(c => c.caseId)).toEqual([
@@ -233,7 +236,7 @@ test("variantDir with casesModule in worker", async () => {
     variantDir: casesVariantDirUrl,
     casesModule: casesModuleUrl,
   };
-  const results = await runMatrix(matrix, { iterations: 5 });
+  const results = await runMatrix(matrix, { iterations: 5, ...fast });
   const variantIds = results.variants.map(v => v.id).sort();
   expect(variantIds).toEqual(["product", "sum"]);
   const sum = results.variants.find(v => v.id === "sum");
@@ -274,7 +277,7 @@ test("baselineVariant with inline variants", async () => {
     },
     baselineVariant: "fast",
   };
-  const results = await runMatrix(matrix, { iterations: 20 });
+  const results = await runMatrix(matrix, { iterations: 20, ...fast });
   expect(results.variants).toHaveLength(2);
 
   const fastVariant = results.variants.find(v => v.id === "fast");
@@ -294,7 +297,7 @@ test("baselineVariant skips when variant not found", async () => {
     variants: { fast: () => {} },
     baselineVariant: "nonexistent",
   };
-  const result = await runMatrix(matrix);
+  const result = await runMatrix(matrix, fast);
   // No deltaPercent since baseline variant wasn't found
   expect(result.variants[0].cases[0].deltaPercent).toBeUndefined();
 });
@@ -306,7 +309,7 @@ test("baselineDir comparison", async () => {
     baselineDir: baselineDirUrl,
     cases: ["a"],
   };
-  const results = await runMatrix(matrix, { iterations: 10 });
+  const results = await runMatrix(matrix, { iterations: 10, ...fast });
 
   expect(results.variants).toHaveLength(2); // impl and extra
   const implVariant = results.variants.find(v => v.id === "impl");
@@ -328,7 +331,7 @@ test("baselineDir only applies to matching variants", async () => {
     baselineDir: baselineDirUrl,
     cases: ["a"],
   };
-  const results = await runMatrix(matrix, { iterations: 10 });
+  const results = await runMatrix(matrix, { iterations: 10, ...fast });
 
   const variantIds = results.variants.map(v => v.id).sort();
   expect(variantIds).toEqual(["extra", "impl"]);
@@ -350,7 +353,7 @@ test("baselineVariant with variantDir", async () => {
     baselineVariant: "impl",
     cases: ["a"],
   };
-  const results = await runMatrix(matrix, { iterations: 10 });
+  const results = await runMatrix(matrix, { iterations: 10, ...fast });
 
   const variantIds = results.variants.map(v => v.id).sort();
   expect(variantIds).toEqual(["extra", "impl"]);
