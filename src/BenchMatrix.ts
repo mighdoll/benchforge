@@ -93,6 +93,8 @@ export interface RunMatrixOptions {
   heapSample?: boolean;
   heapInterval?: number;
   heapDepth?: number;
+  timeSample?: boolean;
+  timeInterval?: number;
 }
 
 /** Context for running matrix benchmarks in worker mode */
@@ -283,6 +285,8 @@ function buildRunnerOptions(options: RunMatrixOptions): RunnerOptions {
     heapSample: options.heapSample,
     heapInterval: options.heapInterval,
     heapDepth: options.heapDepth,
+    timeSample: options.timeSample,
+    timeInterval: options.timeInterval,
   };
 }
 
