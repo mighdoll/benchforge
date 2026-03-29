@@ -46,6 +46,26 @@ export function timeProfileToSpeedscope(
   };
 }
 
+/** Build a SpeedscopeFile from multiple named time profiles (shared frames). */
+export function buildTimeSpeedscopeFile(
+  entries: { name: string; profile: TimeProfile }[],
+): SpeedscopeFile | undefined {
+  if (entries.length === 0) return undefined;
+
+  const frames: SpeedscopeFrame[] = [];
+  const frameIndex = new Map<string, number>();
+  const profiles = entries.map(e =>
+    buildTimeProfile(e.name, e.profile, frames, frameIndex),
+  );
+
+  return {
+    $schema: "https://www.speedscope.app/file-format-schema.json",
+    shared: { frames },
+    profiles,
+    exporter: "benchforge",
+  };
+}
+
 /** Build a speedscope profile from a V8 TimeProfile */
 function buildTimeProfile(
   name: string,

@@ -21,7 +21,7 @@ import {
 import { resolveEditorUri } from "../export/EditorUri.ts";
 import { exportBenchmarkJson } from "../export/JsonExport.ts";
 import { exportPerfettoTrace } from "../export/PerfettoExport.ts";
-import { timeProfileToSpeedscope } from "../export/TimeExport.ts";
+import { buildTimeSpeedscopeFile } from "../export/TimeExport.ts";
 import type {
   MatrixResults,
   MatrixSuite,
@@ -382,8 +382,7 @@ function exportFileFormats(
 }
 
 function parseTimeProfileFile(results: ReportGroup[]) {
-  const data = buildTimeProfileData(results);
-  return data ? JSON.parse(data) : undefined;
+  return buildAllTimeProfiles(results);
 }
 
 async function openViewer(
@@ -600,18 +599,20 @@ function needsTimeSample(args: DefaultCliArgs): boolean {
   return args["time-sample"] || !!args["export-time"];
 }
 
-/** Build time profile SpeedScope JSON from results, or undefined if none */
-function buildTimeProfileData(results: ReportGroup[]): string | undefined {
+/** Build combined time profile SpeedScope file from all results */
+function buildAllTimeProfiles(results: ReportGroup[]) {
+  const entries: {
+    name: string;
+    profile: import("../profiling/time/TimeSampler.ts").TimeProfile;
+  }[] = [];
   for (const group of results) {
     for (const report of groupReports(group)) {
       const { timeProfile } = report.measuredResults;
-      if (timeProfile) {
-        const file = timeProfileToSpeedscope(report.name, timeProfile);
-        return JSON.stringify(file);
-      }
+      if (timeProfile)
+        entries.push({ name: report.name, profile: timeProfile });
     }
   }
-  return undefined;
+  return buildTimeSpeedscopeFile(entries);
 }
 
 /** Find the first raw V8 TimeProfile in results */
@@ -631,7 +632,8 @@ function findTimeProfile(
 function mergeCoverage(
   results: ReportGroup[],
 ): import("../profiling/coverage/CoverageTypes.ts").CoverageData | undefined {
-  const allScripts: import("../profiling/coverage/CoverageTypes.ts").ScriptCoverage[] = [];
+  const allScripts: import("../profiling/coverage/CoverageTypes.ts").ScriptCoverage[] =
+    [];
   for (const group of results) {
     for (const report of groupReports(group)) {
       const { coverage } = report.measuredResults;
