@@ -228,7 +228,7 @@ async function loadReport(): Promise<void> {
         .map((group: any, i: number) => buildGroupHtml(group, i))
         .join("");
 
-    const { renderPlots } = (await import("/viewer/plots.js")) as {
+    const { renderPlots } = (await import("./plots.js")) as {
       renderPlots: (data: unknown) => void;
     };
     renderPlots(data);
@@ -624,9 +624,9 @@ function initViewer(p: DataProvider): void {
   if (config.hasTimeProfile) timeTab.disabled = false;
 
   const allocHash = p.speedscopeHash("alloc");
-  if (allocHash) iframe.src = "/speedscope/index.html#" + allocHash;
+  if (allocHash) iframe.src = "speedscope/#" + allocHash;
   const timeHash = p.speedscopeHash("time");
-  if (timeHash) timeIframe.src = "/speedscope/index.html#" + timeHash;
+  if (timeHash) timeIframe.src = "speedscope/#" + timeHash;
 
   if (config.hasReport) {
     activateTab("report");
