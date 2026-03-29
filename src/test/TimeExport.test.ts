@@ -13,12 +13,22 @@ function mockProfile(): TimeProfile {
       },
       {
         id: 2,
-        callFrame: { functionName: "main", url: "file:///app.ts", lineNumber: 9, columnNumber: 0 },
+        callFrame: {
+          functionName: "main",
+          url: "file:///app.ts",
+          lineNumber: 9,
+          columnNumber: 0,
+        },
         children: [3],
       },
       {
         id: 3,
-        callFrame: { functionName: "compute", url: "file:///app.ts", lineNumber: 19, columnNumber: 4 },
+        callFrame: {
+          functionName: "compute",
+          url: "file:///app.ts",
+          lineNumber: 19,
+          columnNumber: 4,
+        },
         hitCount: 5,
       },
     ],
@@ -33,7 +43,9 @@ test("converts TimeProfile to valid SpeedScope format", () => {
   const profile = mockProfile();
   const file = timeProfileToSpeedscope("test-bench", profile);
 
-  expect(file.$schema).toBe("https://www.speedscope.app/file-format-schema.json");
+  expect(file.$schema).toBe(
+    "https://www.speedscope.app/file-format-schema.json",
+  );
   expect(file.exporter).toBe("benchforge");
   expect(file.profiles).toHaveLength(1);
 
@@ -75,7 +87,9 @@ test("deduplicates shared frames", () => {
 
 test("handles empty samples gracefully", () => {
   const profile: TimeProfile = {
-    nodes: [{ id: 1, callFrame: { functionName: "", url: "", lineNumber: -1 } }],
+    nodes: [
+      { id: 1, callFrame: { functionName: "", url: "", lineNumber: -1 } },
+    ],
     startTime: 0,
     endTime: 0,
     samples: [],
@@ -100,8 +114,19 @@ test("converts 0-indexed V8 lines to 1-indexed", () => {
 test("anonymous functions get location hint in name", () => {
   const profile: TimeProfile = {
     nodes: [
-      { id: 1, callFrame: { functionName: "", url: "", lineNumber: -1 }, children: [2] },
-      { id: 2, callFrame: { functionName: "", url: "file:///lib/utils.ts", lineNumber: 41 } },
+      {
+        id: 1,
+        callFrame: { functionName: "", url: "", lineNumber: -1 },
+        children: [2],
+      },
+      {
+        id: 2,
+        callFrame: {
+          functionName: "",
+          url: "file:///lib/utils.ts",
+          lineNumber: 41,
+        },
+      },
     ],
     startTime: 0,
     endTime: 1000,

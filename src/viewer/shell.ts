@@ -179,11 +179,9 @@ function getHighlighter() {
 
 function activateTab(tabId: string): void {
   activeTabId = tabId;
-  tabBar
-    .querySelectorAll<HTMLButtonElement>(".tab[data-tab]")
-    .forEach((btn) => {
-      btn.classList.toggle("active", btn.dataset.tab === tabId);
-    });
+  tabBar.querySelectorAll<HTMLButtonElement>(".tab[data-tab]").forEach(btn => {
+    btn.classList.toggle("active", btn.dataset.tab === tabId);
+  });
   iframe.style.display = tabId === "flamechart" ? "block" : "none";
   timeIframe.style.display = tabId === "time-flamechart" ? "block" : "none";
   reportPanel.classList.toggle("active", tabId === "report");
@@ -557,12 +555,12 @@ function showDropZone(): void {
     </div>
   `;
 
-  zone.addEventListener("dragover", (e) => {
+  zone.addEventListener("dragover", e => {
     e.preventDefault();
     zone.classList.add("drag-over");
   });
   zone.addEventListener("dragleave", () => zone.classList.remove("drag-over"));
-  zone.addEventListener("drop", async (e) => {
+  zone.addEventListener("drop", async e => {
     e.preventDefault();
     zone.classList.remove("drag-over");
     const file = e.dataTransfer?.files[0];
@@ -599,9 +597,7 @@ async function loadArchiveFile(file: File, zone: HTMLElement): Promise<void> {
   }
 }
 
-async function loadArchiveFromUrl(
-  url: string,
-): Promise<DataProvider | null> {
+async function loadArchiveFromUrl(url: string): Promise<DataProvider | null> {
   try {
     const resp = await fetch(url);
     if (!resp.ok) throw new Error(`HTTP ${resp.status}`);

@@ -27,7 +27,10 @@ function serveSpeedscope(): Plugin {
           txt: "text/plain",
           map: "application/json",
         };
-        res.setHeader("Content-Type", mimeTypes[ext] || "application/octet-stream");
+        res.setHeader(
+          "Content-Type",
+          mimeTypes[ext] || "application/octet-stream",
+        );
         createReadStream(file).pipe(res);
       });
     },

@@ -1,7 +1,6 @@
-import { readFile, writeFile } from "node:fs/promises";
 import { writeFileSync } from "node:fs";
-import { tmpdir } from "node:os";
-import { join, resolve } from "node:path";
+import { readFile } from "node:fs/promises";
+import { resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { groupReports, type ReportGroup } from "../BenchmarkReport.ts";
@@ -77,7 +76,9 @@ export function heapProfileToSpeedscope(
 }
 
 /** Build SpeedscopeFile from report groups. Returns undefined if no heap profiles. */
-export function buildSpeedscopeFile(groups: ReportGroup[]): SpeedscopeFile | undefined {
+export function buildSpeedscopeFile(
+  groups: ReportGroup[],
+): SpeedscopeFile | undefined {
   const frames: SpeedscopeFrame[] = [];
   const frameIndex = new Map<string, number>();
   const profiles: SpeedscopeProfile[] = [];
@@ -166,9 +167,7 @@ export async function archiveBenchmark(
     ...(file?.shared?.frames ?? []),
     ...(timeProfile?.shared?.frames ?? []),
   ];
-  const sources = allFrames.length
-    ? await collectSources(allFrames)
-    : {};
+  const sources = allFrames.length ? await collectSources(allFrames) : {};
   const timestamp = new Date().toISOString().replace(/[:.]/g, "-");
   const archive = {
     schema: 1,
@@ -182,9 +181,11 @@ export async function archiveBenchmark(
     },
   };
 
-  const filename = outputPath || (file
-    ? archiveFileName(file, timestamp)
-    : `benchforge-${timestamp}.benchforge`);
+  const filename =
+    outputPath ||
+    (file
+      ? archiveFileName(file, timestamp)
+      : `benchforge-${timestamp}.benchforge`);
   const absPath = resolve(filename);
   writeFileSync(absPath, JSON.stringify(archive));
   console.log(`Archive written to: ${filename}`);

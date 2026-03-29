@@ -21,13 +21,12 @@ import {
   archiveBenchmark,
   buildSpeedscopeFile,
 } from "../export/AllocExport.ts";
-import { timeProfileToSpeedscope } from "../export/TimeExport.ts";
 import { resolveEditorUri } from "../export/EditorUri.ts";
 import { exportBenchmarkJson } from "../export/JsonExport.ts";
 import { exportPerfettoTrace } from "../export/PerfettoExport.ts";
+import { timeProfileToSpeedscope } from "../export/TimeExport.ts";
 import type { GitVersion } from "../GitUtils.ts";
 import { prepareHtmlData } from "../HtmlDataPrep.ts";
-import { startViewerServer } from "../viewer/ViewerServer.ts";
 import {
   aggregateSites,
   filterSites,
@@ -63,6 +62,7 @@ import {
   timeSection,
   totalTimeSection,
 } from "../StandardSections.ts";
+import { startViewerServer } from "../viewer/ViewerServer.ts";
 import {
   type Configure,
   type DefaultCliArgs,
@@ -141,11 +141,7 @@ export function defaultReport(
 ): string {
   const { adaptive, "gc-stats": gcStats, "trace-opt": traceOpt } = args;
   const hasOpt = hasField(groups, "optStatus");
-  const sections = buildReportSections(
-    adaptive,
-    gcStats,
-    traceOpt && hasOpt,
-  );
+  const sections = buildReportSections(adaptive, gcStats, traceOpt && hasOpt);
   return reportResults(groups, sections);
 }
 
@@ -358,7 +354,12 @@ export async function exportReports(options: ExportOptions): Promise<void> {
         ? args.archive
         : undefined;
     const timeProfileData = buildTimeProfileData(results);
-    await archiveBenchmark({ groups: results, reportData, timeProfileData, outputPath: archivePath });
+    await archiveBenchmark({
+      groups: results,
+      reportData,
+      timeProfileData,
+      outputPath: archivePath,
+    });
   }
 
   let closeViewer: (() => void) | undefined;
@@ -593,10 +594,13 @@ function buildTimeProfileData(results: ReportGroup[]): string | undefined {
 }
 
 /** Find the first raw V8 TimeProfile in results */
-function findTimeProfile(results: ReportGroup[]): import("../time-sample/TimeSampler.ts").TimeProfile | undefined {
+function findTimeProfile(
+  results: ReportGroup[],
+): import("../time-sample/TimeSampler.ts").TimeProfile | undefined {
   for (const group of results) {
     for (const report of groupReports(group)) {
-      if (report.measuredResults.timeProfile) return report.measuredResults.timeProfile;
+      if (report.measuredResults.timeProfile)
+        return report.measuredResults.timeProfile;
     }
   }
   return undefined;
@@ -651,7 +655,14 @@ function browserResultGroups(
       p99: wallMs,
       p999: wallMs,
     };
-    measured = { name, samples: [wallMs], time, gcStats, heapProfile, timeProfile };
+    measured = {
+      name,
+      samples: [wallMs],
+      time,
+      gcStats,
+      heapProfile,
+      timeProfile,
+    };
   }
 
   return [{ name, reports: [{ name, measuredResults: measured }] }];

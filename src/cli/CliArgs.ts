@@ -53,14 +53,41 @@ const cliOptions = {
 } as const;
 
 const optionGroups = {
-  "Benchmark:":   ["duration", "iterations", "warmup", "filter", "all", "worker", "batches", "pause-first", "pause-interval", "pause-duration"],
-  "GC:":          ["gc-stats", "gc-force"],
-  "Adaptive:":    ["adaptive", "min-time", "convergence"],
-  "Allocation:":  ["alloc", "alloc-interval", "alloc-depth", "alloc-rows", "alloc-stack", "alloc-verbose", "alloc-raw", "alloc-user-only"],
+  "Benchmark:": [
+    "duration",
+    "iterations",
+    "warmup",
+    "filter",
+    "all",
+    "worker",
+    "batches",
+    "pause-first",
+    "pause-interval",
+    "pause-duration",
+  ],
+  "GC:": ["gc-stats", "gc-force"],
+  "Adaptive:": ["adaptive", "min-time", "convergence"],
+  "Allocation:": [
+    "alloc",
+    "alloc-interval",
+    "alloc-depth",
+    "alloc-rows",
+    "alloc-stack",
+    "alloc-verbose",
+    "alloc-raw",
+    "alloc-user-only",
+  ],
   "Time Sample:": ["time-sample", "time-interval"],
-  "Output:":      ["view", "export-json", "export-perfetto", "export-time", "archive", "editor"],
-  "Browser:":     ["url", "headless", "timeout", "chrome-args"],
-  "Advanced:":    ["inspect", "trace-opt", "skip-settle"],
+  "Output:": [
+    "view",
+    "export-json",
+    "export-perfetto",
+    "export-time",
+    "archive",
+    "editor",
+  ],
+  "Browser:": ["url", "headless", "timeout", "chrome-args"],
+  "Advanced:": ["inspect", "trace-opt", "skip-settle"],
 } as const;
 
 function applyGroups(y: Argv): Argv {

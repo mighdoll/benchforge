@@ -140,7 +140,16 @@ function resolveStack(
     const { functionName, url, lineNumber, columnNumber } = node.callFrame;
     // Skip the synthetic (root) node
     if (!functionName && !url && lineNumber <= 0) continue;
-    stack.push(internFrame(functionName, url, lineNumber, columnNumber, sharedFrames, frameIndex));
+    stack.push(
+      internFrame(
+        functionName,
+        url,
+        lineNumber,
+        columnNumber,
+        sharedFrames,
+        frameIndex,
+      ),
+    );
   }
 
   cache.set(nodeId, stack);

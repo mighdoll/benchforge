@@ -2,8 +2,8 @@
 import type { BenchmarkFunction, BenchmarkSpec } from "../Benchmark.ts";
 import type { HeapProfile } from "../heap-sample/HeapSampler.ts";
 import type { MeasuredResults } from "../MeasuredResults.ts";
-import type { TimeProfile } from "../time-sample/TimeSampler.ts";
 import { variantModuleUrl } from "../matrix/VariantLoader.ts";
+import type { TimeProfile } from "../time-sample/TimeSampler.ts";
 import {
   type AdaptiveOptions,
   createAdaptiveWrapper,
