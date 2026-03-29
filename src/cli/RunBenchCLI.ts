@@ -627,17 +627,18 @@ function findTimeProfile(
   return undefined;
 }
 
-/** Find the first coverage data in results */
-function findCoverage(
+/** Merge coverage data from all results into a single CoverageData */
+function mergeCoverage(
   results: ReportGroup[],
 ): import("../profiling/coverage/CoverageTypes.ts").CoverageData | undefined {
+  const allScripts: import("../profiling/coverage/CoverageTypes.ts").ScriptCoverage[] = [];
   for (const group of results) {
     for (const report of groupReports(group)) {
-      if (report.measuredResults.coverage)
-        return report.measuredResults.coverage;
+      const { coverage } = report.measuredResults;
+      if (coverage) allScripts.push(...coverage.scripts);
     }
   }
-  return undefined;
+  return allScripts.length > 0 ? { scripts: allScripts } : undefined;
 }
 
 /** Annotate speedscope frame names with coverage counts if available */
@@ -650,7 +651,7 @@ async function annotateCoverage(
     shared: { frames: { name: string; file?: string; line?: number }[] };
   },
 ): Promise<void> {
-  const coverage = findCoverage(results);
+  const coverage = mergeCoverage(results);
   if (!coverage) return;
   if (!profileFile && !timeProfileFile) return;
 
