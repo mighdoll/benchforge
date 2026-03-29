@@ -5,7 +5,7 @@ import { parseCliArgs } from "../cli/CliArgs.ts";
 import { defaultReport, runBenchmarks } from "../cli/RunBenchCLI.ts";
 import type { MeasuredResults } from "../MeasuredResults.ts";
 import { average, percentile } from "../StatisticalUtils.ts";
-import { bevy30SamplesMs } from "../tests/fixtures/bevy30-samples.ts";
+import { bevy30SamplesMs } from "./fixtures/bevy30-samples.ts";
 
 /** Validation helpers for statistical tests */
 export const assertValid = {
