@@ -12,6 +12,7 @@
     "build": "tsdown",
     "build:plots": "tsdown --config tsdown.plots.config.ts",
     "example:node": "bin/benchforge examples/simple-cli.ts --gc-stats --heap-sample --view",
+    "example:time": "bin/benchforge examples/simple-cli.ts --heap-sample --time-sample --view --skip-settle --filter quicksort",
     "example:bench": "bin/benchforge --url file://$PWD/examples/browser-bench/index.html --gc-stats --heap-sample --view",
     "example:heap": "node benchforge-browser/bin.mjs file://$PWD/examples/browser-heap/index.html --gc-stats --view",
     "example:lap": "bin/benchforge --url file://$PWD/examples/browser-lap/index.html --gc-stats --heap-sample --view",
