@@ -12,6 +12,7 @@
   "scripts": {
     "build": "tsdown",
     "build:plots": "tsdown --config tsdown.plots.config.ts",
+    "build:hosted": "run-s build:plots && bash scripts/build-hosted.sh",
     "example:node": "bin/benchforge examples/simple-cli.ts --gc-stats --alloc --view",
     "example:time": "bin/benchforge examples/simple-cli.ts --alloc --time-sample --view --skip-settle --filter quicksort",
     "example:bench": "bin/benchforge --url file://$PWD/examples/browser-bench/index.html --gc-stats --alloc --view",
