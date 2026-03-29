@@ -212,10 +212,10 @@ process.on("message", async (message: RunMessage) => {
 
     const benchStart = getPerfNow();
 
-    const { heapSample, timeSample } = message.options;
+    const { alloc, timeSample } = message.options;
 
     // Run with profiling if either sampler is enabled
-    if (heapSample || timeSample) {
+    if (alloc || timeSample) {
       let heapProfile: HeapProfile | undefined;
       let timeProfile: TimeProfile | undefined;
 
@@ -242,13 +242,13 @@ process.on("message", async (message: RunMessage) => {
         : run;
 
       let results: MeasuredResults[];
-      if (heapSample) {
+      if (alloc) {
         const { withHeapSampling } = await import(
           "../heap-sample/HeapSampler.ts"
         );
         const heapOpts = {
-          samplingInterval: message.options.heapInterval,
-          stackDepth: message.options.heapDepth,
+          samplingInterval: message.options.allocInterval,
+          stackDepth: message.options.allocDepth,
         };
         const r = await withHeapSampling(heapOpts, runMaybeWithTime);
         heapProfile = r.profile;

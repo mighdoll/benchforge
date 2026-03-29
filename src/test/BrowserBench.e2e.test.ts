@@ -34,7 +34,7 @@ test("lap mode with N laps", { timeout: 30000 }, async () => {
 
 test("lap mode 0 laps with heap profiling", { timeout: 30000 }, async () => {
   const url = `file://${examplesDir}/browser-heap/index.html`;
-  const result = await profileBrowser({ url, heapSample: true });
+  const result = await profileBrowser({ url, alloc: true });
 
   expect(result.samples).toBeDefined();
   expect(result.samples!).toHaveLength(0);

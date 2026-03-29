@@ -83,16 +83,16 @@ export interface RunMatrixOptions {
   filteredCases?: string[]; // run only these cases (from filter)
   filteredVariants?: string[]; // run only these variants (from filter)
   // Runner options passthrough
-  collect?: boolean;
+  gcForce?: boolean;
   traceOpt?: boolean;
   noSettle?: boolean;
   pauseFirst?: number;
   pauseInterval?: number;
   pauseDuration?: number;
   gcStats?: boolean;
-  heapSample?: boolean;
-  heapInterval?: number;
-  heapDepth?: number;
+  alloc?: boolean;
+  allocInterval?: number;
+  allocDepth?: number;
   timeSample?: boolean;
   timeInterval?: number;
 }
@@ -275,16 +275,16 @@ function buildRunnerOptions(options: RunMatrixOptions): RunnerOptions {
     maxIterations: options.iterations,
     maxTime: options.maxTime ?? 1000,
     warmup: options.warmup ?? 0,
-    collect: options.collect,
+    gcForce: options.gcForce,
     traceOpt: options.traceOpt,
     noSettle: options.noSettle,
     pauseFirst: options.pauseFirst,
     pauseInterval: options.pauseInterval,
     pauseDuration: options.pauseDuration,
     gcStats: options.gcStats,
-    heapSample: options.heapSample,
-    heapInterval: options.heapInterval,
-    heapDepth: options.heapDepth,
+    alloc: options.alloc,
+    allocInterval: options.allocInterval,
+    allocDepth: options.allocDepth,
     timeSample: options.timeSample,
     timeInterval: options.timeInterval,
   };

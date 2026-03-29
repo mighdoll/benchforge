@@ -12,74 +12,96 @@ export const defaultAdaptiveMaxTime = 20;
 
 // biome-ignore format: compact option definitions
 const cliOptions = {
-  time:           { type: "number",  default: 0.642, requiresArg: true, describe: "test duration in seconds" },
-  collect:        { type: "boolean", default: false, describe: "force GC after each iteration" },
-  "gc-stats":     { type: "boolean", default: false, describe: "collect GC statistics (Node: --trace-gc-nvp, browser: CDP tracing)" },
-  profile:        { type: "boolean", default: false, describe: "run once for profiling" },
-  filter:         { type: "string",  requiresArg: true, describe: "filter benchmarks by regex or substring" },
-  all:            { type: "boolean", default: false, describe: "run all cases (ignore defaultCases)" },
-  worker:         { type: "boolean", default: true, describe: "run in worker process for isolation (default: true)" },
-  adaptive:       { type: "boolean", default: false, describe: "adaptive sampling (experimental)" },
-  "min-time":     { type: "number",  default: 1, describe: "minimum time before adaptive convergence can stop" },
-  convergence:    { type: "number",  default: 95, describe: "adaptive confidence threshold (0-100)" },
-  warmup:         { type: "number",  default: 0, describe: "warmup iterations before measurement" },
-  view:                 { type: "boolean", default: false, describe: "open viewer in browser" },
-  "export-json":        { type: "string",  requiresArg: true, describe: "export benchmark data to JSON file" },
-  "export-perfetto":    { type: "string",  requiresArg: true, describe: "export Perfetto trace file (view at ui.perfetto.dev)" },
-  "archive":            { type: "string",  describe: "archive profile + sources to .benchforge file" },
-  "trace-opt":    { type: "boolean", default: false, describe: "trace V8 optimization tiers (requires --allow-natives-syntax)" },
-  "skip-settle":  { type: "boolean", default: false, describe: "skip post-warmup settle time (see V8 optimization cold start)" },
-  "pause-first":  { type: "number",  describe: "iterations before first pause (then pause-interval applies)" },
+  duration:         { type: "number",  default: 0.642, requiresArg: true, describe: "test duration in seconds" },
+  iterations:       { type: "number",  requiresArg: true, describe: "exact number of iterations (overrides --duration)" },
+  warmup:           { type: "number",  default: 0, describe: "warmup iterations before measurement" },
+  filter:           { type: "string",  requiresArg: true, describe: "filter benchmarks by regex or substring" },
+  all:              { type: "boolean", default: false, describe: "run all cases (ignore defaultCases)" },
+  worker:           { type: "boolean", default: true, describe: "run in worker process for isolation (default: true)" },
+  batches:          { type: "number",  default: 1, describe: "divide time into N batches, alternating baseline/current order" },
+  "pause-first":    { type: "number",  describe: "iterations before first pause (then pause-interval applies)" },
   "pause-interval": { type: "number", default: 0, describe: "iterations between pauses for V8 optimization (0 to disable)" },
   "pause-duration": { type: "number", default: 100, describe: "pause duration in ms for V8 optimization" },
-  batches:          { type: "number",  default: 1, describe: "divide time into N batches, alternating baseline/current order" },
-  iterations:       { type: "number",  requiresArg: true, describe: "exact number of iterations (overrides --time)" },
-  "heap-sample":    { type: "boolean", default: false, describe: "heap sampling allocation attribution (includes garbage)" },
-  "heap-interval":  { type: "number",  default: 32768, describe: "heap sampling interval in bytes" },
-  "heap-depth":     { type: "number",  default: 64, describe: "heap sampling stack depth" },
-  "heap-rows":      { type: "number",  default: 20, describe: "top allocation sites to show" },
-  "heap-stack":     { type: "number",  default: 3, describe: "call stack depth to display" },
-  "heap-verbose":   { type: "boolean", default: false, describe: "verbose output with file:// paths and line numbers" },
-  "heap-raw":       { type: "boolean", default: false, describe: "dump every raw heap sample (ordinal, size, stack)" },
-  "heap-user-only": { type: "boolean", default: false, describe: "filter to user code only (hide node internals)" },
+  "gc-stats":       { type: "boolean", default: false, describe: "collect GC statistics (Node: --trace-gc-nvp, browser: CDP tracing)" },
+  "gc-force":       { type: "boolean", default: false, describe: "force GC after each iteration" },
+  adaptive:         { type: "boolean", default: false, describe: "adaptive sampling (experimental)" },
+  "min-time":       { type: "number",  default: 1, describe: "minimum time before adaptive convergence can stop" },
+  convergence:      { type: "number",  default: 95, describe: "adaptive confidence threshold (0-100)" },
+  alloc:            { type: "boolean", default: false, describe: "allocation sampling attribution (includes garbage)" },
+  "alloc-interval": { type: "number",  default: 32768, describe: "allocation sampling interval in bytes" },
+  "alloc-depth":    { type: "number",  default: 64, describe: "allocation sampling stack depth" },
+  "alloc-rows":     { type: "number",  default: 20, describe: "top allocation sites to show" },
+  "alloc-stack":    { type: "number",  default: 3, describe: "call stack depth to display" },
+  "alloc-verbose":  { type: "boolean", default: false, describe: "verbose output with file:// paths and line numbers" },
+  "alloc-raw":      { type: "boolean", default: false, describe: "dump every raw allocation sample (ordinal, size, stack)" },
+  "alloc-user-only":{ type: "boolean", default: false, describe: "filter to user code only (hide node internals)" },
   "time-sample":    { type: "boolean", default: false, describe: "V8 CPU time sampling profiler" },
   "time-interval":  { type: "number",  default: 1000, describe: "CPU sampling interval in microseconds" },
+  view:             { type: "boolean", default: false, describe: "open viewer in browser" },
+  "export-json":    { type: "string",  requiresArg: true, describe: "export benchmark data to JSON file" },
+  "export-perfetto":{ type: "string",  requiresArg: true, describe: "export Perfetto trace file (view at ui.perfetto.dev)" },
   "export-time":    { type: "string",  requiresArg: true, describe: "export time profile as .cpuprofile (V8/Chrome DevTools format)" },
+  archive:          { type: "string",  describe: "archive profile + sources to .benchforge file" },
   editor:           { type: "string",  default: "vscode", describe: "editor for source links: vscode, cursor, or custom://scheme" },
+  inspect:          { type: "boolean", default: false, describe: "run once for external profiler attach" },
+  "trace-opt":      { type: "boolean", default: false, describe: "trace V8 optimization tiers (requires --allow-natives-syntax)" },
+  "skip-settle":    { type: "boolean", default: false, describe: "skip post-warmup settle time (see V8 optimization cold start)" },
   url:              { type: "string",  requiresArg: true, describe: "page URL for browser profiling (enables browser mode)" },
   headless:         { type: "boolean", default: true, describe: "run browser in headless mode" },
   timeout:          { type: "number",  default: 60, describe: "browser page timeout in seconds" },
   "chrome-args":    { type: "string",  array: true, requiresArg: true, describe: "extra Chromium flags" },
 } as const;
 
+const optionGroups = {
+  "Benchmark:":   ["duration", "iterations", "warmup", "filter", "all", "worker", "batches", "pause-first", "pause-interval", "pause-duration"],
+  "GC:":          ["gc-stats", "gc-force"],
+  "Adaptive:":    ["adaptive", "min-time", "convergence"],
+  "Allocation:":  ["alloc", "alloc-interval", "alloc-depth", "alloc-rows", "alloc-stack", "alloc-verbose", "alloc-raw", "alloc-user-only"],
+  "Time Sample:": ["time-sample", "time-interval"],
+  "Output:":      ["view", "export-json", "export-perfetto", "export-time", "archive", "editor"],
+  "Browser:":     ["url", "headless", "timeout", "chrome-args"],
+  "Advanced:":    ["inspect", "trace-opt", "skip-settle"],
+} as const;
+
+function applyGroups(y: Argv): Argv {
+  return Object.entries(optionGroups).reduce(
+    (acc, [label, keys]) => acc.group(keys as unknown as string[], label),
+    y,
+  );
+}
+
 const { url: _url, ...browserOnlyOptions } = cliOptions;
 
 /** @return yargs configured for browser benchmarking (url as required positional) */
 export function browserCliArgs(yargsInstance: Argv): Argv<DefaultCliArgs> {
-  return yargsInstance
-    .command("$0 <url>", "run browser benchmarks", y => {
-      y.positional("url", {
-        type: "string",
-        describe: "page URL for browser profiling",
-      });
-    })
-    .options(browserOnlyOptions)
-    .help()
-    .strict() as Argv<DefaultCliArgs>;
+  return applyGroups(
+    yargsInstance
+      .command("$0 <url>", "run browser benchmarks", y => {
+        y.positional("url", {
+          type: "string",
+          describe: "page URL for browser profiling",
+        });
+      })
+      .options(browserOnlyOptions)
+      .help()
+      .strict(),
+  ) as Argv<DefaultCliArgs>;
 }
 
 /** @return yargs with standard benchmark options */
 export function defaultCliArgs(yargsInstance: Argv): Argv<DefaultCliArgs> {
-  return yargsInstance
-    .command("$0 [file]", "run benchmarks", y => {
-      y.positional("file", {
-        type: "string",
-        describe: "benchmark file to run",
-      });
-    })
-    .options(cliOptions)
-    .help()
-    .strict() as Argv<DefaultCliArgs>;
+  return applyGroups(
+    yargsInstance
+      .command("$0 [file]", "run benchmarks", y => {
+        y.positional("file", {
+          type: "string",
+          describe: "benchmark file to run",
+        });
+      })
+      .options(cliOptions)
+      .help()
+      .strict(),
+  ) as Argv<DefaultCliArgs>;
 }
 
 /** @return parsed command line arguments */

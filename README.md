@@ -107,20 +107,20 @@ This eliminates manual caching boilerplate in worker modules.
 ## CLI Options
 
 ### Basic Options
-- `--time <seconds>` - Benchmark duration per test (default: 0.642s)
-- `--iterations <count>` - Exact number of iterations (overrides --time)
+- `--duration <seconds>` - Benchmark duration per test (default: 0.642s)
+- `--iterations <count>` - Exact number of iterations (overrides --duration)
 - `--filter <pattern>` - Run only benchmarks matching regex/substring
 - `--worker` / `--no-worker` - Run in isolated worker process (default: true)
-- `--profile` - Run once for profiling (single iteration, no warmup)
+- `--inspect` - Run once for external profiler attach (single iteration, no warmup)
 - `--warmup <count>` - Warmup iterations before measurement (default: 0)
 - `--help` - Show all available options
 
-### Memory Profiling
+### Allocation Profiling
 - `--gc-stats` - Collect GC allocation/collection stats via --trace-gc-nvp
-- `--heap-sample` - Heap sampling allocation attribution (includes garbage)
-- `--heap-interval <bytes>` - Sampling interval in bytes (default: 32768)
-- `--heap-depth <frames>` - Stack depth to capture (default: 64)
-- `--heap-rows <n>` - Number of top allocation sites to show (default: 20)
+- `--alloc` - Allocation sampling attribution (includes garbage)
+- `--alloc-interval <bytes>` - Sampling interval in bytes (default: 32768)
+- `--alloc-depth <frames>` - Stack depth to capture (default: 64)
+- `--alloc-rows <n>` - Number of top allocation sites to show (default: 20)
 
 ### Output Options
 - `--view` - Open viewer in browser (report + allocation tabs)
@@ -134,22 +134,22 @@ This eliminates manual caching boilerplate in worker modules.
 
 ```bash
 benchforge my-bench.ts --filter "concat"
-benchforge my-bench.ts --filter "^parse" --time 2
+benchforge my-bench.ts --filter "^parse" --duration 2
 ```
 
 ### Profiling with external debuggers
 
-Use `--profile` to run benchmarks once for attaching external profilers:
+Use `--inspect` to run benchmarks once for attaching external profilers:
 
 ```bash
 # Use with Chrome DevTools profiler
-node --inspect-brk $(which benchforge) my-bench.ts --profile
+node --inspect-brk $(which benchforge) my-bench.ts --inspect
 
 # Use with other profiling tools
-node --prof $(which benchforge) my-bench.ts --profile
+node --prof $(which benchforge) my-bench.ts --inspect
 ```
 
-The `--profile` flag executes exactly one iteration with no warmup, making it ideal for debugging and performance profiling.
+The `--inspect` flag executes exactly one iteration with no warmup, making it ideal for debugging and performance profiling.
 
 ### Key Concepts
 
@@ -179,7 +179,7 @@ Results are displayed in a formatted table:
 The HTML report displays:
 - Histogram + KDE: Bar chart showing the distribution
 - Time Series: Sample values over iterations
-- Allocation Series: Per-sample heap allocation (requires `--heap-sample`)
+- Allocation Series: Per-sample heap allocation (requires `--alloc`)
 
 ```bash
 # Open viewer in browser (report + allocation tabs)
@@ -214,10 +214,10 @@ View heap allocation profiles as flame charts in the unified viewer:
 
 ```bash
 # Open viewer with allocation tab
-benchforge my-bench.ts --heap-sample --view
+benchforge my-bench.ts --alloc --view
 
 # Archive profile + sources for sharing
-benchforge my-bench.ts --heap-sample --archive
+benchforge my-bench.ts --alloc --archive
 ```
 
 Each benchmark with a heap profile becomes a separate profile, with samples ordered temporally and weighted by allocation size in bytes.
@@ -238,33 +238,33 @@ Adds these columns to the output table:
 - **promo%**: Percentage of allocations promoted to old generation
 - **pause/iter**: GC pause time per iteration
 
-### Heap Sampling
+### Allocation Sampling
 
-For allocation profiling including garbage (short-lived objects), use `--heap-sample` mode which uses Node's built-in inspector API:
+For allocation profiling including garbage (short-lived objects), use `--alloc` mode which uses Node's built-in inspector API:
 
 ```bash
-# Basic heap sampling
-benchforge my-bench.ts --heap-sample --iterations 100
+# Basic allocation sampling
+benchforge my-bench.ts --alloc --iterations 100
 
 # Smaller interval = more samples = better coverage of rare allocations
-benchforge my-bench.ts --heap-sample --heap-interval 4096 --iterations 100
+benchforge my-bench.ts --alloc --alloc-interval 4096 --iterations 100
 
 # Verbose output with clickable file:// paths
-benchforge my-bench.ts --heap-sample --heap-verbose
+benchforge my-bench.ts --alloc --alloc-verbose
 
 # Control call stack display depth
-benchforge my-bench.ts --heap-sample --heap-stack 5
+benchforge my-bench.ts --alloc --alloc-stack 5
 ```
 
 **CLI Options:**
-- `--heap-sample` - Enable heap sampling allocation attribution
-- `--heap-interval <bytes>` - Sampling interval in bytes (default: 32768)
-- `--heap-depth <frames>` - Maximum stack depth to capture (default: 64)
-- `--heap-rows <n>` - Number of top allocation sites to show (default: 20)
-- `--heap-stack <n>` - Call stack depth to display (default: 3)
-- `--heap-verbose` - Show full file:// paths with line numbers (cmd-clickable)
-- `--heap-raw` - Dump every raw heap sample (ordinal, size, stack)
-- `--heap-user-only` - Filter to user code only (hide node internals)
+- `--alloc` - Enable allocation sampling attribution
+- `--alloc-interval <bytes>` - Sampling interval in bytes (default: 32768)
+- `--alloc-depth <frames>` - Maximum stack depth to capture (default: 64)
+- `--alloc-rows <n>` - Number of top allocation sites to show (default: 20)
+- `--alloc-stack <n>` - Call stack depth to display (default: 3)
+- `--alloc-verbose` - Show full file:// paths with line numbers (cmd-clickable)
+- `--alloc-raw` - Dump every raw allocation sample (ordinal, size, stack)
+- `--alloc-user-only` - Filter to user code only (hide node internals)
 
 **Output (default compact):**
 ```
@@ -283,7 +283,7 @@ Samples: 1,842
 
 V8's sampling profiler uses Poisson-distributed sampling. When an allocation occurs, V8 probabilistically decides whether to record it based on the sampling interval. Key points:
 
-1. **selfSize is scaled**: V8 doesn't report raw sampled bytes. It scales sample counts to estimate total allocations (`selfSize = size × count × scaleFactor`). This means changing `--heap-interval` affects sample count and overhead, but the estimated total converges to the same value.
+1. **selfSize is scaled**: V8 doesn't report raw sampled bytes. It scales sample counts to estimate total allocations (`selfSize = size × count × scaleFactor`). This means changing `--alloc-interval` affects sample count and overhead, but the estimated total converges to the same value.
 
 2. **Smaller intervals = better coverage**: With a smaller interval (e.g., 1024 vs 32768), you get more samples and discover more unique allocation sites, especially rare ones. The total estimate stays similar, but you see more of the distribution.
 
@@ -303,7 +303,7 @@ V8's sampling profiler uses Poisson-distributed sampling. When an allocation occ
 | Tool | Use When |
 |------|----------|
 | `--gc-stats` | Need total allocation/collection bytes, GC pause times |
-| `--heap-sample` | Need to identify which functions allocate the most |
+| `--alloc` | Need to identify which functions allocate the most |
 | Both | Cross-reference attribution with totals |
 
 ## Requirements

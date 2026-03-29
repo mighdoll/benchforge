@@ -178,13 +178,13 @@ export async function browserBenchExports(args: DefaultCliArgs): Promise<void> {
   }
 
   const url = args.url!;
-  const { iterations, time } = args;
+  const { iterations, duration } = args;
   const result = await profileBrowser({
     url,
-    heapSample: needsHeapSample(args),
-    heapOptions: {
-      samplingInterval: args["heap-interval"],
-      stackDepth: args["heap-depth"],
+    alloc: needsAlloc(args),
+    allocOptions: {
+      samplingInterval: args["alloc-interval"],
+      stackDepth: args["alloc-depth"],
     },
     timeSample: needsTimeSample(args),
     timeInterval: args["time-interval"],
@@ -195,7 +195,7 @@ export async function browserBenchExports(args: DefaultCliArgs): Promise<void> {
       .filter(Boolean),
     timeout: args.timeout,
     gcStats: args["gc-stats"],
-    maxTime: iterations ? Number.MAX_SAFE_INTEGER : time * 1000,
+    maxTime: iterations ? Number.MAX_SAFE_INTEGER : duration * 1000,
     maxIterations: iterations,
   });
 
@@ -256,13 +256,14 @@ export async function runDefaultBench(
 
 /** Convert CLI args to runner options */
 export function cliToRunnerOptions(args: DefaultCliArgs): RunnerOptions {
-  const { profile, collect, iterations } = args;
-  if (profile)
-    return { maxIterations: iterations ?? 1, warmupTime: 0, collect };
+  const { inspect, iterations } = args;
+  const gcForce = args["gc-force"];
+  if (inspect)
+    return { maxIterations: iterations ?? 1, warmupTime: 0, gcForce };
   if (args.adaptive) return createAdaptiveOptions(args);
 
   return {
-    maxTime: iterations ? Number.POSITIVE_INFINITY : args.time * 1000,
+    maxTime: iterations ? Number.POSITIVE_INFINITY : args.duration * 1000,
     maxIterations: iterations,
     ...cliCommonOptions(args),
   };
@@ -425,10 +426,10 @@ export async function runMatrixSuite(
 
 /** Convert CLI args to matrix run options */
 export function cliToMatrixOptions(args: DefaultCliArgs): RunMatrixOptions {
-  const { time, iterations, worker } = args;
+  const { duration, iterations, worker } = args;
   return {
     iterations,
-    maxTime: iterations ? undefined : time * 1000,
+    maxTime: iterations ? undefined : duration * 1000,
     useWorker: worker,
     ...cliCommonOptions(args),
   };
@@ -542,7 +543,7 @@ async function finishReports(
   suiteName?: string,
   exportOptions?: MatrixExportOptions,
 ): Promise<void> {
-  if (needsHeapSample(args)) {
+  if (needsAlloc(args)) {
     printHeapReports(results, cliHeapReportOptions(args));
   }
   await exportReports({ results, args, suiteName, ...exportOptions });
@@ -553,7 +554,7 @@ function warnBrowserFlags(args: DefaultCliArgs): void {
   const ignored: string[] = [];
   if (!args.worker) ignored.push("--no-worker");
   if (args["trace-opt"]) ignored.push("--trace-opt");
-  if (args.collect) ignored.push("--collect");
+  if (args["gc-force"]) ignored.push("--gc-force");
   if (args.adaptive) ignored.push("--adaptive");
   if (args.batches > 1) ignored.push("--batches");
   if (ignored.length) {
@@ -561,14 +562,14 @@ function warnBrowserFlags(args: DefaultCliArgs): void {
   }
 }
 
-/** @return true if any heap-related flag implies heap sampling */
-function needsHeapSample(args: DefaultCliArgs): boolean {
+/** @return true if any alloc-related flag implies allocation sampling */
+function needsAlloc(args: DefaultCliArgs): boolean {
   return (
-    args["heap-sample"] ||
+    args.alloc ||
     args.archive != null ||
-    args["heap-raw"] ||
-    args["heap-verbose"] ||
-    args["heap-user-only"]
+    args["alloc-raw"] ||
+    args["alloc-verbose"] ||
+    args["alloc-user-only"]
   );
 }
 
@@ -723,17 +724,18 @@ function createAdaptiveOptions(args: DefaultCliArgs): RunnerOptions {
 
 /** Runner/matrix options shared across all CLI modes */
 function cliCommonOptions(args: DefaultCliArgs) {
-  const { collect, warmup } = args;
+  const { warmup } = args;
+  const gcForce = args["gc-force"];
   const { "trace-opt": traceOpt, "skip-settle": noSettle } = args;
   const { "pause-first": pauseFirst, "pause-interval": pauseInterval } = args;
   const { "pause-duration": pauseDuration, "gc-stats": gcStats } = args;
-  const heapSample = needsHeapSample(args);
-  const { "heap-interval": heapInterval } = args;
-  const { "heap-depth": heapDepth } = args;
+  const alloc = needsAlloc(args);
+  const { "alloc-interval": allocInterval } = args;
+  const { "alloc-depth": allocDepth } = args;
   const timeSample = needsTimeSample(args);
   const { "time-interval": timeInterval } = args;
   return {
-    collect,
+    gcForce,
     warmup,
     traceOpt,
     noSettle,
@@ -741,9 +743,9 @@ function cliCommonOptions(args: DefaultCliArgs) {
     pauseInterval,
     pauseDuration,
     gcStats,
-    heapSample,
-    heapInterval,
-    heapDepth,
+    alloc,
+    allocInterval,
+    allocDepth,
     timeSample,
     timeInterval,
   };
@@ -808,11 +810,11 @@ async function runGroup(
 /** @return HeapReportOptions from CLI args */
 function cliHeapReportOptions(args: DefaultCliArgs): HeapReportOptions {
   return {
-    topN: args["heap-rows"],
-    stackDepth: args["heap-stack"],
-    verbose: args["heap-verbose"],
-    raw: args["heap-raw"],
-    userOnly: args["heap-user-only"],
+    topN: args["alloc-rows"],
+    stackDepth: args["alloc-stack"],
+    verbose: args["alloc-verbose"],
+    raw: args["alloc-raw"],
+    userOnly: args["alloc-user-only"],
   };
 }
 

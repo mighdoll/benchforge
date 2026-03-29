@@ -229,7 +229,7 @@ export const optSection: ResultsMapper<OptStats> = {
 /** Build generic sections based on CLI flags */
 export function buildGenericSections(args: {
   "gc-stats"?: boolean;
-  "heap-sample"?: boolean;
+  alloc?: boolean;
 }): ResultsMapper[] {
   const sections: ResultsMapper[] = [];
   if (args["gc-stats"]) sections.push(gcStatsSection);

@@ -14,8 +14,8 @@ import { browserGcStats, type TraceEvent } from "./BrowserGcStats.ts";
 
 export interface BrowserProfileParams {
   url: string;
-  heapSample?: boolean;
-  heapOptions?: HeapSampleOptions;
+  alloc?: boolean;
+  allocOptions?: HeapSampleOptions;
   timeSample?: boolean;
   timeInterval?: number; // microseconds (default 1000)
   gcStats?: boolean;
@@ -49,7 +49,7 @@ export async function profileBrowser(
 ): Promise<BrowserProfileResult> {
   const { url, headless = true, chromeArgs, timeout = 60 } = params;
   const { gcStats: collectGc } = params;
-  const { samplingInterval = 32768 } = params.heapOptions ?? {};
+  const { samplingInterval = 32768 } = params.allocOptions ?? {};
 
   const server = await chromium.launchServer({ headless, args: chromeArgs });
   pipeChromeOutput(server);
@@ -134,7 +134,7 @@ async function setupLapMode(
   timeout: number,
   pageErrors: string[],
 ): Promise<LapModeHandle> {
-  const { heapSample } = params;
+  const { alloc } = params;
   const { promise, resolve, reject } =
     Promise.withResolvers<BrowserProfileResult>();
   let instrumentsStarted = false;
@@ -144,7 +144,7 @@ async function setupLapMode(
   await page.exposeFunction("__benchInstrumentStart", async () => {
     if (instrumentsStarted) return;
     instrumentsStarted = true;
-    if (heapSample) {
+    if (alloc) {
       await cdp.send(
         "HeapProfiler.startSampling",
         heapSamplingParams(samplingInterval),
@@ -159,7 +159,7 @@ async function setupLapMode(
     "__benchCollect",
     async (samples: number[], wallTimeMs: number) => {
       let heapProfile: HeapProfile | undefined;
-      if (heapSample && instrumentsStarted) {
+      if (alloc && instrumentsStarted) {
         const result = await cdp.send("HeapProfiler.stopSampling");
         heapProfile = result.profile as unknown as HeapProfile;
       }
@@ -193,11 +193,11 @@ async function runBenchLoop(
   params: BrowserProfileParams,
   samplingInterval: number,
 ): Promise<BrowserProfileResult> {
-  const { heapSample, timeSample } = params;
+  const { alloc, timeSample } = params;
   const maxTime = params.maxTime ?? 642;
   const maxIter = params.maxIterations ?? Number.MAX_SAFE_INTEGER;
 
-  if (heapSample) {
+  if (alloc) {
     await cdp.send(
       "HeapProfiler.startSampling",
       heapSamplingParams(samplingInterval),
@@ -224,7 +224,7 @@ async function runBenchLoop(
   );
 
   let heapProfile: HeapProfile | undefined;
-  if (heapSample) {
+  if (alloc) {
     const result = await cdp.send("HeapProfiler.stopSampling");
     heapProfile = result.profile as unknown as HeapProfile;
   }

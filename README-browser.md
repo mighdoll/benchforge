@@ -21,9 +21,9 @@ window.__bench = () => {
 ```bash
 benchforge --url http://localhost:5173                    # default 0.642s time limit
 benchforge --url http://localhost:5173 --iterations 200   # exact iteration count
-benchforge --url http://localhost:5173 --time 3           # 3 second time limit
+benchforge --url http://localhost:5173 --duration 3       # 3 second time limit
 benchforge --url http://localhost:5173 --gc-stats         # add GC tracing
-benchforge --url http://localhost:5173 --heap-sample      # add heap profiling
+benchforge --url http://localhost:5173 --alloc            # add allocation profiling
 ```
 
 Output includes full statistics (mean, p50, p99) from per-iteration
@@ -95,7 +95,7 @@ from the previous `__lap()`.
 `__start()` to `__done()`. They cannot be paused between laps.
 
 ```bash
-benchforge --url http://localhost:5173 --heap-sample --gc-stats
+benchforge --url http://localhost:5173 --alloc --gc-stats
 ```
 
 0 laps = single wall-clock measurement. N laps = full per-iteration statistics.
@@ -113,7 +113,7 @@ Page                              CLI (Playwright + CDP)
 
 [bench function mode]
                                   detect window.__bench
-                                  start heap sampling (if --heap-sample)
+                                  start allocation sampling (if --alloc)
                                   inject iteration loop via page.evaluate
   __bench() x N  <----------->   collect timing samples
                                   stop heap sampling
@@ -139,7 +139,7 @@ Browser-specific options:
 | `--chrome-args=<flag>` | | Extra Chromium flags (repeatable, use `=` for values starting with `--`) |
 | `--timeout <seconds>` | 60 | Max wait time |
 
-See [CLI Options](README.md#cli-options) for shared options (`--time`, `--iterations`, `--heap-sample`, `--gc-stats`, `--view`, etc.).
+See [CLI Options](README.md#cli-options) for shared options (`--duration`, `--iterations`, `--alloc`, `--gc-stats`, `--view`, etc.).
 
 Node-only flags (`--trace-opt`, `--adaptive`, `--collect`, etc.)
 are warned and ignored in browser mode.
@@ -164,13 +164,13 @@ See `examples/browser-bench/` (bench function mode) and
 
 ```bash
 # bench function mode - timing statistics
-benchforge --url file://$(pwd)/examples/browser-bench/index.html --time 1
+benchforge --url file://$(pwd)/examples/browser-bench/index.html --duration 1
 
-# lap mode - heap profiling
-benchforge --url file://$(pwd)/examples/browser-heap/index.html --heap-sample --gc-stats
+# lap mode - allocation profiling
+benchforge --url file://$(pwd)/examples/browser-heap/index.html --alloc --gc-stats
 
-# heap profiling with inlining disabled (see true allocation sites)
-benchforge --url file://$(pwd)/examples/browser-heap/index.html --heap-sample \
+# allocation profiling with inlining disabled (see true allocation sites)
+benchforge --url file://$(pwd)/examples/browser-heap/index.html --alloc \
   --chrome-args='--js-flags=--no-turbo-inlining --no-maglev-inlining'
 ```
 

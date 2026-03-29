@@ -28,7 +28,7 @@ export interface RunnerOptions {
   /** Minimum samples required - mitata only */
   minSamples?: number;
   /** Force GC after each iteration (requires --expose-gc) */
-  collect?: boolean;
+  gcForce?: boolean;
   /** Trace V8 optimization tiers (requires --allow-natives-syntax) */
   traceOpt?: boolean;
   /** Skip post-warmup settle time (default: false) */
@@ -41,12 +41,12 @@ export interface RunnerOptions {
   pauseDuration?: number;
   /** Collect GC stats via --trace-gc-nvp (requires worker mode) */
   gcStats?: boolean;
-  /** Heap sampling allocation attribution */
-  heapSample?: boolean;
-  /** Heap sampling interval in bytes */
-  heapInterval?: number;
-  /** Heap sampling stack depth */
-  heapDepth?: number;
+  /** Allocation sampling attribution */
+  alloc?: boolean;
+  /** Allocation sampling interval in bytes */
+  allocInterval?: number;
+  /** Allocation sampling stack depth */
+  allocDepth?: number;
   /** V8 CPU time sampling */
   timeSample?: boolean;
   /** CPU sampling interval in microseconds (default 1000) */
