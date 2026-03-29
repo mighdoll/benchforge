@@ -3,6 +3,7 @@ import { existsSync } from "node:fs";
 import path from "node:path";
 import type { BenchmarkSpec } from "../core/Benchmark.ts";
 import type { MeasuredResults } from "../core/MeasuredResults.ts";
+import type { CoverageData } from "../profiling/coverage/CoverageTypes.ts";
 import type { HeapProfile } from "../profiling/heap/HeapSampler.ts";
 import type { TimeProfile } from "../profiling/time/TimeSampler.ts";
 import {
@@ -42,6 +43,7 @@ type WorkerHandlers = {
     results: MeasuredResults[],
     heapProfile?: HeapProfile,
     timeProfile?: TimeProfile,
+    coverage?: CoverageData,
   ) => void;
   reject: (error: Error) => void;
 };
@@ -220,6 +222,23 @@ function createWorkerWithTiming(gcStats: boolean) {
 // for consistency (less realistic)
 
 /** @return handlers that attach GC stats and heap profile to results */
+/** Attach profiling data to all results in a batch */
+function attachProfilingData(
+  results: MeasuredResults[],
+  gcEvents: GcEvent[] | undefined,
+  heapProfile?: HeapProfile,
+  timeProfile?: TimeProfile,
+  coverage?: CoverageData,
+): void {
+  if (gcEvents?.length) {
+    const gcStats = aggregateGcStats(gcEvents);
+    for (const r of results) r.gcStats = gcStats;
+  }
+  if (heapProfile) for (const r of results) r.heapProfile = heapProfile;
+  if (timeProfile) for (const r of results) r.timeProfile = timeProfile;
+  if (coverage) for (const r of results) r.coverage = coverage;
+}
+
 function createWorkerHandlers(
   specName: string,
   startTime: number,
@@ -232,16 +251,18 @@ function createWorkerHandlers(
       results: MeasuredResults[],
       heapProfile?: HeapProfile,
       timeProfile?: TimeProfile,
+      coverage?: CoverageData,
     ) => {
       logTiming(
         `Total worker time for ${specName}: ${getElapsed(startTime).toFixed(1)}ms`,
       );
-      if (gcEvents?.length) {
-        const gcStats = aggregateGcStats(gcEvents);
-        for (const r of results) r.gcStats = gcStats;
-      }
-      if (heapProfile) for (const r of results) r.heapProfile = heapProfile;
-      if (timeProfile) for (const r of results) r.timeProfile = timeProfile;
+      attachProfilingData(
+        results,
+        gcEvents,
+        heapProfile,
+        timeProfile,
+        coverage,
+      );
       resolve(results);
     },
     reject,
@@ -337,13 +358,14 @@ function createMessageHandler(
     results: MeasuredResults[],
     heapProfile?: HeapProfile,
     timeProfile?: TimeProfile,
+    coverage?: CoverageData,
   ) => void,
   reject: (error: Error) => void,
 ) {
   return (msg: ResultMessage | ErrorMessage) => {
     cleanup();
     if (msg.type === "result") {
-      resolve(msg.results, msg.heapProfile, msg.timeProfile);
+      resolve(msg.results, msg.heapProfile, msg.timeProfile, msg.coverage);
     } else if (msg.type === "error") {
       const error = new Error(`Benchmark "${specName}" failed: ${msg.error}`);
       if (msg.stack) error.stack = msg.stack;

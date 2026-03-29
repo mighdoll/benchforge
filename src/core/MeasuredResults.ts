@@ -1,3 +1,4 @@
+import type { CoverageData } from "../profiling/coverage/CoverageTypes.ts";
 import type { HeapProfile } from "../profiling/heap/HeapSampler.ts";
 import type { TimeProfile } from "../profiling/time/TimeSampler.ts";
 import type { GcStats } from "../runners/GcStats.ts";
@@ -90,6 +91,9 @@ export interface MeasuredResults {
 
   /** V8 CPU time sampling profile (requires --time-sample and worker mode) */
   timeProfile?: TimeProfile;
+
+  /** Per-function execution counts (requires --call-counts) */
+  coverage?: CoverageData;
 }
 
 /** A pause point during sample collection for V8 optimization */

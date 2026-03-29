@@ -12,7 +12,12 @@ import type { MeasuredResults } from "../core/MeasuredResults.ts";
 import {
   archiveBenchmark,
   buildSpeedscopeFile,
+  collectSources,
 } from "../export/AllocExport.ts";
+import {
+  annotateFramesWithCounts,
+  buildCoverageMap,
+} from "../export/CoverageExport.ts";
 import { resolveEditorUri } from "../export/EditorUri.ts";
 import { exportBenchmarkJson } from "../export/JsonExport.ts";
 import { exportPerfettoTrace } from "../export/PerfettoExport.ts";
@@ -197,6 +202,7 @@ export async function browserBenchExports(args: DefaultCliArgs): Promise<void> {
       .filter(Boolean),
     timeout: args.timeout,
     gcStats: args["gc-stats"],
+    callCounts: args["call-counts"],
     maxTime: iterations ? Number.MAX_SAFE_INTEGER : duration * 1000,
     maxIterations: iterations,
   });
@@ -335,45 +341,66 @@ export async function exportReports(options: ExportOptions): Promise<void> {
     reportData = prepareHtmlData(results, htmlOpts);
   }
 
-  if (args["export-json"]) {
-    await exportBenchmarkJson(results, args["export-json"], args, suiteName);
-  }
+  exportFileFormats(results, args, suiteName);
 
-  if (args["export-perfetto"]) {
-    exportPerfettoTrace(results, args["export-perfetto"], args);
-  }
+  // Build speedscope files and annotate with coverage if available
+  const profileFile = buildSpeedscopeFile(results);
+  const timeProfileFile = parseTimeProfileFile(results);
+  await annotateCoverage(results, profileFile, timeProfileFile);
 
-  if (args["export-time"]) {
-    exportTimeProfile(results, args["export-time"]);
-  }
-
+  const timeData = timeProfileFile
+    ? JSON.stringify(timeProfileFile)
+    : undefined;
   if (args.archive != null) {
     const archivePath =
       typeof args.archive === "string" && args.archive
         ? args.archive
         : undefined;
-    const timeProfileData = buildTimeProfileData(results);
     await archiveBenchmark({
       groups: results,
       reportData,
-      timeProfileData,
+      timeProfileData: timeData,
       outputPath: archivePath,
     });
   }
 
   if (args.view) {
-    const profileFile = buildSpeedscopeFile(results);
-    const profileData = profileFile ? JSON.stringify(profileFile) : undefined;
-    const timeProfileData = buildTimeProfileData(results);
-    const viewer = await startViewerServer({
-      profileData,
-      timeProfileData,
-      reportData: reportData ? JSON.stringify(reportData) : undefined,
-      editorUri: resolveEditorUri(args.editor),
-    });
-    await waitForCtrlC();
-    viewer.close();
+    await openViewer(profileFile, timeData, reportData, args);
   }
+}
+
+function exportFileFormats(
+  results: ReportGroup[],
+  args: DefaultCliArgs,
+  suiteName?: string,
+): void {
+  if (args["export-json"])
+    exportBenchmarkJson(results, args["export-json"], args, suiteName);
+  if (args["export-perfetto"])
+    exportPerfettoTrace(results, args["export-perfetto"], args);
+  if (args["export-time"]) exportTimeProfile(results, args["export-time"]);
+}
+
+function parseTimeProfileFile(results: ReportGroup[]) {
+  const data = buildTimeProfileData(results);
+  return data ? JSON.parse(data) : undefined;
+}
+
+async function openViewer(
+  profileFile: ReturnType<typeof buildSpeedscopeFile>,
+  timeProfileData: string | undefined,
+  reportData: ReportData | undefined,
+  args: DefaultCliArgs,
+): Promise<void> {
+  const profileData = profileFile ? JSON.stringify(profileFile) : undefined;
+  const viewer = await startViewerServer({
+    profileData,
+    timeProfileData,
+    reportData: reportData ? JSON.stringify(reportData) : undefined,
+    editorUri: resolveEditorUri(args.editor),
+  });
+  await waitForCtrlC();
+  viewer.close();
 }
 
 /** Run matrix suite with CLI arguments.
@@ -600,6 +627,43 @@ function findTimeProfile(
   return undefined;
 }
 
+/** Find the first coverage data in results */
+function findCoverage(
+  results: ReportGroup[],
+): import("../profiling/coverage/CoverageTypes.ts").CoverageData | undefined {
+  for (const group of results) {
+    for (const report of groupReports(group)) {
+      if (report.measuredResults.coverage)
+        return report.measuredResults.coverage;
+    }
+  }
+  return undefined;
+}
+
+/** Annotate speedscope frame names with coverage counts if available */
+async function annotateCoverage(
+  results: ReportGroup[],
+  profileFile?: {
+    shared: { frames: { name: string; file?: string; line?: number }[] };
+  },
+  timeProfileFile?: {
+    shared: { frames: { name: string; file?: string; line?: number }[] };
+  },
+): Promise<void> {
+  const coverage = findCoverage(results);
+  if (!coverage) return;
+  if (!profileFile && !timeProfileFile) return;
+
+  // Collect sources keyed by coverage script URLs for offset→line resolution
+  const coverageUrls = coverage.scripts.map(s => ({ file: s.url }));
+  const sources = await collectSources(coverageUrls);
+  const coverageMap = buildCoverageMap(coverage, sources);
+  if (profileFile)
+    annotateFramesWithCounts(profileFile.shared.frames, coverageMap);
+  if (timeProfileFile)
+    annotateFramesWithCounts(timeProfileFile.shared.frames, coverageMap);
+}
+
 /** Export the first raw V8 TimeProfile to a JSON file */
 function exportTimeProfile(results: ReportGroup[], path: string): void {
   const profile = findTimeProfile(results);
@@ -633,7 +697,7 @@ function browserResultGroups(
   name: string,
   result: BrowserProfileResult,
 ): ReportGroup[] {
-  const { gcStats, heapProfile, timeProfile } = result;
+  const { gcStats, heapProfile, timeProfile, coverage } = result;
   let measured: MeasuredResults;
 
   // Bench function mode: multiple timing samples with real statistics
@@ -648,6 +712,7 @@ function browserResultGroups(
       gcStats,
       heapProfile,
       timeProfile,
+      coverage,
     };
   } else {
     // Lap mode: 0 laps = single wall-clock, N laps handled above
@@ -668,6 +733,7 @@ function browserResultGroups(
       gcStats,
       heapProfile,
       timeProfile,
+      coverage,
     };
   }
 
@@ -751,6 +817,7 @@ function cliCommonOptions(args: DefaultCliArgs) {
   const { "alloc-depth": allocDepth } = args;
   const timeSample = needsTimeSample(args);
   const { "time-interval": timeInterval } = args;
+  const callCounts = args["call-counts"];
   return {
     gcForce,
     warmup,
@@ -765,6 +832,7 @@ function cliCommonOptions(args: DefaultCliArgs) {
     allocDepth,
     timeSample,
     timeInterval,
+    callCounts,
   };
 }
 

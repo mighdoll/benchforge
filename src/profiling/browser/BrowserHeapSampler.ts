@@ -5,6 +5,10 @@ import {
   type Page,
 } from "playwright";
 import type { GcStats } from "../../runners/GcStats.ts";
+import type {
+  CoverageData,
+  ScriptCoverage,
+} from "../coverage/CoverageTypes.ts";
 import type { HeapProfile, HeapSampleOptions } from "../heap/HeapSampler.ts";
 import type { TimeProfile } from "../time/TimeSampler.ts";
 import { browserGcStats, type TraceEvent } from "./BrowserGcStats.ts";
@@ -15,6 +19,7 @@ export interface BrowserProfileParams {
   allocOptions?: HeapSampleOptions;
   timeSample?: boolean;
   timeInterval?: number; // microseconds (default 1000)
+  callCounts?: boolean;
   gcStats?: boolean;
   headless?: boolean;
   chromeArgs?: string[];
@@ -26,6 +31,7 @@ export interface BrowserProfileParams {
 export interface BrowserProfileResult {
   heapProfile?: HeapProfile;
   timeProfile?: TimeProfile;
+  coverage?: CoverageData;
   gcStats?: GcStats;
   /** Wall-clock ms (lap mode: first start to done, bench function: total loop) */
   wallTimeMs?: number;
@@ -136,7 +142,8 @@ async function setupLapMode(
     Promise.withResolvers<BrowserProfileResult>();
   let instrumentsStarted = false;
 
-  const { timeSample } = params;
+  const { timeSample, callCounts } = params;
+  const needsProfiler = timeSample || callCounts;
 
   await page.exposeFunction("__benchInstrumentStart", async () => {
     if (instrumentsStarted) return;
@@ -147,9 +154,9 @@ async function setupLapMode(
         heapSamplingParams(samplingInterval),
       );
     }
-    if (timeSample) {
-      await startTimeProfiling(cdp, params.timeInterval);
-    }
+    if (needsProfiler) await cdp.send("Profiler.enable");
+    if (timeSample) await startTimeProfiling(cdp, params.timeInterval);
+    if (callCounts) await startCoverageCollection(cdp);
   });
 
   await page.exposeFunction(
@@ -164,7 +171,14 @@ async function setupLapMode(
       if (timeSample && instrumentsStarted) {
         timeProfile = await stopTimeProfiling(cdp);
       }
-      resolve({ samples, heapProfile, timeProfile, wallTimeMs });
+      let coverage: CoverageData | undefined;
+      if (callCounts && instrumentsStarted) {
+        coverage = await collectCoverage(cdp);
+      }
+      if (needsProfiler && instrumentsStarted) {
+        await cdp.send("Profiler.disable");
+      }
+      resolve({ samples, heapProfile, timeProfile, coverage, wallTimeMs });
     },
   );
 
@@ -190,7 +204,7 @@ async function runBenchLoop(
   params: BrowserProfileParams,
   samplingInterval: number,
 ): Promise<BrowserProfileResult> {
-  const { alloc, timeSample } = params;
+  const { alloc, timeSample, callCounts } = params;
   const maxTime = params.maxTime ?? 642;
   const maxIter = params.maxIterations ?? Number.MAX_SAFE_INTEGER;
 
@@ -200,9 +214,10 @@ async function runBenchLoop(
       heapSamplingParams(samplingInterval),
     );
   }
-  if (timeSample) {
-    await startTimeProfiling(cdp, params.timeInterval);
-  }
+  const needsProfiler = timeSample || callCounts;
+  if (needsProfiler) await cdp.send("Profiler.enable");
+  if (timeSample) await startTimeProfiling(cdp, params.timeInterval);
+  if (callCounts) await startCoverageCollection(cdp);
 
   const { samples, totalMs } = await page.evaluate(
     async ({ maxTime, maxIter }) => {
@@ -227,11 +242,14 @@ async function runBenchLoop(
   }
 
   let timeProfile: TimeProfile | undefined;
-  if (timeSample) {
-    timeProfile = await stopTimeProfiling(cdp);
-  }
+  if (timeSample) timeProfile = await stopTimeProfiling(cdp);
 
-  return { samples, heapProfile, timeProfile, wallTimeMs: totalMs };
+  let coverage: CoverageData | undefined;
+  if (callCounts) coverage = await collectCoverage(cdp);
+
+  if (needsProfiler) await cdp.send("Profiler.disable");
+
+  return { samples, heapProfile, timeProfile, coverage, wallTimeMs: totalMs };
 }
 
 /** Stop CDP tracing and parse GC events into GcStats. */
@@ -286,23 +304,39 @@ function injectLapFunctions(): void {
   };
 }
 
-/** Start CDP Profiler for time sampling */
+/** Start CDP Profiler for CPU time sampling (caller manages Profiler.enable/disable) */
 async function startTimeProfiling(
   cdp: CDPSession,
   interval?: number,
 ): Promise<void> {
-  await cdp.send("Profiler.enable");
   if (interval) {
     await cdp.send("Profiler.setSamplingInterval", { interval });
   }
   await cdp.send("Profiler.start");
 }
 
-/** Stop CDP Profiler and return the profile */
+/** Stop CDP Profiler CPU sampling and return the profile */
 async function stopTimeProfiling(cdp: CDPSession): Promise<TimeProfile> {
   const { profile } = await cdp.send("Profiler.stop");
-  await cdp.send("Profiler.disable");
   return profile as unknown as TimeProfile;
+}
+
+/** Start CDP precise coverage (caller manages Profiler.enable/disable) */
+async function startCoverageCollection(cdp: CDPSession): Promise<void> {
+  await cdp.send("Profiler.startPreciseCoverage", {
+    callCount: true,
+    detailed: true,
+  });
+}
+
+/** Collect precise coverage and filter to page-relevant URLs */
+async function collectCoverage(cdp: CDPSession): Promise<CoverageData> {
+  const { result } = await cdp.send("Profiler.takePreciseCoverage");
+  await cdp.send("Profiler.stopPreciseCoverage");
+  const scripts = (result as unknown as ScriptCoverage[]).filter(
+    s => s.url && !s.url.startsWith("chrome") && !s.url.startsWith("devtools"),
+  );
+  return { scripts };
 }
 
 export { profileBrowser as profileBrowserHeap };

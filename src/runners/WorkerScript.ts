@@ -2,6 +2,7 @@
 import type { BenchmarkFunction, BenchmarkSpec } from "../core/Benchmark.ts";
 import type { MeasuredResults } from "../core/MeasuredResults.ts";
 import { variantModuleUrl } from "../matrix/VariantLoader.ts";
+import type { CoverageData } from "../profiling/coverage/CoverageTypes.ts";
 import type { HeapProfile } from "../profiling/heap/HeapSampler.ts";
 import type { TimeProfile } from "../profiling/time/TimeSampler.ts";
 import {
@@ -37,6 +38,7 @@ export interface ResultMessage {
   results: MeasuredResults[];
   heapProfile?: HeapProfile;
   timeProfile?: TimeProfile;
+  coverage?: CoverageData;
 }
 
 /** Message returned from worker process when benchmark fails. */
@@ -191,50 +193,84 @@ function createErrorMessage(error: unknown): ErrorMessage {
   };
 }
 
-/** Run benchmark with heap and/or time profiling enabled. */
+/** Profiling state accumulated during worker benchmark execution */
+interface ProfilingState {
+  heapProfile?: HeapProfile;
+  timeProfile?: TimeProfile;
+  coverage?: CoverageData;
+  /** Shared session so TimeSampler doesn't reset coverage counters */
+  profilerSession?: import("node:inspector/promises").Session;
+}
+
+/** Run benchmark with heap, time, and/or coverage profiling enabled. */
 async function runWithProfiling(
   message: RunMessage,
   runner: BenchRunner,
 ): Promise<ResultMessage> {
+  const state: ProfilingState = {};
+  const runBench = buildProfilingChain(message, runner, state);
+
+  const { callCounts } = message.options;
+  let results: MeasuredResults[];
+  if (callCounts) {
+    const { withCoverageProfiling } = await import(
+      "../profiling/coverage/CoverageSampler.ts"
+    );
+    const r = await withCoverageProfiling(async session => {
+      state.profilerSession = session;
+      return runBench();
+    });
+    state.coverage = r.coverage;
+    results = r.result;
+  } else {
+    results = await runBench();
+  }
+
+  return { type: "result", results, ...state };
+}
+
+/** Build nested profiling chain: outer heap, inner time */
+function buildProfilingChain(
+  message: RunMessage,
+  runner: BenchRunner,
+  state: ProfilingState,
+): () => Promise<MeasuredResults[]> {
   const { alloc, timeSample } = message.options;
-  let heapProfile: HeapProfile | undefined;
-  let timeProfile: TimeProfile | undefined;
 
   const run = async () => {
     const { fn, params } = await resolveBenchmarkFn(message);
     return runner.runBench({ ...message.spec, fn }, message.options, params);
   };
 
-  // Nest: outer heap, inner time (independent V8 subsystems)
   const runMaybeWithTime = timeSample
     ? async () => {
         const { withTimeProfiling } = await import(
           "../profiling/time/TimeSampler.ts"
         );
-        const timeOpts = { interval: message.options.timeInterval };
-        const r = await withTimeProfiling(timeOpts, run);
-        timeProfile = r.profile;
+        const opts = {
+          interval: message.options.timeInterval,
+          session: state.profilerSession,
+        };
+        const r = await withTimeProfiling(opts, run);
+        state.timeProfile = r.profile;
         return r.result;
       }
     : run;
 
-  let results: MeasuredResults[];
-  if (alloc) {
-    const { withHeapSampling } = await import(
-      "../profiling/heap/HeapSampler.ts"
-    );
-    const heapOpts = {
-      samplingInterval: message.options.allocInterval,
-      stackDepth: message.options.allocDepth,
-    };
-    const r = await withHeapSampling(heapOpts, runMaybeWithTime);
-    heapProfile = r.profile;
-    results = r.result;
-  } else {
-    results = await runMaybeWithTime();
-  }
-
-  return { type: "result", results, heapProfile, timeProfile };
+  return alloc
+    ? async () => {
+        const { withHeapSampling } = await import(
+          "../profiling/heap/HeapSampler.ts"
+        );
+        const opts = {
+          samplingInterval: message.options.allocInterval,
+          stackDepth: message.options.allocDepth,
+        };
+        const r = await withHeapSampling(opts, runMaybeWithTime);
+        state.heapProfile = r.profile;
+        return r.result;
+      }
+    : runMaybeWithTime;
 }
 
 /**
@@ -257,9 +293,9 @@ process.on("message", async (message: RunMessage) => {
     logTiming("Runner created in", getElapsed(start));
 
     const benchStart = getPerfNow();
-    const { alloc, timeSample } = message.options;
+    const { alloc, timeSample, callCounts } = message.options;
 
-    if (alloc || timeSample) {
+    if (alloc || timeSample || callCounts) {
       const result = await runWithProfiling(message, runner);
       logTiming("Benchmark execution took", getElapsed(benchStart));
       sendAndExit(result, 0);

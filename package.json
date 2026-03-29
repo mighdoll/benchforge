@@ -9,23 +9,25 @@
     "src"
   ],
   "scripts": {
-    "build": "tsdown",
+    "build": "tsdown && vite build --config vite.viewer.config.ts",
+    "build:lib": "tsdown",
     "build:viewer": "vite build --config vite.viewer.config.ts",
     "dev:viewer": "vite --config vite.viewer.config.ts",
     "example:node": "bin/benchforge examples/simple-cli.ts --gc-stats --alloc --view",
     "example:time": "bin/benchforge examples/simple-cli.ts --alloc --time-sample --view --skip-settle --filter quicksort",
     "example:bench": "bin/benchforge --url file://$PWD/examples/browser-bench/index.html --gc-stats --alloc --view",
+    "example:counts": "bin/benchforge examples/simple-cli.ts --alloc --time-sample --call-counts --view --skip-settle --iterations 5",
     "example:heap": "node benchforge-browser/bin.mjs file://$PWD/examples/browser-heap/index.html --gc-stats --view",
     "example:lap": "bin/benchforge --url file://$PWD/examples/browser-lap/index.html --gc-stats --alloc --view",
     "fix": "biome check --fix --unsafe --error-on-warnings",
     "lint": "biome check --error-on-warnings",
-    "prepublishOnly": "run-s lint build build:viewer",
+    "prepublishOnly": "run-s lint build",
     "test": "pnpm --node-options=--expose-gc vitest --hideSkippedTests --exclude '**/*.e2e.test.ts'",
     "test:e2e": "pnpm --node-options=--expose-gc vitest run '.e2e.' --exclude '**/*.static.e2e.*'",
     "test:static:e2e": "pnpm --node-options=--expose-gc vitest run '.static.e2e.'",
     "test:once": "pnpm --node-options=--expose-gc vitest run --exclude '**/*.e2e.test.ts'",
     "typecheck": "tsgo",
-    "prepush": "run-s fix typecheck test:once build build:viewer test:static:e2e",
+    "prepush": "run-s fix typecheck test:once build test:static:e2e",
     "publish:all": "pnpm publish && pnpm --filter benchforge-browser publish"
   },
   "publishConfig": {

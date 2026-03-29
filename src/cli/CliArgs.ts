@@ -37,6 +37,7 @@ const cliOptions = {
   "alloc-user-only":{ type: "boolean", default: false, describe: "filter to user code only (hide node internals)" },
   "time-sample":    { type: "boolean", default: false, describe: "V8 CPU time sampling profiler" },
   "time-interval":  { type: "number",  default: 1000, describe: "CPU sampling interval in microseconds" },
+  "call-counts":    { type: "boolean", default: false, describe: "collect per-function execution counts via V8 precise coverage" },
   view:             { type: "boolean", default: false, describe: "open viewer in browser" },
   "export-json":    { type: "string",  requiresArg: true, describe: "export benchmark data to JSON file" },
   "export-perfetto":{ type: "string",  requiresArg: true, describe: "export Perfetto trace file (view at ui.perfetto.dev)" },
@@ -78,6 +79,7 @@ const optionGroups = {
     "alloc-user-only",
   ],
   "Time Sample:": ["time-sample", "time-interval"],
+  "Coverage:": ["call-counts"],
   "Output:": [
     "view",
     "export-json",

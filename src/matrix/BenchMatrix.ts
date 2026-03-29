@@ -95,6 +95,7 @@ export interface RunMatrixOptions {
   allocDepth?: number;
   timeSample?: boolean;
   timeInterval?: number;
+  callCounts?: boolean;
 }
 
 /** Context for running matrix benchmarks in worker mode */
@@ -287,6 +288,7 @@ function buildRunnerOptions(options: RunMatrixOptions): RunnerOptions {
     allocDepth: options.allocDepth,
     timeSample: options.timeSample,
     timeInterval: options.timeInterval,
+    callCounts: options.callCounts,
   };
 }
 

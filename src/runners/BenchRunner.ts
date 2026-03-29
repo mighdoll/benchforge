@@ -51,6 +51,8 @@ export interface RunnerOptions {
   timeSample?: boolean;
   /** CPU sampling interval in microseconds (default 1000) */
   timeInterval?: number;
+  /** Collect per-function execution counts via V8 precise coverage */
+  callCounts?: boolean;
 }
 
 /** Execute benchmark with optional parameters */
