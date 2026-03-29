@@ -1,6 +1,6 @@
 import { writeFile } from "node:fs/promises";
-import type { ReportGroup } from "../BenchmarkReport.ts";
 import type { DefaultCliArgs } from "../cli/CliArgs.ts";
+import type { ReportGroup } from "../report/BenchmarkReport.ts";
 import type {
   BenchmarkGroup,
   BenchmarkJsonData,

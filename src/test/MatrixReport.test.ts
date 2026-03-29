@@ -1,5 +1,5 @@
 import { expect, test } from "vitest";
-import type { CaseResult, MatrixResults } from "../BenchMatrix.ts";
+import type { CaseResult, MatrixResults } from "../matrix/BenchMatrix.ts";
 import { reportMatrixResults } from "../matrix/MatrixReport.ts";
 
 /** Create simple measured results for testing */

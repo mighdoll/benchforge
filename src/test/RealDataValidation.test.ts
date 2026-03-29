@@ -4,7 +4,7 @@ import {
   coefficientOfVariation,
   medianAbsoluteDeviation,
   percentile,
-} from "../StatisticalUtils.ts";
+} from "../stats/StatisticalUtils.ts";
 import { bevy30SamplesMs, bevy30SamplesNs } from "./fixtures/bevy30-samples.ts";
 
 test.skip("bevy30 data characteristics", () => {

@@ -1,17 +1,17 @@
-import type { MeasuredResults } from "./MeasuredResults.ts";
-import { bootstrapDifferenceCI } from "./StatisticalUtils.ts";
-import type { UnionToIntersection } from "./TypeUtil.ts";
+import type { MeasuredResults } from "../core/MeasuredResults.ts";
+import type { UnionToIntersection } from "../core/TypeUtil.ts";
+import { bootstrapDifferenceCI } from "../stats/StatisticalUtils.ts";
 import {
   formatDiffWithCI,
   formatDiffWithCIHigherIsBetter,
   truncate,
-} from "./table-util/Formatters.ts";
+} from "./table/Formatters.ts";
 import {
   type AnyColumn,
   buildTable,
   type ColumnGroup,
   type ResultGroup,
-} from "./table-util/TableReport.ts";
+} from "./table/TableReport.ts";
 
 /** Benchmark results with optional baseline for comparison */
 export interface ReportGroup {

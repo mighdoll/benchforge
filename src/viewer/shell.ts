@@ -226,7 +226,7 @@ async function loadReport(): Promise<void> {
         .map((group: any, i: number) => buildGroupHtml(group, i))
         .join("");
 
-    const { renderPlots } = (await import("../html/browser/index.ts")) as {
+    const { renderPlots } = (await import("./plots/index.ts")) as {
       renderPlots: (data: unknown) => void;
     };
     renderPlots(data);

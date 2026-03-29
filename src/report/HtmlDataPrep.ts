@@ -1,17 +1,17 @@
-import type {
-  ReportColumnGroup,
-  ReportGroup,
-  ResultsMapper,
-} from "./BenchmarkReport.ts";
-import type { GitVersion } from "./GitUtils.ts";
+import { bootstrapDifferenceCI } from "../stats/StatisticalUtils.ts";
 import type {
   BenchmarkData,
   DifferenceCI,
   FormattedStat,
   GroupData,
   ReportData,
-} from "./html/index.ts";
-import { bootstrapDifferenceCI } from "./StatisticalUtils.ts";
+} from "../viewer-types/index.ts";
+import type {
+  ReportColumnGroup,
+  ReportGroup,
+  ResultsMapper,
+} from "./BenchmarkReport.ts";
+import type { GitVersion } from "./GitUtils.ts";
 
 export interface PrepareHtmlOptions {
   cliArgs?: Record<string, unknown>;

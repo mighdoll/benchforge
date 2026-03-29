@@ -1,6 +1,6 @@
 import pc from "picocolors";
 
-import { formatBytes } from "../table-util/Formatters.ts";
+import { formatBytes } from "../../report/table/Formatters.ts";
 import type { HeapProfile, HeapSample } from "./HeapSampler.ts";
 import {
   type ResolvedFrame,

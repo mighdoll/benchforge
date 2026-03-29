@@ -1,4 +1,4 @@
-import type { BenchMatrix } from "../BenchMatrix.ts";
+import type { BenchMatrix } from "./BenchMatrix.ts";
 import { loadCasesModule } from "./CaseLoader.ts";
 import { discoverVariants } from "./VariantLoader.ts";
 

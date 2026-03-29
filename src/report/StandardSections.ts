@@ -1,12 +1,7 @@
+import type { MeasuredResults } from "../core/MeasuredResults.ts";
 import type { ReportColumnGroup, ResultsMapper } from "./BenchmarkReport.ts";
-import type { MeasuredResults } from "./MeasuredResults.ts";
-import { formatConvergence } from "./table-util/ConvergenceFormatters.ts";
-import {
-  formatBytes,
-  integer,
-  percent,
-  timeMs,
-} from "./table-util/Formatters.ts";
+import { formatConvergence } from "./table/ConvergenceFormatters.ts";
+import { formatBytes, integer, percent, timeMs } from "./table/Formatters.ts";
 
 export interface TimeStats {
   mean?: number;

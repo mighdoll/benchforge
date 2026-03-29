@@ -1,5 +1,5 @@
 import { expect, test } from "vitest";
-import { withTimeProfiling } from "../time-sample/TimeSampler.ts";
+import { withTimeProfiling } from "../profiling/time/TimeSampler.ts";
 
 test("withTimeProfiling returns valid V8 CPU profile", async () => {
   // Burn some CPU to produce samples

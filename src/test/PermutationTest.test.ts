@@ -1,5 +1,5 @@
 import { expect, test } from "vitest";
-import { compareWithBaseline } from "../PermutationTest.ts";
+import { compareWithBaseline } from "../stats/PermutationTest.ts";
 import { assertValid, getSampleData } from "./TestUtils.ts";
 
 test("detects 20% performance improvement", () => {

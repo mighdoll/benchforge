@@ -3,7 +3,7 @@ import {
   browserGcStats,
   parseGcTraceEvents,
   type TraceEvent,
-} from "../browser/BrowserGcStats.ts";
+} from "../profiling/browser/BrowserGcStats.ts";
 
 test("parseGcTraceEvents parses MinorGC and MajorGC events", () => {
   const events: TraceEvent[] = [

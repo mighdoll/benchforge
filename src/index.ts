@@ -1,27 +1,3 @@
-export type {
-  AnyVariant,
-  BenchMatrix,
-  CaseResult,
-  LoadedCase,
-  MatrixDefaults,
-  MatrixResults,
-  MatrixSuite,
-  RunMatrixOptions,
-  StatefulVariant,
-  Variant,
-  VariantFn,
-  VariantResult,
-} from "./BenchMatrix.ts";
-export { isStatefulVariant, runMatrix } from "./BenchMatrix.ts";
-export type { BenchGroup, BenchmarkSpec, BenchSuite } from "./Benchmark.ts";
-export type {
-  BenchmarkReport,
-  ReportColumnGroup,
-  ReportGroup,
-  ResultsMapper,
-  UnknownRecord,
-} from "./BenchmarkReport.ts";
-export { reportResults } from "./BenchmarkReport.ts";
 export type { Configure, DefaultCliArgs } from "./cli/CliArgs.ts";
 export { browserCliArgs, defaultCliArgs, parseCliArgs } from "./cli/CliArgs.ts";
 export type { ExportOptions, MatrixExportOptions } from "./cli/RunBenchCLI.ts";
@@ -42,6 +18,12 @@ export {
   runDefaultMatrixBench,
   runMatrixSuite,
 } from "./cli/RunBenchCLI.ts";
+export type {
+  BenchGroup,
+  BenchmarkSpec,
+  BenchSuite,
+} from "./core/Benchmark.ts";
+export type { MeasuredResults } from "./core/MeasuredResults.ts";
 export {
   archiveBenchmark,
   buildSpeedscopeFile,
@@ -50,17 +32,21 @@ export {
 } from "./export/AllocExport.ts";
 export * from "./export/JsonFormat.ts";
 export { exportPerfettoTrace } from "./export/PerfettoExport.ts";
-export type { GitVersion } from "./GitUtils.ts";
-export {
-  formatDateWithTimezone,
-  formatGitVersion,
-  getBaselineVersion,
-  getCurrentGitVersion,
-} from "./GitUtils.ts";
-export type { PrepareHtmlOptions } from "./HtmlDataPrep.ts";
-export { prepareHtmlData } from "./HtmlDataPrep.ts";
-export type { ReportData } from "./html/index.ts";
-export type { MeasuredResults } from "./MeasuredResults.ts";
+export type {
+  AnyVariant,
+  BenchMatrix,
+  CaseResult,
+  LoadedCase,
+  MatrixDefaults,
+  MatrixResults,
+  MatrixSuite,
+  RunMatrixOptions,
+  StatefulVariant,
+  Variant,
+  VariantFn,
+  VariantResult,
+} from "./matrix/BenchMatrix.ts";
+export { isStatefulVariant, runMatrix } from "./matrix/BenchMatrix.ts";
 export type { CasesModule } from "./matrix/CaseLoader.ts";
 export { loadCaseData, loadCasesModule } from "./matrix/CaseLoader.ts";
 export type { FilteredMatrix, MatrixFilter } from "./matrix/MatrixFilter.ts";
@@ -75,7 +61,23 @@ export {
   heapTotalColumn,
   reportMatrixResults,
 } from "./matrix/MatrixReport.ts";
-export type { RunnerOptions } from "./runners/BenchRunner.ts";
+export type {
+  BenchmarkReport,
+  ReportColumnGroup,
+  ReportGroup,
+  ResultsMapper,
+  UnknownRecord,
+} from "./report/BenchmarkReport.ts";
+export { reportResults } from "./report/BenchmarkReport.ts";
+export type { GitVersion } from "./report/GitUtils.ts";
+export {
+  formatDateWithTimezone,
+  formatGitVersion,
+  getBaselineVersion,
+  getCurrentGitVersion,
+} from "./report/GitUtils.ts";
+export type { PrepareHtmlOptions } from "./report/HtmlDataPrep.ts";
+export { prepareHtmlData } from "./report/HtmlDataPrep.ts";
 export {
   adaptiveSection,
   buildGenericSections,
@@ -85,12 +87,14 @@ export {
   runsSection,
   timeSection,
   totalTimeSection,
-} from "./StandardSections.ts";
-export { average } from "./StatisticalUtils.ts";
-export { formatConvergence } from "./table-util/ConvergenceFormatters.ts";
+} from "./report/StandardSections.ts";
+export { formatConvergence } from "./report/table/ConvergenceFormatters.ts";
 export {
   formatBytes,
   integer,
   timeMs,
   truncate,
-} from "./table-util/Formatters.ts";
+} from "./report/table/Formatters.ts";
+export type { RunnerOptions } from "./runners/BenchRunner.ts";
+export { average } from "./stats/StatisticalUtils.ts";
+export type { ReportData } from "./viewer-types/index.ts";

@@ -4,12 +4,9 @@ import {
   chromium,
   type Page,
 } from "playwright";
-import type {
-  HeapProfile,
-  HeapSampleOptions,
-} from "../heap-sample/HeapSampler.ts";
-import type { GcStats } from "../runners/GcStats.ts";
-import type { TimeProfile } from "../time-sample/TimeSampler.ts";
+import type { GcStats } from "../../runners/GcStats.ts";
+import type { HeapProfile, HeapSampleOptions } from "../heap/HeapSampler.ts";
+import type { TimeProfile } from "../time/TimeSampler.ts";
 import { browserGcStats, type TraceEvent } from "./BrowserGcStats.ts";
 
 export interface BrowserProfileParams {

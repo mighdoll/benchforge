@@ -1,9 +1,9 @@
 import { spawn } from "node:child_process";
 import { readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { resolve } from "node:path";
-import type { ReportGroup } from "../BenchmarkReport.ts";
 import type { DefaultCliArgs } from "../cli/CliArgs.ts";
-import type { MeasuredResults } from "../MeasuredResults.ts";
+import type { MeasuredResults } from "../core/MeasuredResults.ts";
+import type { ReportGroup } from "../report/BenchmarkReport.ts";
 
 /** Chrome Trace Event format event */
 interface TraceEvent {

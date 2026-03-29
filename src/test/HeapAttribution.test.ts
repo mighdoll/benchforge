@@ -2,7 +2,7 @@ import { expect, test } from "vitest";
 import {
   aggregateSites,
   type HeapSite,
-} from "../heap-sample/HeapSampleReport.ts";
+} from "../profiling/heap/HeapSampleReport.ts";
 
 test("unknown column does not merge distinct functions on same line", () => {
   const sites: HeapSite[] = [

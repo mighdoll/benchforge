@@ -1,9 +1,9 @@
 #!/usr/bin/env node
-import type { BenchmarkFunction, BenchmarkSpec } from "../Benchmark.ts";
-import type { HeapProfile } from "../heap-sample/HeapSampler.ts";
-import type { MeasuredResults } from "../MeasuredResults.ts";
+import type { BenchmarkFunction, BenchmarkSpec } from "../core/Benchmark.ts";
+import type { MeasuredResults } from "../core/MeasuredResults.ts";
 import { variantModuleUrl } from "../matrix/VariantLoader.ts";
-import type { TimeProfile } from "../time-sample/TimeSampler.ts";
+import type { HeapProfile } from "../profiling/heap/HeapSampler.ts";
+import type { TimeProfile } from "../profiling/time/TimeSampler.ts";
 import {
   type AdaptiveOptions,
   createAdaptiveWrapper,
@@ -232,7 +232,7 @@ process.on("message", async (message: RunMessage) => {
       const runMaybeWithTime = timeSample
         ? async () => {
             const { withTimeProfiling } = await import(
-              "../time-sample/TimeSampler.ts"
+              "../profiling/time/TimeSampler.ts"
             );
             const timeOpts = { interval: message.options.timeInterval };
             const r = await withTimeProfiling(timeOpts, run);
@@ -244,7 +244,7 @@ process.on("message", async (message: RunMessage) => {
       let results: MeasuredResults[];
       if (alloc) {
         const { withHeapSampling } = await import(
-          "../heap-sample/HeapSampler.ts"
+          "../profiling/heap/HeapSampler.ts"
         );
         const heapOpts = {
           samplingInterval: message.options.allocInterval,

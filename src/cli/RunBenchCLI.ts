@@ -4,19 +4,11 @@ import { pathToFileURL } from "node:url";
 import pico from "picocolors";
 import { hideBin } from "yargs/helpers";
 import type {
-  MatrixResults,
-  MatrixSuite,
-  RunMatrixOptions,
-} from "../BenchMatrix.ts";
-import { runMatrix } from "../BenchMatrix.ts";
-import type { BenchGroup, BenchmarkSpec, BenchSuite } from "../Benchmark.ts";
-import type {
-  BenchmarkReport,
-  ReportGroup,
-  ResultsMapper,
-} from "../BenchmarkReport.ts";
-import { groupReports, reportResults } from "../BenchmarkReport.ts";
-import type { BrowserProfileResult } from "../browser/BrowserHeapSampler.ts";
+  BenchGroup,
+  BenchmarkSpec,
+  BenchSuite,
+} from "../core/Benchmark.ts";
+import type { MeasuredResults } from "../core/MeasuredResults.ts";
 import {
   archiveBenchmark,
   buildSpeedscopeFile,
@@ -25,20 +17,12 @@ import { resolveEditorUri } from "../export/EditorUri.ts";
 import { exportBenchmarkJson } from "../export/JsonExport.ts";
 import { exportPerfettoTrace } from "../export/PerfettoExport.ts";
 import { timeProfileToSpeedscope } from "../export/TimeExport.ts";
-import type { GitVersion } from "../GitUtils.ts";
-import { prepareHtmlData } from "../HtmlDataPrep.ts";
-import {
-  aggregateSites,
-  filterSites,
-  flattenProfile,
-  formatHeapReport,
-  formatRawSamples,
-  type HeapReportOptions,
-  isBrowserUserCode,
-} from "../heap-sample/HeapSampleReport.ts";
-import { resolveProfile } from "../heap-sample/ResolvedProfile.ts";
-import type { ReportData } from "../html/Types.ts";
-import type { MeasuredResults } from "../MeasuredResults.ts";
+import type {
+  MatrixResults,
+  MatrixSuite,
+  RunMatrixOptions,
+} from "../matrix/BenchMatrix.ts";
+import { runMatrix } from "../matrix/BenchMatrix.ts";
 import { loadCasesModule } from "../matrix/CaseLoader.ts";
 import {
   type FilteredMatrix,
@@ -49,10 +33,25 @@ import {
   type MatrixReportOptions,
   reportMatrixResults,
 } from "../matrix/MatrixReport.ts";
-import { computeStats } from "../runners/BasicRunner.ts";
-import type { RunnerOptions } from "../runners/BenchRunner.ts";
-import type { KnownRunner } from "../runners/CreateRunner.ts";
-import { runBenchmark } from "../runners/RunnerOrchestrator.ts";
+import type { BrowserProfileResult } from "../profiling/browser/BrowserHeapSampler.ts";
+import {
+  aggregateSites,
+  filterSites,
+  flattenProfile,
+  formatHeapReport,
+  formatRawSamples,
+  type HeapReportOptions,
+  isBrowserUserCode,
+} from "../profiling/heap/HeapSampleReport.ts";
+import { resolveProfile } from "../profiling/heap/ResolvedProfile.ts";
+import type {
+  BenchmarkReport,
+  ReportGroup,
+  ResultsMapper,
+} from "../report/BenchmarkReport.ts";
+import { groupReports, reportResults } from "../report/BenchmarkReport.ts";
+import type { GitVersion } from "../report/GitUtils.ts";
+import { prepareHtmlData } from "../report/HtmlDataPrep.ts";
 import {
   adaptiveSection,
   browserGcStatsSection,
@@ -61,8 +60,13 @@ import {
   runsSection,
   timeSection,
   totalTimeSection,
-} from "../StandardSections.ts";
+} from "../report/StandardSections.ts";
+import { computeStats } from "../runners/BasicRunner.ts";
+import type { RunnerOptions } from "../runners/BenchRunner.ts";
+import type { KnownRunner } from "../runners/CreateRunner.ts";
+import { runBenchmark } from "../runners/RunnerOrchestrator.ts";
 import { startViewerServer } from "../viewer/ViewerServer.ts";
+import type { ReportData } from "../viewer-types/Types.ts";
 import {
   type Configure,
   type DefaultCliArgs,
@@ -160,9 +164,11 @@ export async function benchExports(
 export async function browserBenchExports(args: DefaultCliArgs): Promise<void> {
   warnBrowserFlags(args);
 
-  let profileBrowser: typeof import("../browser/BrowserHeapSampler.ts").profileBrowser;
+  let profileBrowser: typeof import("../profiling/browser/BrowserHeapSampler.ts").profileBrowser;
   try {
-    ({ profileBrowser } = await import("../browser/BrowserHeapSampler.ts"));
+    ({ profileBrowser } = await import(
+      "../profiling/browser/BrowserHeapSampler.ts"
+    ));
   } catch {
     throw new Error(
       "playwright is required for browser benchmarking (--url).\n\n" +
@@ -596,7 +602,7 @@ function buildTimeProfileData(results: ReportGroup[]): string | undefined {
 /** Find the first raw V8 TimeProfile in results */
 function findTimeProfile(
   results: ReportGroup[],
-): import("../time-sample/TimeSampler.ts").TimeProfile | undefined {
+): import("../profiling/time/TimeSampler.ts").TimeProfile | undefined {
   for (const group of results) {
     for (const report of groupReports(group)) {
       if (report.measuredResults.timeProfile)

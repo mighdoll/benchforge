@@ -1,5 +1,5 @@
 import { expect, test } from "vitest";
-import type { BenchMatrix } from "../BenchMatrix.ts";
+import type { BenchMatrix } from "../matrix/BenchMatrix.ts";
 import { filterMatrix, parseMatrixFilter } from "../matrix/MatrixFilter.ts";
 
 const inlineMatrix: BenchMatrix<string> = {

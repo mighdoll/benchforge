@@ -1,5 +1,8 @@
 import pico from "picocolors";
-import type { CIDirection, DifferenceCI } from "../StatisticalUtils.ts";
+import type {
+  CIDirection,
+  DifferenceCI,
+} from "../../stats/StatisticalUtils.ts";
 
 const isTest = process.env.NODE_ENV === "test" || process.env.VITEST === "true";
 const { red, green } = isTest

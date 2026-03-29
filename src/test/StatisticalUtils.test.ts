@@ -8,7 +8,7 @@ import {
   medianAbsoluteDeviation,
   percentile,
   standardDeviation,
-} from "../StatisticalUtils.ts";
+} from "../stats/StatisticalUtils.ts";
 import { assertValid, getSampleData } from "./TestUtils.ts";
 
 test("calculates mean correctly", () => {

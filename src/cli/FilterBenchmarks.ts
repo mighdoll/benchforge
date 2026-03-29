@@ -1,4 +1,4 @@
-import type { BenchGroup, BenchSuite } from "../Benchmark.ts";
+import type { BenchGroup, BenchSuite } from "../core/Benchmark.ts";
 
 /** Filter benchmarks by name pattern */
 export function filterBenchmarks(

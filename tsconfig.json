@@ -26,7 +26,7 @@
     "**/node_modules",
     "**/dist",
     "src/tests/fixtures",
-    "src/html/browser",
+    "src/viewer/plots",
     "src/viewer/shell.ts",
     "*.config.ts"
   ]

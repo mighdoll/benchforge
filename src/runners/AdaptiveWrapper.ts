@@ -1,10 +1,10 @@
-import type { BenchmarkSpec } from "../Benchmark.ts";
-import type { MeasuredResults } from "../MeasuredResults.ts";
+import type { BenchmarkSpec } from "../core/Benchmark.ts";
+import type { MeasuredResults } from "../core/MeasuredResults.ts";
 import {
   coefficientOfVariation,
   medianAbsoluteDeviation,
   percentile,
-} from "../StatisticalUtils.ts";
+} from "../stats/StatisticalUtils.ts";
 import type { BenchRunner, RunnerOptions } from "./BenchRunner.ts";
 import { msToNs } from "./RunnerUtils.ts";
 

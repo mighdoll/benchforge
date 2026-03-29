@@ -1,10 +1,10 @@
-import type { MeasuredResults } from "./MeasuredResults.ts";
-import { loadCaseData, loadCasesModule } from "./matrix/CaseLoader.ts";
-import { discoverVariants } from "./matrix/VariantLoader.ts";
-import { BasicRunner } from "./runners/BasicRunner.ts";
-import type { RunnerOptions } from "./runners/BenchRunner.ts";
-import { runMatrixVariant } from "./runners/RunnerOrchestrator.ts";
-import { average } from "./StatisticalUtils.ts";
+import type { MeasuredResults } from "../core/MeasuredResults.ts";
+import { BasicRunner } from "../runners/BasicRunner.ts";
+import type { RunnerOptions } from "../runners/BenchRunner.ts";
+import { runMatrixVariant } from "../runners/RunnerOrchestrator.ts";
+import { average } from "../stats/StatisticalUtils.ts";
+import { loadCaseData, loadCasesModule } from "./CaseLoader.ts";
+import { discoverVariants } from "./VariantLoader.ts";
 
 /** Stateless variant - called each iteration with case data */
 export type VariantFn<T = unknown> = (caseData: T) => void;
@@ -100,7 +100,7 @@ export interface RunMatrixOptions {
 /** Context for running matrix benchmarks in worker mode */
 interface DirMatrixContext<T> {
   matrix: BenchMatrix<T>;
-  casesModule?: import("./matrix/CaseLoader.ts").CasesModule<T>;
+  casesModule?: import("./CaseLoader.ts").CasesModule<T>;
   baselineIds: string[];
   caseIds: string[];
   runnerOpts: RunnerOptions;

@@ -1,6 +1,6 @@
 import path from "node:path";
 import { expect, test } from "vitest";
-import { profileBrowser } from "../browser/BrowserHeapSampler.ts";
+import { profileBrowser } from "../profiling/browser/BrowserHeapSampler.ts";
 
 const examplesDir = path.resolve(import.meta.dirname!, "../../examples");
 

@@ -1,10 +1,10 @@
-import type { BenchSuite } from "../Benchmark.ts";
-import type { BenchmarkReport } from "../BenchmarkReport.ts";
 import type { Configure, DefaultCliArgs } from "../cli/CliArgs.ts";
 import { parseCliArgs } from "../cli/CliArgs.ts";
 import { defaultReport, runBenchmarks } from "../cli/RunBenchCLI.ts";
-import type { MeasuredResults } from "../MeasuredResults.ts";
-import { average, percentile } from "../StatisticalUtils.ts";
+import type { BenchSuite } from "../core/Benchmark.ts";
+import type { MeasuredResults } from "../core/MeasuredResults.ts";
+import type { BenchmarkReport } from "../report/BenchmarkReport.ts";
+import { average, percentile } from "../stats/StatisticalUtils.ts";
 import { bevy30SamplesMs } from "./fixtures/bevy30-samples.ts";
 
 /** Validation helpers for statistical tests */

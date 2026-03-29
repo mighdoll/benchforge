@@ -1,6 +1,6 @@
 import { expect, test } from "vitest";
-import type { BenchMatrix, StatefulVariant } from "../BenchMatrix.ts";
-import { isStatefulVariant, runMatrix } from "../BenchMatrix.ts";
+import type { BenchMatrix, StatefulVariant } from "../matrix/BenchMatrix.ts";
+import { isStatefulVariant, runMatrix } from "../matrix/BenchMatrix.ts";
 import { loadCaseData, loadCasesModule } from "../matrix/CaseLoader.ts";
 import { discoverVariants, loadVariant } from "../matrix/VariantLoader.ts";
 

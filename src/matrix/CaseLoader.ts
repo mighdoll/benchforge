@@ -1,4 +1,4 @@
-import type { LoadedCase } from "../BenchMatrix.ts";
+import type { LoadedCase } from "./BenchMatrix.ts";
 
 /** Module that exports case definitions */
 export interface CasesModule<T = unknown> {

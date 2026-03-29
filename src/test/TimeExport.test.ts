@@ -1,6 +1,6 @@
 import { expect, test } from "vitest";
 import { timeProfileToSpeedscope } from "../export/TimeExport.ts";
-import type { TimeProfile } from "../time-sample/TimeSampler.ts";
+import type { TimeProfile } from "../profiling/time/TimeSampler.ts";
 
 /** Build a minimal TimeProfile for testing */
 function mockProfile(): TimeProfile {

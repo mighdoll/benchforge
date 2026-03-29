@@ -1,6 +1,6 @@
 import fs from "node:fs/promises";
 import { fileURLToPath } from "node:url";
-import type { Variant } from "../BenchMatrix.ts";
+import type { Variant } from "./BenchMatrix.ts";
 
 /** Discover variant ids from a directory of .ts files */
 export async function discoverVariants(dirUrl: string): Promise<string[]> {

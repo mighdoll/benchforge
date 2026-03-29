@@ -1,23 +1,29 @@
-import type { CaseResult, MatrixResults } from "../BenchMatrix.ts";
-import { injectDiffColumns, type ResultsMapper } from "../BenchmarkReport.ts";
-import { totalProfileBytes } from "../heap-sample/HeapSampleReport.ts";
-import { type GcStatsInfo, gcStatsSection } from "../StandardSections.ts";
+import { totalProfileBytes } from "../profiling/heap/HeapSampleReport.ts";
 import {
-  average,
-  bootstrapDifferenceCI,
-  type DifferenceCI,
-} from "../StatisticalUtils.ts";
+  injectDiffColumns,
+  type ResultsMapper,
+} from "../report/BenchmarkReport.ts";
+import {
+  type GcStatsInfo,
+  gcStatsSection,
+} from "../report/StandardSections.ts";
 import {
   duration,
   formatBytes,
   formatDiffWithCI,
   truncate,
-} from "../table-util/Formatters.ts";
+} from "../report/table/Formatters.ts";
 import {
   buildTable,
   type ColumnGroup,
   type ResultGroup,
-} from "../table-util/TableReport.ts";
+} from "../report/table/TableReport.ts";
+import {
+  average,
+  bootstrapDifferenceCI,
+  type DifferenceCI,
+} from "../stats/StatisticalUtils.ts";
+import type { CaseResult, MatrixResults } from "./BenchMatrix.ts";
 
 /** Custom column definition for extra computed metrics */
 export interface ExtraColumn {

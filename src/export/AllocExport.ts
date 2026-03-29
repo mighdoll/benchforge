@@ -2,15 +2,14 @@ import { writeFileSync } from "node:fs";
 import { readFile } from "node:fs/promises";
 import { resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-
-import { groupReports, type ReportGroup } from "../BenchmarkReport.ts";
-import type { HeapProfile } from "../heap-sample/HeapSampler.ts";
+import type { HeapProfile } from "../profiling/heap/HeapSampler.ts";
 import {
   type ResolvedFrame,
   type ResolvedProfile,
   resolveProfile,
-} from "../heap-sample/ResolvedProfile.ts";
-import type { ReportData } from "../html/Types.ts";
+} from "../profiling/heap/ResolvedProfile.ts";
+import { groupReports, type ReportGroup } from "../report/BenchmarkReport.ts";
+import type { ReportData } from "../viewer-types/Types.ts";
 
 /** speedscope file format (https://www.speedscope.app/file-format-schema.json) */
 interface SpeedscopeFile {

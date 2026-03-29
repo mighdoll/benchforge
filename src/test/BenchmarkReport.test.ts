@@ -3,12 +3,12 @@ import {
   type BenchmarkReport,
   reportResults,
   valuesForReports,
-} from "../BenchmarkReport.ts";
+} from "../report/BenchmarkReport.ts";
 import {
   adaptiveSection,
   gcSection,
   timeSection,
-} from "../StandardSections.ts";
+} from "../report/StandardSections.ts";
 import { createBenchmarkReport, createMeasuredResults } from "./TestUtils.ts";
 
 test("combines time and gc sections into report", () => {

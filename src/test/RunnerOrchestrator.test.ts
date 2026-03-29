@@ -1,5 +1,5 @@
 import { expect, test } from "vitest";
-import type { BenchmarkSpec } from "../Benchmark.ts";
+import type { BenchmarkSpec } from "../core/Benchmark.ts";
 import { runBenchmark } from "../runners/RunnerOrchestrator.ts";
 
 /** lightweight function for testing worker communication */

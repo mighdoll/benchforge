@@ -1,8 +1,8 @@
 import { execSync } from "node:child_process";
 import path from "node:path";
 import { expect, test } from "vitest";
-import type { BenchSuite } from "../Benchmark.ts";
 import { filterBenchmarks } from "../cli/FilterBenchmarks.ts";
+import type { BenchSuite } from "../core/Benchmark.ts";
 import { runBenchCLITest } from "./TestUtils.ts";
 
 const testSuite: BenchSuite = {

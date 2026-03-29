@@ -2,7 +2,7 @@ import {
   aggregateGcStats,
   type GcEvent,
   type GcStats,
-} from "../runners/GcStats.ts";
+} from "../../runners/GcStats.ts";
 
 /** CDP trace event from Tracing.dataCollected */
 export interface TraceEvent {
