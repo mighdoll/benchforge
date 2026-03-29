@@ -14,12 +14,6 @@ importers:
 
   .:
     dependencies:
-      '@observablehq/plot':
-        specifier: ^0.6.17
-        version: 0.6.17
-      d3:
-        specifier: ^7.9.0
-        version: 7.9.0
       esbuild:
         specifier: ^0.27.3
         version: 0.27.3
@@ -29,9 +23,9 @@ importers:
       picocolors:
         specifier: ^1.1.1
         version: 1.1.1
-      shiki:
-        specifier: ^4.0.2
-        version: 4.0.2
+      sirv:
+        specifier: ^3.0.2
+        version: 3.0.2
       table:
         specifier: ^6.9.0
         version: 6.9.0
@@ -42,6 +36,9 @@ importers:
       '@biomejs/biome':
         specifier: ^2.4.4
         version: 2.4.4
+      '@observablehq/plot':
+        specifier: ^0.6.17
+        version: 0.6.17
       '@types/d3':
         specifier: ^7.4.3
         version: 7.4.3
@@ -54,12 +51,18 @@ importers:
       '@typescript/native-preview':
         specifier: 7.0.0-dev.20260220.1
         version: 7.0.0-dev.20260220.1
+      d3:
+        specifier: ^7.9.0
+        version: 7.9.0
       npm-run-all:
         specifier: ^4.1.5
         version: 4.1.5
       playwright:
         specifier: 'catalog:'
         version: 1.58.2
+      shiki:
+        specifier: ^4.0.2
+        version: 4.0.2
       tsdown:
         specifier: 0.20.3
         version: 0.20.3(@typescript/native-preview@7.0.0-dev.20260220.1)(typescript@5.9.3)
@@ -342,6 +345,9 @@ packages:
 
   '@oxc-project/types@0.112.0':
     resolution: {integrity: sha512-m6RebKHIRsax2iCwVpYW2ErQwa4ywHJrE4sCK3/8JK8ZZAWOKXaRJFl/uP51gaVyyXlaS4+chU1nSCdzYf6QqQ==}
+
+  '@polka/url@1.0.0-next.29':
+    resolution: {integrity: sha512-wwQAWhWSuHaag8c4q/KN/vCoeOJYshAIvMQwD4GpSb3OiZklFfvAgmj0VCBBImRpuF/aFgIRzllXlVX93Jevww==}
 
   '@quansync/fs@1.0.0':
     resolution: {integrity: sha512-4TJ3DFtlf1L5LDMaM6CanJ/0lckGNtJcMjQ1NAV6zDmA0tEHKZtxNKin8EgPaVX1YzljbxckyT2tJrpQKAtngQ==}
@@ -1475,6 +1481,10 @@ packages:
   minimatch@3.1.2:
     resolution: {integrity: sha512-J7p63hRiAjw1NDEww1W7i37+ByIrOWO5XQQAzZ3VOcL0PNybwpfmV/N05zFAzwQ9USyEcX6t3UO+K5aqBQOIHw==}
 
+  mrmime@2.0.1:
+    resolution: {integrity: sha512-Y3wQdFg2Va6etvQ5I82yUhGdsKrcYox6p7FfL1LbK2J4V01F9TGlepTIhnK24t7koZibmg82KGglhA1XK5IsLQ==}
+    engines: {node: '>=10'}
+
   nanoid@3.3.11:
     resolution: {integrity: sha512-N8SpfPUnUp1bK+PMYW8qSWdl9U+wwNWI4QKxOYDy9JAro3WMX7p2OeVRF9v+347pnakNevPmiHhNmZ2HbFA76w==}
     engines: {node: ^10 || ^12 || ^13.7 || ^14 || >=15.0.1}
@@ -1725,6 +1735,10 @@ packages:
   siginfo@2.0.0:
     resolution: {integrity: sha512-ybx0WO1/8bSBLEWXZvEd7gMW3Sn3JFlW3TvX1nREbDLRNQNaeNN8WK0meBwPdAaOI7TtRRRJn/Es1zhrrCHu7g==}
 
+  sirv@3.0.2:
+    resolution: {integrity: sha512-2wcC/oGxHis/BoHkkPwldgiPSYcpZK3JU28WoMVv55yHJgcZ8rlXvuG9iZggz+sU1d4bRgIGASwyWqjxu3FM0g==}
+    engines: {node: '>=18'}
+
   slice-ansi@4.0.0:
     resolution: {integrity: sha512-qMCMfhY040cVHT43K9BFygqYbUPFZKHOg7K73mtTWJRb8pyP3fzf4Ixd5SzdEJQ6MRUg/WBnOLxghZtKKurENQ==}
     engines: {node: '>=10'}
@@ -1823,6 +1837,10 @@ packages:
   tinyrainbow@3.0.3:
     resolution: {integrity: sha512-PSkbLUoxOFRzJYjjxHJt9xro7D+iilgMX/C9lawzVuYiIdcihh9DXmVibBe8lmcFrRi/VzlPjBxbN7rH24q8/Q==}
     engines: {node: '>=14.0.0'}
+
+  totalist@3.0.1:
+    resolution: {integrity: sha512-sf4i37nQ2LBx4m3wB74y+ubopq6W/dIzXg0FDGjsYnZHVa1Da8FH853wlL2gtUhg+xJXjfk3kUZS3BRoQeoQBQ==}
+    engines: {node: '>=6'}
 
   tree-kill@1.2.2:
     resolution: {integrity: sha512-L0Orpi8qGpRG//Nd+H90vFB+3iHnue1zSSGmNOOCh1GLJ7rUKVwV2HvijphGQS2UmhUZewS9VgvxYIdgr+fG1A==}
@@ -2227,6 +2245,8 @@ snapshots:
       isoformat: 0.2.1
 
   '@oxc-project/types@0.112.0': {}
+
+  '@polka/url@1.0.0-next.29': {}
 
   '@quansync/fs@1.0.0':
     dependencies:
@@ -3409,6 +3429,8 @@ snapshots:
     dependencies:
       brace-expansion: 1.1.12
 
+  mrmime@2.0.1: {}
+
   nanoid@3.3.11: {}
 
   nice-try@1.0.5: {}
@@ -3731,6 +3753,12 @@ snapshots:
 
   siginfo@2.0.0: {}
 
+  sirv@3.0.2:
+    dependencies:
+      '@polka/url': 1.0.0-next.29
+      mrmime: 2.0.1
+      totalist: 3.0.1
+
   slice-ansi@4.0.0:
     dependencies:
       ansi-styles: 4.3.0
@@ -3845,6 +3873,8 @@ snapshots:
       picomatch: 4.0.3
 
   tinyrainbow@3.0.3: {}
+
+  totalist@3.0.1: {}
 
   tree-kill@1.2.2: {}
 

@@ -1,8 +1,9 @@
 import { readFile } from "node:fs/promises";
 import { createServer, type Server } from "node:http";
-import { dirname, extname, join, resolve } from "node:path";
+import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import open from "open";
+import sirv from "sirv";
 import {
   archiveFileName,
   collectSources,
@@ -34,31 +35,9 @@ function packageRoot(): string {
   return join(thisDir, "..");
 }
 
-function speedscopeDir(): string {
-  return join(packageRoot(), "vendor/speedscope");
+function viewerDistDir(): string {
+  return join(packageRoot(), "dist/viewer");
 }
-
-function viewerDir(): string {
-  return join(packageRoot(), "src/viewer");
-}
-
-function browserBundleDir(): string {
-  return join(packageRoot(), "dist/browser");
-}
-
-const mimeTypes: Record<string, string> = {
-  ".html": "text/html",
-  ".js": "application/javascript",
-  ".css": "text/css",
-  ".json": "application/json",
-  ".wasm": "application/wasm",
-  ".woff2": "font/woff2",
-  ".png": "image/png",
-  ".ico": "image/x-icon",
-  ".txt": "text/plain",
-  ".map": "application/json",
-  ".md": "text/plain",
-};
 
 /** Start the viewer server and open in browser */
 export async function startViewerServer(
@@ -66,7 +45,6 @@ export async function startViewerServer(
 ): Promise<{ server: Server; port: number; close: () => void }> {
   const { profileData, timeProfileData, reportData, editorUri } = options;
   const port = options.port ?? 3939;
-  const shellDir = viewerDir();
 
   const sourceCache = new Map<string, string>();
   if (options.sources) {
@@ -75,33 +53,13 @@ export async function startViewerServer(
     }
   }
 
-  const bundleDir = browserBundleDir();
+  const assets = sirv(viewerDistDir(), { single: true });
 
   const server = createServer(async (req, res) => {
     const url = req.url || "/";
     const qIdx = url.indexOf("?");
     const pathname = qIdx >= 0 ? url.slice(0, qIdx) : url;
     const query = qIdx >= 0 ? url.slice(qIdx + 1) : "";
-
-    // Viewer shell at root
-    if (pathname === "/") {
-      await serveFile(res, join(shellDir, "shell.html"));
-      return;
-    }
-
-    // Built browser bundles (shell.js, plots.js, shiki chunk files)
-    if (pathname.startsWith("/viewer/") && pathname.endsWith(".js")) {
-      const relPath = pathname.slice("/viewer/".length);
-      await serveFile(res, join(bundleDir, relPath));
-      return;
-    }
-
-    // Viewer static files (shell.css, report.css, shell.html)
-    if (pathname.startsWith("/viewer/")) {
-      const relPath = pathname.slice("/viewer/".length);
-      await serveFile(res, join(shellDir, relPath));
-      return;
-    }
 
     // Config API (editor URI, data availability)
     if (pathname === "/api/config") {
@@ -165,15 +123,11 @@ export async function startViewerServer(
       return;
     }
 
-    // Speedscope static files
-    if (pathname.startsWith("/speedscope/")) {
-      const relPath = pathname.slice("/speedscope/".length) || "index.html";
-      await serveFile(res, join(speedscopeDir(), relPath));
-      return;
-    }
-
-    res.statusCode = 404;
-    res.end("Not found");
+    // All static files (viewer assets + speedscope) served by sirv
+    assets(req, res, () => {
+      res.statusCode = 404;
+      res.end("Not found");
+    });
   });
 
   const result = await tryListen(server, port);
@@ -260,21 +214,6 @@ async function handleArchiveRequest(
   } catch {
     res.statusCode = 500;
     res.end("Archive failed");
-  }
-}
-
-async function serveFile(
-  res: Res,
-  filePath: string,
-): Promise<void> {
-  try {
-    const content = await readFile(filePath);
-    const mime = mimeTypes[extname(filePath)] || "application/octet-stream";
-    res.setHeader("Content-Type", mime);
-    res.end(content);
-  } catch {
-    res.statusCode = 404;
-    res.end("Not found");
   }
 }
 

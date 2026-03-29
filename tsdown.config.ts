@@ -17,6 +17,7 @@ export default defineConfig({
     "open",
     "picocolors",
     "playwright",
+    "sirv",
     "table",
     "yargs",
     "yargs/helpers",
