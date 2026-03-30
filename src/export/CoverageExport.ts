@@ -87,10 +87,8 @@ function processScript(
     }
 
     if (fn.functionName && range.count > 0) {
-      byName.set(
-        fn.functionName,
-        (byName.get(fn.functionName) ?? 0) + range.count,
-      );
+      const prev = byName.get(fn.functionName) ?? 0;
+      byName.set(fn.functionName, prev + range.count);
     }
   }
 
@@ -105,10 +103,10 @@ function findCount(
   entries: LineCoverage[],
 ): number | undefined {
   // Strip "(anonymous ...)" location hint from frame name for matching
-  const isAnonymous =
+  const isAnon =
     frameName === "(anonymous)" || frameName.startsWith("(anonymous ");
 
-  if (!isAnonymous) {
+  if (!isAnon) {
     // Named function: match by name, prefer closest line
     const byName = entries.filter(e => e.functionName === frameName);
     if (byName.length === 1) return byName[0].count;

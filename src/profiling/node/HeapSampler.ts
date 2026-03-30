@@ -103,13 +103,12 @@ async function startSampling(
     includeObjectsCollectedByMinorGC: opts.includeMinorGC,
     includeObjectsCollectedByMajorGC: opts.includeMajorGC,
   };
-
   try {
     await session.post("HeapProfiler.startSampling", params);
   } catch {
-    console.warn(
-      "HeapProfiler: include-collected params not supported, falling back",
-    );
+    const msg =
+      "HeapProfiler: include-collected params not supported, falling back";
+    console.warn(msg);
     await session.post("HeapProfiler.startSampling", base);
   }
 }

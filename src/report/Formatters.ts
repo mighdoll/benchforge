@@ -2,9 +2,8 @@ import pico from "picocolors";
 import type { CIDirection, DifferenceCI } from "../stats/StatisticalUtils.ts";
 
 const isTest = process.env.NODE_ENV === "test" || process.env.VITEST === "true";
-const { red, green } = isTest
-  ? { red: (str: string) => str, green: (str: string) => str }
-  : pico;
+const identity = (s: string) => s;
+const { red, green } = isTest ? { red: identity, green: identity } : pico;
 
 /** Format floats with custom precision */
 export function floatPrecision(precision: number) {
@@ -89,11 +88,13 @@ export function formatBytes(
 ): string | null {
   if (typeof bytes !== "number") return null;
   const s = opts?.space ? " " : "";
-  if (bytes < 1024) return `${bytes.toFixed(0)}${s}B`;
-  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)}${s}KB`;
-  if (bytes < 1024 * 1024 * 1024)
-    return `${(bytes / 1024 / 1024).toFixed(1)}${s}MB`;
-  return `${(bytes / 1024 / 1024 / 1024).toFixed(1)}${s}GB`;
+  const KB = 1024;
+  const MB = KB * 1024;
+  const GB = MB * 1024;
+  if (bytes < KB) return `${bytes.toFixed(0)}${s}B`;
+  if (bytes < MB) return `${(bytes / KB).toFixed(1)}${s}KB`;
+  if (bytes < GB) return `${(bytes / MB).toFixed(1)}${s}MB`;
+  return `${(bytes / GB).toFixed(1)}${s}GB`;
 }
 
 /** Format percentage difference with confidence interval */
@@ -123,9 +124,7 @@ function coloredPercent(
   positiveIsGreen = true,
 ): string {
   const fraction = numerator / denominator;
-  if (Number.isNaN(fraction) || !Number.isFinite(fraction)) {
-    return " ";
-  }
+  if (!Number.isFinite(fraction)) return " ";
   const positive = fraction >= 0;
   const sign = positive ? "+" : "-";
   const percentStr = `${sign}${percent(fraction)}`;

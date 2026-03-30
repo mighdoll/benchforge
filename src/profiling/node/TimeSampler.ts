@@ -41,11 +41,10 @@ export async function withTimeProfiling<T>(
 
   try {
     if (ownSession) await session.post("Profiler.enable");
-    if (options.interval) {
+    if (options.interval)
       await session.post("Profiler.setSamplingInterval", {
         interval: options.interval,
       });
-    }
     await session.post("Profiler.start");
     const result = await fn();
     const { profile } = await session.post("Profiler.stop");

@@ -84,14 +84,13 @@ export const gcStatsSection: ResultsMapper<GcStatsInfo> = {
     const { gcStats, samples } = results;
     if (!gcStats) return {};
     const iterations = samples.length || 1;
-    const { totalAllocated, totalPromoted } = gcStats;
-    const hasAlloc = totalAllocated && totalAllocated > 0;
+    const alloc = gcStats.totalAllocated;
+    const hasAlloc = alloc && alloc > 0;
     const promoPercent = hasAlloc
-      ? (totalPromoted ?? 0) / totalAllocated
+      ? (gcStats.totalPromoted ?? 0) / alloc
       : undefined;
     return {
-      allocPerIter:
-        totalAllocated != null ? totalAllocated / iterations : undefined,
+      allocPerIter: alloc != null ? alloc / iterations : undefined,
       collected: gcStats.totalCollected || undefined,
       scavenges: gcStats.scavenges,
       fullGCs: gcStats.markCompacts,
@@ -151,10 +150,12 @@ export const totalTimeSection: ResultsMapper<{ totalTime?: number }> = {
         {
           key: "totalTime",
           title: "time",
-          formatter: v => {
-            if (typeof v !== "number") return "";
-            return v >= 30 ? `[${v.toFixed(1)}s]` : `${v.toFixed(1)}s`;
-          },
+          formatter: v =>
+            typeof v !== "number"
+              ? ""
+              : v >= 30
+                ? `[${v.toFixed(1)}s]`
+                : `${v.toFixed(1)}s`,
         },
       ],
     },
@@ -193,14 +194,12 @@ export const optSection: ResultsMapper<OptStats> = {
     if (!opt) return {};
 
     const total = Object.values(opt.byTier).reduce((s, t) => s + t.count, 0);
-    const tierParts = Object.entries(opt.byTier)
+    const tiers = Object.entries(opt.byTier)
       .sort((a, b) => b[1].count - a[1].count)
-      .map(([name, t]) => `${name}:${((t.count / total) * 100).toFixed(0)}%`);
+      .map(([name, t]) => `${name}:${((t.count / total) * 100).toFixed(0)}%`)
+      .join(" ");
 
-    return {
-      tiers: tierParts.join(" "),
-      deopt: opt.deoptCount > 0 ? opt.deoptCount : undefined,
-    };
+    return { tiers, deopt: opt.deoptCount > 0 ? opt.deoptCount : undefined };
   },
   columns: (): ReportColumnGroup<OptStats>[] => [
     {

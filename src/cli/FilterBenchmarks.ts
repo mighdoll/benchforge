@@ -26,20 +26,15 @@ export function filterBenchmarks(
 
 /** Create regex from filter (literal unless regex-like) */
 function createFilterRegex(filter: string): RegExp {
+  const isSlashed = filter.startsWith("/") && filter.endsWith("/");
   const looksLikeRegex =
-    (filter.startsWith("/") && filter.endsWith("/")) ||
-    filter.includes("*") ||
-    filter.includes("?") ||
-    filter.includes("[") ||
-    filter.includes("|") ||
+    isSlashed ||
+    /[*?[|]/.test(filter) ||
     filter.startsWith("^") ||
     filter.endsWith("$");
 
   if (looksLikeRegex) {
-    const pattern =
-      filter.startsWith("/") && filter.endsWith("/")
-        ? filter.slice(1, -1)
-        : filter;
+    const pattern = isSlashed ? filter.slice(1, -1) : filter;
     try {
       return new RegExp(pattern, "i");
     } catch {

@@ -1,5 +1,5 @@
-import type { MeasuredResults } from "./MeasuredResults.ts";
 import type { BenchmarkSpec } from "./BenchmarkSpec.ts";
+import type { MeasuredResults } from "./MeasuredResults.ts";
 
 /** Interface for benchmark execution libraries */
 export interface BenchRunner {

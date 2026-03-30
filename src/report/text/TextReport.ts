@@ -85,7 +85,7 @@ function resultGroupValues<S extends ReadonlyArray<ResultsMapper<any>>>(
   sections: S,
 ): ResultGroup<ReportRowData<S>> {
   const { reports, baseline } = group;
-  const baselineSamples = baseline?.measuredResults.samples;
+  const baseSamples = baseline?.measuredResults.samples;
 
   const results = reports.map(report => {
     const row = {
@@ -93,17 +93,15 @@ function resultGroupValues<S extends ReadonlyArray<ResultsMapper<any>>>(
       ...extractReportValues(report, sections),
     } as ReportRowData<S>;
 
-    if (baselineSamples && report.measuredResults.samples) {
-      (row as any).diffCI = bootstrapDifferenceCI(
-        baselineSamples,
-        report.measuredResults.samples,
-      );
+    if (baseSamples && report.measuredResults.samples) {
+      const samples = report.measuredResults.samples;
+      (row as any).diffCI = bootstrapDifferenceCI(baseSamples, samples);
     }
     return row;
   });
 
-  const baselineRow = baseline && valuesForReports([baseline], sections)[0];
-  return { results, baseline: baselineRow };
+  const baseRow = baseline && valuesForReports([baseline], sections)[0];
+  return { results, baseline: baseRow };
 }
 
 /** @return column groups with diff columns if baseline exists */
@@ -111,12 +109,12 @@ function createColumnGroups<S extends ReadonlyArray<ResultsMapper<any>>>(
   sections: S,
   hasBaseline: boolean,
 ): ColumnGroup<ReportRowData<S>>[] {
-  const nameColumn: ColumnGroup<ReportRowData<S>> = {
-    columns: [{ key: "name" as keyof ReportRowData<S>, title: "name" }],
+  type Row = ReportRowData<S>;
+  const nameCol: ColumnGroup<Row> = {
+    columns: [{ key: "name" as keyof Row, title: "name" }],
   };
-
-  const groups = sections.flatMap(section => section.columns());
-  return [nameColumn, ...(hasBaseline ? injectDiffColumns(groups) : groups)];
+  const groups = sections.flatMap(s => s.columns());
+  return [nameCol, ...(hasBaseline ? injectDiffColumns(groups) : groups)];
 }
 
 /** @return merged statistics from all sections */
@@ -124,9 +122,7 @@ function extractReportValues(
   report: BenchmarkReport,
   sections: ReadonlyArray<ResultsMapper<any>>,
 ): UnknownRecord {
-  const { measuredResults, metadata } = report;
-  const entries = sections.flatMap(s =>
-    Object.entries(s.extract(measuredResults, metadata)),
-  );
+  const { measuredResults: m, metadata } = report;
+  const entries = sections.flatMap(s => Object.entries(s.extract(m, metadata)));
   return Object.fromEntries(entries);
 }

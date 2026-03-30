@@ -26,23 +26,25 @@ export async function setupLapMode(
     Promise.withResolvers<BrowserProfileResult>();
   let instrumentsStarted = false;
 
+  const instrOpts = {
+    alloc,
+    timeSample,
+    callCounts,
+    samplingInterval,
+    timeInterval: params.timeInterval,
+  };
   await page.exposeFunction("__benchInstrumentStart", async () => {
     if (instrumentsStarted) return;
     instrumentsStarted = true;
-    await startInstruments(cdp, {
-      alloc,
-      timeSample,
-      callCounts,
-      samplingInterval,
-      timeInterval: params.timeInterval,
-    });
+    await startInstruments(cdp, instrOpts);
   });
 
+  const stopOpts = { alloc, timeSample, callCounts };
   await page.exposeFunction(
     "__benchCollect",
     async (samples: number[], wallTimeMs: number) => {
       const collected = instrumentsStarted
-        ? await stopInstruments(cdp, { alloc, timeSample, callCounts })
+        ? await stopInstruments(cdp, stopOpts)
         : {};
       resolve({ samples, wallTimeMs, ...collected });
     },

@@ -48,9 +48,8 @@ export async function loadSummary(
 }
 
 function buildReportHeader(metadata: Record<string, unknown>): string {
-  const cliArgs = formatCliArgs(
-    metadata.cliArgs as Record<string, unknown> | undefined,
-  );
+  const args = metadata.cliArgs as Record<string, unknown> | undefined;
+  const cliArgs = formatCliArgs(args);
   const version = formatVersionInfo(metadata);
   return `<div class="report-header">
     <div class="cli-args">${escapeHtml(cliArgs)}</div>
@@ -89,13 +88,12 @@ function formatCliArgs(args?: Record<string, unknown>): string {
 }
 
 function formatVersionInfo(metadata: Record<string, unknown>): string {
-  const currentVersion = metadata.currentVersion as VersionInfo | undefined;
-  const baselineVersion = metadata.baselineVersion as VersionInfo | undefined;
-  if (!currentVersion && !baselineVersion) return "";
+  const cur = metadata.currentVersion as VersionInfo | undefined;
+  const base = metadata.baselineVersion as VersionInfo | undefined;
+  if (!cur && !base) return "";
   const parts: string[] = [];
-  if (currentVersion) parts.push("Current: " + formatVersion(currentVersion));
-  if (baselineVersion)
-    parts.push("Baseline: " + formatVersion(baselineVersion));
+  if (cur) parts.push("Current: " + formatVersion(cur));
+  if (base) parts.push("Baseline: " + formatVersion(base));
   return `<div class="version-info">${parts.join(" | ")}</div>`;
 }
 
@@ -111,24 +109,25 @@ function comparisonBadge(group: BenchmarkGroup, i: number): string {
     <div id="ci-plot-${i}" class="ci-plot-container"></div>`;
 }
 
+function relativeDate(diffMs: number, date: string): string {
+  const mins = Math.floor(diffMs / 60000);
+  if (mins < 1) return "just now";
+  if (mins < 60) return `${mins}m ago`;
+  const hours = Math.floor(diffMs / 3600000);
+  if (hours < 24) return `${hours}h ago`;
+  const days = Math.floor(diffMs / 86400000);
+  if (days === 1) return "yesterday";
+  if (days < 30) return `${days} days ago`;
+  return new Date(date).toLocaleDateString("en-US", {
+    month: "short",
+    day: "numeric",
+  });
+}
+
 function formatVersion(v: VersionInfo): string {
   if (!v || v.hash === "unknown") return "unknown";
   const hash = v.dirty ? v.hash + "*" : v.hash;
   if (!v.date) return hash;
-  const diffMs = Date.now() - new Date(v.date).getTime();
-  const mins = Math.floor(diffMs / 60000);
-  const hours = Math.floor(diffMs / 3600000);
-  const days = Math.floor(diffMs / 86400000);
-  let rel: string;
-  if (mins < 1) rel = "just now";
-  else if (mins < 60) rel = `${mins}m ago`;
-  else if (hours < 24) rel = `${hours}h ago`;
-  else if (days === 1) rel = "yesterday";
-  else if (days < 30) rel = `${days} days ago`;
-  else
-    rel = new Date(v.date).toLocaleDateString("en-US", {
-      month: "short",
-      day: "numeric",
-    });
+  const rel = relativeDate(Date.now() - new Date(v.date).getTime(), v.date);
   return `${hash} (${rel})`;
 }

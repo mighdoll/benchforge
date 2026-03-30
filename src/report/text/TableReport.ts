@@ -128,52 +128,38 @@ function addBaseline<T extends Record<string, any>>(
     addComparisons(columnGroups, result, baseline),
   );
 
-  const markedBaseline = {
-    ...baseline,
-    [nameKey]: `--> ${baseline[nameKey]}`,
-  };
-
-  return [...diffResults, markedBaseline];
+  const marked = { ...baseline, [nameKey]: `--> ${baseline[nameKey]}` };
+  return [...diffResults, marked];
 }
 
 /** Create headers and table configuration */
 function setup<T>(groups: ColumnGroup<T>[], dataRows: string[][]): TableSetup {
   const titles = getTitles(groups);
-  const numColumns = titles.length;
-
-  const sectionRows = createGroupHeaders(groups, numColumns);
-  const headerRows = [...sectionRows, titles];
-  const spanningCells = createSectionSpans(groups);
-  const columnWidths = calcColumnWidths(groups, titles, dataRows);
+  const headerRows = [...createGroupHeaders(groups, titles.length), titles];
   const config: TableUserConfig = {
-    spanningCells,
-    columns: columnWidths,
+    spanningCells: createSectionSpans(groups),
+    columns: calcColumnWidths(groups, titles, dataRows),
     ...createLines(groups),
   };
-
   return { headerRows, config };
 }
 
 /** Add comparison values for diff columns */
 function addComparisons<T extends Record<string, any>>(
   groups: ColumnGroup<T>[],
-  mainRecord: T,
-  baselineRecord: T,
+  main: T,
+  baseline: T,
 ): T {
-  const diffColumns = groups.flatMap(g => g.columns).filter(col => col.diffKey);
-  const updatedMain = { ...mainRecord };
+  const diffCols = groups.flatMap(g => g.columns).filter(col => col.diffKey);
+  const result = { ...main };
 
-  for (const col of diffColumns) {
+  for (const col of diffCols) {
     const dcol = col as DiffColumn<T>;
-    const diffKey = dcol.diffKey;
-    const mainValue = mainRecord[diffKey];
-    const baselineValue = baselineRecord[diffKey];
-    const diffFormat = dcol.diffFormatter ?? diffPercent;
-    const diffStr = diffFormat(mainValue, baselineValue);
-    (updatedMain as any)[col.key] = diffStr;
+    const fmt = dcol.diffFormatter ?? diffPercent;
+    (result as any)[col.key] = fmt(main[dcol.diffKey], baseline[dcol.diffKey]);
   }
 
-  return updatedMain;
+  return result;
 }
 
 /** @return bolded column title strings */
@@ -215,33 +201,26 @@ function calcColumnWidths<T>(
   dataRows: unknown[][],
 ): Record<number, { width: number; wrapWord: boolean }> {
   // First pass: calculate base widths from titles and data
-  const widths: number[] = [];
-  for (let i = 0; i < titles.length; i++) {
-    const titleW = cellWidth(titles[i]);
-    const maxDataW = dataRows.reduce(
+  const widths = titles.map((title, i) => {
+    const maxData = dataRows.reduce(
       (max, row) => Math.max(max, cellWidth(row[i])),
       0,
     );
-    widths.push(Math.max(titleW, maxDataW));
-  }
+    return Math.max(cellWidth(title), maxData);
+  });
 
   // Second pass: ensure group titles fit (accounting for column separators)
-  let colIndex = 0;
+  let col = 0;
   for (const group of groups) {
-    const groupW = cellWidth(group.groupTitle);
-    if (groupW > 0) {
-      const numCols = group.columns.length;
-      const separatorWidth = (numCols - 1) * 3; // " | " between columns
-      const currentWidth = widths
-        .slice(colIndex, colIndex + numCols)
-        .reduce((a, b) => a + b, 0);
-      const needed = groupW - currentWidth - separatorWidth;
-      if (needed > 0) {
-        // Distribute extra width to last column in group
-        widths[colIndex + numCols - 1] += needed;
-      }
+    const gw = cellWidth(group.groupTitle);
+    const n = group.columns.length;
+    if (gw > 0) {
+      const sepWidth = (n - 1) * 3; // " | " between columns
+      const curWidth = widths.slice(col, col + n).reduce((a, b) => a + b, 0);
+      const needed = gw - curWidth - sepWidth;
+      if (needed > 0) widths[col + n - 1] += needed;
     }
-    colIndex += group.columns.length;
+    col += n;
   }
 
   // Convert to table config format
@@ -283,11 +262,7 @@ function calcBorders<T>(groups: ColumnGroup<T>[]): {
 } {
   if (groups.length === 0) return { sectionBorders: [], headerBottom: 1 };
 
-  const sectionBorders: number[] = [];
   let border = 0;
-  for (const g of groups) {
-    border += g.columns.length;
-    sectionBorders.push(border);
-  }
+  const sectionBorders = groups.map(g => (border += g.columns.length));
   return { sectionBorders, headerBottom: 3 };
 }

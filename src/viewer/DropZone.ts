@@ -78,11 +78,11 @@ async function loadArchiveFile(
   } catch (err) {
     console.error("Failed to load archive:", err);
     const content = zone.querySelector(".drop-zone-content")!;
-    const existing = content.querySelector(".drop-zone-error");
-    if (existing) existing.remove();
+    content.querySelector(".drop-zone-error")?.remove();
+    const msg = escapeHtml(String(err));
     content.insertAdjacentHTML(
       "beforeend",
-      `<p class="drop-zone-error">Failed to load file: ${escapeHtml(String(err))}</p>`,
+      `<p class="drop-zone-error">Failed to load file: ${msg}</p>`,
     );
   }
 }

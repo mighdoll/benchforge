@@ -77,12 +77,11 @@ function renderGroupPlots(
   const flattened = flattenSamples(benchmarks);
   const benchmarkNames = benchmarks.map(b => b.name);
 
-  renderToContainer(
-    `#histogram-${groupIndex}`,
-    flattened.allSamples.length > 0,
-    () => createHistogramKde(flattened.allSamples, benchmarkNames),
+  const { allSamples, timeSeries, allGcEvents, allPausePoints, heapSeries } =
+    flattened;
+  renderToContainer(`#histogram-${groupIndex}`, allSamples.length > 0, () =>
+    createHistogramKde(allSamples, benchmarkNames),
   );
-  const { timeSeries, allGcEvents, allPausePoints, heapSeries } = flattened;
   renderToContainer(
     `#sample-timeseries-${groupIndex}`,
     timeSeries.length > 0,
@@ -183,25 +182,24 @@ function generateStatsHtml(b: PreparedBenchmark, gcEnabled: boolean): string {
 }
 
 function flattenSamples(benchmarks: PreparedBenchmark[]): FlattenedData {
-  const result: FlattenedData = {
+  const out: FlattenedData = {
     allSamples: [],
     timeSeries: [],
     heapSeries: [],
     allGcEvents: [],
     allPausePoints: [],
   };
-  for (const b of benchmarks)
-    if (b.samples?.length) flattenBenchmark(b, result);
-  return result;
+  for (const b of benchmarks) if (b.samples?.length) flattenBenchmark(b, out);
+  return out;
 }
 
 function generateCIHtml(ci: BenchmarkEntry["comparisonCI"]): string {
   if (!ci) return "";
-  const text = `${formatPct(ci.percent)} [${formatPct(ci.ci[0])}, ${formatPct(ci.ci[1])}]`;
+  const pct = `${formatPct(ci.percent)} [${formatPct(ci.ci[0])}, ${formatPct(ci.ci[1])}]`;
   return `
     <div class="stat-item">
       <div class="stat-label">vs Baseline</div>
-      <div class="stat-value ci-${ci.direction}">${text}</div>
+      <div class="stat-value ci-${ci.direction}">${pct}</div>
     </div>
   `;
 }
@@ -239,9 +237,10 @@ function flattenBenchmark(b: PreparedBenchmark, out: FlattenedData): void {
 
   b.gcEvents?.forEach(gc => {
     const idx = sampleEndTimes.findIndex(t => t >= gc.offset);
+    const sampleIndex = idx >= 0 ? idx : b.samples.length - 1;
     out.allGcEvents.push({
       benchmark: b.name,
-      sampleIndex: idx >= 0 ? idx : b.samples.length - 1,
+      sampleIndex,
       duration: gc.duration,
     });
   });

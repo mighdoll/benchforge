@@ -58,7 +58,7 @@ function legendBackground(bounds: LegendBounds): any {
       y2: bounds.yMax * 1.05,
     },
   ];
-  const opts = {
+  return Plot.rect(data, {
     x1: "x1",
     x2: "x2",
     y1: "y1",
@@ -67,8 +67,7 @@ function legendBackground(bounds: LegendBounds): any {
     fillOpacity: 0.9,
     stroke: "#ddd",
     strokeWidth: 1,
-  };
-  return Plot.rect(data, opts);
+  });
 }
 
 function symbolMark(pos: LegendPos, item: LegendItem): any {
@@ -149,7 +148,7 @@ function rectMark(pos: LegendPos, color: string): any {
       y2: y + yMax * 0.02,
     },
   ];
-  const opts = {
+  return Plot.rect(data, {
     x1: "x1",
     x2: "x2",
     y1: "y1",
@@ -158,6 +157,5 @@ function rectMark(pos: LegendPos, color: string): any {
     fillOpacity: 0.3,
     stroke: color,
     strokeWidth: 1,
-  };
-  return Plot.rect(data, opts);
+  });
 }

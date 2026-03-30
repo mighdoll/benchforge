@@ -18,7 +18,6 @@ export {
   runDefaultMatrixBench,
   runMatrixSuite,
 } from "./cli/RunBenchCLI.ts";
-export type { MeasuredResults } from "./runners/MeasuredResults.ts";
 export {
   archiveBenchmark,
   buildSpeedscopeFile,
@@ -95,6 +94,7 @@ export type {
   BenchSuite,
 } from "./runners/BenchmarkSpec.ts";
 export type { RunnerOptions } from "./runners/BenchRunner.ts";
+export type { MeasuredResults } from "./runners/MeasuredResults.ts";
 export { average } from "./stats/StatisticalUtils.ts";
 export {
   formatDateWithTimezone,

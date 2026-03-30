@@ -3,7 +3,6 @@ import { basename, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 import pico from "picocolors";
 import { hideBin } from "yargs/helpers";
-import type { MeasuredResults } from "../runners/MeasuredResults.ts";
 import {
   archiveBenchmark,
   buildSpeedscopeFile,
@@ -70,6 +69,7 @@ import type {
 } from "../runners/BenchmarkSpec.ts";
 import type { RunnerOptions } from "../runners/BenchRunner.ts";
 import type { KnownRunner } from "../runners/CreateRunner.ts";
+import type { MeasuredResults } from "../runners/MeasuredResults.ts";
 import { runBenchmark } from "../runners/RunnerOrchestrator.ts";
 import type { ReportData } from "../viewer/ReportData.ts";
 import {
@@ -280,15 +280,15 @@ export function cliToRunnerOptions(args: DefaultCliArgs): RunnerOptions {
 
 /** Log V8 optimization tier distribution and deoptimizations */
 export function reportOptStatus(groups: ReportGroup[]): void {
-  const optData = groups.flatMap(group => {
-    return groupReports(group)
+  const optData = groups.flatMap(group =>
+    groupReports(group)
       .filter(r => r.measuredResults.optStatus)
       .map(r => ({
         name: r.name,
         opt: r.measuredResults.optStatus!,
         samples: r.measuredResults.samples.length,
-      }));
-  });
+      })),
+  );
   if (optData.length === 0) return;
 
   console.log(dim("\nV8 optimization:"));
@@ -333,30 +333,26 @@ export async function exportReports(options: ExportOptions): Promise<void> {
   // Prepare report data (needed for --view and --archive)
   let reportData: ReportData | undefined;
   if (args.view || args.archive != null) {
-    const htmlOpts = {
+    reportData = prepareHtmlData(results, {
       cliArgs: args,
       sections,
       currentVersion,
       baselineVersion,
-    };
-    reportData = prepareHtmlData(results, htmlOpts);
+    });
   }
 
   exportFileFormats(results, args, suiteName);
 
   // Build speedscope files and annotate with coverage if available
   const profileFile = buildSpeedscopeFile(results);
-  const timeProfileFile = parseTimeProfileFile(results);
+  const timeProfileFile = buildAllTimeProfiles(results);
   await annotateCoverage(results, profileFile, timeProfileFile);
 
   const timeData = timeProfileFile
     ? JSON.stringify(timeProfileFile)
     : undefined;
   if (args.archive != null) {
-    const archivePath =
-      typeof args.archive === "string" && args.archive
-        ? args.archive
-        : undefined;
+    const archivePath = args.archive || undefined;
     await archiveBenchmark({
       groups: results,
       reportData,
@@ -501,11 +497,9 @@ function validateArgs(args: DefaultCliArgs): void {
 /** Execute all groups in suite */
 async function runSuite(params: SuiteParams): Promise<ReportGroup[]> {
   const { suite, runner, options, useWorker, batches } = params;
-  const results: ReportGroup[] = [];
-  for (const group of suite.groups) {
-    results.push(await runGroup(group, runner, options, useWorker, batches));
-  }
-  return results;
+  return serialMap(suite.groups, g =>
+    runGroup(g, runner, options, useWorker, batches),
+  );
 }
 
 /** Build report sections based on CLI options */
@@ -540,15 +534,15 @@ async function finishReports(
 
 /** Warn about Node-only flags that are ignored in browser mode. */
 function warnBrowserFlags(args: DefaultCliArgs): void {
-  const ignored: string[] = [];
-  if (!args.worker) ignored.push("--no-worker");
-  if (args["trace-opt"]) ignored.push("--trace-opt");
-  if (args["gc-force"]) ignored.push("--gc-force");
-  if (args.adaptive) ignored.push("--adaptive");
-  if (args.batches > 1) ignored.push("--batches");
-  if (ignored.length) {
+  const ignored = [
+    !args.worker && "--no-worker",
+    args["trace-opt"] && "--trace-opt",
+    args["gc-force"] && "--gc-force",
+    args.adaptive && "--adaptive",
+    args.batches > 1 && "--batches",
+  ].filter(Boolean);
+  if (ignored.length)
     console.warn(yellow(`Ignored in browser mode: ${ignored.join(", ")}`));
-  }
 }
 
 /** @return true if any alloc-related flag implies allocation sampling */
@@ -589,6 +583,7 @@ function browserResultGroups(
   result: BrowserProfileResult,
 ): ReportGroup[] {
   const { gcStats, heapProfile, timeProfile, coverage } = result;
+  const base = { name, gcStats, heapProfile, timeProfile, coverage };
   let measured: MeasuredResults;
 
   // Bench function mode: multiple timing samples with real statistics
@@ -596,14 +591,10 @@ function browserResultGroups(
     const { samples } = result;
     const totalTime = result.wallTimeMs ? result.wallTimeMs / 1000 : undefined;
     measured = {
-      name,
+      ...base,
       samples,
       time: computeStats(samples),
       totalTime,
-      gcStats,
-      heapProfile,
-      timeProfile,
-      coverage,
     };
   } else {
     // Lap mode: 0 laps = single wall-clock, N laps handled above
@@ -617,15 +608,7 @@ function browserResultGroups(
       p99: wallMs,
       p999: wallMs,
     };
-    measured = {
-      name,
-      samples: [wallMs],
-      time,
-      gcStats,
-      heapProfile,
-      timeProfile,
-      coverage,
-    };
+    measured = { ...base, samples: [wallMs], time };
   }
 
   return [{ name, reports: [{ name, measuredResults: measured }] }];
@@ -637,20 +620,13 @@ function printBrowserReport(
   results: ReportGroup[],
   args: DefaultCliArgs,
 ): void {
-  const hasSamples = result.samples && result.samples.length > 0;
+  const hasTime =
+    (result.samples && result.samples.length > 0) || result.wallTimeMs != null;
   const sections: ResultsMapper<any>[] = [];
-  if (hasSamples || result.wallTimeMs != null) {
-    sections.push(timeSection);
-  }
-  if (result.gcStats) {
-    sections.push(browserGcStatsSection);
-  }
-  if (hasSamples || result.wallTimeMs != null) {
-    sections.push(runsSection);
-  }
-  if (sections.length > 0) {
-    console.log(reportResults(results, sections));
-  }
+  if (hasTime) sections.push(timeSection);
+  if (result.gcStats) sections.push(browserGcStatsSection);
+  if (hasTime) sections.push(runsSection);
+  if (sections.length > 0) console.log(reportResults(results, sections));
   if (result.heapProfile) {
     printHeapReports(results, {
       ...cliHeapReportOptions(args),
@@ -699,16 +675,14 @@ function createAdaptiveOptions(args: DefaultCliArgs): RunnerOptions {
 /** Runner/matrix options shared across all CLI modes */
 function cliCommonOptions(args: DefaultCliArgs) {
   const { warmup } = args;
-  const gcForce = args["gc-force"];
+  const { "gc-force": gcForce, "gc-stats": gcStats } = args;
   const { "trace-opt": traceOpt, "skip-settle": noSettle } = args;
   const { "pause-first": pauseFirst, "pause-interval": pauseInterval } = args;
-  const { "pause-duration": pauseDuration, "gc-stats": gcStats } = args;
+  const { "pause-duration": pauseDuration } = args;
+  const { "alloc-interval": allocInterval, "alloc-depth": allocDepth } = args;
+  const { "time-interval": timeInterval, "call-counts": callCounts } = args;
   const alloc = needsAlloc(args);
-  const { "alloc-interval": allocInterval } = args;
-  const { "alloc-depth": allocDepth } = args;
   const timeSample = needsTimeSample(args);
-  const { "time-interval": timeInterval } = args;
-  const callCounts = args["call-counts"];
   return {
     gcForce,
     warmup,
@@ -737,10 +711,6 @@ function exportFileFormats(
   if (args["export-perfetto"])
     exportPerfettoTrace(results, args["export-perfetto"], args);
   if (args["export-time"]) exportTimeProfile(results, args["export-time"]);
-}
-
-function parseTimeProfileFile(results: ReportGroup[]) {
-  return buildAllTimeProfiles(results);
 }
 
 /** Annotate speedscope frame names with coverage counts if available */
@@ -854,17 +824,15 @@ function exportTimeProfile(results: ReportGroup[], path: string): void {
 
 /** Build combined time profile SpeedScope file from all results */
 function buildAllTimeProfiles(results: ReportGroup[]) {
-  const entries: {
-    name: string;
-    profile: import("../profiling/node/TimeSampler.ts").TimeProfile;
-  }[] = [];
-  for (const group of results) {
-    for (const report of groupReports(group)) {
-      const { timeProfile } = report.measuredResults;
-      if (timeProfile)
-        entries.push({ name: report.name, profile: timeProfile });
-    }
-  }
+  type TP = import("../profiling/node/TimeSampler.ts").TimeProfile;
+  const entries = results.flatMap(group =>
+    groupReports(group)
+      .filter(r => r.measuredResults.timeProfile)
+      .map(r => ({
+        name: r.name,
+        profile: r.measuredResults.timeProfile as TP,
+      })),
+  );
   return buildTimeSpeedscopeFile(entries);
 }
 
@@ -872,15 +840,10 @@ function buildAllTimeProfiles(results: ReportGroup[]) {
 function mergeCoverage(
   results: ReportGroup[],
 ): import("../profiling/node/CoverageTypes.ts").CoverageData | undefined {
-  const allScripts: import("../profiling/node/CoverageTypes.ts").ScriptCoverage[] =
-    [];
-  for (const group of results) {
-    for (const report of groupReports(group)) {
-      const { coverage } = report.measuredResults;
-      if (coverage) allScripts.push(...coverage.scripts);
-    }
-  }
-  return allScripts.length > 0 ? { scripts: allScripts } : undefined;
+  const scripts = results.flatMap(group =>
+    groupReports(group).flatMap(r => r.measuredResults.coverage?.scripts ?? []),
+  );
+  return scripts.length > 0 ? { scripts } : undefined;
 }
 
 /** Wait for Ctrl+C before exiting */
@@ -968,13 +931,9 @@ async function runMultipleBatches(
 function findTimeProfile(
   results: ReportGroup[],
 ): import("../profiling/node/TimeSampler.ts").TimeProfile | undefined {
-  for (const group of results) {
-    for (const report of groupReports(group)) {
-      if (report.measuredResults.timeProfile)
-        return report.measuredResults.timeProfile;
-    }
-  }
-  return undefined;
+  const reports = results.flatMap(g => groupReports(g));
+  return reports.find(r => r.measuredResults.timeProfile)?.measuredResults
+    .timeProfile;
 }
 
 /** Run single benchmark and create report */

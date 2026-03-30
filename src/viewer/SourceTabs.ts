@@ -120,12 +120,8 @@ async function updateSourcePanel(
       themes: { light: "github-light", dark: "github-dark" },
     });
 
-    const header = buildSourceHeader(
-      file,
-      line,
-      col,
-      provider.config.editorUri,
-    );
+    const uri = provider.config.editorUri;
+    const header = buildSourceHeader(file, line, col, uri);
     panel.innerHTML = header + '<div class="source-code">' + html + "</div>";
 
     if (line) {
@@ -160,16 +156,15 @@ function buildSourceHeader(
   col: number,
   editorUri: string | null,
 ): string {
-  let header = '<div class="source-header">';
-  header += '<span class="source-path">' + escapeHtml(file) + "</span>";
+  const path = escapeHtml(file);
+  let html = `<div class="source-header">`;
+  html += `<span class="source-path">${path}</span>`;
   if (editorUri) {
-    const editorHref =
-      editorUri + filePathFromUrl(file) + ":" + (line || 1) + ":" + (col || 1);
-    header +=
-      ' <a class="source-editor-link" href="' +
-      escapeHtml(editorHref) +
-      '">Open in Editor</a>';
+    const l = line || 1;
+    const c = col || 1;
+    const href = editorUri + filePathFromUrl(file) + `:${l}:${c}`;
+    html += ` <a class="source-editor-link" href="${escapeHtml(href)}">Open in Editor</a>`;
   }
-  header += "</div>";
-  return header;
+  html += "</div>";
+  return html;
 }

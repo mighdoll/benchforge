@@ -2,8 +2,8 @@ import { spawn } from "node:child_process";
 import { readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { resolve } from "node:path";
 import type { DefaultCliArgs } from "../cli/CliArgs.ts";
-import type { MeasuredResults } from "../runners/MeasuredResults.ts";
 import type { ReportGroup } from "../report/BenchmarkReport.ts";
+import type { MeasuredResults } from "../runners/MeasuredResults.ts";
 
 /** Chrome Trace Event format event */
 interface TraceEvent {
@@ -49,13 +49,13 @@ function buildTraceEvents(
   groups: ReportGroup[],
   args: DefaultCliArgs,
 ): TraceEvent[] {
-  const meta = (name: string, a: Record<string, unknown>): TraceEvent => ({
+  const meta = (name: string, args: Record<string, unknown>): TraceEvent => ({
     ph: "M",
     ts: 0,
     pid,
     tid,
     name,
-    args: a,
+    args,
   });
   const events: TraceEvent[] = [
     meta("process_name", { name: "wesl-bench" }),
@@ -74,17 +74,15 @@ function buildTraceEvents(
 }
 
 /** Merge V8 trace events from a previous run, aligning timestamps */
-function mergeV8Trace(customEvents: TraceEvent[]): TraceEvent[] {
-  const traceFiles = readdirSync(".").filter(
+function mergeV8Trace(events: TraceEvent[]): TraceEvent[] {
+  const files = readdirSync(".").filter(
     f => f.startsWith("node_trace.") && f.endsWith(".log"),
   );
-
-  const v8Events = loadV8Events(traceFiles[0]);
-  normalizeTimestamps(customEvents);
-  if (!v8Events) return customEvents;
-
+  const v8Events = loadV8Events(files[0]);
+  normalizeTimestamps(events);
+  if (!v8Events) return events;
   normalizeTimestamps(v8Events);
-  return [...v8Events, ...customEvents];
+  return [...v8Events, ...events];
 }
 
 /** Write trace events to JSON file */
@@ -131,10 +129,9 @@ function scheduleDeferredMerge(outputPath: string): void {
 /** Clean CLI args for metadata */
 function cleanArgs(args: DefaultCliArgs): Record<string, unknown> {
   const skip = new Set(["_", "$0"]);
-  const entries = Object.entries(args).filter(
-    ([k, v]) => v !== undefined && !skip.has(k),
+  return Object.fromEntries(
+    Object.entries(args).filter(([k, v]) => v !== undefined && !skip.has(k)),
   );
-  return Object.fromEntries(entries);
 }
 
 /** Build events for a single benchmark run */
@@ -146,8 +143,10 @@ function buildBenchmarkEvents(results: MeasuredResults): TraceEvent[] {
   for (let i = 0; i < samples.length; i++) {
     const ts = timestamps[i];
     const ms = Math.round(samples[i] * 100) / 100;
-    events.push(instant(ts, results.name, { n: i, ms }));
-    events.push(counter(ts, "duration", { ms }));
+    events.push(
+      instant(ts, results.name, { n: i, ms }),
+      counter(ts, "duration", { ms }),
+    );
     if (heapSamples?.[i] !== undefined) {
       const MB = Math.round((heapSamples[i] / 1024 / 1024) * 10) / 10;
       events.push(counter(ts, "heap", { MB }));
@@ -181,9 +180,9 @@ function loadV8Events(
 /** Normalize timestamps so events start at 0 */
 function normalizeTimestamps(events: TraceEvent[]): void {
   const times = events.filter(e => e.ts > 0).map(e => e.ts);
-  if (times.length === 0) return;
-  const minTs = Math.min(...times);
-  for (const e of events) if (e.ts > 0) e.ts -= minTs;
+  if (!times.length) return;
+  const min = Math.min(...times);
+  for (const e of events) if (e.ts > 0) e.ts -= min;
 }
 
 function instant(

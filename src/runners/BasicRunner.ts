@@ -1,12 +1,12 @@
 import { getHeapStatistics } from "node:v8";
+import type { BenchmarkSpec } from "./BenchmarkSpec.ts";
+import type { BenchRunner, RunnerOptions } from "./BenchRunner.ts";
+import { executeBenchmark } from "./BenchRunner.ts";
 import type {
   MeasuredResults,
   OptStatusInfo,
   PausePoint,
 } from "./MeasuredResults.ts";
-import type { BenchmarkSpec } from "./BenchmarkSpec.ts";
-import type { BenchRunner, RunnerOptions } from "./BenchRunner.ts";
-import { executeBenchmark } from "./BenchRunner.ts";
 
 export type SampleTimeStats = {
   min: number;
@@ -142,15 +142,15 @@ async function collectSamples<T>(p: CollectParams<T>): Promise<CollectResult> {
   }
   const warmupSamples = p.skipWarmup ? [] : await runWarmup(p);
   const heapBefore = process.memoryUsage().heapUsed;
-  const { samples, heapSamples, timestamps, optStatuses, pausePoints } =
-    await runSampleLoop(p);
+  const loop = await runSampleLoop(p);
+  const { samples, heapSamples, timestamps, optStatuses, pausePoints } = loop;
+  if (samples.length === 0) {
+    throw new Error(`No samples collected for benchmark: ${p.benchmark.name}`);
+  }
   const heapGrowth =
     Math.max(0, process.memoryUsage().heapUsed - heapBefore) /
     1024 /
     samples.length;
-  if (samples.length === 0) {
-    throw new Error(`No samples collected for benchmark: ${p.benchmark.name}`);
-  }
   const optStatus = p.traceOpt
     ? analyzeOptStatus(samples, optStatuses)
     : undefined;
@@ -170,6 +170,7 @@ async function collectSamples<T>(p: CollectParams<T>): Promise<CollectResult> {
 
 function buildMeasuredResults(name: string, c: CollectResult): MeasuredResults {
   const time = computeStats(c.samples);
+  const heap = c.heapGrowth;
   return {
     name,
     samples: c.samples,
@@ -177,7 +178,7 @@ function buildMeasuredResults(name: string, c: CollectResult): MeasuredResults {
     heapSamples: c.heapSamples,
     timestamps: c.timestamps,
     time,
-    heapSize: { avg: c.heapGrowth, min: c.heapGrowth, max: c.heapGrowth },
+    heapSize: { avg: heap, min: heap, max: heap },
     optStatus: c.optStatus,
     optSamples: c.optSamples,
     pausePoints: c.pausePoints,
@@ -257,9 +258,10 @@ async function runSampleLoop<T>(
   }
 
   trimArrays(a, count, trackHeap, !!getOptStatus);
+  const heapSamples = trackHeap ? a.heapSamples : undefined;
   return {
     samples: a.samples,
-    heapSamples: trackHeap ? a.heapSamples : undefined,
+    heapSamples,
     timestamps: a.timestamps,
     optStatuses: a.optStatuses,
     pausePoints: a.pausePoints,
@@ -273,26 +275,25 @@ function analyzeOptStatus(
 ): OptStatusInfo | undefined {
   if (statuses.length === 0 || statuses[0] === undefined) return undefined;
 
-  const byStatusCode = new Map<number, number[]>();
+  const byCode = new Map<number, number[]>();
   let deoptCount = 0;
 
   for (let i = 0; i < samples.length; i++) {
     const status = statuses[i];
     if (status === undefined) continue;
-
-    // Check deopt flag (bit 3)
-    if (status & 8) deoptCount++;
-
-    if (!byStatusCode.has(status)) byStatusCode.set(status, []);
-    byStatusCode.get(status)!.push(samples[i]);
+    if (status & 8) deoptCount++; // Check deopt flag (bit 3)
+    if (!byCode.has(status)) byCode.set(status, []);
+    byCode.get(status)!.push(samples[i]);
   }
 
   const byTier: Record<string, { count: number; medianMs: number }> = {};
-  for (const [status, times] of byStatusCode) {
+  for (const [status, times] of byCode) {
     const name = statusNames[status] || `status=${status}`;
     const sorted = [...times].sort((a, b) => a - b);
-    const median = sorted[Math.floor(sorted.length / 2)];
-    byTier[name] = { count: times.length, medianMs: median };
+    byTier[name] = {
+      count: times.length,
+      medianMs: sorted[Math.floor(sorted.length / 2)],
+    };
   }
 
   return { byTier, deoptCount };
@@ -310,9 +311,9 @@ function gcFunction(): () => void {
 function createOptStatusGetter(): ((fn: unknown) => number) | undefined {
   try {
     // %GetOptimizationStatus returns a bitmask
-    const getter = new Function("f", "return %GetOptimizationStatus(f)");
-    getter(() => {});
-    return getter as (fn: unknown) => number;
+    const fn = new Function("f", "return %GetOptimizationStatus(f)");
+    fn(() => {});
+    return fn as (fn: unknown) => number;
   } catch {
     return undefined;
   }

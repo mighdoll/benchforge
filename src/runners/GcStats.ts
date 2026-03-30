@@ -32,16 +32,16 @@ export function parseGcLine(line: string): GcEvent | undefined {
   const int = (k: string) => Number.parseInt(fields[k] || "0", 10);
   const type = parseGcType(fields.gc);
   const pauseMs = Number.parseFloat(fields.pause || "0");
+  if (Number.isNaN(pauseMs)) return undefined;
+
   const allocated = int("allocated");
   const promoted = int("promoted");
   // V8 uses "new_space_survived" not "survived"
   const survived = int("new_space_survived") || int("survived");
   // Calculate collected from start/end object size if available
-  const startSize = int("start_object_size");
-  const endSize = int("end_object_size");
-  const collected = startSize > endSize ? startSize - endSize : 0;
-
-  if (Number.isNaN(pauseMs)) return undefined;
+  const start = int("start_object_size");
+  const end = int("end_object_size");
+  const collected = start > end ? start - end : 0;
 
   return { type, pauseMs, allocated, collected, promoted, survived };
 }
@@ -52,7 +52,7 @@ export function aggregateGcStats(events: GcEvent[]): GcStats {
   let markCompacts = 0;
   let gcPauseTime = 0;
   let totalCollected = 0;
-  let hasNodeFields = false;
+  let hasNode = false;
   let totalAllocated = 0;
   let totalPromoted = 0;
   let totalSurvived = 0;
@@ -63,7 +63,7 @@ export function aggregateGcStats(events: GcEvent[]): GcStats {
     gcPauseTime += e.pauseMs;
     totalCollected += e.collected;
     if (e.allocated != null) {
-      hasNodeFields = true;
+      hasNode = true;
       totalAllocated += e.allocated;
       totalPromoted += e.promoted ?? 0;
       totalSurvived += e.survived ?? 0;
@@ -75,7 +75,7 @@ export function aggregateGcStats(events: GcEvent[]): GcStats {
     markCompacts,
     totalCollected,
     gcPauseTime,
-    ...(hasNodeFields && { totalAllocated, totalPromoted, totalSurvived }),
+    ...(hasNode && { totalAllocated, totalPromoted, totalSurvived }),
   };
 }
 
@@ -86,13 +86,9 @@ export function emptyGcStats(): GcStats {
 
 /** Parse name=value pairs from trace-gc-nvp line */
 function parseNvpFields(line: string): Record<string, string> {
-  const fields: Record<string, string> = {};
   // Format: "key=value, key=value, ..." or "key=value key=value"
-  const matches = line.matchAll(/(\w+)=([^\s,]+)/g);
-  for (const [, key, value] of matches) {
-    fields[key] = value;
-  }
-  return fields;
+  const pairs = [...line.matchAll(/(\w+)=([^\s,]+)/g)];
+  return Object.fromEntries(pairs.map(([, k, v]) => [k, v]));
 }
 
 /** Map V8 gc type codes to our types */

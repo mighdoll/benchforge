@@ -1,6 +1,6 @@
-import type { MeasuredResults } from "../runners/MeasuredResults.ts";
 import { BasicRunner } from "../runners/BasicRunner.ts";
 import type { RunnerOptions } from "../runners/BenchRunner.ts";
+import type { MeasuredResults } from "../runners/MeasuredResults.ts";
 import { runMatrixVariant } from "../runners/RunnerOrchestrator.ts";
 import { average } from "../stats/StatisticalUtils.ts";
 import { loadCaseData, loadCasesModule } from "./CaseLoader.ts";
@@ -172,22 +172,21 @@ async function runMatrixInline<T>(
   const runner = new BasicRunner();
   const runnerOpts = buildRunnerOptions(options);
 
-  const variantEntries = options.filteredVariants
-    ? Object.entries(matrix.variants!).filter(([id]) =>
-        options.filteredVariants!.includes(id),
-      )
-    : Object.entries(matrix.variants!);
+  const all = Object.entries(matrix.variants!);
+  const filtered = options.filteredVariants;
+  const variantEntries = filtered
+    ? all.filter(([id]) => filtered.includes(id))
+    : all;
 
   const variants: VariantResult[] = [];
   for (const [variantId, variant] of variantEntries) {
     const cases: CaseResult[] = [];
     for (const caseId of caseIds) {
       const loaded = await loadCaseData(casesModule, caseId);
-      const caseData =
-        casesModule || matrix.cases ? loaded.data : (undefined as T);
+      const data = casesModule || matrix.cases ? loaded.data : (undefined as T);
       const measured = await runVariant(
         variant,
-        caseData,
+        data,
         variantId,
         runner,
         runnerOpts,
@@ -223,9 +222,9 @@ async function runDirVariants<T>(
   ctx: DirMatrixContext<T>,
 ): Promise<VariantResult[]> {
   const variants: VariantResult[] = [];
-  for (const variantId of variantIds) {
-    const cases = await runDirVariantCases(variantId, ctx);
-    variants.push({ id: variantId, cases });
+  for (const id of variantIds) {
+    const cases = await runDirVariantCases(id, ctx);
+    variants.push({ id, cases });
   }
   return variants;
 }
@@ -238,21 +237,17 @@ function applyBaselineVariant(
   const baselineVariant = variants.find(v => v.id === baselineVariantId);
   if (!baselineVariant) return;
 
-  const baselineByCase = new Map<string, MeasuredResults>();
-  for (const c of baselineVariant.cases) {
-    baselineByCase.set(c.caseId, c.measured);
-  }
+  const baselineByCase = new Map(
+    baselineVariant.cases.map(c => [c.caseId, c.measured]),
+  );
 
   for (const variant of variants) {
     if (variant.id === baselineVariantId) continue;
-    for (const caseResult of variant.cases) {
-      const baseline = baselineByCase.get(caseResult.caseId);
-      if (baseline) {
-        caseResult.baseline = baseline;
-        caseResult.deltaPercent = computeDeltaPercent(
-          baseline,
-          caseResult.measured,
-        );
+    for (const cr of variant.cases) {
+      const base = baselineByCase.get(cr.caseId);
+      if (base) {
+        cr.baseline = base;
+        cr.deltaPercent = computeDeltaPercent(base, cr.measured);
       }
     }
   }
@@ -300,18 +295,14 @@ async function runVariant<T>(
   runner: BasicRunner,
   options: RunnerOptions,
 ): Promise<MeasuredResults> {
+  let fn: () => void;
   if (isStatefulVariant(variant)) {
     const state = await variant.setup(caseData);
-    const [result] = await runner.runBench(
-      { name, fn: () => variant.run(state) },
-      options,
-    );
-    return result;
+    fn = () => variant.run(state);
+  } else {
+    fn = () => variant(caseData);
   }
-  const [result] = await runner.runBench(
-    { name, fn: () => variant(caseData) },
-    options,
-  );
+  const [result] = await runner.runBench({ name, fn }, options);
   return result;
 }
 
@@ -345,20 +336,25 @@ async function runDirVariantCases<T>(
     const deltaPercent = baseline
       ? computeDeltaPercent(baseline, measured)
       : undefined;
-    const metadata = loaded.metadata;
-    cases.push({ caseId, measured, metadata, baseline, deltaPercent });
+    cases.push({
+      caseId,
+      measured,
+      metadata: loaded.metadata,
+      baseline,
+      deltaPercent,
+    });
   }
   return cases;
 }
 
 /** Compute delta percentage: (current - baseline) / baseline * 100 */
 function computeDeltaPercent(
-  baseline: MeasuredResults,
-  current: MeasuredResults,
+  base: MeasuredResults,
+  cur: MeasuredResults,
 ): number {
-  const baseAvg = average(baseline.samples);
-  if (baseAvg === 0) return 0;
-  return ((average(current.samples) - baseAvg) / baseAvg) * 100;
+  const avg = average(base.samples);
+  if (avg === 0) return 0;
+  return ((average(cur.samples) - avg) / avg) * 100;
 }
 
 /** Run baseline variant if it exists in baselineDir */

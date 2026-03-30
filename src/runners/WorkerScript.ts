@@ -1,5 +1,4 @@
 #!/usr/bin/env node
-import type { MeasuredResults } from "./MeasuredResults.ts";
 import { variantModuleUrl } from "../matrix/VariantLoader.ts";
 import type { CoverageData } from "../profiling/node/CoverageTypes.ts";
 import type { HeapProfile } from "../profiling/node/HeapSampler.ts";
@@ -11,6 +10,7 @@ import {
 import type { BenchmarkFunction, BenchmarkSpec } from "./BenchmarkSpec.ts";
 import type { BenchRunner, RunnerOptions } from "./BenchRunner.ts";
 import { createRunner, type KnownRunner } from "./CreateRunner.ts";
+import type { MeasuredResults } from "./MeasuredResults.ts";
 import { debugWorkerTiming, getElapsed, getPerfNow } from "./TimingUtils.ts"; // 5 minutes
 
 /** Message sent to worker process to start a benchmark run. */
@@ -139,18 +139,15 @@ async function importBenchmarkWithSetup(
   message: RunMessage,
 ): Promise<BenchmarkImportResult> {
   const { modulePath, exportName, setupExportName, params } = message;
-  logTiming(
-    `Importing from ${modulePath}${exportName ? ` (${exportName})` : ""}`,
-  );
+  const suffix = exportName ? ` (${exportName})` : "";
+  logTiming(`Importing from ${modulePath}${suffix}`);
   const module = await import(modulePath!);
-
   const fn = getModuleExport(module, exportName, modulePath!);
 
   if (setupExportName) {
     logTiming(`Calling setup: ${setupExportName}`);
     const setupFn = getModuleExport(module, setupExportName, modulePath!);
-    const setupResult = await setupFn(params);
-    return { fn, params: setupResult };
+    return { fn, params: await setupFn(params) };
   }
 
   return { fn, params };
@@ -242,15 +239,14 @@ function buildProfilingChain(
     return runner.runBench({ ...message.spec, fn }, message.options, params);
   };
 
+  const { timeInterval, allocInterval, allocDepth } = message.options;
+
   const runMaybeWithTime = timeSample
     ? async () => {
         const { withTimeProfiling } = await import(
           "../profiling/node/TimeSampler.ts"
         );
-        const opts = {
-          interval: message.options.timeInterval,
-          session: state.profilerSession,
-        };
+        const opts = { interval: timeInterval, session: state.profilerSession };
         const r = await withTimeProfiling(opts, run);
         state.timeProfile = r.profile;
         return r.result;
@@ -263,8 +259,8 @@ function buildProfilingChain(
           "../profiling/node/HeapSampler.ts"
         );
         const opts = {
-          samplingInterval: message.options.allocInterval,
-          stackDepth: message.options.allocDepth,
+          samplingInterval: allocInterval,
+          stackDepth: allocDepth,
         };
         const r = await withHeapSampling(opts, runMaybeWithTime);
         state.heapProfile = r.profile;
@@ -301,11 +297,8 @@ process.on("message", async (message: RunMessage) => {
       sendAndExit(result, 0);
     } else {
       const { fn, params } = await resolveBenchmarkFn(message);
-      const results = await runner.runBench(
-        { ...message.spec, fn },
-        message.options,
-        params,
-      );
+      const spec = { ...message.spec, fn };
+      const results = await runner.runBench(spec, message.options, params);
       logTiming("Benchmark execution took", getElapsed(benchStart));
       sendAndExit({ type: "result", results }, 0);
     }

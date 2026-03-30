@@ -64,16 +64,15 @@ export function getMostRecentModifiedDate(dir: string): string | undefined {
 
     if (modifiedFiles.length === 0) return undefined;
 
-    let mostRecent = 0;
-    for (const file of modifiedFiles) {
+    const mtime = (f: string): number => {
       try {
-        const filePath = join(dir, file);
-        if (!existsSync(filePath)) continue;
-        const mtime = statSync(filePath).mtimeMs;
-        if (mtime > mostRecent) mostRecent = mtime;
-      } catch {}
-    }
-
+        const p = join(dir, f);
+        return existsSync(p) ? statSync(p).mtimeMs : 0;
+      } catch {
+        return 0;
+      }
+    };
+    const mostRecent = Math.max(0, ...modifiedFiles.map(mtime));
     return mostRecent > 0 ? new Date(mostRecent).toISOString() : undefined;
   } catch {
     return undefined;

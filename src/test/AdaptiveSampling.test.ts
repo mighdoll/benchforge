@@ -1,8 +1,8 @@
 import { test } from "vitest";
-import type { MeasuredResults } from "../runners/MeasuredResults.ts";
 import { createAdaptiveWrapper } from "../runners/AdaptiveWrapper.ts";
 import type { BenchmarkSpec } from "../runners/BenchmarkSpec.ts";
 import type { BenchRunner } from "../runners/BenchRunner.ts";
+import type { MeasuredResults } from "../runners/MeasuredResults.ts";
 import { bevy30SamplesMs } from "./fixtures/bevy30-samples.ts";
 
 /** Assert convergence data exists, return the result for further checks. */

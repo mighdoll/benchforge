@@ -8,25 +8,16 @@ import { hasSufficientSamples, loadSamples } from "./SamplesTab.ts";
 import { closeSourceTab, openSourceTab } from "./SourceTabs.ts";
 import { activateTab } from "./TabSwitcher.ts";
 
+const $ = document.getElementById.bind(document);
 const tabBar = document.querySelector(".tab-bar") as HTMLDivElement;
-const summaryPanel = document.getElementById("summary-panel") as HTMLDivElement;
-const samplesPanel = document.getElementById("samples-panel") as HTMLDivElement;
-const iframe = document.getElementById(
-  "speedscope-iframe",
-) as HTMLIFrameElement;
-const timeIframe = document.getElementById(
-  "time-speedscope-iframe",
-) as HTMLIFrameElement;
-const summaryTabBtn = document.getElementById(
-  "tab-summary",
-) as HTMLButtonElement;
-const samplesTabBtn = document.getElementById(
-  "tab-samples",
-) as HTMLButtonElement;
-const allocTab = document.getElementById("tab-flamechart") as HTMLButtonElement;
-const timeTab = document.getElementById(
-  "tab-time-flamechart",
-) as HTMLButtonElement;
+const summaryPanel = $("summary-panel") as HTMLDivElement;
+const samplesPanel = $("samples-panel") as HTMLDivElement;
+const iframe = $("speedscope-iframe") as HTMLIFrameElement;
+const timeIframe = $("time-speedscope-iframe") as HTMLIFrameElement;
+const summaryTabBtn = $("tab-summary") as HTMLButtonElement;
+const samplesTabBtn = $("tab-samples") as HTMLButtonElement;
+const allocTab = $("tab-flamechart") as HTMLButtonElement;
+const timeTab = $("tab-time-flamechart") as HTMLButtonElement;
 
 let provider: DataProvider;
 let reportData: ReportData | null = null;
@@ -62,8 +53,8 @@ async function initViewer(p: DataProvider): Promise<void> {
   }
 }
 
-function speedscopeHash(profileUrl: string, config: ViewerConfig): string {
-  const parts = ["profileURL=" + encodeURIComponent(profileUrl)];
+function speedscopeHash(url: string, config: ViewerConfig): string {
+  const parts = ["profileURL=" + encodeURIComponent(url)];
   if (config.editorUri)
     parts.push("editorUri=" + encodeURIComponent(config.editorUri));
   return parts.join("&");

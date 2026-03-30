@@ -106,9 +106,8 @@ function buildTimeProfile(
   const weights: number[] = [];
 
   for (let i = 0; i < sampleIds.length; i++) {
-    const nodeId = sampleIds[i];
     const stack = resolveStack(
-      nodeId,
+      sampleIds[i],
       nodeMap,
       parentMap,
       stackCache,
@@ -119,14 +118,13 @@ function buildTimeProfile(
     weights.push(timeDeltas[i]);
   }
 
-  const totalMicroseconds = weights.reduce((sum, w) => sum + w, 0);
-
+  const total = weights.reduce((sum, w) => sum + w, 0);
   return {
     type: "sampled",
     name,
     unit: "microseconds",
     startValue: 0,
-    endValue: totalMicroseconds,
+    endValue: total,
     samples,
     weights,
   };
@@ -157,19 +155,15 @@ function resolveStack(
   for (let i = path.length - 1; i >= 0; i--) {
     const node = nodeMap.get(path[i]);
     if (!node) continue;
-    const { functionName, url, lineNumber, columnNumber } = node.callFrame;
+    const {
+      functionName: fn,
+      url,
+      lineNumber: line,
+      columnNumber: col,
+    } = node.callFrame;
     // Skip the synthetic (root) node
-    if (!functionName && !url && lineNumber <= 0) continue;
-    stack.push(
-      internFrame(
-        functionName,
-        url,
-        lineNumber,
-        columnNumber,
-        sharedFrames,
-        frameIndex,
-      ),
-    );
+    if (!fn && !url && line <= 0) continue;
+    stack.push(internFrame(fn, url, line, col, sharedFrames, frameIndex));
   }
 
   cache.set(nodeId, stack);
@@ -206,6 +200,6 @@ function internFrame(
 /** Display name for a frame: named functions use their name, anonymous get a location hint */
 function displayName(name: string, url: string, line: number): string {
   if (name !== "(anonymous)") return name;
-  const shortFile = url ? url.split("/").pop() : undefined;
-  return shortFile ? `(anonymous ${shortFile}:${line})` : "(anonymous)";
+  const file = url?.split("/").pop();
+  return file ? `(anonymous ${file}:${line})` : "(anonymous)";
 }

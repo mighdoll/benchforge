@@ -56,11 +56,12 @@ export function resolveProfile(profile: HeapProfile): ResolvedProfile {
 
   function walk(node: ProfileNode, parentStack: ResolvedFrame[]): void {
     const { functionName, url, lineNumber, columnNumber } = node.callFrame;
+    const col = columnNumber != null ? columnNumber + 1 : undefined;
     const frame: ResolvedFrame = {
       name: functionName || "(anonymous)",
       url: url || "",
       line: lineNumber + 1,
-      col: columnNumber != null ? columnNumber + 1 : undefined,
+      col,
     };
     const stack = [...parentStack, frame];
     const resolved: ResolvedNode = {

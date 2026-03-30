@@ -29,10 +29,7 @@ export interface DataProvider {
 
 /** Fetches data from the live CLI viewer HTTP server. */
 export class ServerProvider implements DataProvider {
-  readonly config: ViewerConfig;
-  constructor(config: ViewerConfig) {
-    this.config = config;
-  }
+  constructor(readonly config: ViewerConfig) {}
 
   static async create(): Promise<ServerProvider> {
     const resp = await fetch("/api/config");
@@ -52,19 +49,19 @@ export class ServerProvider implements DataProvider {
   }
 
   profileUrl(type: "alloc" | "time"): string | null {
-    const has =
-      type === "alloc" ? this.config.hasProfile : this.config.hasTimeProfile;
-    if (!has) return null;
-    return type === "alloc" ? "/api/profile" : "/api/profile/time";
+    const isAlloc = type === "alloc";
+    if (!(isAlloc ? this.config.hasProfile : this.config.hasTimeProfile))
+      return null;
+    return isAlloc ? "/api/profile" : "/api/profile/time";
   }
 
   async createArchive(): Promise<{ blob: Blob; filename: string }> {
     const resp = await fetch("/api/archive", { method: "POST" });
     if (!resp.ok) throw new Error("Archive failed");
-    const blob = await resp.blob();
     const disp = resp.headers.get("Content-Disposition") || "";
-    const m = disp.match(/filename="?(.+?)"?$/);
-    return { blob, filename: m?.[1] || "benchforge-archive.benchforge" };
+    const match = disp.match(/filename="?(.+?)"?$/);
+    const filename = match?.[1] || "benchforge-archive.benchforge";
+    return { blob: await resp.blob(), filename };
   }
 }
 
@@ -96,8 +93,8 @@ export class ArchiveProvider implements DataProvider {
   }
 
   profileUrl(type: "alloc" | "time"): string | null {
-    const data =
-      type === "alloc" ? this.archive.profile : this.archive.timeProfile;
+    const isAlloc = type === "alloc";
+    const data = isAlloc ? this.archive.profile : this.archive.timeProfile;
     if (!data) return null;
     let url = this.blobUrls.get(type);
     if (!url) {
@@ -110,9 +107,8 @@ export class ArchiveProvider implements DataProvider {
   }
 
   async createArchive(): Promise<{ blob: Blob; filename: string }> {
-    const blob = new Blob([JSON.stringify(this.archive)], {
-      type: "application/json",
-    });
+    const json = JSON.stringify(this.archive);
+    const blob = new Blob([json], { type: "application/json" });
     const ts =
       this.archive.metadata?.timestamp ||
       new Date().toISOString().replace(/[:.]/g, "-");

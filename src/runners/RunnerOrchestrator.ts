@@ -1,7 +1,6 @@
 import { type ChildProcess, fork } from "node:child_process";
 import { existsSync } from "node:fs";
 import path from "node:path";
-import type { MeasuredResults } from "./MeasuredResults.ts";
 import type { CoverageData } from "../profiling/node/CoverageTypes.ts";
 import type { HeapProfile } from "../profiling/node/HeapSampler.ts";
 import type { TimeProfile } from "../profiling/node/TimeSampler.ts";
@@ -13,6 +12,7 @@ import type { BenchmarkSpec } from "./BenchmarkSpec.ts";
 import type { RunnerOptions } from "./BenchRunner.ts";
 import { createRunner, type KnownRunner } from "./CreateRunner.ts";
 import { aggregateGcStats, type GcEvent, parseGcLine } from "./GcStats.ts";
+import type { MeasuredResults } from "./MeasuredResults.ts";
 import { debugWorkerTiming, getElapsed, getPerfNow } from "./TimingUtils.ts";
 import type {
   ErrorMessage,
@@ -69,19 +69,14 @@ export async function runBenchmark<T = unknown>({
   params,
 }: RunBenchmarkParams<T>): Promise<MeasuredResults[]> {
   if (!useWorker) {
-    const resolvedSpec = spec.modulePath
+    const resolved = spec.modulePath
       ? await resolveModuleSpec(spec, params)
       : { spec, params };
-
     const base = await createRunner(runner);
     const benchRunner = (options as any).adaptive
       ? createAdaptiveWrapper(base, options as AdaptiveOptions)
       : base;
-    return benchRunner.runBench(
-      resolvedSpec.spec,
-      options,
-      resolvedSpec.params,
-    );
+    return benchRunner.runBench(resolved.spec, options, resolved.params);
   }
 
   return runInWorker({ spec, runner, options, params });
@@ -91,26 +86,18 @@ export async function runBenchmark<T = unknown>({
 export async function runMatrixVariant(
   params: RunMatrixVariantParams,
 ): Promise<MeasuredResults[]> {
-  const {
-    variantDir,
-    variantId,
-    caseId,
-    caseData,
-    casesModule,
-    runner,
-    options,
-  } = params;
+  const { variantId, caseId, runner, options } = params;
   const name = `${variantId}/${caseId}`;
   const message: RunMessage = {
     type: "run",
     spec: { name, fn: () => {} },
     runnerName: runner,
     options,
-    variantDir,
+    variantDir: params.variantDir,
     variantId,
     caseId,
-    caseData,
-    casesModule,
+    caseData: params.caseData,
+    casesModule: params.casesModule,
   };
   return runWorkerWithMessage(name, options, message);
 }
@@ -212,9 +199,8 @@ function createWorkerWithTiming(gcStats: boolean) {
   const worker = createWorkerProcess(gcStats);
   const createTime = getPerfNow();
   if (gcStats && worker.stdout) setupGcCapture(worker, gcEvents);
-  logTiming(
-    `Worker process created in ${getElapsed(workerStart, createTime).toFixed(1)}ms`,
-  );
+  const elapsed = getElapsed(workerStart, createTime).toFixed(1);
+  logTiming(`Worker process created in ${elapsed}ms`);
   return { worker, createTime, gcEvents };
 }
 
@@ -226,15 +212,9 @@ function createWorkerHandlers(
   reject: (error: Error) => void,
 ): WorkerHandlers {
   return {
-    resolve: (
-      results: MeasuredResults[],
-      heapProfile?: HeapProfile,
-      timeProfile?: TimeProfile,
-      coverage?: CoverageData,
-    ) => {
-      logTiming(
-        `Total worker time for ${specName}: ${getElapsed(startTime).toFixed(1)}ms`,
-      );
+    resolve: (results, heapProfile, timeProfile, coverage) => {
+      const elapsed = getElapsed(startTime).toFixed(1);
+      logTiming(`Total worker time for ${specName}: ${elapsed}ms`);
       attachProfilingData(
         results,
         gcEvents,
@@ -252,14 +232,11 @@ function createWorkerHandlers(
 function setupWorkerHandlers(
   worker: ReturnType<typeof createWorkerProcess>,
   specName: string,
-  handlers: WorkerHandlers,
+  { resolve, reject }: WorkerHandlers,
 ) {
-  const { resolve, reject } = handlers;
   const cleanup = createCleanup(worker, specName, reject);
-  worker.on(
-    "message",
-    createMessageHandler(specName, cleanup, resolve, reject),
-  );
+  const onMsg = createMessageHandler(specName, cleanup, resolve, reject);
+  worker.on("message", onMsg);
   worker.on("error", createErrorHandler(specName, cleanup, reject));
   worker.on("exit", createExitHandler(specName, cleanup, reject));
 }
@@ -272,9 +249,8 @@ function sendWorkerMessage(
 ): void {
   const messageTime = getPerfNow();
   worker.send(message);
-  logTiming(
-    `Message sent to worker in ${getElapsed(createTime, messageTime).toFixed(1)}ms`,
-  );
+  const elapsed = getElapsed(createTime, messageTime).toFixed(1);
+  logTiming(`Message sent to worker in ${elapsed}ms`);
 }
 
 /** Create worker process with configuration */
@@ -354,12 +330,7 @@ function createCleanup(
 function createMessageHandler(
   specName: string,
   cleanup: () => void,
-  resolve: (
-    results: MeasuredResults[],
-    heapProfile?: HeapProfile,
-    timeProfile?: TimeProfile,
-    coverage?: CoverageData,
-  ) => void,
+  resolve: WorkerHandlers["resolve"],
   reject: (error: Error) => void,
 ) {
   return (msg: ResultMessage | ErrorMessage) => {
@@ -382,11 +353,8 @@ function createErrorHandler(
 ) {
   return (error: Error) => {
     cleanup();
-    reject(
-      new Error(
-        `Worker process failed for benchmark "${specName}": ${error.message}`,
-      ),
-    );
+    const msg = `Worker process failed for benchmark "${specName}": ${error.message}`;
+    reject(new Error(msg));
   };
 }
 

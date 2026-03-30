@@ -1,4 +1,3 @@
-import type { MeasuredResults } from "./MeasuredResults.ts";
 import {
   coefficientOfVariation,
   medianAbsoluteDeviation,
@@ -6,6 +5,7 @@ import {
 } from "../stats/StatisticalUtils.ts";
 import type { BenchmarkSpec } from "./BenchmarkSpec.ts";
 import type { BenchRunner, RunnerOptions } from "./BenchRunner.ts";
+import type { MeasuredResults } from "./MeasuredResults.ts";
 import { msToNs } from "./RunnerUtils.ts";
 
 export interface AdaptiveOptions extends RunnerOptions {
@@ -46,17 +46,11 @@ export function createAdaptiveWrapper(
 ): BenchRunner {
   return {
     async runBench<T = unknown>(
-      benchmark: BenchmarkSpec<T>,
-      runnerOptions: RunnerOptions,
+      bench: BenchmarkSpec<T>,
+      opts: RunnerOptions,
       params?: T,
     ): Promise<MeasuredResults[]> {
-      return runAdaptiveBench(
-        baseRunner,
-        benchmark,
-        runnerOptions,
-        options,
-        params,
-      );
+      return runAdaptiveBench(baseRunner, bench, opts, options, params);
     },
   };
 }
@@ -76,27 +70,21 @@ export function checkConvergence(samples: number[]): ConvergenceResult {
 
 /** @return results using adaptive sampling strategy */
 async function runAdaptiveBench<T>(
-  baseRunner: BenchRunner,
-  benchmark: BenchmarkSpec<T>,
-  runnerOptions: RunnerOptions,
-  options: AdaptiveOptions,
+  runner: BenchRunner,
+  bench: BenchmarkSpec<T>,
+  opts: RunnerOptions,
+  adaptive: AdaptiveOptions,
   params?: T,
 ): Promise<MeasuredResults[]> {
   const {
-    minTime: min = options.minTime ?? minTime,
-    maxTime: max = options.maxTime ?? maxTime,
-    targetConfidence: target = options.convergence ?? targetConfidence,
-  } = runnerOptions as AdaptiveOptions;
+    minTime: min = adaptive.minTime ?? minTime,
+    maxTime: max = adaptive.maxTime ?? maxTime,
+    targetConfidence: target = adaptive.convergence ?? targetConfidence,
+  } = opts as AdaptiveOptions;
   const allSamples: number[] = [];
 
   // Collect initial batch (includes warmup + settle)
-  const warmup = await collectInitial(
-    baseRunner,
-    benchmark,
-    runnerOptions,
-    params,
-    allSamples,
-  );
+  const warmup = await collectInitial(runner, bench, opts, params, allSamples);
 
   // Start timing AFTER warmup - warmup time doesn't count against maxTime
   const startTime = performance.now();
@@ -107,23 +95,11 @@ async function runAdaptiveBench<T>(
     targetConfidence: target,
     startTime,
   };
-  await collectAdaptive(
-    baseRunner,
-    benchmark,
-    runnerOptions,
-    params,
-    allSamples,
-    limits,
-  );
+  await collectAdaptive(runner, bench, opts, params, allSamples, limits);
 
-  const convergence = checkConvergence(allSamples.map(s => s * msToNs));
-  return buildResults(
-    allSamples,
-    startTime,
-    convergence,
-    benchmark.name,
-    warmup,
-  );
+  const samplesNs = allSamples.map(s => s * msToNs);
+  const convergence = checkConvergence(samplesNs);
+  return buildResults(allSamples, startTime, convergence, bench.name, warmup);
 }
 
 /** @return window size scaled to execution time */
@@ -142,32 +118,27 @@ function getWindowSize(samples: number[]): number {
 }
 
 /** @return progress when samples insufficient */
-function buildProgressResult(
-  currentSamples: number,
-  minSamples: number,
-): ConvergenceResult {
+function buildProgressResult(current: number, min: number): ConvergenceResult {
   return {
     converged: false,
-    confidence: (currentSamples / minSamples) * 100,
-    reason: `Collecting samples: ${currentSamples}/${minSamples}`,
+    confidence: (current / min) * 100,
+    reason: `Collecting samples: ${current}/${min}`,
   };
 }
 
 /** @return stability metrics between windows */
-function getStability(samples: number[], windowSize: number): Metrics {
-  const recent = samples.slice(-windowSize);
-  const previous = samples.slice(-windowSize * 2, -windowSize);
+function getStability(samples: number[], win: number): Metrics {
+  const toMs = (s: number) => s / msToNs;
+  const recentMs = samples.slice(-win).map(toMs);
+  const prevMs = samples.slice(-win * 2, -win).map(toMs);
 
-  const recentMs = recent.map(s => s / msToNs);
-  const previousMs = previous.map(s => s / msToNs);
+  const medRecent = percentile(recentMs, 0.5);
+  const medPrev = percentile(prevMs, 0.5);
+  const medianDrift = Math.abs(medRecent - medPrev) / medPrev;
 
-  const medianRecent = percentile(recentMs, 0.5);
-  const medianPrevious = percentile(previousMs, 0.5);
-  const medianDrift = Math.abs(medianRecent - medianPrevious) / medianPrevious;
-
-  const impactRecent = getOutlierImpact(recentMs);
-  const impactPrevious = getOutlierImpact(previousMs);
-  const impactDrift = Math.abs(impactRecent.ratio - impactPrevious.ratio);
+  const impRecent = getOutlierImpact(recentMs);
+  const impPrev = getOutlierImpact(prevMs);
+  const impactDrift = Math.abs(impRecent.ratio - impPrev.ratio);
 
   return {
     medianDrift,
@@ -189,11 +160,9 @@ function buildConvergence(metrics: Metrics): ConvergenceResult {
     };
   }
 
-  const confidence = Math.min(
-    100,
-    (1 - medianDrift / stability) * 50 + (1 - impactDrift / stability) * 50,
-  );
-
+  const raw =
+    (1 - medianDrift / stability) * 50 + (1 - impactDrift / stability) * 50;
+  const confidence = Math.min(100, raw);
   const reason =
     medianDrift > impactDrift
       ? `Median drifting: ${(medianDrift * 100).toFixed(1)}%`
@@ -204,28 +173,28 @@ function buildConvergence(metrics: Metrics): ConvergenceResult {
 
 /** @return warmupSamples from initial batch */
 async function collectInitial<T>(
-  baseRunner: BenchRunner,
-  benchmark: BenchmarkSpec<T>,
-  runnerOptions: RunnerOptions,
+  runner: BenchRunner,
+  bench: BenchmarkSpec<T>,
+  opts: RunnerOptions,
   params: T | undefined,
   allSamples: number[],
 ): Promise<number[] | undefined> {
   // Don't pass adaptive flag to base runner to avoid double wrapping
-  const opts = {
-    ...(runnerOptions as any),
+  const batchOpts = {
+    ...(opts as any),
     maxTime: initialBatch,
     maxIterations: undefined,
   };
-  const results = await baseRunner.runBench(benchmark, opts, params);
+  const results = await runner.runBench(bench, batchOpts, params);
   appendSamples(results[0], allSamples);
   return results[0].warmupSamples;
 }
 
 /** @return samples until convergence or timeout */
 async function collectAdaptive<T>(
-  baseRunner: BenchRunner,
-  benchmark: BenchmarkSpec<T>,
-  runnerOptions: RunnerOptions,
+  runner: BenchRunner,
+  bench: BenchmarkSpec<T>,
+  opts: RunnerOptions,
   params: T | undefined,
   allSamples: number[],
   limits: {
@@ -246,7 +215,7 @@ async function collectAdaptive<T>(
       const elapsedSec = (elapsed / 1000).toFixed(1);
       const conf = convergence.confidence.toFixed(0);
       process.stderr.write(
-        `\r◊ ${benchmark.name}: ${conf}% confident (${elapsedSec}s)   `,
+        `\r◊ ${bench.name}: ${conf}% confident (${elapsedSec}s)   `,
       );
       lastLog = elapsed;
     }
@@ -256,40 +225,29 @@ async function collectAdaptive<T>(
     }
 
     // Skip warmup for continuation batches (warmup done in initial batch)
-    const opts = {
-      ...(runnerOptions as any),
+    const batch = {
+      ...(opts as any),
       maxTime: continueBatch,
       maxIterations: continueIterations,
       skipWarmup: true,
     };
-    const batchResults = await baseRunner.runBench(benchmark, opts, params);
-    appendSamples(batchResults[0], allSamples);
+    const results = await runner.runBench(bench, batch, params);
+    appendSamples(results[0], allSamples);
   }
   process.stderr.write("\r" + " ".repeat(60) + "\r");
 }
 
 /** @return measured results with convergence metrics */
 function buildResults(
-  samplesMs: number[],
+  samples: number[],
   startTime: number,
   convergence: ConvergenceResult,
   name: string,
   warmupSamples?: number[],
 ): MeasuredResults[] {
   const totalTime = (performance.now() - startTime) / 1000;
-  const samplesNs = samplesMs.map(s => s * msToNs);
-  const timeStats = computeTimeStats(samplesNs);
-
-  return [
-    {
-      name,
-      samples: samplesMs,
-      warmupSamples,
-      time: timeStats,
-      totalTime,
-      convergence,
-    },
-  ];
+  const time = computeTimeStats(samples.map(s => s * msToNs));
+  return [{ name, samples, warmupSamples, time, totalTime, convergence }];
 }
 
 /** @return outlier impact as proportion of total time */
@@ -310,11 +268,8 @@ function getOutlierImpact(samples: number[]): { ratio: number; count: number } {
     }
   }
 
-  const totalTime = samples.reduce((a, b) => a + b, 0);
-  return {
-    ratio: totalTime > 0 ? excessTime / totalTime : 0,
-    count,
-  };
+  const total = samples.reduce((a, b) => a + b, 0);
+  return { ratio: total > 0 ? excessTime / total : 0, count };
 }
 
 /** Append samples one-by-one to avoid stack overflow from spread on large arrays */
@@ -325,17 +280,15 @@ function appendSamples(result: MeasuredResults, samples: number[]): void {
 
 /** @return true if convergence reached or timeout */
 function shouldStop(
-  convergence: ConvergenceResult,
-  targetConfidence: number,
-  elapsedTime: number,
-  minTime: number,
+  c: ConvergenceResult,
+  target: number,
+  elapsed: number,
+  min: number,
 ): boolean {
-  if (convergence.converged && convergence.confidence >= targetConfidence) {
-    return true;
-  }
+  if (c.converged && c.confidence >= target) return true;
   // After minTime, accept whichever is higher: targetConfidence or fallbackThreshold
-  const threshold = Math.max(targetConfidence, fallbackThreshold);
-  return elapsedTime >= minTime && convergence.confidence >= threshold;
+  const threshold = Math.max(target, fallbackThreshold);
+  return elapsed >= min && c.confidence >= threshold;
 }
 
 /** @return time percentiles and statistics in ms */

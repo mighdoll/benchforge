@@ -49,11 +49,11 @@ function prepareJsonData(
 
 /** Clean CLI args for JSON export (remove undefined values) */
 function cleanCliArgs(args: DefaultCliArgs): Record<string, any> {
-  const toCamel = (k: string) =>
+  const camel = (k: string) =>
     k.replace(/-([a-z])/g, (_, l) => l.toUpperCase());
   const entries = Object.entries(args)
     .filter(([, v]) => v !== undefined && v !== null)
-    .map(([k, v]) => [toCamel(k), v]);
+    .map(([k, v]) => [camel(k), v]);
   return Object.fromEntries(entries);
 }
 

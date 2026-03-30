@@ -96,8 +96,9 @@ function buildScales(
   layout: Layout,
 ): Scales {
   const { margin, plot } = layout;
-  const xMin = Math.min(...histogram.map(b => b.x), ci[0], 0);
-  const xMax = Math.max(...histogram.map(b => b.x), ci[1], 0);
+  const xs = histogram.map(b => b.x);
+  const xMin = Math.min(...xs, ci[0], 0);
+  const xMax = Math.max(...xs, ci[1], 0);
   const yMax = Math.max(...histogram.map(b => b.count));
   return {
     x: (v: number) => margin.left + ((v - xMin) / (xMax - xMin)) * plot.w,
@@ -199,12 +200,9 @@ function drawCILabels(
   scales: Scales,
   height: number,
 ): void {
-  svg.appendChild(
-    text(scales.x(ci[0]), height - 4, formatPct(ci[0]), "middle", "12"),
-  );
-  svg.appendChild(
-    text(scales.x(ci[1]), height - 4, formatPct(ci[1]), "middle", "12"),
-  );
+  const y = height - 4;
+  svg.appendChild(text(scales.x(ci[0]), y, formatPct(ci[0]), "middle", "12"));
+  svg.appendChild(text(scales.x(ci[1]), y, formatPct(ci[1]), "middle", "12"));
 }
 
 function text(
@@ -282,9 +280,6 @@ function line(
 
 /** Set SVG attributes, converting camelCase keys to kebab-case */
 function setAttrs(el: SVGElement, attrs: Record<string, string>): void {
-  for (const [k, v] of Object.entries(attrs))
-    el.setAttribute(
-      k.replace(/[A-Z]/g, c => "-" + c.toLowerCase()),
-      v,
-    );
+  const kebab = (k: string) => k.replace(/[A-Z]/g, c => "-" + c.toLowerCase());
+  for (const [k, v] of Object.entries(attrs)) el.setAttribute(kebab(k), v);
 }

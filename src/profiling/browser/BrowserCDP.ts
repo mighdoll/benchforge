@@ -86,17 +86,15 @@ export async function stopInstruments(
   timeProfile?: TimeProfile;
   coverage?: CoverageData;
 }> {
-  let heapProfile: HeapProfile | undefined;
-  if (opts.alloc) {
-    const result = await cdp.send("HeapProfiler.stopSampling");
-    heapProfile = result.profile as unknown as HeapProfile;
-  }
-  let timeProfile: TimeProfile | undefined;
-  if (opts.timeSample) timeProfile = await stopTimeProfiling(cdp);
-  let coverage: CoverageData | undefined;
-  if (opts.callCounts) coverage = await collectCoverage(cdp);
-  const needsProfiler = opts.timeSample || opts.callCounts;
-  if (needsProfiler) await cdp.send("Profiler.disable");
+  const heapProfile = opts.alloc
+    ? ((await cdp.send("HeapProfiler.stopSampling"))
+        .profile as unknown as HeapProfile)
+    : undefined;
+  const timeProfile = opts.timeSample
+    ? await stopTimeProfiling(cdp)
+    : undefined;
+  const coverage = opts.callCounts ? await collectCoverage(cdp) : undefined;
+  if (opts.timeSample || opts.callCounts) await cdp.send("Profiler.disable");
   return { heapProfile, timeProfile, coverage };
 }
 
@@ -112,13 +110,10 @@ export async function startInstruments(
   },
 ): Promise<void> {
   if (opts.alloc) {
-    await cdp.send(
-      "HeapProfiler.startSampling",
-      heapSamplingParams(opts.samplingInterval),
-    );
+    const heap = heapSamplingParams(opts.samplingInterval);
+    await cdp.send("HeapProfiler.startSampling", heap);
   }
-  const needsProfiler = opts.timeSample || opts.callCounts;
-  if (needsProfiler) await cdp.send("Profiler.enable");
+  if (opts.timeSample || opts.callCounts) await cdp.send("Profiler.enable");
   if (opts.timeSample) await startTimeProfiling(cdp, opts.timeInterval);
   if (opts.callCounts) await startCoverageCollection(cdp);
 }

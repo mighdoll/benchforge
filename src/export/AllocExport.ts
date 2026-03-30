@@ -128,10 +128,7 @@ export async function collectSources(
   frames: { file?: string }[],
   cache?: Map<string, string>,
 ): Promise<Record<string, string>> {
-  const urls = new Set<string>();
-  for (const frame of frames) {
-    if (frame.file) urls.add(frame.file);
-  }
+  const urls = new Set(frames.map(f => f.file).filter(Boolean));
 
   const sources: Record<string, string> = {};
   for (const url of urls) {
@@ -180,11 +177,10 @@ export async function archiveBenchmark(
     },
   };
 
-  const filename =
-    outputPath ||
-    (file
-      ? archiveFileName(file, timestamp)
-      : `benchforge-${timestamp}.benchforge`);
+  const fallback = file
+    ? archiveFileName(file, timestamp)
+    : `benchforge-${timestamp}.benchforge`;
+  const filename = outputPath || fallback;
   const absPath = resolve(filename);
   writeFileSync(absPath, JSON.stringify(archive));
   console.log(`Archive written to: ${filename}`);
@@ -197,8 +193,8 @@ export function archiveFileName(
   file: SpeedscopeFile,
   timestamp: string,
 ): string {
-  const name = file.profiles[0]?.name || "profile";
-  const sanitized = name
+  const raw = file.profiles[0]?.name || "profile";
+  const sanitized = raw
     .replace(/^https?:\/\//, "")
     .replace(/[^a-zA-Z0-9._-]+/g, "-")
     .replace(/-+/g, "-")
@@ -225,9 +221,8 @@ function buildProfile(
   const weights: number[] = [];
 
   if (!resolved.sortedSamples || resolved.sortedSamples.length === 0) {
-    console.error(
-      `Speedscope export: no samples in heap profile for "${name}", skipping`,
-    );
+    const msg = `Speedscope export: no samples in heap profile for "${name}", skipping`;
+    console.error(msg);
     return {
       type: "sampled",
       name,
@@ -273,7 +268,7 @@ function internFrame(
   if (idx === undefined) {
     idx = sharedFrames.length;
     // Match speedscope's convention: anonymous functions include location in name
-    const shortFile = url ? url.split("/").pop() : undefined;
+    const shortFile = url?.split("/").pop();
     const displayName =
       name !== "(anonymous)"
         ? name

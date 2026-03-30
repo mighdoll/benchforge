@@ -10,11 +10,7 @@ import {
   type GcStatsInfo,
   gcStatsSection,
 } from "../report/StandardSections.ts";
-import {
-  buildTable,
-  type ColumnGroup,
-  type ResultGroup,
-} from "../report/text/TableReport.ts";
+import { buildTable, type ColumnGroup } from "../report/text/TableReport.ts";
 import { injectDiffColumns } from "../report/text/TextReport.ts";
 import {
   average,
@@ -121,10 +117,9 @@ function buildCaseTable(
 
   const rows = buildCaseRows(results, caseId, options?.extraColumns);
   const hasBaseline = rows.some(r => r.diffCI);
-  const columns = buildColumns(hasBaseline, options);
-
-  const resultGroup: ResultGroup<MatrixReportRow> = { results: rows };
-  const table = buildTable(columns, [resultGroup]);
+  const table = buildTable(buildColumns(hasBaseline, options), [
+    { results: rows },
+  ]);
   return `${caseTitle}\n${table}`;
 }
 
@@ -133,13 +128,11 @@ function formatCaseTitle(results: MatrixResults, caseId: string): string {
   const caseResult = results.variants[0]?.cases.find(c => c.caseId === caseId);
   const metadata = caseResult?.metadata;
 
-  if (metadata && Object.keys(metadata).length > 0) {
-    const metaParts = Object.entries(metadata)
-      .map(([k, v]) => `${v} ${k}`)
-      .join(", ");
-    return `${caseId} (${metaParts})`;
-  }
-  return caseId;
+  if (!metadata || Object.keys(metadata).length === 0) return caseId;
+  const meta = Object.entries(metadata)
+    .map(([k, v]) => `${v} ${k}`)
+    .join(", ");
+  return `${caseId} (${meta})`;
 }
 
 /** Build table using ResultsMapper sections */
@@ -152,34 +145,31 @@ function buildSectionTable(
   const sections = options.sections!;
   const variantTitle = options.variantTitle ?? "name";
 
-  const rows: Record<string, unknown>[] = [];
   let hasBaseline = false;
+  const rows: Record<string, unknown>[] = [];
 
   for (const variant of results.variants) {
-    const caseResult = variant.cases.find(c => c.caseId === caseId);
-    if (!caseResult) continue;
+    const cr = variant.cases.find(c => c.caseId === caseId);
+    if (!cr) continue;
 
     const row: Record<string, unknown> = { name: truncate(variant.id, 25) };
-
     for (const section of sections) {
-      Object.assign(
-        row,
-        section.extract(caseResult.measured, caseResult.metadata),
-      );
+      Object.assign(row, section.extract(cr.measured, cr.metadata));
     }
 
-    if (caseResult.baseline) {
+    if (cr.baseline) {
       hasBaseline = true;
-      const { samples: base } = caseResult.baseline;
-      row.diffCI = bootstrapDifferenceCI(base, caseResult.measured.samples);
+      row.diffCI = bootstrapDifferenceCI(
+        cr.baseline.samples,
+        cr.measured.samples,
+      );
     }
 
     rows.push(row);
   }
 
-  const columnGroups = buildSectionColumns(sections, variantTitle, hasBaseline);
-  const resultGroup: ResultGroup<Record<string, unknown>> = { results: rows };
-  const table = buildTable(columnGroups, [resultGroup]);
+  const cols = buildSectionColumns(sections, variantTitle, hasBaseline);
+  const table = buildTable(cols, [{ results: rows }]);
   return `${caseTitle}\n${table}`;
 }
 
@@ -200,9 +190,9 @@ function buildColumns(
   hasBaseline: boolean,
   options?: MatrixReportOptions,
 ): ColumnGroup<MatrixReportRow>[] {
-  const variantTitle = options?.variantTitle ?? "variant";
+  const title = options?.variantTitle ?? "variant";
   const nameCol: ColumnGroup<MatrixReportRow> = {
-    columns: [{ key: "name", title: variantTitle }],
+    columns: [{ key: "name", title }],
   };
 
   const ciKey = "diffCI" as keyof MatrixReportRow;
@@ -217,13 +207,13 @@ function buildColumns(
   const groups: ColumnGroup<MatrixReportRow>[] = [nameCol, timeCol];
 
   // Add extra columns, grouped by groupTitle
-  const extraColumns = options?.extraColumns;
-  if (extraColumns?.length) {
+  const extra = options?.extraColumns;
+  if (extra?.length) {
     const byGroup = new Map<string | undefined, ExtraColumn[]>();
-    for (const col of extraColumns) {
-      const group = byGroup.get(col.groupTitle) ?? [];
-      group.push(col);
-      byGroup.set(col.groupTitle, group);
+    for (const col of extra) {
+      const g = byGroup.get(col.groupTitle) ?? [];
+      g.push(col);
+      byGroup.set(col.groupTitle, g);
     }
     for (const [groupTitle, cols] of byGroup) {
       groups.push({
@@ -246,16 +236,15 @@ function buildSectionColumns(
   variantTitle: string,
   hasBaseline: boolean,
 ): ColumnGroup<Record<string, unknown>>[] {
-  const nameCol: ColumnGroup<Record<string, unknown>> = {
+  type Rec = Record<string, unknown>;
+  const nameCol: ColumnGroup<Rec> = {
     columns: [{ key: "name", title: variantTitle }],
   };
-
-  const sectionColumns = sections.flatMap(s => s.columns());
-  const columnGroups = hasBaseline
-    ? injectDiffColumns(sectionColumns)
-    : (sectionColumns as ColumnGroup<Record<string, unknown>>[]);
-
-  return [nameCol, ...columnGroups];
+  const cols = sections.flatMap(s => s.columns());
+  const groups = hasBaseline
+    ? injectDiffColumns(cols)
+    : (cols as ColumnGroup<Rec>[]);
+  return [nameCol, ...groups];
 }
 
 /** Build a single row from case result */

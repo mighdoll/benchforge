@@ -153,9 +153,7 @@ function computeInterval(
   confidence: number,
 ): [number, number] {
   const alpha = (1 - confidence) / 2;
-  const lower = percentile(medians, alpha);
-  const upper = percentile(medians, 1 - alpha);
-  return [lower, upper];
+  return [percentile(medians, alpha), percentile(medians, 1 - alpha)];
 }
 
 /** Bin values into histogram for compact visualization */

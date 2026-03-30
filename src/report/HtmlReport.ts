@@ -60,15 +60,14 @@ function prepareGroupData(
   sections?: ResultsMapper[],
   higherIsBetter?: boolean,
 ): BenchmarkGroup {
-  const baselineSamples = group.baseline?.measuredResults.samples;
+  const base = group.baseline;
+  const baselineSamples = base?.measuredResults.samples;
+  const baseline = base
+    ? { ...prepareBenchmarkData(base, sections), comparisonCI: undefined }
+    : undefined;
   return {
     name: group.name,
-    baseline: group.baseline
-      ? {
-          ...prepareBenchmarkData(group.baseline, sections),
-          comparisonCI: undefined,
-        }
-      : undefined,
+    baseline,
     benchmarks: group.reports.map(report => {
       const samples = report.measuredResults.samples;
       const rawCI =

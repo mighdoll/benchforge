@@ -40,11 +40,8 @@ export async function startViewerServer(
 ): Promise<{ server: Server; port: number; close: () => void }> {
   const port = options.port ?? 3939;
 
-  const sourceCache = new Map<string, string>();
-  if (options.sources) {
-    for (const [url, source] of Object.entries(options.sources))
-      sourceCache.set(url, source);
-  }
+  const entries = Object.entries(options.sources ?? {});
+  const sourceCache = new Map<string, string>(entries);
 
   const assets = sirv(viewerDistDir(), { single: true });
   const handler = createRequestHandler(options, sourceCache, assets);
@@ -79,15 +76,10 @@ export async function viewArchive(filePath: string): Promise<void> {
     process.exit(1);
   }
 
-  const profileData = archive.profile
-    ? JSON.stringify(archive.profile)
-    : undefined;
-  const timeProfileData = archive.timeProfile
-    ? JSON.stringify(archive.timeProfile)
-    : undefined;
-  const reportData = archive.report
-    ? JSON.stringify(archive.report)
-    : undefined;
+  const toJson = (v: unknown) => (v ? JSON.stringify(v) : undefined);
+  const profileData = toJson(archive.profile);
+  const timeProfileData = toJson(archive.timeProfile);
+  const reportData = toJson(archive.report);
   const sources = archive.sources as Record<string, string> | undefined;
 
   const { close } = await startViewerServer({
@@ -118,15 +110,14 @@ function createRequestHandler(
 ): (req: import("node:http").IncomingMessage, res: Res) => void {
   const routes: Record<string, RouteHandler> = {
     "/api/config": res => {
+      const config = {
+        editorUri: ctx.editorUri || null,
+        hasReport: !!ctx.reportData,
+        hasProfile: !!ctx.profileData,
+        hasTimeProfile: !!ctx.timeProfileData,
+      };
       res.setHeader("Content-Type", "application/json");
-      res.end(
-        JSON.stringify({
-          editorUri: ctx.editorUri || null,
-          hasReport: !!ctx.reportData,
-          hasProfile: !!ctx.profileData,
-          hasTimeProfile: !!ctx.timeProfileData,
-        }),
-      );
+      res.end(JSON.stringify(config));
     },
     "/api/report-data": res => sendJson(res, ctx.reportData, "report data"),
     "/api/profile": res => sendProfile(res, ctx.profileData),
@@ -266,9 +257,10 @@ async function handleArchiveRequest(
   sourceCache: Map<string, string>,
 ): Promise<void> {
   try {
-    const profile = profileData ? JSON.parse(profileData) : null;
-    const timeProfile = timeProfileData ? JSON.parse(timeProfileData) : null;
-    const report = reportData ? JSON.parse(reportData) : null;
+    const parse = (s?: string) => (s ? JSON.parse(s) : null);
+    const profile = parse(profileData);
+    const timeProfile = parse(timeProfileData);
+    const report = parse(reportData);
     const allFrames = [
       ...(profile?.shared?.frames ?? []),
       ...(timeProfile?.shared?.frames ?? []),
