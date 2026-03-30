@@ -71,7 +71,6 @@ import type { RunnerOptions } from "../runners/BenchRunner.ts";
 import type { KnownRunner } from "../runners/CreateRunner.ts";
 import { runBenchmark } from "../runners/RunnerOrchestrator.ts";
 import type { ReportData } from "../viewer/ReportData.ts";
-import { startViewerServer } from "../viewer/ViewerServer.ts";
 import {
   type Configure,
   type DefaultCliArgs,
@@ -79,6 +78,7 @@ import {
   parseCliArgs,
 } from "./CliArgs.ts";
 import { filterBenchmarks } from "./FilterBenchmarks.ts";
+import { startViewerServer } from "./ViewerServer.ts";
 
 export interface ExportOptions {
   results: ReportGroup[];

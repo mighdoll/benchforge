@@ -9,7 +9,7 @@ if (argv[0] === "view") {
     console.error("Usage: benchforge view <file.benchforge>");
     process.exit(1);
   }
-  const { viewArchive } = await import("../viewer/ViewerServer.ts");
+  const { viewArchive } = await import("../cli/ViewerServer.ts");
   await viewArchive(filePath);
 } else {
   const { runDefaultBench } = await import("../index.ts");

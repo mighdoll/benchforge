@@ -28,12 +28,12 @@ export interface ViewerServerOptions {
 }
 
 /** Resolve the package root directory.
- *  In dev: src/viewer/ViewerServer.ts → dirname is "viewer" → up 2.
- *  In dist: dist/ViewerServer-*.mjs   → dirname is "dist"   → up 1. */
+ *  In dev: src/cli/ViewerServer.ts  → dirname is "cli"  → up 2.
+ *  In dist: dist/ViewerServer-*.mjs → dirname is "dist" → up 1. */
 function packageRoot(): string {
   const thisDir = dirname(fileURLToPath(import.meta.url));
   const base = thisDir.split("/").pop() || "";
-  if (base === "viewer") return join(thisDir, "../..");
+  if (base === "cli") return join(thisDir, "../..");
   return join(thisDir, "..");
 }
 
