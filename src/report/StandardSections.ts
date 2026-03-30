@@ -153,12 +153,10 @@ export const totalTimeSection: ResultsMapper<{ totalTime?: number }> = {
         {
           key: "totalTime",
           title: "time",
-          formatter: v =>
-            typeof v !== "number"
-              ? ""
-              : v >= 30
-                ? `[${v.toFixed(1)}s]`
-                : `${v.toFixed(1)}s`,
+          formatter: v => {
+            if (typeof v !== "number") return "";
+            return v >= 30 ? `[${v.toFixed(1)}s]` : `${v.toFixed(1)}s`;
+          },
         },
       ],
     },

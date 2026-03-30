@@ -75,21 +75,26 @@ async function getFilteredVariants<T>(
 ): Promise<string[] | undefined> {
   if (!variantPattern) return undefined;
 
-  const allIds = matrix.variants
-    ? Object.keys(matrix.variants)
-    : matrix.variantDir
-      ? await discoverVariants(matrix.variantDir)
-      : undefined;
-
-  if (!allIds) {
-    throw new Error("BenchMatrix requires 'variants' or 'variantDir'");
+  if (matrix.variants) {
+    const ids = Object.keys(matrix.variants).filter(id =>
+      matchPattern(id, variantPattern),
+    );
+    if (ids.length === 0) {
+      throw new Error(`No variants match filter: "${variantPattern}"`);
+    }
+    return ids;
   }
 
-  const filtered = allIds.filter(id => matchPattern(id, variantPattern));
-  if (filtered.length === 0) {
-    throw new Error(`No variants match filter: "${variantPattern}"`);
+  if (matrix.variantDir) {
+    const allIds = await discoverVariants(matrix.variantDir);
+    const filtered = allIds.filter(id => matchPattern(id, variantPattern));
+    if (filtered.length === 0) {
+      throw new Error(`No variants match filter: "${variantPattern}"`);
+    }
+    return filtered;
   }
-  return filtered;
+
+  throw new Error("BenchMatrix requires 'variants' or 'variantDir'");
 }
 
 /** Match id against pattern (case-insensitive substring) */
