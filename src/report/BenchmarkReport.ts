@@ -59,9 +59,9 @@ type ReportRowData<S extends ReadonlyArray<ResultsMapper<any>>> =
   ReportRowBase & UnionToIntersection<SectionStats<S[number]>>;
 
 /** Convert union to intersection - https://mighdoll.dev/blog/modern-typescript-intersection/ */
-type UnionToIntersection<U> = (
-  U extends any ? (k: U) => void : never
-) extends (k: infer I extends U) => void
+type UnionToIntersection<U> = (U extends any ? (k: U) => void : never) extends (
+  k: infer I extends U,
+) => void
   ? I
   : never;
 

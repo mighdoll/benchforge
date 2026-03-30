@@ -5,10 +5,7 @@ import {
   type Page,
 } from "playwright";
 import type { GcStats } from "../../runners/GcStats.ts";
-import type {
-  CoverageData,
-  ScriptCoverage,
-} from "../node/CoverageTypes.ts";
+import type { CoverageData, ScriptCoverage } from "../node/CoverageTypes.ts";
 import type { HeapProfile, HeapSampleOptions } from "../node/HeapSampler.ts";
 import type { TimeProfile } from "../node/TimeSampler.ts";
 import { browserGcStats, type TraceEvent } from "./BrowserGcStats.ts";
