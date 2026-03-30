@@ -3,7 +3,7 @@ import type {
   MeasuredResults,
   OptStatusInfo,
   PausePoint,
-} from "../core/MeasuredResults.ts";
+} from "./MeasuredResults.ts";
 import type { BenchmarkSpec } from "./BenchmarkSpec.ts";
 import type { BenchRunner, RunnerOptions } from "./BenchRunner.ts";
 import { executeBenchmark } from "./BenchRunner.ts";

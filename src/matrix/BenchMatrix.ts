@@ -1,4 +1,4 @@
-import type { MeasuredResults } from "../core/MeasuredResults.ts";
+import type { MeasuredResults } from "../runners/MeasuredResults.ts";
 import { BasicRunner } from "../runners/BasicRunner.ts";
 import type { RunnerOptions } from "../runners/BenchRunner.ts";
 import { runMatrixVariant } from "../runners/RunnerOrchestrator.ts";

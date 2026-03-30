@@ -3,7 +3,7 @@ import { basename, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 import pico from "picocolors";
 import { hideBin } from "yargs/helpers";
-import type { MeasuredResults } from "../core/MeasuredResults.ts";
+import type { MeasuredResults } from "../runners/MeasuredResults.ts";
 import {
   archiveBenchmark,
   buildSpeedscopeFile,

@@ -1,4 +1,4 @@
-import type { MeasuredResults } from "../core/MeasuredResults.ts";
+import type { MeasuredResults } from "../runners/MeasuredResults.ts";
 
 import type { AnyColumn } from "./text/TableReport.ts";
 

@@ -1,7 +1,7 @@
 import { type ChildProcess, fork } from "node:child_process";
 import { existsSync } from "node:fs";
 import path from "node:path";
-import type { MeasuredResults } from "../core/MeasuredResults.ts";
+import type { MeasuredResults } from "./MeasuredResults.ts";
 import type { CoverageData } from "../profiling/node/CoverageTypes.ts";
 import type { HeapProfile } from "../profiling/node/HeapSampler.ts";
 import type { TimeProfile } from "../profiling/node/TimeSampler.ts";

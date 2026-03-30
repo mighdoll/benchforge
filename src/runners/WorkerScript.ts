@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-import type { MeasuredResults } from "../core/MeasuredResults.ts";
+import type { MeasuredResults } from "./MeasuredResults.ts";
 import { variantModuleUrl } from "../matrix/VariantLoader.ts";
 import type { CoverageData } from "../profiling/node/CoverageTypes.ts";
 import type { HeapProfile } from "../profiling/node/HeapSampler.ts";

@@ -1,4 +1,4 @@
-import type { MeasuredResults } from "../core/MeasuredResults.ts";
+import type { MeasuredResults } from "../runners/MeasuredResults.ts";
 import type { ReportColumnGroup, ResultsMapper } from "./BenchmarkReport.ts";
 import { formatBytes, integer, percent, timeMs } from "./Formatters.ts";
 import { formatConvergence } from "./text/ConvergenceFormatters.ts";

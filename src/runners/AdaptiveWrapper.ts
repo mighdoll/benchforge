@@ -1,4 +1,4 @@
-import type { MeasuredResults } from "../core/MeasuredResults.ts";
+import type { MeasuredResults } from "./MeasuredResults.ts";
 import {
   coefficientOfVariation,
   medianAbsoluteDeviation,

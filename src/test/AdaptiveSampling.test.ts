@@ -1,5 +1,5 @@
 import { test } from "vitest";
-import type { MeasuredResults } from "../core/MeasuredResults.ts";
+import type { MeasuredResults } from "../runners/MeasuredResults.ts";
 import { createAdaptiveWrapper } from "../runners/AdaptiveWrapper.ts";
 import type { BenchmarkSpec } from "../runners/BenchmarkSpec.ts";
 import type { BenchRunner } from "../runners/BenchRunner.ts";

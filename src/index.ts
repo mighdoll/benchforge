@@ -18,7 +18,7 @@ export {
   runDefaultMatrixBench,
   runMatrixSuite,
 } from "./cli/RunBenchCLI.ts";
-export type { MeasuredResults } from "./core/MeasuredResults.ts";
+export type { MeasuredResults } from "./runners/MeasuredResults.ts";
 export {
   archiveBenchmark,
   buildSpeedscopeFile,
