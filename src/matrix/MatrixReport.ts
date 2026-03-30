@@ -1,8 +1,5 @@
 import { totalProfileBytes } from "../profiling/node/HeapSampleReport.ts";
-import {
-  injectDiffColumns,
-  type ResultsMapper,
-} from "../report/BenchmarkReport.ts";
+import type { ResultsMapper } from "../report/BenchmarkReport.ts";
 import {
   type GcStatsInfo,
   gcStatsSection,
@@ -12,12 +9,13 @@ import {
   formatBytes,
   formatDiffWithCI,
   truncate,
-} from "../report/table/Formatters.ts";
+} from "../report/Formatters.ts";
 import {
   buildTable,
   type ColumnGroup,
   type ResultGroup,
-} from "../report/table/TableReport.ts";
+} from "../report/text/TableReport.ts";
+import { injectDiffColumns } from "../report/text/TextReport.ts";
 import {
   average,
   bootstrapDifferenceCI,

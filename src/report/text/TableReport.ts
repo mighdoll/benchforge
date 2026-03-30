@@ -1,7 +1,7 @@
 import pico from "picocolors";
 import type { Alignment, SpanningCellConfig, TableUserConfig } from "table";
 import { table } from "table";
-import { diffPercent } from "./Formatters.ts";
+import { diffPercent } from "../Formatters.ts";
 
 /** Related table columns */
 export interface ColumnGroup<T> {

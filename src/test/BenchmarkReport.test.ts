@@ -1,14 +1,11 @@
 import { expect, test } from "vitest";
-import {
-  type BenchmarkReport,
-  reportResults,
-  valuesForReports,
-} from "../report/BenchmarkReport.ts";
+import type { BenchmarkReport } from "../report/BenchmarkReport.ts";
 import {
   adaptiveSection,
   gcSection,
   timeSection,
 } from "../report/StandardSections.ts";
+import { reportResults, valuesForReports } from "../report/text/TextReport.ts";
 import { createBenchmarkReport, createMeasuredResults } from "./TestUtils.ts";
 
 test("combines time and gc sections into report", () => {

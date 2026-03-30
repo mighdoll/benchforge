@@ -1,5 +1,5 @@
 import { expect, test } from "vitest";
-import { integer } from "../Formatters.ts";
+import { integer } from "../../Formatters.ts";
 import {
   buildTable,
   type ColumnGroup,

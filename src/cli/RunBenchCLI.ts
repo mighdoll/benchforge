@@ -7,7 +7,7 @@ import type {
   BenchGroup,
   BenchmarkSpec,
   BenchSuite,
-} from "../core/Benchmark.ts";
+} from "../runners/BenchmarkSpec.ts";
 import type { MeasuredResults } from "../core/MeasuredResults.ts";
 import {
   archiveBenchmark,
@@ -54,9 +54,10 @@ import type {
   ReportGroup,
   ResultsMapper,
 } from "../report/BenchmarkReport.ts";
-import { groupReports, reportResults } from "../report/BenchmarkReport.ts";
+import { groupReports } from "../report/BenchmarkReport.ts";
 import type { GitVersion } from "../report/GitUtils.ts";
-import { prepareHtmlData } from "../report/HtmlDataPrep.ts";
+import { prepareHtmlData } from "../report/HtmlReport.ts";
+import { reportResults } from "../report/text/TextReport.ts";
 import {
   adaptiveSection,
   browserGcStatsSection,

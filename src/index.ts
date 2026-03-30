@@ -22,7 +22,7 @@ export type {
   BenchGroup,
   BenchmarkSpec,
   BenchSuite,
-} from "./core/Benchmark.ts";
+} from "./runners/BenchmarkSpec.ts";
 export type { MeasuredResults } from "./core/MeasuredResults.ts";
 export {
   archiveBenchmark,
@@ -68,15 +68,20 @@ export type {
   ResultsMapper,
   UnknownRecord,
 } from "./report/BenchmarkReport.ts";
-export { reportResults } from "./report/BenchmarkReport.ts";
+export {
+  formatBytes,
+  integer,
+  timeMs,
+  truncate,
+} from "./report/Formatters.ts";
 export type { GitVersion } from "./report/GitUtils.ts";
 export {
   formatGitVersion,
   getBaselineVersion,
   getCurrentGitVersion,
 } from "./report/GitUtils.ts";
-export type { PrepareHtmlOptions } from "./report/HtmlDataPrep.ts";
-export { prepareHtmlData } from "./report/HtmlDataPrep.ts";
+export type { PrepareHtmlOptions } from "./report/HtmlReport.ts";
+export { prepareHtmlData } from "./report/HtmlReport.ts";
 export {
   adaptiveSection,
   buildGenericSections,
@@ -87,13 +92,8 @@ export {
   timeSection,
   totalTimeSection,
 } from "./report/StandardSections.ts";
-export { formatConvergence } from "./report/table/ConvergenceFormatters.ts";
-export {
-  formatBytes,
-  integer,
-  timeMs,
-  truncate,
-} from "./report/table/Formatters.ts";
+export { formatConvergence } from "./report/text/ConvergenceFormatters.ts";
+export { reportResults } from "./report/text/TextReport.ts";
 export type { RunnerOptions } from "./runners/BenchRunner.ts";
 export { average } from "./stats/StatisticalUtils.ts";
 export {
