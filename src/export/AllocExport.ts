@@ -4,44 +4,24 @@ import { resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import type { HeapProfile } from "../profiling/node/HeapSampler.ts";
 import {
-  type ResolvedFrame,
   type ResolvedProfile,
   resolveProfile,
 } from "../profiling/node/ResolvedProfile.ts";
 import { groupReports, type ReportGroup } from "../report/BenchmarkReport.ts";
 import type { ReportData } from "../viewer/ReportData.ts";
+import {
+  internFrame,
+  type SpeedscopeFile,
+  type SpeedscopeFrame,
+  type SpeedscopeHeapProfile,
+  speedscopeFile,
+} from "./SpeedscopeTypes.ts";
 
 export interface ArchiveOptions {
   groups: ReportGroup[];
   reportData?: ReportData;
   timeProfileData?: string;
   outputPath?: string;
-}
-
-/** speedscope file format (https://www.speedscope.app/file-format-schema.json) */
-interface SpeedscopeFile {
-  $schema: "https://www.speedscope.app/file-format-schema.json";
-  shared: { frames: SpeedscopeFrame[] };
-  profiles: SpeedscopeProfile[];
-  name?: string;
-  exporter?: string;
-}
-
-interface SpeedscopeFrame {
-  name: string;
-  file?: string;
-  line?: number;
-  col?: number;
-}
-
-interface SpeedscopeProfile {
-  type: "sampled";
-  name: string;
-  unit: "bytes";
-  startValue: number;
-  endValue: number;
-  samples: number[][]; // each sample is stack of frame indices
-  weights: number[]; // bytes per sample
 }
 
 /** Export heap profiles from benchmark results to speedscope JSON format.
@@ -73,12 +53,7 @@ export function heapProfileToSpeedscope(
   const resolved = resolveProfile(profile);
   const p = buildProfile(name, resolved, frames, frameIndex);
 
-  return {
-    $schema: "https://www.speedscope.app/file-format-schema.json",
-    shared: { frames },
-    profiles: [p],
-    exporter: "benchforge",
-  };
+  return speedscopeFile(frames, [p]);
 }
 
 /** Build SpeedscopeFile from report groups. Returns undefined if no heap profiles. */
@@ -87,7 +62,7 @@ export function buildSpeedscopeFile(
 ): SpeedscopeFile | undefined {
   const frames: SpeedscopeFrame[] = [];
   const frameIndex = new Map<string, number>();
-  const profiles: SpeedscopeProfile[] = [];
+  const profiles: SpeedscopeHeapProfile[] = [];
 
   for (const group of groups) {
     for (const report of groupReports(group)) {
@@ -100,12 +75,7 @@ export function buildSpeedscopeFile(
 
   if (profiles.length === 0) return undefined;
 
-  return {
-    $schema: "https://www.speedscope.app/file-format-schema.json",
-    shared: { frames },
-    profiles,
-    exporter: "benchforge",
-  };
+  return speedscopeFile(frames, profiles);
 }
 
 /** Fetch a single source URL. Supports file:// (fs read) and http(s):// (fetch). */
@@ -128,7 +98,7 @@ export async function collectSources(
   frames: { file?: string }[],
   cache?: Map<string, string>,
 ): Promise<Record<string, string>> {
-  const urls = new Set(frames.map(f => f.file).filter(Boolean));
+  const urls = new Set(frames.map(f => f.file).filter((u): u is string => !!u));
 
   const sources: Record<string, string> = {};
   for (const url of urls) {
@@ -209,11 +179,13 @@ function buildProfile(
   resolved: ResolvedProfile,
   sharedFrames: SpeedscopeFrame[],
   frameIndex: Map<string, number>,
-): SpeedscopeProfile {
+): SpeedscopeHeapProfile {
   // Build nodeId -> stack of frame indices
   const nodeStacks = new Map<number, number[]>();
   for (const node of resolved.nodes) {
-    const stack = node.stack.map(f => internFrame(f, sharedFrames, frameIndex));
+    const stack = node.stack.map(f =>
+      internFrame(f.name, f.url, f.line, f.col, sharedFrames, frameIndex),
+    );
     nodeStacks.set(node.nodeId, stack);
   }
 
@@ -253,33 +225,4 @@ function buildProfile(
     samples,
     weights,
   };
-}
-
-/** Intern a call frame, returning its index in the shared frames array */
-function internFrame(
-  frame: ResolvedFrame,
-  sharedFrames: SpeedscopeFrame[],
-  frameIndex: Map<string, number>,
-): number {
-  const { name, url, line, col } = frame;
-  const key = `${name}\0${url}\0${line}\0${col}`;
-
-  const existing = frameIndex.get(key);
-  if (existing !== undefined) return existing;
-
-  const idx = sharedFrames.length;
-  const entry: SpeedscopeFrame = { name: displayName(name, url, line) };
-  if (url) entry.file = url;
-  if (line > 0) entry.line = line;
-  if (col != null) entry.col = col;
-  sharedFrames.push(entry);
-  frameIndex.set(key, idx);
-  return idx;
-}
-
-/** Display name for a frame: named functions use their name, anonymous get a location hint */
-function displayName(name: string, url: string, line: number): string {
-  if (name !== "(anonymous)") return name;
-  const shortFile = url?.split("/").pop();
-  return shortFile ? `(anonymous ${shortFile}:${line})` : "(anonymous)";
 }

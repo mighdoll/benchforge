@@ -1,9 +1,11 @@
-import pico from "picocolors";
-import type { CIDirection, DifferenceCI } from "../stats/StatisticalUtils.ts";
+import {
+  type CIDirection,
+  type DifferenceCI,
+  flipCI,
+} from "../stats/StatisticalUtils.ts";
+import colors from "./Colors.ts";
 
-const isTest = process.env.NODE_ENV === "test" || process.env.VITEST === "true";
-const identity = (s: string) => s;
-const { red, green } = isTest ? { red: identity, green: identity } : pico;
+const { red, green } = colors;
 
 /** Format floats with custom precision */
 export function floatPrecision(precision: number) {
@@ -73,13 +75,6 @@ export function diffPercentBenchmark(main: unknown, base: unknown): string {
   return coloredPercent(diff, base, false); // negative is good for benchmarks
 }
 
-/** Format memory size in KB with appropriate units */
-export function memoryKB(kb: unknown): string | null {
-  if (typeof kb !== "number") return null;
-  if (kb < 1024) return `${kb.toFixed(0)}KB`;
-  return `${(kb / 1024).toFixed(1)}MB`;
-}
-
 /** Format bytes with appropriate units (B, KB, MB, GB).
  *  Use `space: true` for human-readable console output (`1.5 KB`). */
 export function formatBytes(
@@ -107,9 +102,11 @@ export function formatDiffWithCI(value: unknown): string | null {
 /** Format percentage difference with CI for throughput metrics (higher is better) */
 export function formatDiffWithCIHigherIsBetter(value: unknown): string | null {
   if (!isDifferenceCI(value)) return null;
-  const { percent, ci, direction } = value;
-  // Flip percent sign for "higher is better" metrics (direction stays same)
-  return colorByDirection(diffCIText(-percent, [-ci[1], -ci[0]]), direction);
+  const flipped = flipCI(value);
+  return colorByDirection(
+    diffCIText(flipped.percent, flipped.ci),
+    flipped.direction,
+  );
 }
 
 /** @return truncated string with ellipsis if over maxLen */
@@ -146,11 +143,11 @@ function colorByDirection(text: string, direction: CIDirection): string {
 
 /** @return formatted "pct [lo, hi]" text for a diff with CI */
 function diffCIText(pct: number, ci: [number, number]): string {
-  return `${formatBound(pct)} [${formatBound(ci[0])}, ${formatBound(ci[1])}]`;
+  return `${formatSignedPercent(pct)} [${formatSignedPercent(ci[0])}, ${formatSignedPercent(ci[1])}]`;
 }
 
 /** @return signed percentage string (e.g. "+1.2%", "-3.4%") */
-function formatBound(v: number): string {
+export function formatSignedPercent(v: number): string {
   const sign = v >= 0 ? "+" : "";
   return `${sign}${v.toFixed(1)}%`;
 }

@@ -1,7 +1,6 @@
 import { writeFileSync } from "node:fs";
 import { basename, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
-import pico from "picocolors";
 import { hideBin } from "yargs/helpers";
 import {
   archiveBenchmark,
@@ -49,11 +48,13 @@ import type {
   ResultsMapper,
 } from "../report/BenchmarkReport.ts";
 import { groupReports } from "../report/BenchmarkReport.ts";
+import colors from "../report/Colors.ts";
 import type { GitVersion } from "../report/GitUtils.ts";
 import { prepareHtmlData } from "../report/HtmlReport.ts";
 import {
   adaptiveSection,
   browserGcStatsSection,
+  formatTierSummary,
   gcStatsSection,
   optSection,
   runsSection,
@@ -79,7 +80,7 @@ import {
   parseCliArgs,
 } from "./CliArgs.ts";
 import { filterBenchmarks } from "./FilterBenchmarks.ts";
-import { startViewerServer } from "./ViewerServer.ts";
+import { startViewerServer, waitForCtrlC } from "./ViewerServer.ts";
 
 /** Options for exporting benchmark results to various formats */
 export interface ExportOptions {
@@ -114,10 +115,7 @@ type SuiteParams = {
   batches: number;
 };
 
-const isTest = process.env.NODE_ENV === "test" || process.env.VITEST === "true";
-const { yellow, dim } = isTest
-  ? { yellow: (s: string) => s, dim: (s: string) => s }
-  : pico;
+const { yellow, dim } = colors;
 
 /** Parse CLI with custom configuration */
 export function parseBenchArgs<T = DefaultCliArgs>(
@@ -295,13 +293,7 @@ export function reportOptStatus(groups: ReportGroup[]): void {
 
   console.log(dim("\nV8 optimization:"));
   for (const { name, opt, samples } of optData) {
-    const total = Object.values(opt.byTier).reduce((s, t) => s + t.count, 0);
-    const tierParts = Object.entries(opt.byTier)
-      .sort((a, b) => b[1].count - a[1].count)
-      .map(
-        ([tier, info]) => `${tier} ${((info.count / total) * 100).toFixed(0)}%`,
-      )
-      .join(", ");
+    const tierParts = formatTierSummary(opt, " ", ", ");
     console.log(`  ${name}: ${tierParts} ${dim(`(${samples} samples)`)}`);
   }
 
@@ -844,17 +836,6 @@ function mergeCoverage(
     groupReports(group).flatMap(r => r.measuredResults.coverage?.scripts ?? []),
   );
   return scripts.length > 0 ? { scripts } : undefined;
-}
-
-/** Wait for Ctrl+C before exiting */
-function waitForCtrlC(): Promise<void> {
-  return new Promise(resolve => {
-    console.log(dim("\nPress Ctrl+C to exit"));
-    process.on("SIGINT", () => {
-      console.log();
-      resolve();
-    });
-  });
 }
 
 /** Warn if parameterized benchmarks lack setup */

@@ -3,14 +3,11 @@ import { variantModuleUrl } from "../matrix/VariantLoader.ts";
 import type { CoverageData } from "../profiling/node/CoverageTypes.ts";
 import type { HeapProfile } from "../profiling/node/HeapSampler.ts";
 import type { TimeProfile } from "../profiling/node/TimeSampler.ts";
-import {
-  type AdaptiveOptions,
-  createAdaptiveWrapper,
-} from "./AdaptiveWrapper.ts";
 import type { BenchmarkFunction, BenchmarkSpec } from "./BenchmarkSpec.ts";
 import type { BenchRunner, RunnerOptions } from "./BenchRunner.ts";
-import { createRunner, type KnownRunner } from "./CreateRunner.ts";
+import type { KnownRunner } from "./CreateRunner.ts";
 import type { MeasuredResults } from "./MeasuredResults.ts";
+import { createBenchRunner, getModuleExport } from "./RunnerUtils.ts";
 import { debugWorkerTiming, getElapsed, getPerfNow } from "./TimingUtils.ts";
 
 /** Message sent to worker process to start a benchmark run. */
@@ -149,11 +146,19 @@ async function importBenchmarkWithSetup(
   const suffix = exportName ? ` (${exportName})` : "";
   logTiming(`Importing from ${modulePath}${suffix}`);
   const module = await import(modulePath!);
-  const fn = getModuleExport(module, exportName, modulePath!);
+  const fn = getModuleExport<BenchmarkFunction>(
+    module,
+    exportName,
+    modulePath!,
+  );
 
   if (setupExportName) {
     logTiming(`Calling setup: ${setupExportName}`);
-    const setupFn = getModuleExport(module, setupExportName, modulePath!);
+    const setupFn = getModuleExport<BenchmarkFunction>(
+      module,
+      setupExportName,
+      modulePath!,
+    );
     return { fn, params: await setupFn(params) };
   }
 
@@ -181,20 +186,6 @@ async function loadCaseFromModule(
     return module.loadCase(caseId);
   }
   return { data: caseId };
-}
-
-/** Get named or default export from module */
-function getModuleExport(
-  module: any,
-  exportName: string | undefined,
-  modulePath: string,
-): BenchmarkFunction {
-  const fn = exportName ? module[exportName] : module.default || module;
-  if (typeof fn !== "function") {
-    const name = exportName || "default";
-    throw new Error(`Export '${name}' from ${modulePath} is not a function`);
-  }
-  return fn;
 }
 
 /** Create error message from exception */
@@ -287,12 +278,7 @@ process.on("message", async (message: RunMessage) => {
 
   try {
     const start = getPerfNow();
-    const baseRunner = await createRunner(message.runnerName);
-
-    const runner = (message.options as any).adaptive
-      ? createAdaptiveWrapper(baseRunner, message.options as AdaptiveOptions)
-      : baseRunner;
-
+    const runner = await createBenchRunner(message.runnerName, message.options);
     logTiming("Runner created in", getElapsed(start));
 
     const benchStart = getPerfNow();

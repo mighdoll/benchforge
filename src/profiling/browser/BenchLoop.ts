@@ -1,5 +1,9 @@
 import type { CDPSession, Page } from "playwright";
-import { startInstruments, stopInstruments } from "./BrowserCDP.ts";
+import {
+  instrumentOpts,
+  startInstruments,
+  stopInstruments,
+} from "./BrowserCDP.ts";
 import type {
   BrowserProfileParams,
   BrowserProfileResult,
@@ -12,17 +16,11 @@ export async function runBenchLoop(
   params: BrowserProfileParams,
   samplingInterval: number,
 ): Promise<BrowserProfileResult> {
-  const { alloc = false, timeSample = false, callCounts = false } = params;
   const maxTime = params.maxTime ?? 642;
   const maxIter = params.maxIterations ?? Number.MAX_SAFE_INTEGER;
+  const opts = instrumentOpts(params, samplingInterval);
 
-  await startInstruments(cdp, {
-    alloc,
-    timeSample,
-    callCounts,
-    samplingInterval,
-    timeInterval: params.timeInterval,
-  });
+  await startInstruments(cdp, opts);
 
   const { samples, totalMs } = await page.evaluate(
     async ({ maxTime, maxIter }) => {
@@ -40,11 +38,7 @@ export async function runBenchLoop(
     { maxTime, maxIter },
   );
 
-  const collected = await stopInstruments(cdp, {
-    alloc,
-    timeSample,
-    callCounts,
-  });
+  const collected = await stopInstruments(cdp, opts);
 
   return { samples, wallTimeMs: totalMs, ...collected };
 }

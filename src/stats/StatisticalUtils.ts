@@ -22,6 +22,16 @@ export interface DifferenceCI {
   histogram?: HistogramBin[];
 }
 
+/** Negate percent and CI for "higher is better" metrics (e.g., throughput) */
+export function flipCI(ci: DifferenceCI): DifferenceCI {
+  return {
+    percent: -ci.percent,
+    ci: [-ci.ci[1], -ci.ci[0]],
+    direction: ci.direction,
+    histogram: ci.histogram?.map(bin => ({ x: -bin.x, count: bin.count })),
+  };
+}
+
 /** Options for bootstrap resampling methods */
 type BootstrapOptions = {
   resamples?: number;

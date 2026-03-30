@@ -1,5 +1,9 @@
 import type { CDPSession, Page } from "playwright";
-import { startInstruments, stopInstruments } from "./BrowserCDP.ts";
+import {
+  instrumentOpts,
+  startInstruments,
+  stopInstruments,
+} from "./BrowserCDP.ts";
 import type {
   BrowserProfileParams,
   BrowserProfileResult,
@@ -25,30 +29,22 @@ export async function setupLapMode(
   timeout: number,
   pageErrors: string[],
 ): Promise<LapModeHandle> {
-  const { alloc = false, timeSample = false, callCounts = false } = params;
   const { promise, resolve, reject } =
     Promise.withResolvers<BrowserProfileResult>();
   let instrumentsStarted = false;
 
-  const instrOpts = {
-    alloc,
-    timeSample,
-    callCounts,
-    samplingInterval,
-    timeInterval: params.timeInterval,
-  };
+  const opts = instrumentOpts(params, samplingInterval);
   await page.exposeFunction("__benchInstrumentStart", async () => {
     if (instrumentsStarted) return;
     instrumentsStarted = true;
-    await startInstruments(cdp, instrOpts);
+    await startInstruments(cdp, opts);
   });
 
-  const stopOpts = { alloc, timeSample, callCounts };
   await page.exposeFunction(
     "__benchCollect",
     async (samples: number[], wallTimeMs: number) => {
       const collected = instrumentsStarted
-        ? await stopInstruments(cdp, stopOpts)
+        ? await stopInstruments(cdp, opts)
         : {};
       resolve({ samples, wallTimeMs, ...collected });
     },

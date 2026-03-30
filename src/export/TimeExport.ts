@@ -2,32 +2,13 @@ import type {
   TimeProfile,
   TimeProfileNode,
 } from "../profiling/node/TimeSampler.ts";
-
-/** speedscope file format (https://www.speedscope.app/file-format-schema.json) */
-interface SpeedscopeFile {
-  $schema: "https://www.speedscope.app/file-format-schema.json";
-  shared: { frames: SpeedscopeFrame[] };
-  profiles: SpeedscopeTimeProfile[];
-  name?: string;
-  exporter?: string;
-}
-
-interface SpeedscopeFrame {
-  name: string;
-  file?: string;
-  line?: number;
-  col?: number;
-}
-
-interface SpeedscopeTimeProfile {
-  type: "sampled";
-  name: string;
-  unit: "microseconds";
-  startValue: number;
-  endValue: number;
-  samples: number[][]; // each sample is stack of frame indices
-  weights: number[]; // microseconds per sample
-}
+import {
+  internFrame,
+  type SpeedscopeFile,
+  type SpeedscopeFrame,
+  type SpeedscopeTimeProfile,
+  speedscopeFile,
+} from "./SpeedscopeTypes.ts";
 
 /** Convert a TimeProfile to speedscope format */
 export function timeProfileToSpeedscope(
@@ -38,12 +19,7 @@ export function timeProfileToSpeedscope(
   const frameIndex = new Map<string, number>();
   const p = buildTimeProfile(name, profile, frames, frameIndex);
 
-  return {
-    $schema: "https://www.speedscope.app/file-format-schema.json",
-    shared: { frames },
-    profiles: [p],
-    exporter: "benchforge",
-  };
+  return speedscopeFile(frames, [p]);
 }
 
 /** Build a SpeedscopeFile from multiple named time profiles (shared frames). */
@@ -58,12 +34,7 @@ export function buildTimeSpeedscopeFile(
     buildTimeProfile(e.name, e.profile, frames, frameIndex),
   );
 
-  return {
-    $schema: "https://www.speedscope.app/file-format-schema.json",
-    shared: { frames },
-    profiles,
-    exporter: "benchforge",
-  };
+  return speedscopeFile(frames, profiles);
 }
 
 /** Build a speedscope profile from a V8 TimeProfile */
@@ -155,51 +126,16 @@ function resolveStack(
   for (let i = path.length - 1; i >= 0; i--) {
     const node = nodeMap.get(path[i]);
     if (!node) continue;
-    const {
-      functionName: fn,
-      url,
-      lineNumber: line,
-      columnNumber: col,
-    } = node.callFrame;
+    const { functionName, url, lineNumber, columnNumber } = node.callFrame;
     // Skip the synthetic (root) node
-    if (!fn && !url && line <= 0) continue;
-    stack.push(internFrame(fn, url, line, col, sharedFrames, frameIndex));
+    if (!functionName && !url && lineNumber <= 0) continue;
+    // V8 lines/cols are 0-indexed; speedscope expects 1-indexed
+    const name = functionName || "(anonymous)";
+    const line = lineNumber + 1;
+    const col = columnNumber != null ? columnNumber + 1 : undefined;
+    stack.push(internFrame(name, url, line, col, sharedFrames, frameIndex));
   }
 
   cache.set(nodeId, stack);
   return stack;
-}
-
-/** Intern a call frame, returning its index in the shared frames array */
-function internFrame(
-  functionName: string,
-  url: string,
-  lineNumber: number,
-  columnNumber: number | undefined,
-  sharedFrames: SpeedscopeFrame[],
-  frameIndex: Map<string, number>,
-): number {
-  const name = functionName || "(anonymous)";
-  const line = lineNumber + 1; // V8 is 0-indexed
-  const col = columnNumber != null ? columnNumber + 1 : undefined;
-  const key = `${name}\0${url}\0${line}\0${col}`;
-
-  const existing = frameIndex.get(key);
-  if (existing !== undefined) return existing;
-
-  const idx = sharedFrames.length;
-  const entry: SpeedscopeFrame = { name: displayName(name, url, line) };
-  if (url) entry.file = url;
-  if (line > 0) entry.line = line;
-  if (col != null) entry.col = col;
-  sharedFrames.push(entry);
-  frameIndex.set(key, idx);
-  return idx;
-}
-
-/** Display name for a frame: named functions use their name, anonymous get a location hint */
-function displayName(name: string, url: string, line: number): string {
-  if (name !== "(anonymous)") return name;
-  const file = url?.split("/").pop();
-  return file ? `(anonymous ${file}:${line})` : "(anonymous)";
 }

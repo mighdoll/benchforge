@@ -89,14 +89,8 @@ export async function viewArchive(filePath: string): Promise<void> {
     sources,
   });
 
-  await new Promise<void>(resolve => {
-    console.log("\nPress Ctrl+C to exit");
-    process.on("SIGINT", () => {
-      console.log();
-      close();
-      resolve();
-    });
-  });
+  await waitForCtrlC();
+  close();
 }
 
 /** Build HTTP request handler with API routes and static asset fallback */
@@ -117,10 +111,11 @@ function createRequestHandler(
       res.end(JSON.stringify(config));
     },
     "/api/report-data": res => sendJson(res, ctx.reportData, "report data"),
-    "/api/profile": res => sendProfile(res, ctx.profileData),
-    "/api/profile/alloc": res => sendProfile(res, ctx.profileData),
+    "/api/profile": res => sendJson(res, ctx.profileData, "profile data", true),
+    "/api/profile/alloc": res =>
+      sendJson(res, ctx.profileData, "profile data", true),
     "/api/profile/time": res =>
-      sendProfile(res, ctx.timeProfileData, "time profile data"),
+      sendJson(res, ctx.timeProfileData, "time profile data", true),
     "/api/source": (res, query) => handleSourceRequest(res, query, sourceCache),
     "/api/archive": (res, _q, method) => {
       if (method !== "POST") {
@@ -195,20 +190,11 @@ function packageRoot(): string {
   return join(thisDir, "..");
 }
 
-function sendJson(res: Res, data: string | undefined, label: string): void {
-  if (!data) {
-    res.statusCode = 404;
-    res.end(`No ${label}`);
-    return;
-  }
-  res.setHeader("Content-Type", "application/json");
-  res.end(data);
-}
-
-function sendProfile(
+function sendJson(
   res: Res,
   data: string | undefined,
-  label = "profile data",
+  label: string,
+  cors = false,
 ): void {
   if (!data) {
     res.statusCode = 404;
@@ -216,7 +202,7 @@ function sendProfile(
     return;
   }
   res.setHeader("Content-Type", "application/json");
-  res.setHeader("Access-Control-Allow-Origin", "*");
+  if (cors) res.setHeader("Access-Control-Allow-Origin", "*");
   res.end(data);
 }
 
@@ -289,4 +275,15 @@ async function handleArchiveRequest(
     res.statusCode = 500;
     res.end("Archive failed");
   }
+}
+
+/** Wait for Ctrl+C before exiting */
+export function waitForCtrlC(): Promise<void> {
+  return new Promise(resolve => {
+    console.log("\nPress Ctrl+C to exit");
+    process.on("SIGINT", () => {
+      console.log();
+      resolve();
+    });
+  });
 }

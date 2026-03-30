@@ -1,7 +1,6 @@
-import pico from "picocolors";
+import colors from "../Colors.ts";
 
-const isTest = process.env.NODE_ENV === "test" || process.env.VITEST === "true";
-const { red } = isTest ? { red: (str: string) => str } : pico;
+const { red } = colors;
 
 const lowConfidence = 80;
 

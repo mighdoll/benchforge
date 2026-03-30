@@ -1,12 +1,13 @@
 import type { BenchmarkEntry, ReportData } from "../ReportData.ts";
 import { createCIPlot } from "./CIPlot.ts";
 import { createHistogramKde } from "./HistogramKde.ts";
-import type {
-  FlatGcEvent,
-  FlatPausePoint,
-  HeapPoint,
-  Sample,
-  TimeSeriesPoint,
+import {
+  type FlatGcEvent,
+  type FlatPausePoint,
+  formatPct,
+  type HeapPoint,
+  type Sample,
+  type TimeSeriesPoint,
 } from "./PlotTypes.ts";
 import { createSampleTimeSeries } from "./SampleTimeSeries.ts";
 
@@ -250,11 +251,6 @@ function flattenBenchmark(b: PreparedBenchmark, out: FlattenedData): void {
       durationMs: p.durationMs,
     });
   });
-}
-
-function formatPct(v: number): string {
-  const sign = v >= 0 ? "+" : "";
-  return sign + v.toFixed(1) + "%";
 }
 
 /** Running total array, used to map GC event offsets to sample indices */

@@ -1,6 +1,6 @@
-import pico from "picocolors";
 import type { Alignment, SpanningCellConfig, TableUserConfig } from "table";
 import { table } from "table";
+import colors from "../Colors.ts";
 import { diffPercent } from "../Formatters.ts";
 
 /** Related table columns */
@@ -53,8 +53,7 @@ interface Lines {
   drawVerticalLine: (index: number, size: number) => boolean;
 }
 
-const isTest = process.env.NODE_ENV === "test" || process.env.VITEST === "true";
-const { bold } = isTest ? { bold: (str: string) => str } : pico;
+const { bold } = colors;
 
 // Regex to strip ANSI escape codes (ESC [ ... m sequences)
 const ansiEscapeRegex = new RegExp(

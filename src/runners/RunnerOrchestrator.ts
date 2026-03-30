@@ -4,15 +4,12 @@ import path from "node:path";
 import type { CoverageData } from "../profiling/node/CoverageTypes.ts";
 import type { HeapProfile } from "../profiling/node/HeapSampler.ts";
 import type { TimeProfile } from "../profiling/node/TimeSampler.ts";
-import {
-  type AdaptiveOptions,
-  createAdaptiveWrapper,
-} from "./AdaptiveWrapper.ts";
-import type { BenchmarkSpec } from "./BenchmarkSpec.ts";
+import type { BenchmarkFunction, BenchmarkSpec } from "./BenchmarkSpec.ts";
 import type { RunnerOptions } from "./BenchRunner.ts";
-import { createRunner, type KnownRunner } from "./CreateRunner.ts";
+import type { KnownRunner } from "./CreateRunner.ts";
 import { aggregateGcStats, type GcEvent, parseGcLine } from "./GcStats.ts";
 import type { MeasuredResults } from "./MeasuredResults.ts";
+import { createBenchRunner, getModuleExport } from "./RunnerUtils.ts";
 import { debugWorkerTiming, getElapsed, getPerfNow } from "./TimingUtils.ts";
 import type {
   ErrorMessage,
@@ -55,10 +52,7 @@ export async function runBenchmark<T = unknown>({
     const resolved = spec.modulePath
       ? await resolveModuleSpec(spec, params)
       : { spec, params };
-    const base = await createRunner(runner);
-    const benchRunner = (options as any).adaptive
-      ? createAdaptiveWrapper(base, options as AdaptiveOptions)
-      : base;
+    const benchRunner = await createBenchRunner(runner, options);
     return benchRunner.runBench(resolved.spec, options, resolved.params);
   }
 
@@ -92,25 +86,19 @@ async function resolveModuleSpec<T>(
   params: T | undefined,
 ): Promise<{ spec: BenchmarkSpec<T>; params: T | undefined }> {
   const module = await import(spec.modulePath!);
-
-  const fn = spec.exportName
-    ? module[spec.exportName]
-    : module.default || module;
-
-  if (typeof fn !== "function") {
-    const name = spec.exportName || "default";
-    throw new Error(
-      `Export '${name}' from ${spec.modulePath} is not a function`,
-    );
-  }
+  const fn = getModuleExport<BenchmarkFunction<T>>(
+    module,
+    spec.exportName,
+    spec.modulePath!,
+  );
 
   let resolvedParams = params;
   if (spec.setupExportName) {
-    const setupFn = module[spec.setupExportName];
-    if (typeof setupFn !== "function") {
-      const msg = `Setup export '${spec.setupExportName}' from ${spec.modulePath} is not a function`;
-      throw new Error(msg);
-    }
+    const setupFn = getModuleExport<(p: T | undefined) => T | Promise<T>>(
+      module,
+      spec.setupExportName,
+      spec.modulePath!,
+    );
     resolvedParams = await setupFn(params);
   }
 

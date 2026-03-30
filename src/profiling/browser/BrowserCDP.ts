@@ -5,6 +5,34 @@ import type { HeapProfile } from "../node/HeapSampler.ts";
 import type { TimeProfile } from "../node/TimeSampler.ts";
 import { browserGcStats, type TraceEvent } from "./BrowserGcStats.ts";
 
+/** Options for starting/stopping CDP instruments (heap, CPU, coverage). */
+export interface InstrumentOpts {
+  alloc: boolean;
+  timeSample: boolean;
+  callCounts: boolean;
+  samplingInterval: number;
+  timeInterval?: number;
+}
+
+/** Build instrument options from profile params with optional flag defaults. */
+export function instrumentOpts(
+  params: {
+    alloc?: boolean;
+    timeSample?: boolean;
+    callCounts?: boolean;
+    timeInterval?: number;
+  },
+  samplingInterval: number,
+): InstrumentOpts {
+  return {
+    alloc: params.alloc ?? false,
+    timeSample: params.timeSample ?? false,
+    callCounts: params.callCounts ?? false,
+    samplingInterval,
+    timeInterval: params.timeInterval,
+  };
+}
+
 /** Start CDP GC tracing, returns the event collector array. */
 export async function startGcTracing(cdp: CDPSession): Promise<TraceEvent[]> {
   const events: TraceEvent[] = [];
@@ -68,7 +96,7 @@ export async function collectCoverage(cdp: CDPSession): Promise<CoverageData> {
 /** Stop all active CDP instruments and return collected profiles/coverage. */
 export async function stopInstruments(
   cdp: CDPSession,
-  opts: { alloc: boolean; timeSample: boolean; callCounts: boolean },
+  opts: InstrumentOpts,
 ): Promise<{
   heapProfile?: HeapProfile;
   timeProfile?: TimeProfile;
@@ -89,13 +117,7 @@ export async function stopInstruments(
 /** Start all requested CDP instruments. */
 export async function startInstruments(
   cdp: CDPSession,
-  opts: {
-    alloc: boolean;
-    timeSample: boolean;
-    callCounts: boolean;
-    samplingInterval: number;
-    timeInterval?: number;
-  },
+  opts: InstrumentOpts,
 ): Promise<void> {
   if (opts.alloc) {
     await cdp.send("HeapProfiler.startSampling", {

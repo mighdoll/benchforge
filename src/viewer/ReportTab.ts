@@ -1,12 +1,8 @@
+import type { GitVersion } from "../report/GitUtils.ts";
+import { formatRelativeTime } from "./DateFormat.ts";
 import { escapeHtml } from "./Helpers.ts";
 import type { DataProvider } from "./Providers.ts";
 import type { BenchmarkGroup, ReportData } from "./ReportData.ts";
-
-interface VersionInfo {
-  hash: string;
-  date?: string;
-  dirty?: boolean;
-}
 
 const defaultArgs: Record<string, unknown> = {
   worker: true,
@@ -92,8 +88,8 @@ function formatCliArgs(args?: Record<string, unknown>): string {
 }
 
 function formatVersionInfo(metadata: Record<string, unknown>): string {
-  const cur = metadata.currentVersion as VersionInfo | undefined;
-  const base = metadata.baselineVersion as VersionInfo | undefined;
+  const cur = metadata.currentVersion as GitVersion | undefined;
+  const base = metadata.baselineVersion as GitVersion | undefined;
   if (!cur && !base) return "";
   const parts: string[] = [];
   if (cur) parts.push("Current: " + formatVersion(cur));
@@ -114,27 +110,10 @@ function comparisonBadge(group: BenchmarkGroup, i: number): string {
     <div id="ci-plot-${i}" class="ci-plot-container"></div>`;
 }
 
-/** Format a time difference as a human-readable relative string ("3h ago", "yesterday"). */
-function relativeDate(diffMs: number, date: string): string {
-  const mins = Math.floor(diffMs / 60000);
-  if (mins < 1) return "just now";
-  if (mins < 60) return `${mins}m ago`;
-  const hours = Math.floor(diffMs / 3600000);
-  if (hours < 24) return `${hours}h ago`;
-  const days = Math.floor(diffMs / 86400000);
-  if (days === 1) return "yesterday";
-  if (days < 30) return `${days} days ago`;
-  return new Date(date).toLocaleDateString("en-US", {
-    month: "short",
-    day: "numeric",
-  });
-}
-
 /** Format a git version as "hash (relative-date)", appending "*" if dirty. */
-function formatVersion(v: VersionInfo): string {
+function formatVersion(v: GitVersion): string {
   if (!v || v.hash === "unknown") return "unknown";
   const hash = v.dirty ? v.hash + "*" : v.hash;
   if (!v.date) return hash;
-  const rel = relativeDate(Date.now() - new Date(v.date).getTime(), v.date);
-  return `${hash} (${rel})`;
+  return `${hash} (${formatRelativeTime(v.date)})`;
 }

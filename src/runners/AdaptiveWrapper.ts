@@ -1,8 +1,5 @@
-import {
-  coefficientOfVariation,
-  medianAbsoluteDeviation,
-  percentile,
-} from "../stats/StatisticalUtils.ts";
+import { percentile } from "../stats/StatisticalUtils.ts";
+import { computeStats, outlierImpactRatio } from "./BasicRunner.ts";
 import type { BenchmarkSpec } from "./BenchmarkSpec.ts";
 import type { BenchRunner, RunnerOptions } from "./BenchRunner.ts";
 import type { MeasuredResults } from "./MeasuredResults.ts";
@@ -130,9 +127,9 @@ function getStability(samples: number[], win: number): Metrics {
   const medPrev = percentile(prevMs, 0.5);
   const medianDrift = Math.abs(medRecent - medPrev) / medPrev;
 
-  const impRecent = getOutlierImpact(recentMs);
-  const impPrev = getOutlierImpact(prevMs);
-  const impactDrift = Math.abs(impRecent.ratio - impPrev.ratio);
+  const impRecent = outlierImpactRatio(recentMs);
+  const impPrev = outlierImpactRatio(prevMs);
+  const impactDrift = Math.abs(impRecent - impPrev);
 
   return {
     medianDrift,
@@ -238,30 +235,8 @@ function buildResults(
   warmupSamples?: number[],
 ): MeasuredResults[] {
   const totalTime = (performance.now() - startTime) / 1000;
-  const time = computeTimeStats(samples.map(s => s * msToNs));
+  const time = computeStats(samples);
   return [{ name, samples, warmupSamples, time, totalTime, convergence }];
-}
-
-/** Measure outlier impact as proportion of excess time above the 1.5*IQR threshold. */
-function getOutlierImpact(samples: number[]): { ratio: number; count: number } {
-  if (samples.length === 0) return { ratio: 0, count: 0 };
-
-  const median = percentile(samples, 0.5);
-  const q75 = percentile(samples, 0.75);
-  const threshold = median + 1.5 * (q75 - median);
-
-  let excessTime = 0;
-  let count = 0;
-
-  for (const sample of samples) {
-    if (sample > threshold) {
-      excessTime += sample - median;
-      count++;
-    }
-  }
-
-  const total = samples.reduce((a, b) => a + b, 0);
-  return { ratio: total > 0 ? excessTime / total : 0, count };
 }
 
 /** Append samples one-by-one to avoid stack overflow from spread on large arrays */
@@ -280,33 +255,4 @@ function shouldStop(
   if (c.converged && c.confidence >= target) return true;
   const threshold = Math.max(target, fallbackThreshold);
   return elapsed >= min && c.confidence >= threshold;
-}
-
-/** Compute time percentiles, CV, MAD, and outlier rate from nanosecond samples. */
-function computeTimeStats(samplesNs: number[]) {
-  const samplesMs = samplesNs.map(s => s / msToNs);
-  const min = samplesNs.reduce(
-    (a, b) => Math.min(a, b),
-    Number.POSITIVE_INFINITY,
-  );
-  const max = samplesNs.reduce(
-    (a, b) => Math.max(a, b),
-    Number.NEGATIVE_INFINITY,
-  );
-  const sum = samplesNs.reduce((a, b) => a + b, 0);
-
-  return {
-    min: min / msToNs,
-    max: max / msToNs,
-    avg: sum / samplesNs.length / msToNs,
-    p25: percentile(samplesNs, 0.25) / msToNs,
-    p50: percentile(samplesNs, 0.5) / msToNs,
-    p75: percentile(samplesNs, 0.75) / msToNs,
-    p95: percentile(samplesNs, 0.95) / msToNs,
-    p99: percentile(samplesNs, 0.99) / msToNs,
-    p999: percentile(samplesNs, 0.999) / msToNs,
-    cv: coefficientOfVariation(samplesMs),
-    mad: medianAbsoluteDeviation(samplesMs),
-    outlierRate: getOutlierImpact(samplesMs).ratio,
-  };
 }

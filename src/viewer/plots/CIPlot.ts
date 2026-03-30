@@ -2,6 +2,7 @@ import type {
   DifferenceCI,
   HistogramBin,
 } from "../../stats/StatisticalUtils.ts";
+import { formatPct } from "./PlotTypes.ts";
 
 export interface DistributionPlotOptions {
   width?: number;
@@ -33,8 +34,6 @@ const colors = {
   slower: { fill: "#fee2e2", stroke: "#ef4444" },
   uncertain: { fill: "#dbeafe", stroke: "#3b82f6" },
 };
-
-const formatPct = (v: number) => (v >= 0 ? "+" : "") + v.toFixed(0) + "%";
 
 /** Create a small distribution plot showing histogram with CI shading */
 export function createDistributionPlot(
@@ -82,10 +81,10 @@ export function createDistributionPlot(
   );
   const labelY = layout.height - 4;
   svg.appendChild(
-    text(scales.x(ci[0]), labelY, formatPct(ci[0]), "middle", "12"),
+    text(scales.x(ci[0]), labelY, formatPct(ci[0], 0), "middle", "12"),
   );
   svg.appendChild(
-    text(scales.x(ci[1]), labelY, formatPct(ci[1]), "middle", "12"),
+    text(scales.x(ci[1]), labelY, formatPct(ci[1], 0), "middle", "12"),
   );
   return svg;
 }

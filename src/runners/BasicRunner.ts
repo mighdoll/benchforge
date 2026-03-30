@@ -1,4 +1,9 @@
 import { getHeapStatistics } from "node:v8";
+import {
+  coefficientOfVariation,
+  medianAbsoluteDeviation,
+  percentile,
+} from "../stats/StatisticalUtils.ts";
 import type { BenchmarkSpec } from "./BenchmarkSpec.ts";
 import type { BenchRunner, RunnerOptions } from "./BenchRunner.ts";
 import { executeBenchmark } from "./BenchRunner.ts";
@@ -7,16 +12,6 @@ import type {
   OptStatusInfo,
   PausePoint,
 } from "./MeasuredResults.ts";
-
-export type SampleTimeStats = {
-  min: number;
-  max: number;
-  avg: number;
-  p50: number;
-  p75: number;
-  p99: number;
-  p999: number;
-};
 
 type CollectParams<T = unknown> = {
   benchmark: BenchmarkSpec<T>;
@@ -120,19 +115,45 @@ export class BasicRunner implements BenchRunner {
   }
 }
 
-/** Compute percentiles and basic statistics from timing samples. */
-export function computeStats(samples: number[]): SampleTimeStats {
-  const sorted = [...samples].sort((a, b) => a - b);
-  const avg = samples.reduce((sum, s) => sum + s, 0) / samples.length;
+/** Compute percentiles, CV, MAD, and outlier rate from timing samples (ms). */
+export function computeStats(samples: number[]): MeasuredResults["time"] {
+  let min = Number.POSITIVE_INFINITY;
+  let max = Number.NEGATIVE_INFINITY;
+  let sum = 0;
+  for (const s of samples) {
+    if (s < min) min = s;
+    if (s > max) max = s;
+    sum += s;
+  }
   return {
-    min: sorted[0],
-    max: sorted[sorted.length - 1],
-    avg,
-    p50: percentile(sorted, 0.5),
-    p75: percentile(sorted, 0.75),
-    p99: percentile(sorted, 0.99),
-    p999: percentile(sorted, 0.999),
+    min,
+    max,
+    avg: sum / samples.length,
+    p25: percentile(samples, 0.25),
+    p50: percentile(samples, 0.5),
+    p75: percentile(samples, 0.75),
+    p95: percentile(samples, 0.95),
+    p99: percentile(samples, 0.99),
+    p999: percentile(samples, 0.999),
+    cv: coefficientOfVariation(samples),
+    mad: medianAbsoluteDeviation(samples),
+    outlierRate: outlierImpactRatio(samples),
   };
+}
+
+/** Measure outlier impact as proportion of excess time above the 1.5*IQR threshold. */
+export function outlierImpactRatio(samples: number[]): number {
+  if (samples.length === 0) return 0;
+  const median = percentile(samples, 0.5);
+  const q75 = percentile(samples, 0.75);
+  const threshold = median + 1.5 * (q75 - median);
+
+  let excessTime = 0;
+  for (const sample of samples) {
+    if (sample > threshold) excessTime += sample - median;
+  }
+  const total = samples.reduce((a, b) => a + b, 0);
+  return total > 0 ? excessTime / total : 0;
 }
 
 /** Collect timing samples with warmup, heap tracking, and optional V8 optimization tracing. */
@@ -184,18 +205,6 @@ function buildMeasuredResults(name: string, c: CollectResult): MeasuredResults {
     optSamples: c.optSamples,
     pausePoints: c.pausePoints,
   };
-}
-
-/** Interpolated percentile from a pre-sorted array. */
-function percentile(sortedArray: number[], p: number): number {
-  const index = (sortedArray.length - 1) * p;
-  const lower = Math.floor(index);
-  const upper = Math.ceil(index);
-  const weight = index % 1;
-
-  if (upper >= sortedArray.length) return sortedArray[sortedArray.length - 1];
-
-  return sortedArray[lower] * (1 - weight) + sortedArray[upper] * weight;
 }
 
 /** Run warmup iterations with gc + settle time for V8 optimization */

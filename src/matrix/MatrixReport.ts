@@ -191,7 +191,7 @@ function buildColumns(
   };
 
   const ciKey = "diffCI" as keyof MatrixReportRow;
-  const diffCol = { key: ciKey, title: "Δ% CI", formatter: formatDiff };
+  const diffCol = { key: ciKey, title: "Δ% CI", formatter: formatDiffWithCI };
   const timeCol: ColumnGroup<MatrixReportRow> = {
     columns: [
       { key: "time", title: "time", formatter: duration },
@@ -263,10 +263,4 @@ function buildRow(
   }
 
   return row;
-}
-
-/** Format diff with CI, or "baseline" marker */
-function formatDiff(value: unknown): string | null {
-  if (!value) return null;
-  return formatDiffWithCI(value as DifferenceCI);
 }

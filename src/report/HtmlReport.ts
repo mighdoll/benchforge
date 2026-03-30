@@ -1,5 +1,4 @@
-import type { DifferenceCI } from "../stats/StatisticalUtils.ts";
-import { bootstrapDifferenceCI } from "../stats/StatisticalUtils.ts";
+import { bootstrapDifferenceCI, flipCI } from "../stats/StatisticalUtils.ts";
 import type {
   BenchmarkEntry,
   BenchmarkGroup,
@@ -99,16 +98,6 @@ function prepareBenchmarkData(
     stats: measuredResults.time,
     heapSize: measuredResults.heapSize,
     sectionStats: sections ? extractSectionStats(report, sections) : undefined,
-  };
-}
-
-/** Flip CI percent for metrics where higher is better (e.g., lines/sec) */
-function flipCI(ci: DifferenceCI): DifferenceCI {
-  return {
-    percent: -ci.percent,
-    ci: [-ci.ci[1], -ci.ci[0]],
-    direction: ci.direction,
-    histogram: ci.histogram?.map(bin => ({ x: -bin.x, count: bin.count })),
   };
 }
 
