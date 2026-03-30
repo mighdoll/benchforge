@@ -145,29 +145,24 @@ function buildSectionTable(
   const sections = options.sections!;
   const variantTitle = options.variantTitle ?? "name";
 
-  let hasBaseline = false;
-  const rows: Record<string, unknown>[] = [];
-
-  for (const variant of results.variants) {
+  const rows = results.variants.flatMap(variant => {
     const cr = variant.cases.find(c => c.caseId === caseId);
-    if (!cr) continue;
+    if (!cr) return [];
 
     const row: Record<string, unknown> = { name: truncate(variant.id, 25) };
     for (const section of sections) {
       Object.assign(row, section.extract(cr.measured, cr.metadata));
     }
-
     if (cr.baseline) {
-      hasBaseline = true;
       row.diffCI = bootstrapDifferenceCI(
         cr.baseline.samples,
         cr.measured.samples,
       );
     }
+    return [row];
+  });
 
-    rows.push(row);
-  }
-
+  const hasBaseline = rows.some(r => r.diffCI);
   const cols = buildSectionColumns(sections, variantTitle, hasBaseline);
   const table = buildTable(cols, [{ results: rows }]);
   return `${caseTitle}\n${table}`;
@@ -204,30 +199,24 @@ function buildColumns(
     ],
   };
 
-  const groups: ColumnGroup<MatrixReportRow>[] = [nameCol, timeCol];
+  return [nameCol, timeCol, ...extraColumnGroups(options?.extraColumns)];
+}
 
-  // Add extra columns, grouped by groupTitle
-  const extra = options?.extraColumns;
-  if (extra?.length) {
-    const byGroup = new Map<string | undefined, ExtraColumn[]>();
-    for (const col of extra) {
-      const g = byGroup.get(col.groupTitle) ?? [];
-      g.push(col);
-      byGroup.set(col.groupTitle, g);
-    }
-    for (const [groupTitle, cols] of byGroup) {
-      groups.push({
-        groupTitle,
-        columns: cols.map(col => ({
-          key: col.key as keyof MatrixReportRow,
-          title: col.title,
-          formatter: col.formatter ?? String,
-        })),
-      });
-    }
-  }
+/** Group extra columns by groupTitle into ColumnGroups */
+function extraColumnGroups(
+  extra?: ExtraColumn[],
+): ColumnGroup<MatrixReportRow>[] {
+  if (!extra?.length) return [];
 
-  return groups;
+  const byGroup = Map.groupBy(extra, col => col.groupTitle);
+  return [...byGroup].map(([groupTitle, cols]) => ({
+    groupTitle,
+    columns: cols.map(col => ({
+      key: col.key as keyof MatrixReportRow,
+      title: col.title,
+      formatter: col.formatter ?? String,
+    })),
+  }));
 }
 
 /** Build column groups from ResultsMapper sections */

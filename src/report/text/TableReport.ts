@@ -233,13 +233,12 @@ function calcColumnWidths<T>(
 function createLines<T>(groups: ColumnGroup<T>[]): Lines {
   const { sectionBorders, headerBottom } = calcBorders(groups);
 
-  function drawVerticalLine(index: number, size: number): boolean {
-    return index === 0 || index === size || sectionBorders.includes(index);
-  }
-  function drawHorizontalLine(index: number, size: number): boolean {
-    return index === 0 || index === size || index === headerBottom;
-  }
-  return { drawHorizontalLine, drawVerticalLine };
+  return {
+    drawVerticalLine: (index, size) =>
+      index === 0 || index === size || sectionBorders.includes(index),
+    drawHorizontalLine: (index, size) =>
+      index === 0 || index === size || index === headerBottom,
+  };
 }
 
 /** @return array padded with blank strings to the given length */

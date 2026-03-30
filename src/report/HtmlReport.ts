@@ -6,11 +6,7 @@ import type {
   ReportData,
   SectionStat,
 } from "../viewer/ReportData.ts";
-import type {
-  ReportColumnGroup,
-  ReportGroup,
-  ResultsMapper,
-} from "./BenchmarkReport.ts";
+import type { ReportGroup, ResultsMapper } from "./BenchmarkReport.ts";
 import type { GitVersion } from "./GitUtils.ts";
 
 export interface PrepareHtmlOptions {
@@ -122,18 +118,14 @@ function extractSectionStats(
 ): SectionStat[] {
   return sections.flatMap(section => {
     const vals = section.extract(report.measuredResults, report.metadata);
-    return section.columns().flatMap(g => formatGroupStats(vals, g));
+    return section
+      .columns()
+      .flatMap(g =>
+        g.columns
+          .map(c => formatColumnStat(vals, c, g.groupTitle))
+          .filter((s): s is SectionStat => s !== undefined),
+      );
   });
-}
-
-/** @return formatted stats for one column group, skipping undefined values */
-function formatGroupStats(
-  values: Record<string, unknown>,
-  group: ReportColumnGroup<Record<string, unknown>>,
-): SectionStat[] {
-  return group.columns
-    .map(c => formatColumnStat(values, c, group.groupTitle))
-    .filter((s): s is SectionStat => s !== undefined);
 }
 
 /** @return formatted stat for a single column, or undefined if empty/placeholder */

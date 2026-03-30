@@ -76,15 +76,17 @@ function buildSummaryGroupHtml(group: BenchmarkGroup, i: number): string {
 
 function formatCliArgs(args?: Record<string, unknown>): string {
   if (!args) return "benchforge";
-  const parts = ["benchforge"];
-  for (const [key, value] of Object.entries(args)) {
-    if (skipArgs.has(key) || value === undefined || value === false) continue;
-    if (defaultArgs[key] === value) continue;
-    if (!key.includes("-") && key !== key.toLowerCase()) continue;
-    if (key === "convergence" && !args.adaptive) continue;
-    parts.push(value === true ? `--${key}` : `--${key} ${value}`);
-  }
-  return parts.join(" ");
+  const flags = Object.entries(args)
+    .filter(([key, value]) => {
+      if (skipArgs.has(key) || value === undefined || value === false)
+        return false;
+      if (defaultArgs[key] === value) return false;
+      if (!key.includes("-") && key !== key.toLowerCase()) return false;
+      if (key === "convergence" && !args.adaptive) return false;
+      return true;
+    })
+    .map(([key, value]) => (value === true ? `--${key}` : `--${key} ${value}`));
+  return ["benchforge", ...flags].join(" ");
 }
 
 function formatVersionInfo(metadata: Record<string, unknown>): string {

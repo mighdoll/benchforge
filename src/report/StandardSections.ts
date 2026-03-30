@@ -225,8 +225,5 @@ export function buildGenericSections(args: {
   "gc-stats"?: boolean;
   alloc?: boolean;
 }): ResultsMapper[] {
-  const sections: ResultsMapper[] = [];
-  if (args["gc-stats"]) sections.push(gcStatsSection);
-  sections.push(runsSection);
-  return sections;
+  return [...(args["gc-stats"] ? [gcStatsSection] : []), runsSection];
 }

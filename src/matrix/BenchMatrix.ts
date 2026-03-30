@@ -119,7 +119,11 @@ export async function runMatrix<T>(
   matrix: BenchMatrix<T>,
   options: RunMatrixOptions = {},
 ): Promise<MatrixResults> {
-  validateBaseline(matrix);
+  if (matrix.baselineDir && matrix.baselineVariant) {
+    throw new Error(
+      "BenchMatrix cannot have both 'baselineDir' and 'baselineVariant'",
+    );
+  }
   const effectiveOptions = { ...matrix.defaults, ...options };
 
   if (matrix.variantDir) {
@@ -129,13 +133,6 @@ export async function runMatrix<T>(
     return runMatrixInline(matrix, effectiveOptions);
   }
   throw new Error("BenchMatrix requires either 'variants' or 'variantDir'");
-}
-
-/** @throws if both baselineDir and baselineVariant are set */
-function validateBaseline<T>(matrix: BenchMatrix<T>): void {
-  const msg =
-    "BenchMatrix cannot have both 'baselineDir' and 'baselineVariant'";
-  if (matrix.baselineDir && matrix.baselineVariant) throw new Error(msg);
 }
 
 /** Run matrix with variantDir (worker mode for memory isolation) */
@@ -163,10 +160,11 @@ async function runMatrixInline<T>(
   matrix: BenchMatrix<T>,
   options: RunMatrixOptions,
 ): Promise<MatrixResults> {
-  // baselineDir is only valid with variantDir
-  const msg =
-    "BenchMatrix with inline 'variants' cannot use 'baselineDir'. Use 'variantDir' instead.";
-  if (matrix.baselineDir) throw new Error(msg);
+  if (matrix.baselineDir) {
+    throw new Error(
+      "BenchMatrix with inline 'variants' cannot use 'baselineDir'. Use 'variantDir' instead.",
+    );
+  }
 
   const { casesModule, caseIds } = await resolveCases(matrix, options);
   const runner = new BasicRunner();

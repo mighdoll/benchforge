@@ -44,14 +44,11 @@ export function openSourceTab(
   }
 
   const spacer = tabBar.querySelector(".tab-spacer")!;
-  const shortName = file.split("/").pop() || file;
-  const label = line ? shortName + ":" + line : shortName;
 
   const btn = document.createElement("button");
   btn.className = "tab";
   btn.dataset.tab = id;
-  btn.innerHTML =
-    escapeHtml(label) + ' <span class="tab-close" title="Close">&times;</span>';
+  btn.innerHTML = tabLabelHtml(file, line);
   tabBar.insertBefore(btn, spacer);
 
   const panel = document.createElement("div");
@@ -90,6 +87,14 @@ function sourceTabId(file: string): string {
   return "src:" + file;
 }
 
+function tabLabelHtml(file: string, line: number): string {
+  const shortName = file.split("/").pop() || file;
+  const label = line ? shortName + ":" + line : shortName;
+  return (
+    escapeHtml(label) + ' <span class="tab-close" title="Close">&times;</span>'
+  );
+}
+
 async function updateSourcePanel(
   tabData: SourceTabData,
   file: string,
@@ -99,10 +104,7 @@ async function updateSourcePanel(
 ): Promise<void> {
   const { panel, button } = tabData;
   const gen = tabData.generation;
-  const shortName = file.split("/").pop() || file;
-  const label = line ? shortName + ":" + line : shortName;
-  button.innerHTML =
-    escapeHtml(label) + ' <span class="tab-close" title="Close">&times;</span>';
+  button.innerHTML = tabLabelHtml(file, line);
 
   panel.innerHTML =
     '<div class="source-placeholder"><p>Loading source\u2026</p></div>';
@@ -120,17 +122,20 @@ async function updateSourcePanel(
       themes: { light: "github-light", dark: "github-dark" },
     });
 
-    const uri = provider.config.editorUri;
-    const header = buildSourceHeader(file, line, col, uri);
+    const header = buildSourceHeader(
+      file,
+      line,
+      col,
+      provider.config.editorUri,
+    );
     panel.innerHTML = header + '<div class="source-code">' + html + "</div>";
 
-    if (line) {
-      const lines = panel.querySelectorAll(".source-code .line");
-      const target = lines[line - 1];
-      if (target) {
-        target.classList.add("highlighted");
-        target.scrollIntoView({ block: "center" });
-      }
+    const target = line
+      ? panel.querySelectorAll(".source-code .line")[line - 1]
+      : undefined;
+    if (target) {
+      target.classList.add("highlighted");
+      target.scrollIntoView({ block: "center" });
     }
   } catch {
     if (tabData.generation !== gen) return;
@@ -157,14 +162,10 @@ function buildSourceHeader(
   editorUri: string | null,
 ): string {
   const path = escapeHtml(file);
-  let html = `<div class="source-header">`;
-  html += `<span class="source-path">${path}</span>`;
-  if (editorUri) {
-    const l = line || 1;
-    const c = col || 1;
-    const href = editorUri + filePathFromUrl(file) + `:${l}:${c}`;
-    html += ` <a class="source-editor-link" href="${escapeHtml(href)}">Open in Editor</a>`;
-  }
-  html += "</div>";
-  return html;
+  const editorLink = editorUri
+    ? ` <a class="source-editor-link" href="${escapeHtml(
+        editorUri + filePathFromUrl(file) + `:${line || 1}:${col || 1}`,
+      )}">Open in Editor</a>`
+    : "";
+  return `<div class="source-header"><span class="source-path">${path}</span>${editorLink}</div>`;
 }

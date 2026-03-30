@@ -32,7 +32,7 @@ interface PlotContext {
   benchmarks: string[];
 }
 
-const OPT_STATUS_NAMES: Record<number, string> = {
+const optStatusNames: Record<number, string> = {
   1: "interpreted",
   129: "sparkplug",
   17: "turbofan",
@@ -40,7 +40,7 @@ const OPT_STATUS_NAMES: Record<number, string> = {
   49: "turbofan+maglev",
   32769: "optimized",
 };
-const OPT_TIER_COLORS: Record<string, string> = {
+const optTierColors: Record<string, string> = {
   turbofan: "#22c55e",
   optimized: "#22c55e",
   "turbofan+maglev": "#22c55e",
@@ -115,7 +115,7 @@ export function createSampleTimeSeries(
 
 function buildPlotContext(timeSeries: TimeSeriesPoint[]): PlotContext {
   const benchmarks = [...new Set(timeSeries.map(d => d.benchmark))];
-  const sampleData = buildSampleData(timeSeries, benchmarks);
+  const sampleData = buildSampleData(timeSeries);
   const { unitSuffix, convertValue, formatValue } = getTimeUnit(
     sampleData.map(d => d.value),
   );
@@ -127,10 +127,13 @@ function buildPlotContext(timeSeries: TimeSeriesPoint[]): PlotContext {
   const xMin = d3.min(convertedData, d => d.sample)!;
   const xMax = d3.max(convertedData, d => d.sample)!;
   const hasWarmup = convertedData.some(d => d.isWarmup);
-  const tierSet = new Set(
-    convertedData.filter(d => d.optTier && !d.isWarmup).map(d => d.optTier),
-  );
-  const optTiers = [...tierSet].filter((t): t is string => t !== null);
+  const optTiers = [
+    ...new Set(
+      convertedData
+        .filter(d => d.optTier && !d.isWarmup)
+        .map(d => d.optTier as string),
+    ),
+  ];
   return {
     convertedData,
     xMin,
@@ -268,7 +271,7 @@ function sampleDotMarks(ctx: PlotContext): any[] {
         x: "sample",
         y: "displayValue",
         fill: (d: SampleData) =>
-          d.optTier ? OPT_TIER_COLORS[d.optTier] || "#4682b4" : "#4682b4",
+          (d.optTier && optTierColors[d.optTier]) || "#4682b4",
         r: 3,
         opacity: 0.8,
         title: tipTitle,
@@ -304,15 +307,15 @@ function buildLegendItems(
   if (hasHeap) items.push({ color: "#9333ea", label: "heap", style: "rect" });
   for (const tier of optTiers)
     items.push({
-      color: OPT_TIER_COLORS[tier] || "#4682b4",
+      color: optTierColors[tier] || "#4682b4",
       label: tier,
       style: "filled-dot",
     });
   if (optTiers.length === 0) {
     const sorted = [...benchmarks].sort((a, b) => {
-      const aBase = a.includes("(baseline)");
-      const bBase = b.includes("(baseline)");
-      return aBase === bBase ? 0 : aBase ? 1 : -1;
+      return (
+        Number(a.includes("(baseline)")) - Number(b.includes("(baseline)"))
+      );
     });
     for (const bm of sorted) {
       const isBase = bm.includes("(baseline)");
@@ -328,27 +331,18 @@ function buildLegendItems(
 
 function buildSampleData(
   timeSeries: TimeSeriesPoint[],
-  benchmarks: string[],
 ): Omit<SampleData, "displayValue">[] {
-  const result: Omit<SampleData, "displayValue">[] = [];
-  for (const benchmark of benchmarks) {
-    const isBaseline = benchmark.includes("(baseline)");
-    for (const d of timeSeries.filter(t => t.benchmark === benchmark)) {
-      const optTier =
-        d.optStatus !== undefined
-          ? OPT_STATUS_NAMES[d.optStatus] || "unknown"
-          : null;
-      result.push({
-        benchmark,
-        sample: d.iteration,
-        value: d.value,
-        isBaseline,
-        isWarmup: d.isWarmup || false,
-        optTier,
-      });
-    }
-  }
-  return result;
+  return timeSeries.map(d => ({
+    benchmark: d.benchmark,
+    sample: d.iteration,
+    value: d.value,
+    isBaseline: d.benchmark.includes("(baseline)"),
+    isWarmup: d.isWarmup || false,
+    optTier:
+      d.optStatus !== undefined
+        ? optStatusNames[d.optStatus] || "unknown"
+        : null,
+  }));
 }
 
 /** Pick display unit (ns/us/ms) based on average value magnitude */

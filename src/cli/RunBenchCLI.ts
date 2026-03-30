@@ -331,15 +331,15 @@ export async function exportReports(options: ExportOptions): Promise<void> {
   const { currentVersion, baselineVersion } = options;
 
   // Prepare report data (needed for --view and --archive)
-  let reportData: ReportData | undefined;
-  if (args.view || args.archive != null) {
-    reportData = prepareHtmlData(results, {
-      cliArgs: args,
-      sections,
-      currentVersion,
-      baselineVersion,
-    });
-  }
+  const needsReportData = args.view || args.archive != null;
+  const reportData = needsReportData
+    ? prepareHtmlData(results, {
+        cliArgs: args,
+        sections,
+        currentVersion,
+        baselineVersion,
+      })
+    : undefined;
 
   exportFileFormats(results, args, suiteName);
 
@@ -508,15 +508,12 @@ function buildReportSections(
   gcStats: boolean,
   hasOptData: boolean,
 ) {
-  const sections = adaptive
-    ? [adaptiveSection, totalTimeSection]
-    : [timeSection];
-
-  if (gcStats) sections.push(gcStatsSection);
-  if (hasOptData) sections.push(optSection);
-  sections.push(runsSection);
-
-  return sections;
+  return [
+    ...(adaptive ? [adaptiveSection, totalTimeSection] : [timeSection]),
+    ...(gcStats ? [gcStatsSection] : []),
+    ...(hasOptData ? [optSection] : []),
+    runsSection,
+  ];
 }
 
 /** Print heap reports (if enabled) and export results */
@@ -622,10 +619,11 @@ function printBrowserReport(
 ): void {
   const hasTime =
     (result.samples && result.samples.length > 0) || result.wallTimeMs != null;
-  const sections: ResultsMapper<any>[] = [];
-  if (hasTime) sections.push(timeSection);
-  if (result.gcStats) sections.push(browserGcStatsSection);
-  if (hasTime) sections.push(runsSection);
+  const sections: ResultsMapper<any>[] = [
+    ...(hasTime ? [timeSection] : []),
+    ...(result.gcStats ? [browserGcStatsSection] : []),
+    ...(hasTime ? [runsSection] : []),
+  ];
   if (sections.length > 0) console.log(reportResults(results, sections));
   if (result.heapProfile) {
     printHeapReports(results, {
@@ -859,14 +857,16 @@ function waitForCtrlC(): Promise<void> {
 
 /** Warn if parameterized benchmarks lack setup */
 function validateBenchmarkParameters(group: BenchGroup): void {
-  const { name, setup, benchmarks, baseline } = group;
-  if (setup) return;
+  if (group.setup) return;
 
-  const allBenchmarks = baseline ? [...benchmarks, baseline] : benchmarks;
-  for (const benchmark of allBenchmarks) {
-    if (benchmark.fn.length > 0) {
+  const allBenchmarks = group.baseline
+    ? [...group.benchmarks, group.baseline]
+    : group.benchmarks;
+
+  for (const bench of allBenchmarks) {
+    if (bench.fn.length > 0) {
       console.warn(
-        `Benchmark "${benchmark.name}" in group "${name}" expects parameters but no setup() provided.`,
+        `Benchmark "${bench.name}" in group "${group.name}" expects parameters but no setup() provided.`,
       );
     }
   }

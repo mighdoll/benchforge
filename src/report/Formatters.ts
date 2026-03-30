@@ -88,13 +88,13 @@ export function formatBytes(
 ): string | null {
   if (typeof bytes !== "number") return null;
   const s = opts?.space ? " " : "";
-  const KB = 1024;
-  const MB = KB * 1024;
-  const GB = MB * 1024;
-  if (bytes < KB) return `${bytes.toFixed(0)}${s}B`;
-  if (bytes < MB) return `${(bytes / KB).toFixed(1)}${s}KB`;
-  if (bytes < GB) return `${(bytes / MB).toFixed(1)}${s}MB`;
-  return `${(bytes / GB).toFixed(1)}${s}GB`;
+  const kb = 1024;
+  const mb = kb * 1024;
+  const gb = mb * 1024;
+  if (bytes < kb) return `${bytes.toFixed(0)}${s}B`;
+  if (bytes < mb) return `${(bytes / kb).toFixed(1)}${s}KB`;
+  if (bytes < gb) return `${(bytes / mb).toFixed(1)}${s}MB`;
+  return `${(bytes / gb).toFixed(1)}${s}GB`;
 }
 
 /** Format percentage difference with confidence interval */

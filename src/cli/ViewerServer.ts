@@ -43,7 +43,7 @@ export async function startViewerServer(
   const entries = Object.entries(options.sources ?? {});
   const sourceCache = new Map<string, string>(entries);
 
-  const assets = sirv(viewerDistDir(), { single: true });
+  const assets = sirv(join(packageRoot(), "dist/viewer"), { single: true });
   const handler = createRequestHandler(options, sourceCache, assets);
   const server = createServer(handler);
 
@@ -66,11 +66,11 @@ export async function viewArchive(filePath: string): Promise<void> {
   const content = await readFile(absPath, "utf-8");
   const archive = JSON.parse(content);
 
-  const KNOWN_SCHEMA = 1;
+  const knownSchema = 1;
   const schema = archive.schema ?? 0;
-  if (schema > KNOWN_SCHEMA) {
+  if (schema > knownSchema) {
     console.error(
-      `Archive schema version ${schema} is newer than supported (${KNOWN_SCHEMA}). ` +
+      `Archive schema version ${schema} is newer than supported (${knownSchema}). ` +
         `Please update benchforge to view this archive.`,
     );
     process.exit(1);
@@ -97,10 +97,6 @@ export async function viewArchive(filePath: string): Promise<void> {
       resolve();
     });
   });
-}
-
-function viewerDistDir(): string {
-  return join(packageRoot(), "dist/viewer");
 }
 
 function createRequestHandler(

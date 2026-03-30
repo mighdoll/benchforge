@@ -91,23 +91,25 @@ async function main(): Promise<void> {
 
 tabBar.addEventListener("click", async (ev: MouseEvent) => {
   const target = ev.target as HTMLElement;
-  const tabBtn = target.closest<HTMLButtonElement>(".tab[data-tab]");
-  if (tabBtn) {
-    if (tabBtn.disabled) return;
-    if (target.closest(".tab-close")) {
-      closeSourceTab(tabBtn.dataset.tab!, provider.config);
-      return;
-    }
-    const tabId = tabBtn.dataset.tab!;
-    activateTab(tabId);
-    if (tabId === "samples" && !samplesLoaded && reportData) {
-      samplesLoaded = true;
-      loadSamples(reportData, samplesPanel);
-    }
-    return;
-  }
+
   if (target.closest('[data-action="archive"]')) {
     archiveProfile(provider);
+    return;
+  }
+
+  const tabBtn = target.closest<HTMLButtonElement>(".tab[data-tab]");
+  if (!tabBtn || tabBtn.disabled) return;
+
+  if (target.closest(".tab-close")) {
+    closeSourceTab(tabBtn.dataset.tab!, provider.config);
+    return;
+  }
+
+  const tabId = tabBtn.dataset.tab!;
+  activateTab(tabId);
+  if (tabId === "samples" && !samplesLoaded && reportData) {
+    samplesLoaded = true;
+    loadSamples(reportData, samplesPanel);
   }
 });
 

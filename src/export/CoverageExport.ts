@@ -45,17 +45,12 @@ export function annotateFramesWithCounts(
 ): void {
   const { map, byName } = coverage;
   for (const frame of frames) {
-    let count: number | undefined;
-
-    if (frame.file) {
-      const entries = map.get(frame.file);
-      if (entries) count = findCount(frame.name, frame.line, entries);
-    }
-
-    // Fall back to name-only lookup (handles eval'd / inline functions)
-    if (count === undefined && !frame.name.startsWith("(anonymous")) {
-      count = byName.get(frame.name);
-    }
+    const entries = frame.file ? map.get(frame.file) : undefined;
+    const count =
+      (entries && findCount(frame.name, frame.line, entries)) ??
+      (!frame.name.startsWith("(anonymous")
+        ? byName.get(frame.name)
+        : undefined);
 
     if (count !== undefined && count > 0) {
       frame.name = `${frame.name} [${formatCount(count)}]`;
@@ -102,25 +97,21 @@ function findCount(
   frameLine: number | undefined,
   entries: LineCoverage[],
 ): number | undefined {
-  // Strip "(anonymous ...)" location hint from frame name for matching
   const isAnon =
     frameName === "(anonymous)" || frameName.startsWith("(anonymous ");
 
-  if (!isAnon) {
-    // Named function: match by name, prefer closest line
-    const byName = entries.filter(e => e.functionName === frameName);
-    if (byName.length === 1) return byName[0].count;
-    if (byName.length > 1 && frameLine) {
-      return closestByLine(byName, frameLine)?.count;
-    }
-    if (byName.length > 1) return byName[0].count;
-    return undefined;
+  if (isAnon) {
+    if (!frameLine) return undefined;
+    const anonymous = entries.filter(e => e.functionName === "");
+    return closestByLine(anonymous, frameLine)?.count;
   }
 
-  // Anonymous function: match by closest line among anonymous entries
-  if (!frameLine) return undefined;
-  const anonymous = entries.filter(e => e.functionName === "");
-  return closestByLine(anonymous, frameLine)?.count;
+  // Named function: match by name, prefer closest line
+  const nameMatches = entries.filter(e => e.functionName === frameName);
+  if (nameMatches.length === 0) return undefined;
+  if (nameMatches.length === 1) return nameMatches[0].count;
+  if (frameLine) return closestByLine(nameMatches, frameLine)?.count;
+  return nameMatches[0].count;
 }
 
 /** Format a count for display: 1234 → "1.2K", 1234567 → "1.2M" */
@@ -155,14 +146,8 @@ function closestByLine(
   entries: LineCoverage[],
   line: number,
 ): LineCoverage | undefined {
-  let best: LineCoverage | undefined;
-  let bestDist = Number.MAX_SAFE_INTEGER;
-  for (const e of entries) {
-    const dist = Math.abs(e.startLine - line);
-    if (dist < bestDist) {
-      bestDist = dist;
-      best = e;
-    }
-  }
-  return best;
+  if (entries.length === 0) return undefined;
+  return entries.reduce((best, e) =>
+    Math.abs(e.startLine - line) < Math.abs(best.startLine - line) ? e : best,
+  );
 }

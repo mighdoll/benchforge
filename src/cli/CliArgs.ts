@@ -136,8 +136,8 @@ export function parseCliArgs<T = DefaultCliArgs>(
 }
 
 function applyGroups(y: Argv): Argv {
-  let acc = y;
-  for (const [label, keys] of Object.entries(optionGroups))
-    acc = acc.group(keys as unknown as string[], label);
-  return acc;
+  return Object.entries(optionGroups).reduce(
+    (acc, [label, keys]) => acc.group(keys as unknown as string[], label),
+    y,
+  );
 }

@@ -1,4 +1,4 @@
-import type { BenchGroup, BenchSuite } from "../runners/BenchmarkSpec.ts";
+import type { BenchSuite } from "../runners/BenchmarkSpec.ts";
 
 /** Filter benchmarks by name pattern */
 export function filterBenchmarks(
@@ -20,7 +20,9 @@ export function filterBenchmarks(
           : undefined,
     }))
     .filter(group => !removeEmpty || group.benchmarks.length > 0);
-  validateFilteredSuite(groups, filter);
+  if (groups.every(g => g.benchmarks.length === 0)) {
+    throw new Error(`No benchmarks match filter: "${filter}"`);
+  }
   return { name: suite.name, groups };
 }
 
@@ -48,13 +50,6 @@ function createFilterRegex(filter: string): RegExp {
 /** Strip case suffix like " [large]" from benchmark name for filtering */
 function stripCaseSuffix(name: string): string {
   return name.replace(/ \[.*?\]$/, "");
-}
-
-/** Ensure at least one benchmark matches filter */
-function validateFilteredSuite(groups: BenchGroup[], filter?: string): void {
-  if (groups.every(g => g.benchmarks.length === 0)) {
-    throw new Error(`No benchmarks match filter: "${filter}"`);
-  }
 }
 
 /** Escape regex special characters */

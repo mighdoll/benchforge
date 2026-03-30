@@ -184,16 +184,16 @@ function internFrame(
   const col = columnNumber != null ? columnNumber + 1 : undefined;
   const key = `${name}\0${url}\0${line}\0${col}`;
 
-  let idx = frameIndex.get(key);
-  if (idx === undefined) {
-    idx = sharedFrames.length;
-    const entry: SpeedscopeFrame = { name: displayName(name, url, line) };
-    if (url) entry.file = url;
-    if (line > 0) entry.line = line;
-    if (col != null) entry.col = col;
-    sharedFrames.push(entry);
-    frameIndex.set(key, idx);
-  }
+  const existing = frameIndex.get(key);
+  if (existing !== undefined) return existing;
+
+  const idx = sharedFrames.length;
+  const entry: SpeedscopeFrame = { name: displayName(name, url, line) };
+  if (url) entry.file = url;
+  if (line > 0) entry.line = line;
+  if (col != null) entry.col = col;
+  sharedFrames.push(entry);
+  frameIndex.set(key, idx);
   return idx;
 }
 

@@ -264,23 +264,22 @@ function internFrame(
   const { name, url, line, col } = frame;
   const key = `${name}\0${url}\0${line}\0${col}`;
 
-  let idx = frameIndex.get(key);
-  if (idx === undefined) {
-    idx = sharedFrames.length;
-    // Match speedscope's convention: anonymous functions include location in name
-    const shortFile = url?.split("/").pop();
-    const displayName =
-      name !== "(anonymous)"
-        ? name
-        : shortFile
-          ? `(anonymous ${shortFile}:${line})`
-          : "(anonymous)";
-    const entry: SpeedscopeFrame = { name: displayName };
-    if (url) entry.file = url;
-    if (line > 0) entry.line = line;
-    if (col != null) entry.col = col;
-    sharedFrames.push(entry);
-    frameIndex.set(key, idx);
-  }
+  const existing = frameIndex.get(key);
+  if (existing !== undefined) return existing;
+
+  const idx = sharedFrames.length;
+  const entry: SpeedscopeFrame = { name: displayName(name, url, line) };
+  if (url) entry.file = url;
+  if (line > 0) entry.line = line;
+  if (col != null) entry.col = col;
+  sharedFrames.push(entry);
+  frameIndex.set(key, idx);
   return idx;
+}
+
+/** Display name for a frame: named functions use their name, anonymous get a location hint */
+function displayName(name: string, url: string, line: number): string {
+  if (name !== "(anonymous)") return name;
+  const shortFile = url?.split("/").pop();
+  return shortFile ? `(anonymous ${shortFile}:${line})` : "(anonymous)";
 }

@@ -9,7 +9,7 @@ import { browserGcStats, type TraceEvent } from "./BrowserGcStats.ts";
 export async function startGcTracing(cdp: CDPSession): Promise<TraceEvent[]> {
   const events: TraceEvent[] = [];
   cdp.on("Tracing.dataCollected", ({ value }) => {
-    for (const e of value) events.push(e as unknown as TraceEvent);
+    events.push(...(value as unknown as TraceEvent[]));
   });
   await cdp.send("Tracing.start", {
     traceConfig: { includedCategories: ["v8", "v8.gc"] },
@@ -28,18 +28,6 @@ export async function collectTracing(
   await cdp.send("Tracing.end");
   await complete;
   return browserGcStats(traceEvents);
-}
-
-export function heapSamplingParams(samplingInterval: number): {
-  samplingInterval: number;
-  includeObjectsCollectedByMajorGC: boolean;
-  includeObjectsCollectedByMinorGC: boolean;
-} {
-  return {
-    samplingInterval,
-    includeObjectsCollectedByMajorGC: true,
-    includeObjectsCollectedByMinorGC: true,
-  };
 }
 
 /** Start CDP Profiler for CPU time sampling (caller manages Profiler.enable/disable) */
@@ -110,8 +98,11 @@ export async function startInstruments(
   },
 ): Promise<void> {
   if (opts.alloc) {
-    const heap = heapSamplingParams(opts.samplingInterval);
-    await cdp.send("HeapProfiler.startSampling", heap);
+    await cdp.send("HeapProfiler.startSampling", {
+      samplingInterval: opts.samplingInterval,
+      includeObjectsCollectedByMajorGC: true,
+      includeObjectsCollectedByMinorGC: true,
+    });
   }
   if (opts.timeSample || opts.callCounts) await cdp.send("Profiler.enable");
   if (opts.timeSample) await startTimeProfiling(cdp, opts.timeInterval);

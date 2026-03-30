@@ -11,7 +11,7 @@ import type { BenchmarkFunction, BenchmarkSpec } from "./BenchmarkSpec.ts";
 import type { BenchRunner, RunnerOptions } from "./BenchRunner.ts";
 import { createRunner, type KnownRunner } from "./CreateRunner.ts";
 import type { MeasuredResults } from "./MeasuredResults.ts";
-import { debugWorkerTiming, getElapsed, getPerfNow } from "./TimingUtils.ts"; // 5 minutes
+import { debugWorkerTiming, getElapsed, getPerfNow } from "./TimingUtils.ts";
 
 /** Message sent to worker process to start a benchmark run. */
 export interface RunMessage {
@@ -68,14 +68,12 @@ const workerStartTime = getPerfNow();
 const maxLifetime = 5 * 60 * 1000;
 
 /** Log timing with consistent format */
-const logTiming = debugWorkerTiming ? _logTiming : () => {};
-function _logTiming(operation: string, duration?: number) {
-  if (duration === undefined) {
-    console.log(`[Worker] ${operation}`);
-  } else {
-    console.log(`[Worker] ${operation} ${duration.toFixed(1)}ms`);
-  }
-}
+const logTiming = debugWorkerTiming
+  ? (operation: string, duration?: number) => {
+      const suffix = duration !== undefined ? ` ${duration.toFixed(1)}ms` : "";
+      console.log(`[Worker] ${operation}${suffix}`);
+    }
+  : () => {};
 
 /** Send message and exit with duration log */
 function sendAndExit(msg: ResultMessage | ErrorMessage, exitCode: number) {

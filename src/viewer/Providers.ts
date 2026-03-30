@@ -49,10 +49,8 @@ export class ServerProvider implements DataProvider {
   }
 
   profileUrl(type: "alloc" | "time"): string | null {
-    const isAlloc = type === "alloc";
-    if (!(isAlloc ? this.config.hasProfile : this.config.hasTimeProfile))
-      return null;
-    return isAlloc ? "/api/profile" : "/api/profile/time";
+    if (type === "alloc") return this.config.hasProfile ? "/api/profile" : null;
+    return this.config.hasTimeProfile ? "/api/profile/time" : null;
   }
 
   async createArchive(): Promise<{ blob: Blob; filename: string }> {

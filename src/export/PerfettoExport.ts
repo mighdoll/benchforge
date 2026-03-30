@@ -47,20 +47,23 @@ export function exportPerfettoTrace(
 /** Build trace events from benchmark results */
 function buildTraceEvents(
   groups: ReportGroup[],
-  args: DefaultCliArgs,
+  cliArgs: DefaultCliArgs,
 ): TraceEvent[] {
-  const meta = (name: string, args: Record<string, unknown>): TraceEvent => ({
+  const meta = (
+    name: string,
+    metaArgs: Record<string, unknown>,
+  ): TraceEvent => ({
     ph: "M",
     ts: 0,
     pid,
     tid,
     name,
-    args,
+    args: metaArgs,
   });
   const events: TraceEvent[] = [
     meta("process_name", { name: "wesl-bench" }),
     meta("thread_name", { name: "MainThread" }),
-    meta("bench_settings", cleanArgs(args)),
+    meta("bench_settings", cleanArgs(cliArgs)),
   ];
 
   for (const group of groups) {
@@ -148,8 +151,8 @@ function buildBenchmarkEvents(results: MeasuredResults): TraceEvent[] {
       counter(ts, "duration", { ms }),
     );
     if (heapSamples?.[i] !== undefined) {
-      const MB = Math.round((heapSamples[i] / 1024 / 1024) * 10) / 10;
-      events.push(counter(ts, "heap", { MB }));
+      const mb = Math.round((heapSamples[i] / 1024 / 1024) * 10) / 10;
+      events.push(counter(ts, "heap", { MB: mb }));
     }
   }
 

@@ -98,15 +98,17 @@ export async function profileBrowser(
 /** Forward Chrome's stdout/stderr to the terminal so V8 flag output is visible. */
 function pipeChromeOutput(server: BrowserServer): void {
   const proc = server.process();
-  const pipe = (stream: NodeJS.ReadableStream | null) =>
+  const forward = (stream: NodeJS.ReadableStream | null) =>
     stream?.on("data", (chunk: Buffer) => {
-      for (const t of chunk
+      chunk
         .toString()
         .split("\n")
         .map(l => l.trim())
-        .filter(Boolean))
-        process.stderr.write(`[chrome] ${t}\n`);
+        .filter(Boolean)
+        .forEach(line => {
+          process.stderr.write(`[chrome] ${line}\n`);
+        });
     });
-  pipe(proc.stdout);
-  pipe(proc.stderr);
+  forward(proc.stdout);
+  forward(proc.stderr);
 }

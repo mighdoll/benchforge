@@ -56,10 +56,9 @@ export function createHistogramKde(
 
 /** Bin samples into grouped histogram bars for each benchmark */
 function buildBarData(allSamples: Sample[], benchmarkNames: string[]) {
-  const values = allSamples.map(d => d.value);
-  const sorted = values.sort((a, b) => a - b);
-  const binMin = d3.quantile(sorted, 0.01)!;
-  const binMax = d3.quantile(sorted, 0.99)!;
+  const sortedValues = allSamples.map(d => d.value).sort((a, b) => a - b);
+  const binMin = d3.quantile(sortedValues, 0.01)!;
+  const binMax = d3.quantile(sortedValues, 0.99)!;
   const binCount = 25;
   const step = (binMax - binMin) / binCount;
   const thresholds = d3.range(1, binCount).map(i => binMin + i * step);

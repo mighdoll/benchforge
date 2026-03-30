@@ -61,7 +61,11 @@ export function checkConvergence(samples: number[]): ConvergenceResult {
   const minSamples = windowSize * 2;
 
   if (samples.length < minSamples) {
-    return buildProgressResult(samples.length, minSamples);
+    return {
+      converged: false,
+      confidence: (samples.length / minSamples) * 100,
+      reason: `Collecting samples: ${samples.length}/${minSamples}`,
+    };
   }
 
   const metrics = getStability(samples, windowSize);
@@ -115,15 +119,6 @@ function getWindowSize(samples: number[]): number {
   if (recentMedian < 1) return 50; // <1ms
   if (recentMedian < 10) return 30; // <10ms
   return 20; // >10ms
-}
-
-/** @return progress when samples insufficient */
-function buildProgressResult(current: number, min: number): ConvergenceResult {
-  return {
-    converged: false,
-    confidence: (current / min) * 100,
-    reason: `Collecting samples: ${current}/${min}`,
-  };
 }
 
 /** @return stability metrics between windows */
@@ -294,51 +289,28 @@ function shouldStop(
 /** @return time percentiles and statistics in ms */
 function computeTimeStats(samplesNs: number[]) {
   const samplesMs = samplesNs.map(s => s / msToNs);
-  const { min, max, sum } = getMinMaxSum(samplesNs);
-  const percentiles = getPercentiles(samplesNs);
-  const robust = getRobustMetrics(samplesMs);
+  const min = samplesNs.reduce(
+    (a, b) => Math.min(a, b),
+    Number.POSITIVE_INFINITY,
+  );
+  const max = samplesNs.reduce(
+    (a, b) => Math.max(a, b),
+    Number.NEGATIVE_INFINITY,
+  );
+  const sum = samplesNs.reduce((a, b) => a + b, 0);
 
   return {
     min: min / msToNs,
     max: max / msToNs,
     avg: sum / samplesNs.length / msToNs,
-    ...percentiles,
-    ...robust,
-  };
-}
-
-/** @return min, max, sum of samples */
-function getMinMaxSum(samples: number[]) {
-  const min = samples.reduce(
-    (a, b) => Math.min(a, b),
-    Number.POSITIVE_INFINITY,
-  );
-  const max = samples.reduce(
-    (a, b) => Math.max(a, b),
-    Number.NEGATIVE_INFINITY,
-  );
-  const sum = samples.reduce((a, b) => a + b, 0);
-  return { min, max, sum };
-}
-
-/** @return percentiles in ms */
-function getPercentiles(samples: number[]) {
-  return {
-    p25: percentile(samples, 0.25) / msToNs,
-    p50: percentile(samples, 0.5) / msToNs,
-    p75: percentile(samples, 0.75) / msToNs,
-    p95: percentile(samples, 0.95) / msToNs,
-    p99: percentile(samples, 0.99) / msToNs,
-    p999: percentile(samples, 0.999) / msToNs,
-  };
-}
-
-/** @return robust variability metrics */
-function getRobustMetrics(samplesMs: number[]) {
-  const impact = getOutlierImpact(samplesMs);
-  return {
+    p25: percentile(samplesNs, 0.25) / msToNs,
+    p50: percentile(samplesNs, 0.5) / msToNs,
+    p75: percentile(samplesNs, 0.75) / msToNs,
+    p95: percentile(samplesNs, 0.95) / msToNs,
+    p99: percentile(samplesNs, 0.99) / msToNs,
+    p999: percentile(samplesNs, 0.999) / msToNs,
     cv: coefficientOfVariation(samplesMs),
     mad: medianAbsoluteDeviation(samplesMs),
-    outlierRate: impact.ratio,
+    outlierRate: getOutlierImpact(samplesMs).ratio,
   };
 }

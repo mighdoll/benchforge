@@ -51,14 +51,42 @@ export function createDistributionPlot(
   const { fill, stroke } = colors[opts.direction];
   const scales = buildScales(histogram, ci, layout);
 
-  drawTitle(svg, opts.title, layout.margin.left);
-  drawCIRegion(svg, ci, scales, layout, fill);
+  svg.appendChild(
+    text(layout.margin.left, 14, opts.title, "start", "13", "#333", "600"),
+  );
+  const ciX = scales.x(ci[0]);
+  const ciW = scales.x(ci[1]) - ciX;
+  svg.appendChild(
+    rect(ciX, layout.margin.top, ciW, layout.plot.h, { fill, opacity: "0.5" }),
+  );
   opts.smooth
     ? drawSmoothedDist(svg, histogram, scales, stroke)
     : drawHistogramBars(svg, histogram, scales, layout, stroke);
-  drawZeroLine(svg, scales, layout);
-  drawPointEstimate(svg, pointEstimate, scales, layout, stroke);
-  drawCILabels(svg, ci, scales, layout.height);
+  const zeroX = scales.x(0);
+  if (
+    zeroX >= layout.margin.left &&
+    zeroX <= layout.width - layout.margin.right
+  ) {
+    svg.appendChild(
+      line(zeroX, layout.margin.top, zeroX, layout.margin.top + layout.plot.h, {
+        stroke: "#666",
+        strokeWidth: "1",
+        strokeDasharray: "3,2",
+      }),
+    );
+  }
+  const ptX = scales.x(pointEstimate);
+  const ptTop = layout.margin.top;
+  svg.appendChild(
+    line(ptX, ptTop, ptX, ptTop + layout.plot.h, { stroke, strokeWidth: "2" }),
+  );
+  const labelY = layout.height - 4;
+  svg.appendChild(
+    text(scales.x(ci[0]), labelY, formatPct(ci[0]), "middle", "12"),
+  );
+  svg.appendChild(
+    text(scales.x(ci[1]), labelY, formatPct(ci[1]), "middle", "12"),
+  );
   return svg;
 }
 
@@ -106,24 +134,6 @@ function buildScales(
   };
 }
 
-function drawTitle(svg: SVGSVGElement, title: string, x: number): void {
-  svg.appendChild(text(x, 14, title, "start", "13", "#333", "600"));
-}
-
-function drawCIRegion(
-  svg: SVGSVGElement,
-  ci: [number, number],
-  scales: Scales,
-  layout: Layout,
-  fill: string,
-) {
-  const x = scales.x(ci[0]);
-  const w = scales.x(ci[1]) - x;
-  svg.appendChild(
-    rect(x, layout.margin.top, w, layout.plot.h, { fill, opacity: "0.5" }),
-  );
-}
-
 function drawSmoothedDist(
   svg: SVGSVGElement,
   histogram: HistogramBin[],
@@ -169,40 +179,6 @@ function drawHistogramBars(
       ),
     );
   }
-}
-
-function drawZeroLine(svg: SVGSVGElement, scales: Scales, layout: Layout) {
-  const zeroX = scales.x(0);
-  if (zeroX < layout.margin.left || zeroX > layout.width - layout.margin.right)
-    return;
-  const top = layout.margin.top;
-  const attrs = { stroke: "#666", strokeWidth: "1", strokeDasharray: "3,2" };
-  svg.appendChild(line(zeroX, top, zeroX, top + layout.plot.h, attrs));
-}
-
-function drawPointEstimate(
-  svg: SVGSVGElement,
-  pt: number,
-  scales: Scales,
-  layout: Layout,
-  stroke: string,
-) {
-  const x = scales.x(pt);
-  const top = layout.margin.top;
-  svg.appendChild(
-    line(x, top, x, top + layout.plot.h, { stroke, strokeWidth: "2" }),
-  );
-}
-
-function drawCILabels(
-  svg: SVGSVGElement,
-  ci: [number, number],
-  scales: Scales,
-  height: number,
-): void {
-  const y = height - 4;
-  svg.appendChild(text(scales.x(ci[0]), y, formatPct(ci[0]), "middle", "12"));
-  svg.appendChild(text(scales.x(ci[1]), y, formatPct(ci[1]), "middle", "12"));
 }
 
 function text(

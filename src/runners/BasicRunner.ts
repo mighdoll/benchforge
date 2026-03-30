@@ -227,7 +227,8 @@ async function runSampleLoop<T>(
   } = p;
   const trackHeap = true; // Always track heap for charts
   const getOptStatus = p.traceOpt ? createOptStatusGetter() : undefined;
-  const estimated = estimateSampleCount(maxTime, maxIterations);
+  // Assume 0.1ms per iteration minimum for pre-allocation
+  const estimated = maxIterations || Math.ceil(maxTime / 0.1);
   const a = createSampleArrays(estimated, trackHeap, !!getOptStatus);
 
   let count = 0;
@@ -299,9 +300,9 @@ function analyzeOptStatus(
   return { byTier, deoptCount };
 }
 
-/** @return runtime gc() function, or no-op if unavailable */
+/** @return runtime gc() or no-op if unavailable */
 function gcFunction(): () => void {
-  const gc = globalThis.gc || (globalThis as any).__gc;
+  const gc = globalThis.gc ?? (globalThis as any).__gc;
   if (gc) return gc;
   console.warn("gc() not available, run node/bun with --expose-gc");
   return () => {};
@@ -319,23 +320,18 @@ function createOptStatusGetter(): ((fn: unknown) => number) | undefined {
   }
 }
 
-/** Estimate sample count for pre-allocation */
-function estimateSampleCount(maxTime: number, maxIterations: number): number {
-  return maxIterations || Math.ceil(maxTime / 0.1); // assume 0.1ms per iteration minimum
-}
-
 /** Pre-allocate arrays to reduce GC pressure during measurement */
 function createSampleArrays(
   n: number,
   trackHeap: boolean,
   trackOpt: boolean,
 ): SampleArrays {
-  const arr = (track: boolean) => (track ? new Array<number>(n) : []);
+  const prealloc = (enabled: boolean) => (enabled ? new Array<number>(n) : []);
   return {
     samples: new Array<number>(n),
     timestamps: new Array<number>(n),
-    heapSamples: arr(trackHeap),
-    optStatuses: arr(trackOpt),
+    heapSamples: prealloc(trackHeap),
+    optStatuses: prealloc(trackOpt),
     pausePoints: [],
   };
 }

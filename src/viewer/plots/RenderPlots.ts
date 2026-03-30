@@ -99,14 +99,17 @@ function renderGroupPlots(
 function prepareBenchmarks(
   group: ReportData["groups"][0],
 ): PreparedBenchmark[] {
-  const benchmarks: PreparedBenchmark[] = [];
-  if (group.baseline) {
-    const name = group.baseline.name + " (baseline)";
-    benchmarks.push({ ...group.baseline, name, isBaseline: true });
-  }
-  for (const b of group.benchmarks)
-    benchmarks.push({ ...b, isBaseline: false });
-  return benchmarks;
+  const baseline: PreparedBenchmark[] = group.baseline
+    ? [
+        {
+          ...group.baseline,
+          name: group.baseline.name + " (baseline)",
+          isBaseline: true,
+        },
+      ]
+    : [];
+  const current = group.benchmarks.map(b => ({ ...b, isBaseline: false }));
+  return [...baseline, ...current];
 }
 
 /** Clear a container element and append a freshly created plot */
@@ -123,62 +126,54 @@ function renderToContainer(
 
 function generateStatsHtml(b: PreparedBenchmark, gcEnabled: boolean): string {
   const ciHtml = generateCIHtml(b.comparisonCI);
+  const statsHtml = b.sectionStats?.length
+    ? sectionStatsHtml(b.sectionStats, gcEnabled)
+    : fallbackStatsHtml(b.stats);
 
-  if (b.sectionStats?.length) {
-    const stats = gcEnabled
-      ? b.sectionStats
-      : b.sectionStats.filter(s => s.groupTitle !== "gc");
-    const statsHtml = stats
-      .map(
-        stat => `
-      <div class="stat-item">
-        <div class="stat-label">${stat.groupTitle ? stat.groupTitle + " " : ""}${stat.label}</div>
-        <div class="stat-value">${stat.value}</div>
-      </div>
-    `,
-      )
-      .join("");
-    return `
-      <div class="summary-stats">
-        <h3 style="margin-bottom: 10px; color: #333;">${b.name}</h3>
-        <div class="stats-grid">${ciHtml}${statsHtml}</div>
-      </div>
-    `;
-  }
-
-  // Fallback to hardcoded stats
   return `
     <div class="summary-stats">
       <h3 style="margin-bottom: 10px; color: #333;">${b.name}</h3>
-      <div class="stats-grid">
-        ${ciHtml}
-        <div class="stat-item">
-          <div class="stat-label">Min</div>
-          <div class="stat-value">${b.stats.min.toFixed(3)}ms</div>
-        </div>
-        <div class="stat-item">
-          <div class="stat-label">Median</div>
-          <div class="stat-value">${b.stats.p50.toFixed(3)}ms</div>
-        </div>
-        <div class="stat-item">
-          <div class="stat-label">Mean</div>
-          <div class="stat-value">${b.stats.avg.toFixed(3)}ms</div>
-        </div>
-        <div class="stat-item">
-          <div class="stat-label">Max</div>
-          <div class="stat-value">${b.stats.max.toFixed(3)}ms</div>
-        </div>
-        <div class="stat-item">
-          <div class="stat-label">P75</div>
-          <div class="stat-value">${b.stats.p75.toFixed(3)}ms</div>
-        </div>
-        <div class="stat-item">
-          <div class="stat-label">P99</div>
-          <div class="stat-value">${b.stats.p99.toFixed(3)}ms</div>
-        </div>
-      </div>
+      <div class="stats-grid">${ciHtml}${statsHtml}</div>
     </div>
   `;
+}
+
+function sectionStatsHtml(
+  sectionStats: NonNullable<PreparedBenchmark["sectionStats"]>,
+  gcEnabled: boolean,
+): string {
+  const stats = gcEnabled
+    ? sectionStats
+    : sectionStats.filter(s => s.groupTitle !== "gc");
+  return stats
+    .map(
+      stat => `
+      <div class="stat-item">
+        <div class="stat-label">${stat.groupTitle ? stat.groupTitle + " " : ""}${stat.label}</div>
+        <div class="stat-value">${stat.value}</div>
+      </div>`,
+    )
+    .join("");
+}
+
+function fallbackStatsHtml(stats: PreparedBenchmark["stats"]): string {
+  const items: [string, number][] = [
+    ["Min", stats.min],
+    ["Median", stats.p50],
+    ["Mean", stats.avg],
+    ["Max", stats.max],
+    ["P75", stats.p75],
+    ["P99", stats.p99],
+  ];
+  return items
+    .map(
+      ([label, value]) => `
+      <div class="stat-item">
+        <div class="stat-label">${label}</div>
+        <div class="stat-value">${value.toFixed(3)}ms</div>
+      </div>`,
+    )
+    .join("");
 }
 
 function flattenSamples(benchmarks: PreparedBenchmark[]): FlattenedData {
@@ -189,7 +184,9 @@ function flattenSamples(benchmarks: PreparedBenchmark[]): FlattenedData {
     allGcEvents: [],
     allPausePoints: [],
   };
-  for (const b of benchmarks) if (b.samples?.length) flattenBenchmark(b, out);
+  for (const b of benchmarks) {
+    if (b.samples?.length) flattenBenchmark(b, out);
+  }
   return out;
 }
 

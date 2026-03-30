@@ -56,9 +56,9 @@ export function flattenProfile(resolved: ResolvedProfile): HeapSite[] {
     const stack = node.stack.map(toCallFrame);
     const site: HeapSite = { ...frame, bytes: node.selfSize, stack };
     sites.push(site);
-    const existing = nodeIdToSites.get(node.nodeId);
-    if (existing) existing.push(site);
-    else nodeIdToSites.set(node.nodeId, [site]);
+    const bucket = nodeIdToSites.get(node.nodeId) ?? [];
+    if (!bucket.length) nodeIdToSites.set(node.nodeId, bucket);
+    bucket.push(site);
   }
 
   // Attach raw samples to their corresponding sites
@@ -128,10 +128,9 @@ export function aggregateSites(sites: HeapSite[]): HeapSite[] {
 
   // Sort callers by bytes descending, use top caller as primary stack
   for (const site of byLocation.values()) {
-    if (site.callers && site.callers.length > 1) {
-      site.callers.sort((a, b) => b.bytes - a.bytes);
-      site.stack = site.callers[0].stack;
-    }
+    if (!site.callers || site.callers.length <= 1) continue;
+    site.callers.sort((a, b) => b.bytes - a.bytes);
+    site.stack = site.callers[0].stack;
   }
 
   return [...byLocation.values()].sort((a, b) => b.bytes - a.bytes);
@@ -145,15 +144,12 @@ export function formatHeapReport(
   const { topN, stackDepth = 3, verbose = false } = options;
   const { totalAll, totalUserCode, sampleCount, isUserCode } = options;
   const isUser = isUserCode ?? isNodeUserCode;
+  const formatSite = verbose ? formatVerboseSite : formatCompactSite;
   const lines: string[] = [];
   lines.push(`Heap allocation sites (top ${topN}, garbage included):`);
 
   for (const site of sites.slice(0, topN)) {
-    if (verbose) {
-      formatVerboseSite(lines, site, stackDepth, isUser);
-    } else {
-      formatCompactSite(lines, site, stackDepth, isUser);
-    }
+    formatSite(lines, site, stackDepth, isUser);
   }
 
   lines.push("");
