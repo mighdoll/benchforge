@@ -8,8 +8,6 @@ import { hasSufficientSamples, loadSamples } from "./SamplesTab.ts";
 import { closeSourceTab, openSourceTab } from "./SourceTabs.ts";
 import { activateTab } from "./TabSwitcher.ts";
 
-// ─── DOM References ────────────────────────────────────────
-
 const tabBar = document.querySelector(".tab-bar") as HTMLDivElement;
 const summaryPanel = document.getElementById("summary-panel") as HTMLDivElement;
 const samplesPanel = document.getElementById("samples-panel") as HTMLDivElement;
@@ -30,13 +28,9 @@ const timeTab = document.getElementById(
   "tab-time-flamechart",
 ) as HTMLButtonElement;
 
-// ─── State ─────────────────────────────────────────────────
-
 let provider: DataProvider;
 let reportData: ReportData | null = null;
 let samplesLoaded = false;
-
-// ─── Tab Bar Event Delegation ──────────────────────────────
 
 tabBar.addEventListener("click", async (ev: MouseEvent) => {
   const target = ev.target as HTMLElement;
@@ -60,16 +54,12 @@ tabBar.addEventListener("click", async (ev: MouseEvent) => {
   }
 });
 
-// ─── PostMessage from speedscope iframe ────────────────────
-
 window.addEventListener("message", (ev: MessageEvent) => {
   if (ev.data?.type === "open-source") {
     const { file, line, col } = ev.data;
     if (file) openSourceTab(file, line, col, provider);
   }
 });
-
-// ─── Initialization ────────────────────────────────────────
 
 async function initViewer(p: DataProvider): Promise<void> {
   provider = p;
@@ -99,8 +89,6 @@ async function initViewer(p: DataProvider): Promise<void> {
     activateTab("time-flamechart");
   }
 }
-
-// ─── Entry Point ───────────────────────────────────────────
 
 async function main(): Promise<void> {
   const params = new URLSearchParams(window.location.search);

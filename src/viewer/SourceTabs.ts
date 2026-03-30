@@ -23,8 +23,6 @@ const tabBar = document.querySelector(".tab-bar") as HTMLDivElement;
 const tabContent = document.querySelector(".tab-content") as HTMLDivElement;
 const sourceTabs = new Map<string, SourceTabData>();
 
-// ─── Shiki (lazy singleton) ───────────────────────────────
-
 let highlighterPromise: Promise<HighlighterCore> | undefined;
 
 function getHighlighter(): Promise<HighlighterCore> {
@@ -35,8 +33,6 @@ function getHighlighter(): Promise<HighlighterCore> {
   });
   return highlighterPromise;
 }
-
-// ─── Public API ───────────────────────────────────────────
 
 function sourceTabId(file: string): string {
   return "src:" + file;
@@ -102,8 +98,6 @@ export function closeSourceTab(tabId: string, config: ViewerConfig): void {
     else if (config.hasTimeProfile) activateTab("time-flamechart");
   }
 }
-
-// ─── Internal ─────────────────────────────────────────────
 
 function buildSourceHeader(
   file: string,
