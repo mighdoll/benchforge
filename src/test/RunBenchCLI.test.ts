@@ -148,43 +148,41 @@ test("runs benchmarks with setup function", { timeout: 30000 }, async () => {
   expect(output).toContain("runs");
 });
 
-test(
-  "runs benchmarks with baseline comparison",
-  { timeout: 30000 },
-  async () => {
-    const suiteWithBaseline: BenchSuite = {
-      name: "Baseline Test",
-      groups: [
-        {
-          name: "Sort Comparison",
-          setup: () => ({
-            data: Array.from({ length: 10 }, () => Math.random()),
-          }),
-          baseline: {
-            name: "baseline sort",
-            fn: ({ data }: any) => [...data].sort(),
-          },
-          benchmarks: [
-            {
-              name: "optimized sort",
-              fn: ({ data }: any) => [...data].sort((a, b) => a - b),
-            },
-          ],
+test("runs benchmarks with baseline comparison", {
+  timeout: 30000,
+}, async () => {
+  const suiteWithBaseline: BenchSuite = {
+    name: "Baseline Test",
+    groups: [
+      {
+        name: "Sort Comparison",
+        setup: () => ({
+          data: Array.from({ length: 10 }, () => Math.random()),
+        }),
+        baseline: {
+          name: "baseline sort",
+          fn: ({ data }: any) => [...data].sort(),
         },
-      ],
-    };
+        benchmarks: [
+          {
+            name: "optimized sort",
+            fn: ({ data }: any) => [...data].sort((a, b) => a - b),
+          },
+        ],
+      },
+    ],
+  };
 
-    const output = await runBenchCLITest(
-      suiteWithBaseline,
-      "--iterations 20 --skip-settle",
-    );
+  const output = await runBenchCLITest(
+    suiteWithBaseline,
+    "--iterations 20 --skip-settle",
+  );
 
-    expect(output).toContain("baseline sort");
-    expect(output).toContain("optimized sort");
-    expect(output).toContain("Δ%"); // Diff column should appear
-    expect(output).toContain("mean");
-  },
-);
+  expect(output).toContain("baseline sort");
+  expect(output).toContain("optimized sort");
+  expect(output).toContain("Δ%"); // Diff column should appear
+  expect(output).toContain("mean");
+});
 
 test("file mode: BenchSuite export", { timeout: 30000 }, () => {
   const output = executeBenchforgeFile(

@@ -6,34 +6,32 @@ import {
 } from "../runners/AdaptiveWrapper.ts";
 import { BasicRunner } from "../runners/BasicRunner.ts";
 
-test.skip(
-  "adaptive runner collects samples for minimum time",
-  { timeout: 10000 },
-  async () => {
-    const runner = new BasicRunner();
-    const adaptive = createAdaptiveWrapper(runner, {
-      minTime: 100,
-      maxTime: 300,
-    });
+test.skip("adaptive runner collects samples for minimum time", {
+  timeout: 10000,
+}, async () => {
+  const runner = new BasicRunner();
+  const adaptive = createAdaptiveWrapper(runner, {
+    minTime: 100,
+    maxTime: 300,
+  });
 
-    const benchmark: BenchmarkSpec = {
-      name: "test-min-time",
-      fn: () => {
-        let sum = 0;
-        for (let i = 0; i < 1000; i++) sum += i;
-        return sum;
-      },
-    };
+  const benchmark: BenchmarkSpec = {
+    name: "test-min-time",
+    fn: () => {
+      let sum = 0;
+      for (let i = 0; i < 1000; i++) sum += i;
+      return sum;
+    },
+  };
 
-    const start = performance.now();
-    const results = await adaptive.runBench(benchmark, { minTime: 100 });
-    const elapsed = performance.now() - start;
+  const start = performance.now();
+  const results = await adaptive.runBench(benchmark, { minTime: 100 });
+  const elapsed = performance.now() - start;
 
-    expect(results).toHaveLength(1);
-    expect(results[0].samples.length).toBeGreaterThan(0);
-    expect(elapsed).toBeGreaterThanOrEqual(100);
-  },
-);
+  expect(results).toHaveLength(1);
+  expect(results[0].samples.length).toBeGreaterThan(0);
+  expect(elapsed).toBeGreaterThanOrEqual(100);
+});
 
 test.skip("adaptive runner respects max time limit", async () => {
   const runner = new BasicRunner();

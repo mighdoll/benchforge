@@ -6,7 +6,7 @@
   },
   "files": {
     "ignoreUnknown": false,
-    "includes": ["**/*.ts", "**/*.json", "**/biome.jsonc"]
+    "includes": ["**/*.ts", "**/*.json", "**/biome.jsonc", "!**/.claude/**/*"]
   },
   "formatter": {
     "enabled": true,

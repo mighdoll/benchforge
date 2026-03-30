@@ -60,72 +60,66 @@ afterAll(() => {
   proc?.kill();
 });
 
-test(
-  "live viewer: report tab shows chart SVG",
-  { timeout: 30_000 },
-  async () => {
-    const browser = await chromium.launch();
-    const consoleErrors: string[] = [];
-    try {
-      const page = await browser.newPage();
-      page.on("console", msg => {
-        if (msg.type() === "error" && !msg.text().includes("WebGL"))
-          consoleErrors.push(msg.text());
-      });
-      await page.goto(`http://localhost:${port}`, { waitUntil: "networkidle" });
+test("live viewer: report tab shows chart SVG", {
+  timeout: 30_000,
+}, async () => {
+  const browser = await chromium.launch();
+  const consoleErrors: string[] = [];
+  try {
+    const page = await browser.newPage();
+    page.on("console", msg => {
+      if (msg.type() === "error" && !msg.text().includes("WebGL"))
+        consoleErrors.push(msg.text());
+    });
+    await page.goto(`http://localhost:${port}`, { waitUntil: "networkidle" });
 
-      const reportPanel = page.locator("#report-panel");
-      const svg = reportPanel.locator("svg").first();
-      await svg.waitFor({ state: "visible", timeout: 15_000 });
-      const childCount = await svg
-        .locator("path, rect, circle, line, text")
-        .count();
-      expect(childCount).toBeGreaterThan(0);
-    } finally {
-      await browser.close();
-    }
-    expect(consoleErrors).toEqual([]);
-  },
-);
+    const reportPanel = page.locator("#report-panel");
+    const svg = reportPanel.locator("svg").first();
+    await svg.waitFor({ state: "visible", timeout: 15_000 });
+    const childCount = await svg
+      .locator("path, rect, circle, line, text")
+      .count();
+    expect(childCount).toBeGreaterThan(0);
+  } finally {
+    await browser.close();
+  }
+  expect(consoleErrors).toEqual([]);
+});
 
-test(
-  "live viewer: allocation tab has speedscope content",
-  { timeout: 30_000 },
-  async () => {
-    const browser = await chromium.launch();
-    try {
-      const page = await browser.newPage();
-      await page.goto(`http://localhost:${port}`, { waitUntil: "networkidle" });
+test("live viewer: allocation tab has speedscope content", {
+  timeout: 30_000,
+}, async () => {
+  const browser = await chromium.launch();
+  try {
+    const page = await browser.newPage();
+    await page.goto(`http://localhost:${port}`, { waitUntil: "networkidle" });
 
-      await page.locator("#tab-flamechart").click();
-      const frame = page.frameLocator("#speedscope-iframe");
-      await frame
-        .locator("body *")
-        .first()
-        .waitFor({ state: "visible", timeout: 15_000 });
-    } finally {
-      await browser.close();
-    }
-  },
-);
+    await page.locator("#tab-flamechart").click();
+    const frame = page.frameLocator("#speedscope-iframe");
+    await frame
+      .locator("body *")
+      .first()
+      .waitFor({ state: "visible", timeout: 15_000 });
+  } finally {
+    await browser.close();
+  }
+});
 
-test(
-  "live viewer: timing tab has speedscope content",
-  { timeout: 30_000 },
-  async () => {
-    const browser = await chromium.launch();
-    try {
-      const page = await browser.newPage();
-      await page.goto(`http://localhost:${port}`, { waitUntil: "networkidle" });
+test("live viewer: timing tab has speedscope content", {
+  timeout: 30_000,
+}, async () => {
+  const browser = await chromium.launch();
+  try {
+    const page = await browser.newPage();
+    await page.goto(`http://localhost:${port}`, { waitUntil: "networkidle" });
 
-      await page.locator("#tab-time-flamechart").click();
-      const frame = page.frameLocator("#time-speedscope-iframe");
-      await frame
-        .locator("body *")
-        .first()
-        .waitFor({ state: "visible", timeout: 15_000 });
-    } finally {
-      await browser.close();
-    }
-  },
-);
+    await page.locator("#tab-time-flamechart").click();
+    const frame = page.frameLocator("#time-speedscope-iframe");
+    await frame
+      .locator("body *")
+      .first()
+      .waitFor({ state: "visible", timeout: 15_000 });
+  } finally {
+    await browser.close();
+  }
+});

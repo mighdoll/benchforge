@@ -34,105 +34,99 @@ afterAll(() => {
   server?.close();
 });
 
-test(
-  "static viewer: drop zone appears on load",
-  { timeout: 30_000 },
-  async () => {
-    const browser = await chromium.launch();
-    try {
-      const page = await browser.newPage();
-      await page.goto(`http://localhost:${port}`, { waitUntil: "networkidle" });
+test("static viewer: drop zone appears on load", {
+  timeout: 30_000,
+}, async () => {
+  const browser = await chromium.launch();
+  try {
+    const page = await browser.newPage();
+    await page.goto(`http://localhost:${port}`, { waitUntil: "networkidle" });
 
-      await page.locator(".drop-zone").waitFor({ state: "visible" });
-    } finally {
-      await browser.close();
-    }
-  },
-);
+    await page.locator(".drop-zone").waitFor({ state: "visible" });
+  } finally {
+    await browser.close();
+  }
+});
 
-test(
-  "static viewer: archive upload shows report with chart",
-  { timeout: 30_000 },
-  async () => {
-    const browser = await chromium.launch();
-    const consoleErrors: string[] = [];
-    try {
-      const page = await browser.newPage();
-      page.on("console", msg => {
-        if (msg.type() === "error" && !msg.text().includes("WebGL"))
-          consoleErrors.push(msg.text());
-      });
-      await page.goto(`http://localhost:${port}`, { waitUntil: "networkidle" });
+test("static viewer: archive upload shows report with chart", {
+  timeout: 30_000,
+}, async () => {
+  const browser = await chromium.launch();
+  const consoleErrors: string[] = [];
+  try {
+    const page = await browser.newPage();
+    page.on("console", msg => {
+      if (msg.type() === "error" && !msg.text().includes("WebGL"))
+        consoleErrors.push(msg.text());
+    });
+    await page.goto(`http://localhost:${port}`, { waitUntil: "networkidle" });
 
-      const fileInput = page.locator('.drop-zone input[type="file"]');
-      await fileInput.setInputFiles(archivePath);
+    const fileInput = page.locator('.drop-zone input[type="file"]');
+    await fileInput.setInputFiles(archivePath);
 
-      await page
-        .locator(".drop-zone")
-        .waitFor({ state: "detached", timeout: 15_000 });
-      const reportPanel = page.locator("#report-panel");
+    await page
+      .locator(".drop-zone")
+      .waitFor({ state: "detached", timeout: 15_000 });
+    const reportPanel = page.locator("#report-panel");
 
-      const svg = reportPanel.locator("svg").first();
-      await svg.waitFor({ state: "visible", timeout: 15_000 });
-      const childCount = await svg
-        .locator("path, rect, circle, line, text")
-        .count();
-      expect(childCount).toBeGreaterThan(0);
-    } finally {
-      await browser.close();
-    }
-    expect(consoleErrors).toEqual([]);
-  },
-);
+    const svg = reportPanel.locator("svg").first();
+    await svg.waitFor({ state: "visible", timeout: 15_000 });
+    const childCount = await svg
+      .locator("path, rect, circle, line, text")
+      .count();
+    expect(childCount).toBeGreaterThan(0);
+  } finally {
+    await browser.close();
+  }
+  expect(consoleErrors).toEqual([]);
+});
 
-test(
-  "static viewer: tab navigation after archive upload",
-  { timeout: 30_000 },
-  async () => {
-    const browser = await chromium.launch();
-    const consoleErrors: string[] = [];
-    try {
-      const page = await browser.newPage();
-      page.on("console", msg => {
-        if (msg.type() === "error" && !msg.text().includes("WebGL"))
-          consoleErrors.push(msg.text());
-      });
-      await page.goto(`http://localhost:${port}`, { waitUntil: "networkidle" });
+test("static viewer: tab navigation after archive upload", {
+  timeout: 30_000,
+}, async () => {
+  const browser = await chromium.launch();
+  const consoleErrors: string[] = [];
+  try {
+    const page = await browser.newPage();
+    page.on("console", msg => {
+      if (msg.type() === "error" && !msg.text().includes("WebGL"))
+        consoleErrors.push(msg.text());
+    });
+    await page.goto(`http://localhost:${port}`, { waitUntil: "networkidle" });
 
-      const fileInput = page.locator('.drop-zone input[type="file"]');
-      await fileInput.setInputFiles(archivePath);
-      await page
-        .locator(".drop-zone")
-        .waitFor({ state: "detached", timeout: 15_000 });
+    const fileInput = page.locator('.drop-zone input[type="file"]');
+    await fileInput.setInputFiles(archivePath);
+    await page
+      .locator(".drop-zone")
+      .waitFor({ state: "detached", timeout: 15_000 });
 
-      const reportPanel = page.locator("#report-panel");
-      await reportPanel
-        .locator("svg")
-        .first()
-        .waitFor({ state: "visible", timeout: 15_000 });
+    const reportPanel = page.locator("#report-panel");
+    await reportPanel
+      .locator("svg")
+      .first()
+      .waitFor({ state: "visible", timeout: 15_000 });
 
-      // Allocation tab
-      await page.locator("#tab-flamechart").click();
-      const allocFrame = page.frameLocator("#speedscope-iframe");
-      await allocFrame
-        .locator("body *")
-        .first()
-        .waitFor({ state: "visible", timeout: 15_000 });
+    // Allocation tab
+    await page.locator("#tab-flamechart").click();
+    const allocFrame = page.frameLocator("#speedscope-iframe");
+    await allocFrame
+      .locator("body *")
+      .first()
+      .waitFor({ state: "visible", timeout: 15_000 });
 
-      // Timing tab
-      await page.locator("#tab-time-flamechart").click();
-      const timeFrame = page.frameLocator("#time-speedscope-iframe");
-      await timeFrame
-        .locator("body *")
-        .first()
-        .waitFor({ state: "visible", timeout: 15_000 });
+    // Timing tab
+    await page.locator("#tab-time-flamechart").click();
+    const timeFrame = page.frameLocator("#time-speedscope-iframe");
+    await timeFrame
+      .locator("body *")
+      .first()
+      .waitFor({ state: "visible", timeout: 15_000 });
 
-      // Back to Report
-      await page.locator("#tab-report").click();
-      await reportPanel.locator("svg").first().waitFor({ state: "visible" });
-    } finally {
-      await browser.close();
-    }
-    expect(consoleErrors).toEqual([]);
-  },
-);
+    // Back to Report
+    await page.locator("#tab-report").click();
+    await reportPanel.locator("svg").first().waitFor({ state: "visible" });
+  } finally {
+    await browser.close();
+  }
+  expect(consoleErrors).toEqual([]);
+});
