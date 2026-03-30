@@ -1,10 +1,10 @@
-import { BasicRunner } from "../runners/BasicRunner.ts";
 import type { RunnerOptions } from "../runners/BenchRunner.ts";
 import type { MeasuredResults } from "../runners/MeasuredResults.ts";
-import { runMatrixVariant } from "../runners/RunnerOrchestrator.ts";
 import { average } from "../stats/StatisticalUtils.ts";
-import { loadCaseData, loadCasesModule } from "./CaseLoader.ts";
-import { discoverVariants } from "./VariantLoader.ts";
+import type { CasesModule } from "./CaseLoader.ts";
+import { loadCasesModule } from "./CaseLoader.ts";
+import { runMatrixWithDir } from "./MatrixDirRunner.ts";
+import { runMatrixInline } from "./MatrixInlineRunner.ts";
 
 /** Stateless variant - called each iteration with case data */
 export type VariantFn<T = unknown> = (caseData: T) => void;
@@ -98,15 +98,6 @@ export interface RunMatrixOptions {
   callCounts?: boolean;
 }
 
-/** Context for running matrix benchmarks in worker mode */
-interface DirMatrixContext<T> {
-  matrix: BenchMatrix<T>;
-  casesModule?: import("./CaseLoader.ts").CasesModule<T>;
-  baselineIds: string[];
-  caseIds: string[];
-  runnerOpts: RunnerOptions;
-}
-
 /** @return true if variant is a StatefulVariant (has setup + run) */
 export function isStatefulVariant<T, S>(
   v: Variant<T, S>,
@@ -135,100 +126,8 @@ export async function runMatrix<T>(
   throw new Error("BenchMatrix requires either 'variants' or 'variantDir'");
 }
 
-/** Run matrix with variantDir (worker mode for memory isolation) */
-async function runMatrixWithDir<T>(
-  matrix: BenchMatrix<T>,
-  options: RunMatrixOptions,
-): Promise<MatrixResults> {
-  const allVariantIds = await discoverVariants(matrix.variantDir!);
-  if (allVariantIds.length === 0) {
-    throw new Error(`No variants found in ${matrix.variantDir}`);
-  }
-  const variantIds = options.filteredVariants ?? allVariantIds;
-
-  const ctx = await createDirContext(matrix, options);
-  const variants = await runDirVariants(variantIds, ctx);
-
-  if (matrix.baselineVariant) {
-    applyBaselineVariant(variants, matrix.baselineVariant);
-  }
-  return { name: matrix.name, variants };
-}
-
-/** Run matrix with inline variants (non-worker mode) */
-async function runMatrixInline<T>(
-  matrix: BenchMatrix<T>,
-  options: RunMatrixOptions,
-): Promise<MatrixResults> {
-  if (matrix.baselineDir) {
-    throw new Error(
-      "BenchMatrix with inline 'variants' cannot use 'baselineDir'. Use 'variantDir' instead.",
-    );
-  }
-
-  const { casesModule, caseIds } = await resolveCases(matrix, options);
-  const runner = new BasicRunner();
-  const runnerOpts = buildRunnerOptions(options);
-
-  const all = Object.entries(matrix.variants!);
-  const filtered = options.filteredVariants;
-  const variantEntries = filtered
-    ? all.filter(([id]) => filtered.includes(id))
-    : all;
-
-  const variants: VariantResult[] = [];
-  for (const [variantId, variant] of variantEntries) {
-    const cases: CaseResult[] = [];
-    for (const caseId of caseIds) {
-      const loaded = await loadCaseData(casesModule, caseId);
-      const data = casesModule || matrix.cases ? loaded.data : (undefined as T);
-      const measured = await runVariant(
-        variant,
-        data,
-        variantId,
-        runner,
-        runnerOpts,
-      );
-      cases.push({ caseId, measured, metadata: loaded.metadata });
-    }
-    variants.push({ id: variantId, cases });
-  }
-
-  if (matrix.baselineVariant) {
-    applyBaselineVariant(variants, matrix.baselineVariant);
-  }
-
-  return { name: matrix.name, variants };
-}
-
-/** Create context for directory-based matrix execution */
-async function createDirContext<T>(
-  matrix: BenchMatrix<T>,
-  options: RunMatrixOptions,
-): Promise<DirMatrixContext<T>> {
-  const baselineIds = matrix.baselineDir
-    ? await discoverVariants(matrix.baselineDir)
-    : [];
-  const { casesModule, caseIds } = await resolveCases(matrix, options);
-  const runnerOpts = buildRunnerOptions(options);
-  return { matrix, casesModule, baselineIds, caseIds, runnerOpts };
-}
-
-/** Run all variants using worker processes */
-async function runDirVariants<T>(
-  variantIds: string[],
-  ctx: DirMatrixContext<T>,
-): Promise<VariantResult[]> {
-  const variants: VariantResult[] = [];
-  for (const id of variantIds) {
-    const cases = await runDirVariantCases(id, ctx);
-    variants.push({ id, cases });
-  }
-  return variants;
-}
-
 /** Apply baselineVariant comparison - one variant is the reference for all others */
-function applyBaselineVariant(
+export function applyBaselineVariant(
   variants: VariantResult[],
   baselineVariantId: string,
 ): void {
@@ -252,10 +151,10 @@ function applyBaselineVariant(
 }
 
 /** Load cases module and resolve filtered case IDs */
-async function resolveCases<T>(
+export async function resolveCases<T>(
   matrix: BenchMatrix<T>,
   options: RunMatrixOptions,
-) {
+): Promise<{ casesModule: CasesModule<T> | undefined; caseIds: string[] }> {
   const casesModule = matrix.casesModule
     ? await loadCasesModule<T>(matrix.casesModule)
     : undefined;
@@ -265,7 +164,7 @@ async function resolveCases<T>(
 }
 
 /** Convert matrix options to runner options */
-function buildRunnerOptions(options: RunMatrixOptions): RunnerOptions {
+export function buildRunnerOptions(options: RunMatrixOptions): RunnerOptions {
   return {
     maxIterations: options.iterations,
     maxTime: options.maxTime ?? 1000,
@@ -286,94 +185,12 @@ function buildRunnerOptions(options: RunMatrixOptions): RunnerOptions {
   };
 }
 
-/** Run a single variant with case data */
-async function runVariant<T>(
-  variant: AnyVariant<T>,
-  caseData: T,
-  name: string,
-  runner: BasicRunner,
-  options: RunnerOptions,
-): Promise<MeasuredResults> {
-  let fn: () => void;
-  if (isStatefulVariant(variant)) {
-    const state = await variant.setup(caseData);
-    fn = () => variant.run(state);
-  } else {
-    fn = () => variant(caseData);
-  }
-  const [result] = await runner.runBench({ name, fn }, options);
-  return result;
-}
-
-/** Run all cases for a single variant */
-async function runDirVariantCases<T>(
-  variantId: string,
-  ctx: DirMatrixContext<T>,
-): Promise<CaseResult[]> {
-  const { matrix, casesModule, caseIds, runnerOpts } = ctx;
-  const cases: CaseResult[] = [];
-
-  for (const caseId of caseIds) {
-    const caseData = !matrix.casesModule && matrix.cases ? caseId : undefined;
-    const [measured] = await runMatrixVariant({
-      variantDir: matrix.variantDir!,
-      variantId,
-      caseId,
-      caseData,
-      casesModule: matrix.casesModule,
-      runner: "basic",
-      options: runnerOpts,
-    });
-
-    const loaded = await loadCaseData(casesModule, caseId);
-    const baseline = await runBaselineIfExists(
-      variantId,
-      caseId,
-      caseData,
-      ctx,
-    );
-    const deltaPercent = baseline
-      ? computeDeltaPercent(baseline, measured)
-      : undefined;
-    cases.push({
-      caseId,
-      measured,
-      metadata: loaded.metadata,
-      baseline,
-      deltaPercent,
-    });
-  }
-  return cases;
-}
-
 /** Compute delta percentage: (current - baseline) / baseline * 100 */
-function computeDeltaPercent(
+export function computeDeltaPercent(
   base: MeasuredResults,
   cur: MeasuredResults,
 ): number {
   const avg = average(base.samples);
   if (avg === 0) return 0;
   return ((average(cur.samples) - avg) / avg) * 100;
-}
-
-/** Run baseline variant if it exists in baselineDir */
-async function runBaselineIfExists<T>(
-  variantId: string,
-  caseId: string,
-  caseData: unknown,
-  ctx: DirMatrixContext<T>,
-): Promise<MeasuredResults | undefined> {
-  const { matrix, baselineIds, runnerOpts } = ctx;
-  if (!matrix.baselineDir || !baselineIds.includes(variantId)) return undefined;
-
-  const [measured] = await runMatrixVariant({
-    variantDir: matrix.baselineDir,
-    variantId,
-    caseId,
-    caseData,
-    casesModule: matrix.casesModule,
-    runner: "basic",
-    options: runnerOpts,
-  });
-  return measured;
 }
