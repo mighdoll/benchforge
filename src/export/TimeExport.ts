@@ -176,13 +176,6 @@ function resolveStack(
   return stack;
 }
 
-/** Display name for a frame: named functions use their name, anonymous get a location hint */
-function displayName(name: string, url: string, line: number): string {
-  if (name !== "(anonymous)") return name;
-  const shortFile = url ? url.split("/").pop() : undefined;
-  return shortFile ? `(anonymous ${shortFile}:${line})` : "(anonymous)";
-}
-
 /** Intern a call frame, returning its index in the shared frames array */
 function internFrame(
   functionName: string,
@@ -208,4 +201,11 @@ function internFrame(
     frameIndex.set(key, idx);
   }
   return idx;
+}
+
+/** Display name for a frame: named functions use their name, anonymous get a location hint */
+function displayName(name: string, url: string, line: number): string {
+  if (name !== "(anonymous)") return name;
+  const shortFile = url ? url.split("/").pop() : undefined;
+  return shortFile ? `(anonymous ${shortFile}:${line})` : "(anonymous)";
 }

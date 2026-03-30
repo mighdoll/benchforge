@@ -218,27 +218,6 @@ function createWorkerWithTiming(gcStats: boolean) {
   return { worker, createTime, gcEvents };
 }
 
-// Consider: --no-compilation-cache, --max-old-space-size=512, --no-lazy
-// for consistency (less realistic)
-
-/** @return handlers that attach GC stats and heap profile to results */
-/** Attach profiling data to all results in a batch */
-function attachProfilingData(
-  results: MeasuredResults[],
-  gcEvents: GcEvent[] | undefined,
-  heapProfile?: HeapProfile,
-  timeProfile?: TimeProfile,
-  coverage?: CoverageData,
-): void {
-  if (gcEvents?.length) {
-    const gcStats = aggregateGcStats(gcEvents);
-    for (const r of results) r.gcStats = gcStats;
-  }
-  if (heapProfile) for (const r of results) r.heapProfile = heapProfile;
-  if (timeProfile) for (const r of results) r.timeProfile = timeProfile;
-  if (coverage) for (const r of results) r.coverage = coverage;
-}
-
 function createWorkerHandlers(
   specName: string,
   startTime: number,
@@ -331,6 +310,27 @@ function setupGcCapture(worker: ChildProcess, gcEvents: GcEvent[]): void {
       }
     }
   });
+}
+
+// Consider: --no-compilation-cache, --max-old-space-size=512, --no-lazy
+// for consistency (less realistic)
+
+/** @return handlers that attach GC stats and heap profile to results */
+/** Attach profiling data to all results in a batch */
+function attachProfilingData(
+  results: MeasuredResults[],
+  gcEvents: GcEvent[] | undefined,
+  heapProfile?: HeapProfile,
+  timeProfile?: TimeProfile,
+  coverage?: CoverageData,
+): void {
+  if (gcEvents?.length) {
+    const gcStats = aggregateGcStats(gcEvents);
+    for (const r of results) r.gcStats = gcStats;
+  }
+  if (heapProfile) for (const r of results) r.heapProfile = heapProfile;
+  if (timeProfile) for (const r of results) r.timeProfile = timeProfile;
+  if (coverage) for (const r of results) r.coverage = coverage;
 }
 
 /** Create cleanup for timeout and termination */

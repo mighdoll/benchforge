@@ -110,19 +110,6 @@ function prepareBenchmarks(
   return benchmarks;
 }
 
-function flattenSamples(benchmarks: PreparedBenchmark[]): FlattenedData {
-  const result: FlattenedData = {
-    allSamples: [],
-    timeSeries: [],
-    heapSeries: [],
-    allGcEvents: [],
-    allPausePoints: [],
-  };
-  for (const b of benchmarks)
-    if (b.samples?.length) flattenBenchmark(b, result);
-  return result;
-}
-
 /** Clear a container element and append a freshly created plot */
 function renderToContainer(
   selector: string,
@@ -195,6 +182,30 @@ function generateStatsHtml(b: PreparedBenchmark, gcEnabled: boolean): string {
   `;
 }
 
+function flattenSamples(benchmarks: PreparedBenchmark[]): FlattenedData {
+  const result: FlattenedData = {
+    allSamples: [],
+    timeSeries: [],
+    heapSeries: [],
+    allGcEvents: [],
+    allPausePoints: [],
+  };
+  for (const b of benchmarks)
+    if (b.samples?.length) flattenBenchmark(b, result);
+  return result;
+}
+
+function generateCIHtml(ci: BenchmarkEntry["comparisonCI"]): string {
+  if (!ci) return "";
+  const text = `${formatPct(ci.percent)} [${formatPct(ci.ci[0])}, ${formatPct(ci.ci[1])}]`;
+  return `
+    <div class="stat-item">
+      <div class="stat-label">vs Baseline</div>
+      <div class="stat-value ci-${ci.direction}">${text}</div>
+    </div>
+  `;
+}
+
 /** Extract time series, heap, GC, and pause data from one benchmark */
 function flattenBenchmark(b: PreparedBenchmark, out: FlattenedData): void {
   const warmupCount = b.warmupSamples?.length || 0;
@@ -243,15 +254,9 @@ function flattenBenchmark(b: PreparedBenchmark, out: FlattenedData): void {
   });
 }
 
-function generateCIHtml(ci: BenchmarkEntry["comparisonCI"]): string {
-  if (!ci) return "";
-  const text = `${formatPct(ci.percent)} [${formatPct(ci.ci[0])}, ${formatPct(ci.ci[1])}]`;
-  return `
-    <div class="stat-item">
-      <div class="stat-label">vs Baseline</div>
-      <div class="stat-value ci-${ci.direction}">${text}</div>
-    </div>
-  `;
+function formatPct(v: number): string {
+  const sign = v >= 0 ? "+" : "";
+  return sign + v.toFixed(1) + "%";
 }
 
 function cumulativeSum(arr: number[]): number[] {
@@ -262,9 +267,4 @@ function cumulativeSum(arr: number[]): number[] {
     result.push(sum);
   }
   return result;
-}
-
-function formatPct(v: number): string {
-  const sign = v >= 0 ? "+" : "";
-  return sign + v.toFixed(1) + "%";
 }

@@ -11,6 +11,13 @@ import {
 import { groupReports, type ReportGroup } from "../report/BenchmarkReport.ts";
 import type { ReportData } from "../viewer/ReportData.ts";
 
+export interface ArchiveOptions {
+  groups: ReportGroup[];
+  reportData?: ReportData;
+  timeProfileData?: string;
+  outputPath?: string;
+}
+
 /** speedscope file format (https://www.speedscope.app/file-format-schema.json) */
 interface SpeedscopeFile {
   $schema: "https://www.speedscope.app/file-format-schema.json";
@@ -140,13 +147,6 @@ export async function collectSources(
   }
 
   return sources;
-}
-
-export interface ArchiveOptions {
-  groups: ReportGroup[];
-  reportData?: ReportData;
-  timeProfileData?: string;
-  outputPath?: string;
 }
 
 /** Build a .benchforge archive containing profile + report + sources.

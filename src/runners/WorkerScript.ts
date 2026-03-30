@@ -55,6 +55,15 @@ interface BenchmarkImportResult {
   params: unknown;
 }
 
+/** Profiling state accumulated during worker benchmark execution */
+interface ProfilingState {
+  heapProfile?: HeapProfile;
+  timeProfile?: TimeProfile;
+  coverage?: CoverageData;
+  /** Shared session so TimeSampler doesn't reset coverage counters */
+  profilerSession?: import("node:inspector/promises").Session;
+}
+
 const workerStartTime = getPerfNow();
 const maxLifetime = 5 * 60 * 1000;
 
@@ -191,15 +200,6 @@ function createErrorMessage(error: unknown): ErrorMessage {
     error: error instanceof Error ? error.message : String(error),
     stack: error instanceof Error ? error.stack : undefined,
   };
-}
-
-/** Profiling state accumulated during worker benchmark execution */
-interface ProfilingState {
-  heapProfile?: HeapProfile;
-  timeProfile?: TimeProfile;
-  coverage?: CoverageData;
-  /** Shared session so TimeSampler doesn't reset coverage counters */
-  profilerSession?: import("node:inspector/promises").Session;
 }
 
 /** Run benchmark with heap, time, and/or coverage profiling enabled. */

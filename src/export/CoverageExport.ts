@@ -13,27 +13,6 @@ export interface LineCoverage {
 /** Map from source URL to per-function execution counts */
 export type CoverageMap = Map<string, LineCoverage[]>;
 
-/** Build array where index i = character offset where line (i+1) starts */
-function buildLineOffsets(source: string): number[] {
-  const offsets = [0]; // line 1 starts at offset 0
-  for (let i = 0; i < source.length; i++) {
-    if (source[i] === "\n") offsets.push(i + 1);
-  }
-  return offsets;
-}
-
-/** Convert character offset to 1-indexed line number via binary search */
-function offsetToLine(offset: number, lineOffsets: number[]): number {
-  let lo = 0;
-  let hi = lineOffsets.length - 1;
-  while (lo < hi) {
-    const mid = (lo + hi + 1) >> 1;
-    if (lineOffsets[mid] <= offset) lo = mid;
-    else hi = mid - 1;
-  }
-  return lo + 1; // 1-indexed
-}
-
 /** Result of building coverage data: per-URL entries + name-only lookup */
 export interface CoverageResult {
   /** Per-URL coverage entries (for frames with matching file URLs) */
@@ -56,6 +35,32 @@ export function buildCoverageMap(
   }
 
   return { map, byName };
+}
+
+/** Annotate speedscope frame names with execution counts.
+ *  Uses file+name matching when available, falls back to name-only. */
+export function annotateFramesWithCounts(
+  frames: { name: string; file?: string; line?: number }[],
+  coverage: CoverageResult,
+): void {
+  const { map, byName } = coverage;
+  for (const frame of frames) {
+    let count: number | undefined;
+
+    if (frame.file) {
+      const entries = map.get(frame.file);
+      if (entries) count = findCount(frame.name, frame.line, entries);
+    }
+
+    // Fall back to name-only lookup (handles eval'd / inline functions)
+    if (count === undefined && !frame.name.startsWith("(anonymous")) {
+      count = byName.get(frame.name);
+    }
+
+    if (count !== undefined && count > 0) {
+      frame.name = `${frame.name} [${formatCount(count)}]`;
+    }
+  }
 }
 
 function processScript(
@@ -92,32 +97,6 @@ function processScript(
   if (entries.length > 0 && url) map.set(url, entries);
 }
 
-/** Annotate speedscope frame names with execution counts.
- *  Uses file+name matching when available, falls back to name-only. */
-export function annotateFramesWithCounts(
-  frames: { name: string; file?: string; line?: number }[],
-  coverage: CoverageResult,
-): void {
-  const { map, byName } = coverage;
-  for (const frame of frames) {
-    let count: number | undefined;
-
-    if (frame.file) {
-      const entries = map.get(frame.file);
-      if (entries) count = findCount(frame.name, frame.line, entries);
-    }
-
-    // Fall back to name-only lookup (handles eval'd / inline functions)
-    if (count === undefined && !frame.name.startsWith("(anonymous")) {
-      count = byName.get(frame.name);
-    }
-
-    if (count !== undefined && count > 0) {
-      frame.name = `${frame.name} [${formatCount(count)}]`;
-    }
-  }
-}
-
 /** Match a frame to a coverage entry by function name and approximate line.
  *  Named functions match by name; anonymous functions match by closest line. */
 function findCount(
@@ -146,6 +125,34 @@ function findCount(
   return closestByLine(anonymous, frameLine)?.count;
 }
 
+/** Format a count for display: 1234 → "1.2K", 1234567 → "1.2M" */
+function formatCount(n: number): string {
+  if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`;
+  if (n >= 10_000) return `${(n / 1_000).toFixed(1)}K`;
+  return String(n);
+}
+
+/** Build array where index i = character offset where line (i+1) starts */
+function buildLineOffsets(source: string): number[] {
+  const offsets = [0]; // line 1 starts at offset 0
+  for (let i = 0; i < source.length; i++) {
+    if (source[i] === "\n") offsets.push(i + 1);
+  }
+  return offsets;
+}
+
+/** Convert character offset to 1-indexed line number via binary search */
+function offsetToLine(offset: number, lineOffsets: number[]): number {
+  let lo = 0;
+  let hi = lineOffsets.length - 1;
+  while (lo < hi) {
+    const mid = (lo + hi + 1) >> 1;
+    if (lineOffsets[mid] <= offset) lo = mid;
+    else hi = mid - 1;
+  }
+  return lo + 1; // 1-indexed
+}
+
 function closestByLine(
   entries: LineCoverage[],
   line: number,
@@ -160,11 +167,4 @@ function closestByLine(
     }
   }
   return best;
-}
-
-/** Format a count for display: 1234 → "1.2K", 1234567 → "1.2M" */
-function formatCount(n: number): string {
-  if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`;
-  if (n >= 10_000) return `${(n / 1_000).toFixed(1)}K`;
-  return String(n);
 }

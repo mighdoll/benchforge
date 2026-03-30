@@ -92,13 +92,6 @@ const optionGroups = {
   "Advanced:": ["inspect", "trace-opt", "skip-settle"],
 } as const;
 
-function applyGroups(y: Argv): Argv {
-  return Object.entries(optionGroups).reduce(
-    (acc, [label, keys]) => acc.group(keys as unknown as string[], label),
-    y,
-  );
-}
-
 const { url: _url, ...browserOnlyOptions } = cliOptions;
 
 /** @return yargs configured for browser benchmarking (url as required positional) */
@@ -140,4 +133,11 @@ export function parseCliArgs<T = DefaultCliArgs>(
 ): T {
   const yargsInstance = configure(yargs(args));
   return yargsInstance.parseSync() as T;
+}
+
+function applyGroups(y: Argv): Argv {
+  return Object.entries(optionGroups).reduce(
+    (acc, [label, keys]) => acc.group(keys as unknown as string[], label),
+    y,
+  );
 }

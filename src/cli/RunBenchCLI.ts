@@ -369,39 +369,6 @@ export async function exportReports(options: ExportOptions): Promise<void> {
   }
 }
 
-function exportFileFormats(
-  results: ReportGroup[],
-  args: DefaultCliArgs,
-  suiteName?: string,
-): void {
-  if (args["export-json"])
-    exportBenchmarkJson(results, args["export-json"], args, suiteName);
-  if (args["export-perfetto"])
-    exportPerfettoTrace(results, args["export-perfetto"], args);
-  if (args["export-time"]) exportTimeProfile(results, args["export-time"]);
-}
-
-function parseTimeProfileFile(results: ReportGroup[]) {
-  return buildAllTimeProfiles(results);
-}
-
-async function openViewer(
-  profileFile: ReturnType<typeof buildSpeedscopeFile>,
-  timeProfileData: string | undefined,
-  reportData: ReportData | undefined,
-  args: DefaultCliArgs,
-): Promise<void> {
-  const profileData = profileFile ? JSON.stringify(profileFile) : undefined;
-  const viewer = await startViewerServer({
-    profileData,
-    timeProfileData,
-    reportData: reportData ? JSON.stringify(reportData) : undefined,
-    editorUri: resolveEditorUri(args.editor),
-  });
-  await waitForCtrlC();
-  viewer.close();
-}
-
 /** Run matrix suite with CLI arguments.
  *  no options ==> defaultCases/defaultVariants, --filter ==> subset of defaults,
  *  --all --filter ==> subset of all, --all ==> all cases/variants */
@@ -599,86 +566,6 @@ function needsTimeSample(args: DefaultCliArgs): boolean {
   return args["time-sample"] || !!args["export-time"];
 }
 
-/** Build combined time profile SpeedScope file from all results */
-function buildAllTimeProfiles(results: ReportGroup[]) {
-  const entries: {
-    name: string;
-    profile: import("../profiling/node/TimeSampler.ts").TimeProfile;
-  }[] = [];
-  for (const group of results) {
-    for (const report of groupReports(group)) {
-      const { timeProfile } = report.measuredResults;
-      if (timeProfile)
-        entries.push({ name: report.name, profile: timeProfile });
-    }
-  }
-  return buildTimeSpeedscopeFile(entries);
-}
-
-/** Find the first raw V8 TimeProfile in results */
-function findTimeProfile(
-  results: ReportGroup[],
-): import("../profiling/node/TimeSampler.ts").TimeProfile | undefined {
-  for (const group of results) {
-    for (const report of groupReports(group)) {
-      if (report.measuredResults.timeProfile)
-        return report.measuredResults.timeProfile;
-    }
-  }
-  return undefined;
-}
-
-/** Merge coverage data from all results into a single CoverageData */
-function mergeCoverage(
-  results: ReportGroup[],
-): import("../profiling/node/CoverageTypes.ts").CoverageData | undefined {
-  const allScripts: import("../profiling/node/CoverageTypes.ts").ScriptCoverage[] =
-    [];
-  for (const group of results) {
-    for (const report of groupReports(group)) {
-      const { coverage } = report.measuredResults;
-      if (coverage) allScripts.push(...coverage.scripts);
-    }
-  }
-  return allScripts.length > 0 ? { scripts: allScripts } : undefined;
-}
-
-/** Annotate speedscope frame names with coverage counts if available */
-async function annotateCoverage(
-  results: ReportGroup[],
-  profileFile?: {
-    shared: { frames: { name: string; file?: string; line?: number }[] };
-  },
-  timeProfileFile?: {
-    shared: { frames: { name: string; file?: string; line?: number }[] };
-  },
-): Promise<void> {
-  const coverage = mergeCoverage(results);
-  if (!coverage) return;
-  if (!profileFile && !timeProfileFile) return;
-
-  // Collect sources keyed by coverage script URLs for offset→line resolution
-  const coverageUrls = coverage.scripts.map(s => ({ file: s.url }));
-  const sources = await collectSources(coverageUrls);
-  const coverageResult = buildCoverageMap(coverage, sources);
-  if (profileFile)
-    annotateFramesWithCounts(profileFile.shared.frames, coverageResult);
-  if (timeProfileFile)
-    annotateFramesWithCounts(timeProfileFile.shared.frames, coverageResult);
-}
-
-/** Export the first raw V8 TimeProfile to a JSON file */
-function exportTimeProfile(results: ReportGroup[], path: string): void {
-  const profile = findTimeProfile(results);
-  if (profile) {
-    const absPath = resolve(path);
-    writeFileSync(absPath, JSON.stringify(profile));
-    console.log(`Time profile exported to: ${path}`);
-  } else {
-    console.log("No time profiles to export.");
-  }
-}
-
 /** Strip surrounding quotes from a chrome arg token.
  *
  * (Needed because --chrome-args values pass through yargs and spawn() without
@@ -839,15 +726,61 @@ function cliCommonOptions(args: DefaultCliArgs) {
   };
 }
 
-/** Wait for Ctrl+C before exiting */
-function waitForCtrlC(): Promise<void> {
-  return new Promise(resolve => {
-    console.log(dim("\nPress Ctrl+C to exit"));
-    process.on("SIGINT", () => {
-      console.log();
-      resolve();
-    });
+function exportFileFormats(
+  results: ReportGroup[],
+  args: DefaultCliArgs,
+  suiteName?: string,
+): void {
+  if (args["export-json"])
+    exportBenchmarkJson(results, args["export-json"], args, suiteName);
+  if (args["export-perfetto"])
+    exportPerfettoTrace(results, args["export-perfetto"], args);
+  if (args["export-time"]) exportTimeProfile(results, args["export-time"]);
+}
+
+function parseTimeProfileFile(results: ReportGroup[]) {
+  return buildAllTimeProfiles(results);
+}
+
+/** Annotate speedscope frame names with coverage counts if available */
+async function annotateCoverage(
+  results: ReportGroup[],
+  profileFile?: {
+    shared: { frames: { name: string; file?: string; line?: number }[] };
+  },
+  timeProfileFile?: {
+    shared: { frames: { name: string; file?: string; line?: number }[] };
+  },
+): Promise<void> {
+  const coverage = mergeCoverage(results);
+  if (!coverage) return;
+  if (!profileFile && !timeProfileFile) return;
+
+  // Collect sources keyed by coverage script URLs for offset→line resolution
+  const coverageUrls = coverage.scripts.map(s => ({ file: s.url }));
+  const sources = await collectSources(coverageUrls);
+  const coverageResult = buildCoverageMap(coverage, sources);
+  if (profileFile)
+    annotateFramesWithCounts(profileFile.shared.frames, coverageResult);
+  if (timeProfileFile)
+    annotateFramesWithCounts(timeProfileFile.shared.frames, coverageResult);
+}
+
+async function openViewer(
+  profileFile: ReturnType<typeof buildSpeedscopeFile>,
+  timeProfileData: string | undefined,
+  reportData: ReportData | undefined,
+  args: DefaultCliArgs,
+): Promise<void> {
+  const profileData = profileFile ? JSON.stringify(profileFile) : undefined;
+  const viewer = await startViewerServer({
+    profileData,
+    timeProfileData,
+    reportData: reportData ? JSON.stringify(reportData) : undefined,
+    editorUri: resolveEditorUri(args.editor),
   });
+  await waitForCtrlC();
+  viewer.close();
 }
 
 /** Apply default sections and extra columns for matrix reports */
@@ -904,6 +837,60 @@ function cliHeapReportOptions(args: DefaultCliArgs): HeapReportOptions {
     raw: args["alloc-raw"],
     userOnly: args["alloc-user-only"],
   };
+}
+
+/** Export the first raw V8 TimeProfile to a JSON file */
+function exportTimeProfile(results: ReportGroup[], path: string): void {
+  const profile = findTimeProfile(results);
+  if (profile) {
+    const absPath = resolve(path);
+    writeFileSync(absPath, JSON.stringify(profile));
+    console.log(`Time profile exported to: ${path}`);
+  } else {
+    console.log("No time profiles to export.");
+  }
+}
+
+/** Build combined time profile SpeedScope file from all results */
+function buildAllTimeProfiles(results: ReportGroup[]) {
+  const entries: {
+    name: string;
+    profile: import("../profiling/node/TimeSampler.ts").TimeProfile;
+  }[] = [];
+  for (const group of results) {
+    for (const report of groupReports(group)) {
+      const { timeProfile } = report.measuredResults;
+      if (timeProfile)
+        entries.push({ name: report.name, profile: timeProfile });
+    }
+  }
+  return buildTimeSpeedscopeFile(entries);
+}
+
+/** Merge coverage data from all results into a single CoverageData */
+function mergeCoverage(
+  results: ReportGroup[],
+): import("../profiling/node/CoverageTypes.ts").CoverageData | undefined {
+  const allScripts: import("../profiling/node/CoverageTypes.ts").ScriptCoverage[] =
+    [];
+  for (const group of results) {
+    for (const report of groupReports(group)) {
+      const { coverage } = report.measuredResults;
+      if (coverage) allScripts.push(...coverage.scripts);
+    }
+  }
+  return allScripts.length > 0 ? { scripts: allScripts } : undefined;
+}
+
+/** Wait for Ctrl+C before exiting */
+function waitForCtrlC(): Promise<void> {
+  return new Promise(resolve => {
+    console.log(dim("\nPress Ctrl+C to exit"));
+    process.on("SIGINT", () => {
+      console.log();
+      resolve();
+    });
+  });
 }
 
 /** Warn if parameterized benchmarks lack setup */
@@ -974,6 +961,19 @@ async function runMultipleBatches(
     benchmarkBatches,
     meta,
   );
+}
+
+/** Find the first raw V8 TimeProfile in results */
+function findTimeProfile(
+  results: ReportGroup[],
+): import("../profiling/node/TimeSampler.ts").TimeProfile | undefined {
+  for (const group of results) {
+    for (const report of groupReports(group)) {
+      if (report.measuredResults.timeProfile)
+        return report.measuredResults.timeProfile;
+    }
+  }
+  return undefined;
 }
 
 /** Run single benchmark and create report */

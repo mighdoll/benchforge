@@ -27,19 +27,12 @@ export interface ViewerServerOptions {
   sources?: Record<string, string>;
 }
 
-/** Resolve the package root directory.
- *  In dev: src/cli/ViewerServer.ts  → dirname is "cli"  → up 2.
- *  In dist: dist/ViewerServer-*.mjs → dirname is "dist" → up 1. */
-function packageRoot(): string {
-  const thisDir = dirname(fileURLToPath(import.meta.url));
-  const base = thisDir.split("/").pop() || "";
-  if (base === "cli") return join(thisDir, "../..");
-  return join(thisDir, "..");
-}
-
-function viewerDistDir(): string {
-  return join(packageRoot(), "dist/viewer");
-}
+type Res = import("node:http").ServerResponse;
+type RouteHandler = (
+  res: Res,
+  query: string,
+  method: string,
+) => Promise<void> | void;
 
 /** Start the viewer server and open in browser */
 export async function startViewerServer(
@@ -70,36 +63,52 @@ export async function startViewerServer(
   };
 }
 
-type Res = import("node:http").ServerResponse;
-type RouteHandler = (
-  res: Res,
-  query: string,
-  method: string,
-) => Promise<void> | void;
+/** Open a .benchforge archive in the viewer */
+export async function viewArchive(filePath: string): Promise<void> {
+  const absPath = resolve(filePath);
+  const content = await readFile(absPath, "utf-8");
+  const archive = JSON.parse(content);
 
-function sendJson(res: Res, data: string | undefined, label: string): void {
-  if (!data) {
-    res.statusCode = 404;
-    res.end(`No ${label}`);
-    return;
+  const KNOWN_SCHEMA = 1;
+  const schema = archive.schema ?? 0;
+  if (schema > KNOWN_SCHEMA) {
+    console.error(
+      `Archive schema version ${schema} is newer than supported (${KNOWN_SCHEMA}). ` +
+        `Please update benchforge to view this archive.`,
+    );
+    process.exit(1);
   }
-  res.setHeader("Content-Type", "application/json");
-  res.end(data);
+
+  const profileData = archive.profile
+    ? JSON.stringify(archive.profile)
+    : undefined;
+  const timeProfileData = archive.timeProfile
+    ? JSON.stringify(archive.timeProfile)
+    : undefined;
+  const reportData = archive.report
+    ? JSON.stringify(archive.report)
+    : undefined;
+  const sources = archive.sources as Record<string, string> | undefined;
+
+  const { close } = await startViewerServer({
+    profileData,
+    timeProfileData,
+    reportData,
+    sources,
+  });
+
+  await new Promise<void>(resolve => {
+    console.log("\nPress Ctrl+C to exit");
+    process.on("SIGINT", () => {
+      console.log();
+      close();
+      resolve();
+    });
+  });
 }
 
-function sendProfile(
-  res: Res,
-  data: string | undefined,
-  label = "profile data",
-): void {
-  if (!data) {
-    res.statusCode = 404;
-    res.end(`No ${label}`);
-    return;
-  }
-  res.setHeader("Content-Type", "application/json");
-  res.setHeader("Access-Control-Allow-Origin", "*");
-  res.end(data);
+function viewerDistDir(): string {
+  return join(packageRoot(), "dist/viewer");
 }
 
 function createRequestHandler(
@@ -158,6 +167,68 @@ function createRequestHandler(
       res.end("Not found");
     });
   };
+}
+
+function tryListen(
+  server: Server,
+  port: number,
+  maxRetries = 10,
+): Promise<{ server: Server; port: number }> {
+  return new Promise((resolve, reject) => {
+    let attempt = 0;
+    const listen = (p: number) => {
+      server.once("error", (err: NodeJS.ErrnoException) => {
+        if (err.code === "EADDRINUSE" && attempt < maxRetries) {
+          attempt++;
+          listen(p + 1);
+        } else {
+          reject(err);
+        }
+      });
+      server.listen(p, () => {
+        server.removeAllListeners("error");
+        const addr = server.address();
+        const actualPort = typeof addr === "object" && addr ? addr.port : p;
+        resolve({ server, port: actualPort });
+      });
+    };
+    listen(port);
+  });
+}
+
+/** Resolve the package root directory.
+ *  In dev: src/cli/ViewerServer.ts  → dirname is "cli"  → up 2.
+ *  In dist: dist/ViewerServer-*.mjs → dirname is "dist" → up 1. */
+function packageRoot(): string {
+  const thisDir = dirname(fileURLToPath(import.meta.url));
+  const base = thisDir.split("/").pop() || "";
+  if (base === "cli") return join(thisDir, "../..");
+  return join(thisDir, "..");
+}
+
+function sendJson(res: Res, data: string | undefined, label: string): void {
+  if (!data) {
+    res.statusCode = 404;
+    res.end(`No ${label}`);
+    return;
+  }
+  res.setHeader("Content-Type", "application/json");
+  res.end(data);
+}
+
+function sendProfile(
+  res: Res,
+  data: string | undefined,
+  label = "profile data",
+): void {
+  if (!data) {
+    res.statusCode = 404;
+    res.end(`No ${label}`);
+    return;
+  }
+  res.setHeader("Content-Type", "application/json");
+  res.setHeader("Access-Control-Allow-Origin", "*");
+  res.end(data);
 }
 
 async function handleSourceRequest(
@@ -228,75 +299,4 @@ async function handleArchiveRequest(
     res.statusCode = 500;
     res.end("Archive failed");
   }
-}
-
-/** Open a .benchforge archive in the viewer */
-export async function viewArchive(filePath: string): Promise<void> {
-  const absPath = resolve(filePath);
-  const content = await readFile(absPath, "utf-8");
-  const archive = JSON.parse(content);
-
-  const KNOWN_SCHEMA = 1;
-  const schema = archive.schema ?? 0;
-  if (schema > KNOWN_SCHEMA) {
-    console.error(
-      `Archive schema version ${schema} is newer than supported (${KNOWN_SCHEMA}). ` +
-        `Please update benchforge to view this archive.`,
-    );
-    process.exit(1);
-  }
-
-  const profileData = archive.profile
-    ? JSON.stringify(archive.profile)
-    : undefined;
-  const timeProfileData = archive.timeProfile
-    ? JSON.stringify(archive.timeProfile)
-    : undefined;
-  const reportData = archive.report
-    ? JSON.stringify(archive.report)
-    : undefined;
-  const sources = archive.sources as Record<string, string> | undefined;
-
-  const { close } = await startViewerServer({
-    profileData,
-    timeProfileData,
-    reportData,
-    sources,
-  });
-
-  await new Promise<void>(resolve => {
-    console.log("\nPress Ctrl+C to exit");
-    process.on("SIGINT", () => {
-      console.log();
-      close();
-      resolve();
-    });
-  });
-}
-
-function tryListen(
-  server: Server,
-  port: number,
-  maxRetries = 10,
-): Promise<{ server: Server; port: number }> {
-  return new Promise((resolve, reject) => {
-    let attempt = 0;
-    const listen = (p: number) => {
-      server.once("error", (err: NodeJS.ErrnoException) => {
-        if (err.code === "EADDRINUSE" && attempt < maxRetries) {
-          attempt++;
-          listen(p + 1);
-        } else {
-          reject(err);
-        }
-      });
-      server.listen(p, () => {
-        server.removeAllListeners("error");
-        const addr = server.address();
-        const actualPort = typeof addr === "object" && addr ? addr.port : p;
-        resolve({ server, port: actualPort });
-      });
-    };
-    listen(port);
-  });
 }

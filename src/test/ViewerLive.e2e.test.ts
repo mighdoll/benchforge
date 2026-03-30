@@ -13,53 +13,6 @@ const examplePath = path.resolve(
 let proc: ChildProcess;
 let port: number;
 
-beforeAll(async () => {
-  const args = [
-    examplePath,
-    "--view",
-    "--alloc",
-    "--time-sample",
-    "--iterations",
-    "3",
-    "--warmup",
-    "0",
-    "--skip-settle",
-  ];
-
-  proc = spawn(binPath, args, {
-    stdio: ["ignore", "pipe", "pipe"],
-    env: { ...process.env, BENCHFORGE_NO_OPEN: "1" },
-  });
-
-  // Parse port from stdout line like "Viewer: http://localhost:3939"
-  port = await new Promise<number>((resolve, reject) => {
-    let stdout = "";
-    proc.stdout!.on("data", (chunk: Buffer) => {
-      stdout += chunk.toString();
-      const match = stdout.match(/Viewer: http:\/\/localhost:(\d+)/);
-      if (match) resolve(Number(match[1]));
-    });
-    proc.on("error", reject);
-    proc.on("exit", code => {
-      if (!port)
-        reject(
-          new Error(
-            `Process exited (${code}) before viewer started.\nstdout: ${stdout}`,
-          ),
-        );
-    });
-    setTimeout(
-      () =>
-        reject(new Error(`Timed out waiting for viewer.\nstdout: ${stdout}`)),
-      60_000,
-    );
-  });
-}, 90_000);
-
-afterAll(() => {
-  proc?.kill();
-});
-
 test("live viewer: summary tab shows stats", {
   timeout: 30_000,
 }, async () => {
@@ -154,4 +107,51 @@ test("live viewer: timing tab has speedscope content", {
   } finally {
     await browser.close();
   }
+});
+
+beforeAll(async () => {
+  const args = [
+    examplePath,
+    "--view",
+    "--alloc",
+    "--time-sample",
+    "--iterations",
+    "3",
+    "--warmup",
+    "0",
+    "--skip-settle",
+  ];
+
+  proc = spawn(binPath, args, {
+    stdio: ["ignore", "pipe", "pipe"],
+    env: { ...process.env, BENCHFORGE_NO_OPEN: "1" },
+  });
+
+  // Parse port from stdout line like "Viewer: http://localhost:3939"
+  port = await new Promise<number>((resolve, reject) => {
+    let stdout = "";
+    proc.stdout!.on("data", (chunk: Buffer) => {
+      stdout += chunk.toString();
+      const match = stdout.match(/Viewer: http:\/\/localhost:(\d+)/);
+      if (match) resolve(Number(match[1]));
+    });
+    proc.on("error", reject);
+    proc.on("exit", code => {
+      if (!port)
+        reject(
+          new Error(
+            `Process exited (${code}) before viewer started.\nstdout: ${stdout}`,
+          ),
+        );
+    });
+    setTimeout(
+      () =>
+        reject(new Error(`Timed out waiting for viewer.\nstdout: ${stdout}`)),
+      60_000,
+    );
+  });
+}, 90_000);
+
+afterAll(() => {
+  proc?.kill();
 });
