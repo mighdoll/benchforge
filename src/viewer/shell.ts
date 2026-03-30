@@ -72,9 +72,8 @@ async function main(): Promise<void> {
     }
   }
 
-  const preloaded = (window as Record<string, unknown>).__benchforgeArchive as
-    | ArchiveData
-    | undefined;
+  const preloaded = (window as unknown as Record<string, unknown>)
+    .__benchforgeArchive as ArchiveData | undefined;
   if (preloaded) {
     initViewer(new ArchiveProvider(preloaded));
     return;
