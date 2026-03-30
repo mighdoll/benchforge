@@ -97,4 +97,4 @@ export {
 } from "./report/table/Formatters.ts";
 export type { RunnerOptions } from "./runners/BenchRunner.ts";
 export { average } from "./stats/StatisticalUtils.ts";
-export type { ReportData } from "./viewer-types/index.ts";
+export type { ReportData } from "./viewer/ViewerTypes.ts";

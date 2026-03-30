@@ -2,9 +2,9 @@ import * as Plot from "@observablehq/plot";
 import * as d3 from "d3";
 import { buildLegend, type LegendItem } from "./LegendUtils.ts";
 import type {
-  GcEvent,
+  FlatGcEvent,
+  FlatPausePoint,
   HeapPoint,
-  PausePoint,
   TimeSeriesPoint,
 } from "./Types.ts";
 
@@ -52,8 +52,8 @@ const OPT_TIER_COLORS: Record<string, string> = {
 /** Create sample time series showing each sample in order */
 export function createSampleTimeSeries(
   timeSeries: TimeSeriesPoint[],
-  gcEvents: GcEvent[] = [],
-  pausePoints: PausePoint[] = [],
+  gcEvents: FlatGcEvent[] = [],
+  pausePoints: FlatPausePoint[] = [],
   heapSeries: HeapPoint[] = [],
 ): SVGSVGElement | HTMLElement {
   const ctx = buildPlotContext(timeSeries);
@@ -187,7 +187,7 @@ function heapMarks(
 }
 
 function gcMark(
-  gcEvents: GcEvent[],
+  gcEvents: FlatGcEvent[],
   yMin: number,
   convertValue: (ms: number) => number,
 ): any {
@@ -211,7 +211,7 @@ function gcMark(
 }
 
 function pauseMarks(
-  pausePoints: PausePoint[],
+  pausePoints: FlatPausePoint[],
   yMin: number,
   yMax: number,
 ): any[] {

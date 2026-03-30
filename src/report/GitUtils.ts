@@ -1,14 +1,14 @@
 import { execSync } from "node:child_process";
 import { existsSync, readFileSync, statSync } from "node:fs";
 import { join } from "node:path";
-import type { GitVersion } from "../viewer-types/index.ts";
-import { formatDateWithTimezone } from "../viewer-types/index.ts";
+import { formatDateWithTimezone } from "../viewer/DateFormat.ts";
+import type { GitVersion } from "../viewer/ViewerTypes.ts";
 
-export type { GitVersion } from "../viewer-types/index.ts";
 export {
   formatDateWithTimezone,
   formatRelativeTime,
-} from "../viewer-types/index.ts";
+} from "../viewer/DateFormat.ts";
+export type { GitVersion } from "../viewer/ViewerTypes.ts";
 
 /** Get current git version info. For dirty repos, uses most recent modified file date. */
 export function getCurrentGitVersion(): GitVersion | undefined {

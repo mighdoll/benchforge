@@ -1,6 +1,8 @@
-/** Data passed to the HTML report generator */
+import type { DifferenceCI } from "../stats/StatisticalUtils.ts";
+
+/** Top-level data structure for the HTML benchmark report */
 export interface ReportData {
-  groups: GroupData[];
+  groups: BenchmarkGroup[];
   metadata: {
     timestamp: string;
     bencherVersion: string;
@@ -11,13 +13,14 @@ export interface ReportData {
   };
 }
 
-export interface GroupData {
+export interface BenchmarkGroup {
   name: string;
-  baseline?: BenchmarkData;
-  benchmarks: BenchmarkData[];
+  baseline?: BenchmarkEntry;
+  benchmarks: BenchmarkEntry[];
 }
 
-export interface BenchmarkData {
+/** One benchmark's raw data, statistics, and optional comparison results */
+export interface BenchmarkEntry {
   name: string;
   samples: number[];
   warmupSamples?: number[];
@@ -26,21 +29,23 @@ export interface BenchmarkData {
   gcEvents?: GcEvent[];
   optSamples?: number[];
   pausePoints?: PausePoint[];
-  stats: {
-    min: number;
-    max: number;
-    avg: number;
-    p50: number;
-    p75: number;
-    p99: number;
-    p999: number;
-  };
+  stats: BenchmarkStats;
   heapSize?: { min: number; max: number; avg: number };
-  sectionStats?: FormattedStat[];
+  sectionStats?: SectionStat[];
   comparisonCI?: DifferenceCI;
 }
 
-export interface FormattedStat {
+export interface BenchmarkStats {
+  min: number;
+  max: number;
+  avg: number;
+  p50: number;
+  p75: number;
+  p99: number;
+  p999: number;
+}
+
+export interface SectionStat {
   label: string;
   value: string;
   groupTitle?: string;
@@ -60,18 +65,4 @@ export interface GitVersion {
   hash: string;
   date: string;
   dirty?: boolean;
-}
-
-export type CIDirection = "faster" | "slower" | "uncertain";
-
-export interface HistogramBin {
-  x: number;
-  count: number;
-}
-
-export interface DifferenceCI {
-  percent: number;
-  ci: [number, number];
-  direction: CIDirection;
-  histogram?: HistogramBin[];
 }

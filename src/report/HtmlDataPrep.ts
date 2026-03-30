@@ -1,11 +1,11 @@
+import type { DifferenceCI } from "../stats/StatisticalUtils.ts";
 import { bootstrapDifferenceCI } from "../stats/StatisticalUtils.ts";
 import type {
-  BenchmarkData,
-  DifferenceCI,
-  FormattedStat,
-  GroupData,
+  BenchmarkEntry,
+  BenchmarkGroup,
   ReportData,
-} from "../viewer-types/index.ts";
+  SectionStat,
+} from "../viewer/ViewerTypes.ts";
 import type {
   ReportColumnGroup,
   ReportGroup,
@@ -59,12 +59,15 @@ function prepareGroupData(
   group: ReportGroup,
   sections?: ResultsMapper[],
   higherIsBetter?: boolean,
-): GroupData {
+): BenchmarkGroup {
   const baselineSamples = group.baseline?.measuredResults.samples;
   return {
     name: group.name,
     baseline: group.baseline
-      ? prepareBenchmarkData(group.baseline, sections)
+      ? {
+          ...prepareBenchmarkData(group.baseline, sections),
+          comparisonCI: undefined,
+        }
       : undefined,
     benchmarks: group.reports.map(report => {
       const samples = report.measuredResults.samples;
@@ -86,7 +89,7 @@ function prepareBenchmarkData(
     metadata?: Record<string, unknown>;
   },
   sections?: ResultsMapper[],
-): Omit<BenchmarkData, "comparisonCI"> {
+): Omit<BenchmarkEntry, "comparisonCI"> {
   const { measuredResults } = report;
   return {
     name: report.name,
@@ -117,7 +120,7 @@ function flipCI(ci: DifferenceCI): DifferenceCI {
 function extractSectionStats(
   report: { measuredResults: any; metadata?: Record<string, unknown> },
   sections: ResultsMapper[],
-): FormattedStat[] {
+): SectionStat[] {
   return sections.flatMap(section => {
     const vals = section.extract(report.measuredResults, report.metadata);
     return section.columns().flatMap(g => formatGroupStats(vals, g));
@@ -128,10 +131,10 @@ function extractSectionStats(
 function formatGroupStats(
   values: Record<string, unknown>,
   group: ReportColumnGroup<Record<string, unknown>>,
-): FormattedStat[] {
+): SectionStat[] {
   return group.columns
     .map(c => formatColumnStat(values, c, group.groupTitle))
-    .filter((s): s is FormattedStat => s !== undefined);
+    .filter((s): s is SectionStat => s !== undefined);
 }
 
 /** @return formatted stat for a single column, or undefined if empty/placeholder */
@@ -139,7 +142,7 @@ function formatColumnStat(
   values: Record<string, unknown>,
   col: ColumnLike,
   groupTitle?: string,
-): FormattedStat | undefined {
+): SectionStat | undefined {
   const raw = values[col.key];
   if (raw === undefined) return undefined;
   const formatted = col.formatter ? col.formatter(raw) : String(raw);

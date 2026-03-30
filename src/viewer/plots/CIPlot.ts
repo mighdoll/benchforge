@@ -1,4 +1,7 @@
-import type { ComparisonCI, HistogramBin } from "./Types.ts";
+import type {
+  DifferenceCI,
+  HistogramBin,
+} from "../../stats/StatisticalUtils.ts";
 
 export interface DistributionPlotOptions {
   width?: number;
@@ -59,9 +62,9 @@ export function createDistributionPlot(
   return svg;
 }
 
-/** Convenience wrapper for ComparisonCI data */
+/** Convenience wrapper for DifferenceCI data */
 export function createCIPlot(
-  ci: ComparisonCI,
+  ci: DifferenceCI,
   options: Partial<DistributionPlotOptions> = {},
 ): SVGSVGElement {
   if (!ci.histogram) return createSvg(0, 0);

@@ -1,26 +1,25 @@
+import type { BenchmarkEntry, ReportData } from "../ViewerTypes.ts";
 import { createCIPlot } from "./CIPlot.ts";
 import { createHistogramKde } from "./HistogramKde.ts";
 import { createSampleTimeSeries } from "./SampleTimeSeries.ts";
 import type {
-  BenchmarkEntry,
-  GcEvent,
+  FlatGcEvent,
+  FlatPausePoint,
   HeapPoint,
-  PausePoint,
-  ReportData,
   Sample,
   TimeSeriesPoint,
 } from "./Types.ts";
 
 interface PreparedBenchmark extends BenchmarkEntry {
-  name: string;
+  isBaseline: boolean;
 }
 
 interface FlattenedData {
   allSamples: Sample[];
   timeSeries: TimeSeriesPoint[];
   heapSeries: HeapPoint[];
-  allGcEvents: GcEvent[];
-  allPausePoints: PausePoint[];
+  allGcEvents: FlatGcEvent[];
+  allPausePoints: FlatPausePoint[];
 }
 
 /** Render all plots for the benchmark report */
