@@ -1,19 +1,21 @@
 export type { Configure, DefaultCliArgs } from "./cli/CliArgs.ts";
 export { browserCliArgs, defaultCliArgs, parseCliArgs } from "./cli/CliArgs.ts";
-export type { ExportOptions, MatrixExportOptions } from "./cli/RunBenchCLI.ts";
+export { cliToMatrixOptions } from "./cli/CliOptions.ts";
+export { runBenchmarks } from "./cli/SuiteRunner.ts";
 export {
-  benchExports,
-  cliToMatrixOptions,
   defaultMatrixReport,
   defaultReport,
-  exportReports,
   hasField,
-  matrixBenchExports,
   matrixToReportGroups,
-  parseBenchArgs,
   printHeapReports,
   reportOptStatus,
-  runBenchmarks,
+} from "./cli/CliReport.ts";
+export type { ExportOptions, MatrixExportOptions } from "./cli/CliExport.ts";
+export { exportReports } from "./cli/CliExport.ts";
+export {
+  benchExports,
+  matrixBenchExports,
+  parseBenchArgs,
   runDefaultBench,
   runDefaultMatrixBench,
   runMatrixSuite,

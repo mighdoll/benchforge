@@ -1,6 +1,7 @@
 import type { Configure, DefaultCliArgs } from "../cli/CliArgs.ts";
 import { parseCliArgs } from "../cli/CliArgs.ts";
-import { defaultReport, runBenchmarks } from "../cli/RunBenchCLI.ts";
+import { defaultReport } from "../cli/CliReport.ts";
+import { runBenchmarks } from "../cli/SuiteRunner.ts";
 import type { BenchmarkReport } from "../report/BenchmarkReport.ts";
 import type { BenchSuite } from "../runners/BenchmarkSpec.ts";
 import type { MeasuredResults } from "../runners/MeasuredResults.ts";

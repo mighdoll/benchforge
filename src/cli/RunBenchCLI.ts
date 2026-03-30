@@ -1,24 +1,27 @@
-import { writeFileSync } from "node:fs";
 import { basename, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 import { hideBin } from "yargs/helpers";
+import type { BrowserProfileResult } from "../profiling/browser/BrowserProfiler.ts";
 import {
-  archiveBenchmark,
-  buildSpeedscopeFile,
-  collectSources,
-} from "../export/AllocExport.ts";
+  isBrowserUserCode,
+} from "../profiling/node/HeapSampleReport.ts";
+import type {
+  ReportGroup,
+  ResultsMapper,
+} from "../report/BenchmarkReport.ts";
 import {
-  annotateFramesWithCounts,
-  buildCoverageMap,
-} from "../export/CoverageExport.ts";
-import { resolveEditorUri } from "../export/EditorUri.ts";
-import { exportBenchmarkJson } from "../export/JsonExport.ts";
-import { exportPerfettoTrace } from "../export/PerfettoExport.ts";
-import { buildTimeSpeedscopeFile } from "../export/TimeExport.ts";
+  browserGcStatsSection,
+  runsSection,
+  timeSection,
+} from "../report/StandardSections.ts";
+import { reportResults } from "../report/text/TextReport.ts";
+import colors from "../report/Colors.ts";
+import { computeStats } from "../runners/BasicRunner.ts";
+import type { BenchSuite } from "../runners/BenchmarkSpec.ts";
+import type { MeasuredResults } from "../runners/MeasuredResults.ts";
 import type {
   MatrixResults,
   MatrixSuite,
-  RunMatrixOptions,
 } from "../matrix/BenchMatrix.ts";
 import { runMatrix } from "../matrix/BenchMatrix.ts";
 import { loadCasesModule } from "../matrix/CaseLoader.ts";
@@ -27,95 +30,33 @@ import {
   filterMatrix,
   parseMatrixFilter,
 } from "../matrix/MatrixFilter.ts";
-import {
-  type MatrixReportOptions,
-  reportMatrixResults,
-} from "../matrix/MatrixReport.ts";
-import type { BrowserProfileResult } from "../profiling/browser/BrowserProfiler.ts";
-import {
-  aggregateSites,
-  filterSites,
-  flattenProfile,
-  formatHeapReport,
-  formatRawSamples,
-  type HeapReportOptions,
-  isBrowserUserCode,
-} from "../profiling/node/HeapSampleReport.ts";
-import { resolveProfile } from "../profiling/node/ResolvedProfile.ts";
-import type {
-  BenchmarkReport,
-  ReportGroup,
-  ResultsMapper,
-} from "../report/BenchmarkReport.ts";
-import { groupReports } from "../report/BenchmarkReport.ts";
-import colors from "../report/Colors.ts";
-import type { GitVersion } from "../report/GitUtils.ts";
-import { prepareHtmlData } from "../report/HtmlReport.ts";
-import {
-  adaptiveSection,
-  browserGcStatsSection,
-  formatTierSummary,
-  gcStatsSection,
-  optSection,
-  runsSection,
-  timeSection,
-  totalTimeSection,
-} from "../report/StandardSections.ts";
-import { reportResults } from "../report/text/TextReport.ts";
-import { computeStats } from "../runners/BasicRunner.ts";
-import type {
-  BenchGroup,
-  BenchmarkSpec,
-  BenchSuite,
-} from "../runners/BenchmarkSpec.ts";
-import type { RunnerOptions } from "../runners/BenchRunner.ts";
-import type { KnownRunner } from "../runners/CreateRunner.ts";
-import type { MeasuredResults } from "../runners/MeasuredResults.ts";
-import { runBenchmark } from "../runners/RunnerOrchestrator.ts";
-import type { ReportData } from "../viewer/ReportData.ts";
+import type { MatrixReportOptions } from "../matrix/MatrixReport.ts";
 import {
   type Configure,
   type DefaultCliArgs,
-  defaultAdaptiveMaxTime,
   parseCliArgs,
 } from "./CliArgs.ts";
-import { filterBenchmarks } from "./FilterBenchmarks.ts";
-import { startViewerServer, waitForCtrlC } from "./ViewerServer.ts";
+import {
+  cliHeapReportOptions,
+  cliToMatrixOptions,
+  needsAlloc,
+  needsTimeSample,
+  validateArgs,
+} from "./CliOptions.ts";
+import { runBenchmarks } from "./SuiteRunner.ts";
+import {
+  defaultMatrixReport,
+  defaultReport,
+  matrixToReportGroups,
+  printHeapReports,
+} from "./CliReport.ts";
+import {
+  type MatrixExportOptions,
+  exportReports,
+  finishReports,
+} from "./CliExport.ts";
 
-/** Options for exporting benchmark results to various formats */
-export interface ExportOptions {
-  results: ReportGroup[];
-  args: DefaultCliArgs;
-  sections?: any[];
-  suiteName?: string;
-  currentVersion?: GitVersion;
-  baselineVersion?: GitVersion;
-}
-
-/** Export options specific to matrix benchmarks (no results/args — uses MatrixResults) */
-export interface MatrixExportOptions {
-  sections?: any[];
-  currentVersion?: GitVersion;
-  baselineVersion?: GitVersion;
-}
-
-type RunParams = {
-  runner: KnownRunner;
-  options: RunnerOptions;
-  useWorker: boolean;
-  params: unknown;
-  metadata?: Record<string, any>;
-};
-
-type SuiteParams = {
-  runner: KnownRunner;
-  options: RunnerOptions;
-  useWorker: boolean;
-  suite: BenchSuite;
-  batches: number;
-};
-
-const { yellow, dim } = colors;
+const { yellow } = colors;
 
 /** Parse CLI with custom configuration */
 export function parseBenchArgs<T = DefaultCliArgs>(
@@ -125,34 +66,23 @@ export function parseBenchArgs<T = DefaultCliArgs>(
   return parseCliArgs(argv, configureArgs) as T & DefaultCliArgs;
 }
 
-/** Run suite with CLI arguments */
-export async function runBenchmarks(
-  suite: BenchSuite,
-  args: DefaultCliArgs,
-): Promise<ReportGroup[]> {
-  validateArgs(args);
-  const { filter, worker: useWorker, batches = 1 } = args;
-  const options = cliToRunnerOptions(args);
-  const filtered = filterBenchmarks(suite, filter);
-
-  return runSuite({
-    suite: filtered,
-    runner: "basic",
-    options,
-    useWorker,
-    batches,
-  });
-}
-
-/** Generate table with standard sections */
-export function defaultReport(
-  groups: ReportGroup[],
-  args: DefaultCliArgs,
-): string {
-  const { adaptive, "gc-stats": gcStats, "trace-opt": traceOpt } = args;
-  const hasOpt = hasField(groups, "optStatus");
-  const sections = buildReportSections(adaptive, gcStats, traceOpt && hasOpt);
-  return reportResults(groups, sections);
+/** Run benchmarks and display table. Suite is optional with --url (browser mode). */
+export async function runDefaultBench(
+  suite?: BenchSuite,
+  configureArgs?: Configure<any>,
+): Promise<void> {
+  const args = parseBenchArgs(configureArgs);
+  if (args.url) {
+    await browserBenchExports(args);
+  } else if (suite) {
+    await benchExports(suite, args);
+  } else if (args.file) {
+    await fileBenchExports(args.file, args);
+  } else {
+    throw new Error(
+      "Provide a benchmark file, --url for browser mode, or pass a BenchSuite directly.",
+    );
+  }
 }
 
 /** Run benchmarks, display table, and optionally generate HTML report */
@@ -214,148 +144,29 @@ export async function browserBenchExports(args: DefaultCliArgs): Promise<void> {
   await exportReports({ results, args });
 }
 
-/** Print heap allocation reports for benchmarks with heap profiles */
-export function printHeapReports(
-  groups: ReportGroup[],
-  options: HeapReportOptions,
-): void {
-  for (const group of groups) {
-    for (const report of groupReports(group)) {
-      const { heapProfile } = report.measuredResults;
-      if (!heapProfile) continue;
-
-      console.log(dim(`\n─── Heap profile: ${report.name} ───`));
-      const resolved = resolveProfile(heapProfile);
-      const sites = flattenProfile(resolved);
-      const userSites = filterSites(sites, options.isUserCode);
-      const totalUserCode = userSites.reduce((sum, s) => sum + s.bytes, 0);
-      const aggregated = aggregateSites(options.userOnly ? userSites : sites);
-      const extra = {
-        totalAll: resolved.totalBytes,
-        totalUserCode,
-        sampleCount: resolved.sortedSamples?.length,
-      };
-      console.log(formatHeapReport(aggregated, { ...options, ...extra }));
-      if (options.raw) {
-        console.log(dim(`\n─── Raw samples: ${report.name} ───`));
-        console.log(formatRawSamples(resolved));
-      }
-    }
-  }
-}
-
-/** Run benchmarks and display table. Suite is optional with --url (browser mode). */
-export async function runDefaultBench(
-  suite?: BenchSuite,
+/** Run matrix suite with full CLI handling (parse, run, report, export) */
+export async function runDefaultMatrixBench(
+  suite: MatrixSuite,
   configureArgs?: Configure<any>,
+  reportOptions?: MatrixReportOptions,
 ): Promise<void> {
   const args = parseBenchArgs(configureArgs);
-  if (args.url) {
-    await browserBenchExports(args);
-  } else if (suite) {
-    await benchExports(suite, args);
-  } else if (args.file) {
-    await fileBenchExports(args.file, args);
-  } else {
-    throw new Error(
-      "Provide a benchmark file, --url for browser mode, or pass a BenchSuite directly.",
-    );
-  }
+  await matrixBenchExports(suite, args, reportOptions);
 }
 
-/** Convert CLI args to runner options */
-export function cliToRunnerOptions(args: DefaultCliArgs): RunnerOptions {
-  const { inspect, iterations } = args;
-  const gcForce = args["gc-force"];
-  if (inspect)
-    return { maxIterations: iterations ?? 1, warmupTime: 0, gcForce };
-  if (args.adaptive) return createAdaptiveOptions(args);
+/** Run matrix benchmarks, display table, and generate exports */
+export async function matrixBenchExports(
+  suite: MatrixSuite,
+  args: DefaultCliArgs,
+  reportOptions?: MatrixReportOptions,
+  exportOptions?: MatrixExportOptions,
+): Promise<void> {
+  const results = await runMatrixSuite(suite, args);
+  const report = defaultMatrixReport(results, reportOptions, args);
+  console.log(report);
 
-  return {
-    maxTime: iterations ? Number.POSITIVE_INFINITY : args.duration * 1000,
-    maxIterations: iterations,
-    ...cliCommonOptions(args),
-  };
-}
-
-/** Log V8 optimization tier distribution and deoptimizations */
-export function reportOptStatus(groups: ReportGroup[]): void {
-  const optData = groups.flatMap(group =>
-    groupReports(group)
-      .filter(r => r.measuredResults.optStatus)
-      .map(r => ({
-        name: r.name,
-        opt: r.measuredResults.optStatus!,
-        samples: r.measuredResults.samples.length,
-      })),
-  );
-  if (optData.length === 0) return;
-
-  console.log(dim("\nV8 optimization:"));
-  for (const { name, opt, samples } of optData) {
-    const tierParts = formatTierSummary(opt, " ", ", ");
-    console.log(`  ${name}: ${tierParts} ${dim(`(${samples} samples)`)}`);
-  }
-
-  const totalDeopts = optData.reduce((s, d) => s + d.opt.deoptCount, 0);
-  if (totalDeopts > 0) {
-    console.log(
-      yellow(
-        `  ⚠ ${totalDeopts} deoptimization${totalDeopts > 1 ? "s" : ""} detected`,
-      ),
-    );
-  }
-}
-
-/** @return true if any result has the specified field with a defined value */
-export function hasField(
-  results: ReportGroup[],
-  field: keyof MeasuredResults,
-): boolean {
-  return results.some(group =>
-    groupReports(group).some(
-      ({ measuredResults }) => measuredResults[field] !== undefined,
-    ),
-  );
-}
-
-/** Export reports (JSON, Perfetto, archive, viewer) based on CLI args */
-export async function exportReports(options: ExportOptions): Promise<void> {
-  const { results, args, sections, suiteName } = options;
-  const { currentVersion, baselineVersion } = options;
-
-  const needsReportData = args.view || args.archive != null;
-  const reportData = needsReportData
-    ? prepareHtmlData(results, {
-        cliArgs: args,
-        sections,
-        currentVersion,
-        baselineVersion,
-      })
-    : undefined;
-
-  exportFileFormats(results, args, suiteName);
-
-  const profileFile = buildSpeedscopeFile(results);
-  const timeProfileFile = buildAllTimeProfiles(results);
-  await annotateCoverage(results, profileFile, timeProfileFile);
-
-  const timeData = timeProfileFile
-    ? JSON.stringify(timeProfileFile)
-    : undefined;
-  if (args.archive != null) {
-    const archivePath = args.archive || undefined;
-    await archiveBenchmark({
-      groups: results,
-      reportData,
-      timeProfileData: timeData,
-      outputPath: archivePath,
-    });
-  }
-
-  if (args.view) {
-    await openViewer(profileFile, timeData, reportData, args);
-  }
+  const reportGroups = matrixToReportGroups(results);
+  await finishReports(reportGroups, args, suite.name, exportOptions);
 }
 
 /** Run matrix suite with CLI arguments.
@@ -384,7 +195,6 @@ export async function runMatrixSuite(
       };
     }
 
-    // filter merges via intersection with defaults
     if (filter) {
       filtered = await filterMatrix(filtered, filter);
     }
@@ -401,169 +211,26 @@ export async function runMatrixSuite(
   return results;
 }
 
-/** Convert CLI args to matrix run options */
-export function cliToMatrixOptions(args: DefaultCliArgs): RunMatrixOptions {
-  const { duration, iterations, worker } = args;
-  return {
-    iterations,
-    maxTime: iterations ? undefined : duration * 1000,
-    useWorker: worker,
-    ...cliCommonOptions(args),
-  };
-}
-
-/** Generate report for matrix results. Uses same sections as regular benchmarks. */
-export function defaultMatrixReport(
-  results: MatrixResults[],
-  reportOptions?: MatrixReportOptions,
-  args?: DefaultCliArgs,
-): string {
-  const options = args
-    ? mergeMatrixDefaults(reportOptions, args, results)
-    : reportOptions;
-  return results.map(r => reportMatrixResults(r, options)).join("\n\n");
-}
-
-/** Run matrix suite with full CLI handling (parse, run, report, export) */
-export async function runDefaultMatrixBench(
-  suite: MatrixSuite,
-  configureArgs?: Configure<any>,
-  reportOptions?: MatrixReportOptions,
-): Promise<void> {
-  const args = parseBenchArgs(configureArgs);
-  await matrixBenchExports(suite, args, reportOptions);
-}
-
-/** Convert MatrixResults to ReportGroup[] for export compatibility */
-export function matrixToReportGroups(results: MatrixResults[]): ReportGroup[] {
-  return results.flatMap(matrix =>
-    matrix.variants.flatMap(variant =>
-      variant.cases.map(c => {
-        const { metadata } = c;
-        const report = {
-          name: variant.id,
-          measuredResults: c.measured,
-          metadata,
-        };
-        const baseline = c.baseline
-          ? {
-              name: `${variant.id} (baseline)`,
-              measuredResults: c.baseline,
-              metadata,
-            }
-          : undefined;
-        return {
-          name: `${variant.id} / ${c.caseId}`,
-          reports: [report],
-          baseline,
-        };
-      }),
-    ),
-  );
-}
-
-/** Run matrix benchmarks, display table, and generate exports */
-export async function matrixBenchExports(
-  suite: MatrixSuite,
+/** Import a file and run it as a benchmark based on what it exports */
+async function fileBenchExports(
+  filePath: string,
   args: DefaultCliArgs,
-  reportOptions?: MatrixReportOptions,
-  exportOptions?: MatrixExportOptions,
 ): Promise<void> {
-  const results = await runMatrixSuite(suite, args);
-  const report = defaultMatrixReport(results, reportOptions, args);
-  console.log(report);
+  const fileUrl = pathToFileURL(resolve(filePath)).href;
+  const mod = await import(fileUrl);
+  const candidate = mod.default;
 
-  const reportGroups = matrixToReportGroups(results);
-  await finishReports(reportGroups, args, suite.name, exportOptions);
-}
-
-/** Validate CLI argument combinations */
-function validateArgs(args: DefaultCliArgs): void {
-  if (args["gc-stats"] && !args.worker && !args.url) {
-    throw new Error(
-      "--gc-stats requires worker mode (the default). Remove --no-worker flag.",
+  if (candidate && Array.isArray(candidate.matrices)) {
+    await matrixBenchExports(candidate as MatrixSuite, args);
+  } else if (candidate && Array.isArray(candidate.groups)) {
+    await benchExports(candidate as BenchSuite, args);
+  } else if (typeof candidate === "function") {
+    const name = basename(filePath).replace(/\.[^.]+$/, "");
+    await benchExports(
+      { name, groups: [{ name, benchmarks: [{ name, fn: candidate }] }] },
+      args,
     );
   }
-}
-
-/** Execute all groups in suite */
-async function runSuite(params: SuiteParams): Promise<ReportGroup[]> {
-  const { suite, runner, options, useWorker, batches } = params;
-  return serialMap(suite.groups, g =>
-    runGroup(g, runner, options, useWorker, batches),
-  );
-}
-
-/** Build report sections based on CLI options */
-function buildReportSections(
-  adaptive: boolean,
-  gcStats: boolean,
-  hasOptData: boolean,
-) {
-  return [
-    ...(adaptive ? [adaptiveSection, totalTimeSection] : [timeSection]),
-    ...(gcStats ? [gcStatsSection] : []),
-    ...(hasOptData ? [optSection] : []),
-    runsSection,
-  ];
-}
-
-/** Print heap reports (if enabled) and export results */
-async function finishReports(
-  results: ReportGroup[],
-  args: DefaultCliArgs,
-  suiteName?: string,
-  exportOptions?: MatrixExportOptions,
-): Promise<void> {
-  if (needsAlloc(args)) {
-    printHeapReports(results, cliHeapReportOptions(args));
-  }
-  await exportReports({ results, args, suiteName, ...exportOptions });
-}
-
-/** Warn about Node-only flags that are ignored in browser mode. */
-function warnBrowserFlags(args: DefaultCliArgs): void {
-  const ignored = [
-    !args.worker && "--no-worker",
-    args["trace-opt"] && "--trace-opt",
-    args["gc-force"] && "--gc-force",
-    args.adaptive && "--adaptive",
-    args.batches > 1 && "--batches",
-  ].filter(Boolean);
-  if (ignored.length)
-    console.warn(yellow(`Ignored in browser mode: ${ignored.join(", ")}`));
-}
-
-/** @return true if any alloc-related flag implies allocation sampling */
-function needsAlloc(args: DefaultCliArgs): boolean {
-  return (
-    args.alloc ||
-    args.archive != null ||
-    args["alloc-raw"] ||
-    args["alloc-verbose"] ||
-    args["alloc-user-only"]
-  );
-}
-
-/** @return true if time sampling should be enabled */
-function needsTimeSample(args: DefaultCliArgs): boolean {
-  return args["time-sample"] || !!args["export-time"];
-}
-
-/** Strip surrounding quotes from a chrome arg token.
- *
- * (Needed because --chrome-args values pass through yargs and spawn() without
- * shell processing, so literal quote characters reach Chrome/V8 unrecognized.)
- */
-function stripQuotes(s: string): string {
-  /* (['"]): opening quote; (.*): content; \1: require same closing quote */
-  const unquote = s.replace(/^(['"])(.*)\1$/s, "$2");
-
-  /* value portion: --flag="--value" or --flag='--value'
-     (-[^=]+=): flag name and =; (['"])(.*)\2: quoted value */
-  const valueUnquote = unquote.replace(/^(-[^=]+=)(['"])(.*)\2$/s, "$1$3");
-
-  return valueUnquote;
 }
 
 /** Wrap browser profile result as ReportGroup[] for the standard pipeline */
@@ -575,7 +242,6 @@ function browserResultGroups(
   const base = { name, gcStats, heapProfile, timeProfile, coverage };
   let measured: MeasuredResults;
 
-  // Bench function mode: multiple timing samples with real statistics
   if (result.samples && result.samples.length > 0) {
     const { samples } = result;
     const totalTime = result.wallTimeMs ? result.wallTimeMs / 1000 : undefined;
@@ -586,7 +252,6 @@ function browserResultGroups(
       totalTime,
     };
   } else {
-    // Lap mode: 0 laps = single wall-clock, N laps handled above
     const wallMs = result.wallTimeMs ?? 0;
     const time = {
       min: wallMs,
@@ -625,414 +290,23 @@ function printBrowserReport(
   }
 }
 
-/** Import a file and run it as a benchmark based on what it exports */
-async function fileBenchExports(
-  filePath: string,
-  args: DefaultCliArgs,
-): Promise<void> {
-  const fileUrl = pathToFileURL(resolve(filePath)).href;
-  const mod = await import(fileUrl);
-  const candidate = mod.default;
-
-  if (candidate && Array.isArray(candidate.matrices)) {
-    // MatrixSuite export
-    await matrixBenchExports(candidate as MatrixSuite, args);
-  } else if (candidate && Array.isArray(candidate.groups)) {
-    // BenchSuite export
-    await benchExports(candidate as BenchSuite, args);
-  } else if (typeof candidate === "function") {
-    // Default function export: wrap as a single benchmark
-    const name = basename(filePath).replace(/\.[^.]+$/, "");
-    await benchExports(
-      { name, groups: [{ name, benchmarks: [{ name, fn: candidate }] }] },
-      args,
-    );
-  }
-  // else: self-executing file already ran on import
+/** Warn about Node-only flags that are ignored in browser mode. */
+function warnBrowserFlags(args: DefaultCliArgs): void {
+  const ignored = [
+    !args.worker && "--no-worker",
+    args["trace-opt"] && "--trace-opt",
+    args["gc-force"] && "--gc-force",
+    args.adaptive && "--adaptive",
+    args.batches > 1 && "--batches",
+  ].filter(Boolean);
+  if (ignored.length)
+    console.warn(yellow(`Ignored in browser mode: ${ignored.join(", ")}`));
 }
 
-/** Create options for adaptive mode */
-function createAdaptiveOptions(args: DefaultCliArgs): RunnerOptions {
-  return {
-    minTime: (args["min-time"] ?? 1) * 1000,
-    maxTime: defaultAdaptiveMaxTime * 1000,
-    targetConfidence: args.convergence,
-    adaptive: true,
-    ...cliCommonOptions(args),
-  } as any;
+/** Strip surrounding quotes from a chrome arg token. */
+function stripQuotes(s: string): string {
+  const unquote = s.replace(/^(['"])(.*)\1$/s, "$2");
+  const valueUnquote = unquote.replace(/^(-[^=]+=)(['"])(.*)\2$/s, "$1$3");
+  return valueUnquote;
 }
 
-/** Runner/matrix options shared across all CLI modes */
-function cliCommonOptions(args: DefaultCliArgs) {
-  const { warmup } = args;
-  const { "gc-force": gcForce, "gc-stats": gcStats } = args;
-  const { "trace-opt": traceOpt, "skip-settle": noSettle } = args;
-  const { "pause-first": pauseFirst, "pause-interval": pauseInterval } = args;
-  const { "pause-duration": pauseDuration } = args;
-  const { "alloc-interval": allocInterval, "alloc-depth": allocDepth } = args;
-  const { "time-interval": timeInterval, "call-counts": callCounts } = args;
-  const alloc = needsAlloc(args);
-  const timeSample = needsTimeSample(args);
-  return {
-    gcForce,
-    warmup,
-    traceOpt,
-    noSettle,
-    pauseFirst,
-    pauseInterval,
-    pauseDuration,
-    gcStats,
-    alloc,
-    allocInterval,
-    allocDepth,
-    timeSample,
-    timeInterval,
-    callCounts,
-  };
-}
-
-/** Write JSON, Perfetto, and time profile files if requested by CLI args */
-function exportFileFormats(
-  results: ReportGroup[],
-  args: DefaultCliArgs,
-  suiteName?: string,
-): void {
-  if (args["export-json"])
-    exportBenchmarkJson(results, args["export-json"], args, suiteName);
-  if (args["export-perfetto"])
-    exportPerfettoTrace(results, args["export-perfetto"], args);
-  if (args["export-time"]) exportTimeProfile(results, args["export-time"]);
-}
-
-/** Annotate speedscope frame names with coverage counts if available */
-async function annotateCoverage(
-  results: ReportGroup[],
-  profileFile?: {
-    shared: { frames: { name: string; file?: string; line?: number }[] };
-  },
-  timeProfileFile?: {
-    shared: { frames: { name: string; file?: string; line?: number }[] };
-  },
-): Promise<void> {
-  const coverage = mergeCoverage(results);
-  if (!coverage) return;
-  if (!profileFile && !timeProfileFile) return;
-
-  // Collect sources keyed by coverage script URLs for offset→line resolution
-  const coverageUrls = coverage.scripts.map(s => ({ file: s.url }));
-  const sources = await collectSources(coverageUrls);
-  const coverageResult = buildCoverageMap(coverage, sources);
-  if (profileFile)
-    annotateFramesWithCounts(profileFile.shared.frames, coverageResult);
-  if (timeProfileFile)
-    annotateFramesWithCounts(timeProfileFile.shared.frames, coverageResult);
-}
-
-/** Start viewer server with profile data and block until Ctrl+C */
-async function openViewer(
-  profileFile: ReturnType<typeof buildSpeedscopeFile>,
-  timeProfileData: string | undefined,
-  reportData: ReportData | undefined,
-  args: DefaultCliArgs,
-): Promise<void> {
-  const profileData = profileFile ? JSON.stringify(profileFile) : undefined;
-  const viewer = await startViewerServer({
-    profileData,
-    timeProfileData,
-    reportData: reportData ? JSON.stringify(reportData) : undefined,
-    editorUri: resolveEditorUri(args.editor),
-  });
-  await waitForCtrlC();
-  viewer.close();
-}
-
-/** Apply default sections and extra columns for matrix reports */
-function mergeMatrixDefaults(
-  reportOptions: MatrixReportOptions | undefined,
-  args: DefaultCliArgs,
-  results: MatrixResults[],
-): MatrixReportOptions {
-  const result: MatrixReportOptions = { ...reportOptions };
-
-  if (!result.sections?.length) {
-    const groups = matrixToReportGroups(results);
-    result.sections = buildReportSections(
-      args.adaptive,
-      args["gc-stats"],
-      args["trace-opt"] && hasField(groups, "optStatus"),
-    );
-  }
-
-  return result;
-}
-
-/** Execute group with shared setup, optionally batching to reduce ordering bias */
-async function runGroup(
-  group: BenchGroup,
-  runner: KnownRunner,
-  options: RunnerOptions,
-  useWorker: boolean,
-  batches = 1,
-): Promise<ReportGroup> {
-  const { name, benchmarks, baseline, setup, metadata } = group;
-  const setupParams = await setup?.();
-  validateBenchmarkParameters(group);
-
-  const runParams = {
-    runner,
-    options,
-    useWorker,
-    params: setupParams,
-    metadata,
-  };
-  if (batches === 1) {
-    return runSingleBatch(name, benchmarks, baseline, runParams);
-  }
-  return runMultipleBatches(name, benchmarks, baseline, runParams, batches);
-}
-
-/** @return HeapReportOptions from CLI args */
-function cliHeapReportOptions(args: DefaultCliArgs): HeapReportOptions {
-  return {
-    topN: args["alloc-rows"],
-    stackDepth: args["alloc-stack"],
-    verbose: args["alloc-verbose"],
-    raw: args["alloc-raw"],
-    userOnly: args["alloc-user-only"],
-  };
-}
-
-/** Export the first raw V8 TimeProfile to a JSON file */
-function exportTimeProfile(results: ReportGroup[], path: string): void {
-  const profile = findTimeProfile(results);
-  if (profile) {
-    const absPath = resolve(path);
-    writeFileSync(absPath, JSON.stringify(profile));
-    console.log(`Time profile exported to: ${path}`);
-  } else {
-    console.log("No time profiles to export.");
-  }
-}
-
-/** Build combined time profile SpeedScope file from all results */
-function buildAllTimeProfiles(results: ReportGroup[]) {
-  type TP = import("../profiling/node/TimeSampler.ts").TimeProfile;
-  const entries = results.flatMap(group =>
-    groupReports(group)
-      .filter(r => r.measuredResults.timeProfile)
-      .map(r => ({
-        name: r.name,
-        profile: r.measuredResults.timeProfile as TP,
-      })),
-  );
-  return buildTimeSpeedscopeFile(entries);
-}
-
-/** Merge coverage data from all results into a single CoverageData */
-function mergeCoverage(
-  results: ReportGroup[],
-): import("../profiling/node/CoverageTypes.ts").CoverageData | undefined {
-  const scripts = results.flatMap(group =>
-    groupReports(group).flatMap(r => r.measuredResults.coverage?.scripts ?? []),
-  );
-  return scripts.length > 0 ? { scripts } : undefined;
-}
-
-/** Warn if parameterized benchmarks lack setup */
-function validateBenchmarkParameters(group: BenchGroup): void {
-  if (group.setup) return;
-
-  const allBenchmarks = group.baseline
-    ? [...group.benchmarks, group.baseline]
-    : group.benchmarks;
-
-  for (const bench of allBenchmarks) {
-    if (bench.fn.length > 0) {
-      console.warn(
-        `Benchmark "${bench.name}" in group "${group.name}" expects parameters but no setup() provided.`,
-      );
-    }
-  }
-}
-
-/** Run benchmarks in a single batch */
-async function runSingleBatch(
-  name: string,
-  benchmarks: BenchmarkSpec[],
-  baseline: BenchmarkSpec | undefined,
-  runParams: RunParams,
-): Promise<ReportGroup> {
-  const baselineReport = baseline
-    ? await runSingleBenchmark(baseline, runParams)
-    : undefined;
-  const reports = await serialMap(benchmarks, b =>
-    runSingleBenchmark(b, runParams),
-  );
-  return { name, reports, baseline: baselineReport };
-}
-
-/** Run benchmarks in multiple batches, alternating order to reduce bias */
-async function runMultipleBatches(
-  name: string,
-  benchmarks: BenchmarkSpec[],
-  baseline: BenchmarkSpec | undefined,
-  runParams: RunParams,
-  batches: number,
-): Promise<ReportGroup> {
-  const timePerBatch = (runParams.options.maxTime || 5000) / batches;
-  const batchParams = {
-    ...runParams,
-    options: { ...runParams.options, maxTime: timePerBatch },
-  };
-  const baselineBatches: MeasuredResults[] = [];
-  const benchmarkBatches = new Map<string, MeasuredResults[]>();
-
-  for (let i = 0; i < batches; i++) {
-    const reverseOrder = i % 2 === 1;
-    await runBatchIteration(
-      benchmarks,
-      baseline,
-      batchParams,
-      reverseOrder,
-      baselineBatches,
-      benchmarkBatches,
-    );
-  }
-
-  const meta = runParams.metadata;
-  return mergeBatchResults(
-    name,
-    benchmarks,
-    baseline,
-    baselineBatches,
-    benchmarkBatches,
-    meta,
-  );
-}
-
-/** Find the first raw V8 TimeProfile in results */
-function findTimeProfile(
-  results: ReportGroup[],
-): import("../profiling/node/TimeSampler.ts").TimeProfile | undefined {
-  const reports = results.flatMap(g => groupReports(g));
-  return reports.find(r => r.measuredResults.timeProfile)?.measuredResults
-    .timeProfile;
-}
-
-/** Run single benchmark and create report */
-async function runSingleBenchmark(
-  spec: BenchmarkSpec,
-  runParams: RunParams,
-): Promise<BenchmarkReport> {
-  const { runner, options, useWorker, params, metadata } = runParams;
-  const benchmarkParams = { spec, runner, options, useWorker, params };
-  const [result] = await runBenchmark(benchmarkParams);
-  return { name: spec.name, measuredResults: result, metadata };
-}
-
-/** Sequential map - like Promise.all(arr.map(fn)) but runs one at a time */
-async function serialMap<T, R>(
-  arr: T[],
-  fn: (item: T) => Promise<R>,
-): Promise<R[]> {
-  const results: R[] = [];
-  for (const item of arr) {
-    results.push(await fn(item));
-  }
-  return results;
-}
-
-/** Run one batch iteration in either order */
-async function runBatchIteration(
-  benchmarks: BenchmarkSpec[],
-  baseline: BenchmarkSpec | undefined,
-  runParams: RunParams,
-  reverseOrder: boolean,
-  baselineBatches: MeasuredResults[],
-  benchmarkBatches: Map<string, MeasuredResults[]>,
-): Promise<void> {
-  const runBaseline = async () => {
-    if (baseline) {
-      const r = await runSingleBenchmark(baseline, runParams);
-      baselineBatches.push(r.measuredResults);
-    }
-  };
-  const runBenches = async () => {
-    for (const b of benchmarks) {
-      const r = await runSingleBenchmark(b, runParams);
-      appendToMap(benchmarkBatches, b.name, r.measuredResults);
-    }
-  };
-
-  if (reverseOrder) {
-    await runBenches();
-    await runBaseline();
-  } else {
-    await runBaseline();
-    await runBenches();
-  }
-}
-
-/** Merge batch results into final ReportGroup */
-function mergeBatchResults(
-  name: string,
-  benchmarks: BenchmarkSpec[],
-  baseline: BenchmarkSpec | undefined,
-  baselineBatches: MeasuredResults[],
-  benchmarkBatches: Map<string, MeasuredResults[]>,
-  metadata?: Record<string, unknown>,
-): ReportGroup {
-  const mergedBaseline = baseline
-    ? {
-        name: baseline.name,
-        measuredResults: mergeResults(baselineBatches),
-        metadata,
-      }
-    : undefined;
-  const reports = benchmarks.map(b => ({
-    name: b.name,
-    measuredResults: mergeResults(benchmarkBatches.get(b.name) || []),
-    metadata,
-  }));
-  return { name, reports, baseline: mergedBaseline };
-}
-
-function appendToMap(
-  map: Map<string, MeasuredResults[]>,
-  key: string,
-  value: MeasuredResults,
-) {
-  if (!map.has(key)) map.set(key, []);
-  map.get(key)!.push(value);
-}
-
-/** Merge multiple batch results into a single MeasuredResults */
-function mergeResults(results: MeasuredResults[]): MeasuredResults {
-  if (results.length === 0) {
-    throw new Error("Cannot merge empty results array");
-  }
-  if (results.length === 1) return results[0];
-
-  const allSamples = results.flatMap(r => r.samples);
-  const allWarmup = results.flatMap(r => r.warmupSamples || []);
-  const time = computeStats(allSamples);
-
-  let offset = 0;
-  const allPausePoints = results.flatMap(r => {
-    const pts = (r.pausePoints ?? []).map(p => ({
-      sampleIndex: p.sampleIndex + offset,
-      durationMs: p.durationMs,
-    }));
-    offset += r.samples.length;
-    return pts;
-  });
-
-  return {
-    name: results[0].name,
-    samples: allSamples,
-    warmupSamples: allWarmup.length ? allWarmup : undefined,
-    time,
-    totalTime: results.reduce((sum, r) => sum + (r.totalTime || 0), 0),
-    pausePoints: allPausePoints.length ? allPausePoints : undefined,
-  };
-}
