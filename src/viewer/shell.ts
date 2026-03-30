@@ -1,4 +1,11 @@
-import { createHighlighter, type HighlighterGeneric } from "shiki";
+import { createHighlighterCore, type HighlighterCore } from "shiki/core";
+import langCss from "shiki/dist/langs/css.mjs";
+import langHtml from "shiki/dist/langs/html.mjs";
+import langJs from "shiki/dist/langs/javascript.mjs";
+import langTs from "shiki/dist/langs/typescript.mjs";
+import themeDark from "shiki/dist/themes/github-dark.mjs";
+import themeLight from "shiki/dist/themes/github-light.mjs";
+import { createJavaScriptRegexEngine } from "shiki/engine/javascript";
 
 // ─── Types ─────────────────────────────────────────────────
 
@@ -165,12 +172,13 @@ const sourceTabs = new Map<string, SourceTabData>();
 // ─── Shiki (lazy singleton) ───────────────────────────────
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-let highlighterPromise: Promise<HighlighterGeneric<any, any>> | undefined;
+let highlighterPromise: Promise<HighlighterCore> | undefined;
 
 function getHighlighter() {
-  highlighterPromise ??= createHighlighter({
-    themes: ["github-light", "github-dark"],
-    langs: ["javascript", "typescript"],
+  highlighterPromise ??= createHighlighterCore({
+    themes: [themeLight, themeDark],
+    langs: [langJs, langTs, langCss, langHtml],
+    engine: createJavaScriptRegexEngine(),
   });
   return highlighterPromise;
 }
