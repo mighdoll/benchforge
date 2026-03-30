@@ -21,7 +21,9 @@ export interface DataProvider {
   readonly config: ViewerConfig;
   fetchReportData(): Promise<unknown>;
   fetchSource(url: string): Promise<string>;
-  speedscopeHash(type: "alloc" | "time"): string | null;
+  // LATER once we replace the speedscope iframe with an integrated viewer,
+  // we can pass profile data directly instead of returning URLs.
+  profileUrl(type: "alloc" | "time"): string | null;
   createArchive(): Promise<{ blob: Blob; filename: string }>;
 }
 
@@ -49,15 +51,11 @@ export class ServerProvider implements DataProvider {
     return resp.text();
   }
 
-  speedscopeHash(type: "alloc" | "time"): string | null {
+  profileUrl(type: "alloc" | "time"): string | null {
     const has =
       type === "alloc" ? this.config.hasProfile : this.config.hasTimeProfile;
     if (!has) return null;
-    const url = type === "alloc" ? "/api/profile" : "/api/profile/time";
-    const parts = ["profileURL=" + url];
-    if (this.config.editorUri)
-      parts.push("editorUri=" + encodeURIComponent(this.config.editorUri));
-    return parts.join("&");
+    return type === "alloc" ? "/api/profile" : "/api/profile/time";
   }
 
   async createArchive(): Promise<{ blob: Blob; filename: string }> {
@@ -97,7 +95,7 @@ export class ArchiveProvider implements DataProvider {
     return source;
   }
 
-  speedscopeHash(type: "alloc" | "time"): string | null {
+  profileUrl(type: "alloc" | "time"): string | null {
     const data =
       type === "alloc" ? this.archive.profile : this.archive.timeProfile;
     if (!data) return null;
@@ -108,7 +106,7 @@ export class ArchiveProvider implements DataProvider {
       );
       this.blobUrls.set(type, url);
     }
-    return "profileURL=" + encodeURIComponent(url);
+    return url;
   }
 
   async createArchive(): Promise<{ blob: Blob; filename: string }> {

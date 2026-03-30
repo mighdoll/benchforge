@@ -1,6 +1,6 @@
 import { archiveProfile } from "./Archive.ts";
 import { loadArchiveFromUrl, showDropZone } from "./DropZone.ts";
-import type { ArchiveData, DataProvider } from "./Providers.ts";
+import type { ArchiveData, DataProvider, ViewerConfig } from "./Providers.ts";
 import { ArchiveProvider, ServerProvider } from "./Providers.ts";
 import type { ReportData } from "./ReportData.ts";
 import { loadSummary } from "./ReportTab.ts";
@@ -43,10 +43,10 @@ async function initViewer(p: DataProvider): Promise<void> {
   allocTab.disabled = !config.hasProfile;
   timeTab.disabled = !config.hasTimeProfile;
 
-  const allocHash = p.speedscopeHash("alloc");
-  if (allocHash) iframe.src = "speedscope/#" + allocHash;
-  const timeHash = p.speedscopeHash("time");
-  if (timeHash) timeIframe.src = "speedscope/#" + timeHash;
+  const allocUrl = p.profileUrl("alloc");
+  if (allocUrl) iframe.src = "speedscope/#" + speedscopeHash(allocUrl, config);
+  const timeUrl = p.profileUrl("time");
+  if (timeUrl) timeIframe.src = "speedscope/#" + speedscopeHash(timeUrl, config);
 
   if (config.hasReport) {
     activateTab("summary");
@@ -59,6 +59,13 @@ async function initViewer(p: DataProvider): Promise<void> {
   } else if (config.hasTimeProfile) {
     activateTab("time-flamechart");
   }
+}
+
+function speedscopeHash(profileUrl: string, config: ViewerConfig): string {
+  const parts = ["profileURL=" + encodeURIComponent(profileUrl)];
+  if (config.editorUri)
+    parts.push("editorUri=" + encodeURIComponent(config.editorUri));
+  return parts.join("&");
 }
 
 async function main(): Promise<void> {
