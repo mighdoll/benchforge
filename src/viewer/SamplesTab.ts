@@ -23,6 +23,7 @@ export function hasSufficientSamples(data: ReportData): boolean {
   );
 }
 
+/** Build the HTML scaffold for a group's time-series and histogram plots. */
 function buildSamplesGroupHtml(
   group: ReportData["groups"][0],
   i: number,

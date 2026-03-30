@@ -47,6 +47,7 @@ export async function loadSummary(
   }
 }
 
+/** Render the header bar with CLI args, generation date, and git version info. */
 function buildReportHeader(metadata: Record<string, unknown>): string {
   const args = metadata.cliArgs as Record<string, unknown> | undefined;
   const cliArgs = formatCliArgs(args);
@@ -74,6 +75,7 @@ function buildSummaryGroupHtml(group: BenchmarkGroup, i: number): string {
   </div>`;
 }
 
+/** Reconstruct a display-friendly CLI invocation, hiding default and internal args. */
 function formatCliArgs(args?: Record<string, unknown>): string {
   if (!args) return "benchforge";
   const flags = Object.entries(args)
@@ -99,6 +101,7 @@ function formatVersionInfo(metadata: Record<string, unknown>): string {
   return `<div class="version-info">${parts.join(" | ")}</div>`;
 }
 
+/** Render a faster/slower/inconclusive badge with a CI plot container, if comparison data exists. */
 function comparisonBadge(group: BenchmarkGroup, i: number): string {
   const ci = group.benchmarks[0]?.comparisonCI;
   if (!ci) return "";
@@ -111,6 +114,7 @@ function comparisonBadge(group: BenchmarkGroup, i: number): string {
     <div id="ci-plot-${i}" class="ci-plot-container"></div>`;
 }
 
+/** Format a time difference as a human-readable relative string ("3h ago", "yesterday"). */
 function relativeDate(diffMs: number, date: string): string {
   const mins = Math.floor(diffMs / 60000);
   if (mins < 1) return "just now";
@@ -126,6 +130,7 @@ function relativeDate(diffMs: number, date: string): string {
   });
 }
 
+/** Format a git version as "hash (relative-date)", appending "*" if dirty. */
 function formatVersion(v: VersionInfo): string {
   if (!v || v.hash === "unknown") return "unknown";
   const hash = v.dirty ? v.hash + "*" : v.hash;

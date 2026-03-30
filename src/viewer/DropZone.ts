@@ -63,6 +63,7 @@ export async function loadArchiveFromUrl(
   }
 }
 
+/** Parse a dropped/selected file and initialize the viewer with an ArchiveProvider. */
 async function loadArchiveFile(
   file: File,
   zone: HTMLElement,

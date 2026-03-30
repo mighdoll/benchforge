@@ -103,6 +103,7 @@ function buildBarData(allSamples: Sample[], benchmarkNames: string[]) {
   return { barData, binMin, binMax, yMax };
 }
 
+/** Map benchmark names to colors and legend items using Observable 10 palette */
 function buildColorData(benchmarkNames: string[]) {
   const scheme = (d3 as any).schemeObservable10;
   const colorMap = new Map(

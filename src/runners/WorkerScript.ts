@@ -19,17 +19,26 @@ export interface RunMessage {
   spec: BenchmarkSpec;
   runnerName: KnownRunner;
   options: RunnerOptions;
-  fnCode?: string; // Made optional - either fnCode or modulePath is required
-  modulePath?: string; // Path to module for dynamic import
-  exportName?: string; // Export name from module
-  setupExportName?: string; // Setup function export name - called once, result passed to fn
+  /** Serialized function body (mutually exclusive with modulePath) */
+  fnCode?: string;
+  /** Module to import for the benchmark function */
+  modulePath?: string;
+  /** Named export from the module (defaults to default export) */
+  exportName?: string;
+  /** Setup function export: called once, result passed as params to fn */
+  setupExportName?: string;
   params?: unknown;
-  // Variant directory mode (BenchMatrix)
-  variantDir?: string; // Directory URL containing variant .ts files
-  variantId?: string; // Variant filename (without .ts)
-  caseData?: unknown; // Data to pass to variant
-  caseId?: string; // Case identifier
-  casesModule?: string; // URL to cases module (exports cases[] and loadCase())
+
+  /** Directory URL containing variant .ts files (BenchMatrix mode) */
+  variantDir?: string;
+  /** Variant filename without .ts extension */
+  variantId?: string;
+  /** Data to pass to variant function */
+  caseData?: unknown;
+  /** Case identifier */
+  caseId?: string;
+  /** URL to cases module (exports cases[] and loadCase()) */
+  casesModule?: string;
 }
 
 /** Message returned from worker process with benchmark results. */

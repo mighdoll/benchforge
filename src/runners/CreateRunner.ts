@@ -3,7 +3,7 @@ import type { BenchRunner } from "./BenchRunner.ts";
 
 export type KnownRunner = "basic";
 
-/** @return benchmark runner */
+/** Create a benchmark runner by name. */
 export async function createRunner(
   _runnerName: KnownRunner,
 ): Promise<BenchRunner> {

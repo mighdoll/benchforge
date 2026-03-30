@@ -8,6 +8,7 @@ import { runBenchLoop } from "./BenchLoop.ts";
 import { collectTracing, startGcTracing } from "./BrowserCDP.ts";
 import { setupLapMode } from "./LapMode.ts";
 
+/** Options for a browser benchmark run (profiling, GC, iteration limits). */
 export interface BrowserProfileParams {
   url: string;
   alloc?: boolean;
@@ -23,6 +24,7 @@ export interface BrowserProfileParams {
   maxIterations?: number; // exact iteration count (bench function mode)
 }
 
+/** Collected profiles, timing samples, and GC stats from a browser benchmark. */
 export interface BrowserProfileResult {
   heapProfile?: HeapProfile;
   timeProfile?: TimeProfile;
@@ -34,9 +36,12 @@ export interface BrowserProfileResult {
   samples?: number[];
 }
 
-/** Run browser benchmark, auto-detecting page API mode.
- *  Bench function (window.__bench): CLI controls iteration and timing.
- *  Lap mode (__start/__lap/__done): page controls the measured region. */
+/**
+ * Run browser benchmark, auto-detecting bench function vs lap mode.
+ *
+ * Bench function (window.__bench): CLI controls iteration and timing.
+ * Lap mode (__start/__lap/__done): page controls the measured region.
+ */
 export async function profileBrowser(
   params: BrowserProfileParams,
 ): Promise<BrowserProfileResult> {

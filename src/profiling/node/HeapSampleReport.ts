@@ -74,7 +74,7 @@ export function flattenProfile(resolved: ResolvedProfile): HeapSite[] {
   return sites.sort((a, b) => b.bytes - a.bytes);
 }
 
-/** Check if site is user code (not node internals) */
+/** Return true if the call frame is user code (excludes node: and internal/ URLs) */
 export function isNodeUserCode(site: CallFrame): boolean {
   const { url } = site;
   if (!url) return false;
@@ -85,7 +85,7 @@ export function isNodeUserCode(site: CallFrame): boolean {
   );
 }
 
-/** Check if site is user code (not browser internals) */
+/** Return true if the call frame is user code (excludes chrome-extension:// and devtools:// URLs) */
 export function isBrowserUserCode(site: CallFrame): boolean {
   const { url } = site;
   if (!url) return false;
@@ -96,7 +96,7 @@ export function isBrowserUserCode(site: CallFrame): boolean {
   );
 }
 
-/** Filter sites to user code only */
+/** Return only sites matching a user-code predicate (default: {@link isNodeUserCode}) */
 export function filterSites(
   sites: HeapSite[],
   isUser: UserCodeFilter = isNodeUserCode,
@@ -163,7 +163,7 @@ export function formatHeapReport(
   return lines.join("\n");
 }
 
-/** Get total bytes from sites */
+/** Sum bytes across all sites */
 export function totalBytes(sites: HeapSite[]): number {
   return sites.reduce((sum, s) => sum + s.bytes, 0);
 }

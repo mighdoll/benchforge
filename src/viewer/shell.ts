@@ -23,6 +23,7 @@ let provider: DataProvider;
 let reportData: ReportData | null = null;
 let samplesLoaded = false;
 
+/** Initialize the viewer with a data provider: configure tabs, load iframes, and fetch report data. */
 async function initViewer(p: DataProvider): Promise<void> {
   provider = p;
   reportData = null;
@@ -53,6 +54,7 @@ async function initViewer(p: DataProvider): Promise<void> {
   }
 }
 
+/** Build the URL hash fragment for the speedscope iframe (profile URL + optional editor URI). */
 function speedscopeHash(url: string, config: ViewerConfig): string {
   const parts = ["profileURL=" + encodeURIComponent(url)];
   if (config.editorUri)
@@ -60,6 +62,7 @@ function speedscopeHash(url: string, config: ViewerConfig): string {
   return parts.join("&");
 }
 
+/** Entry point: resolve data provider from URL param, preloaded archive, server, or drop zone. */
 async function main(): Promise<void> {
   const params = new URLSearchParams(window.location.search);
   const archiveUrl = params.get("url");

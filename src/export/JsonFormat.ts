@@ -13,17 +13,20 @@ export interface BenchmarkJsonData {
   suites: BenchmarkSuite[];
 }
 
+/** Named collection of benchmark groups within a single run */
 export interface BenchmarkSuite {
   name: string;
   groups: BenchmarkGroup[];
 }
 
+/** Group of benchmarks with an optional baseline for comparison */
 export interface BenchmarkGroup {
   name: string;
   baseline?: BenchmarkResult;
   benchmarks: BenchmarkResult[];
 }
 
+/** Individual benchmark result with timing stats, optional metrics, and adaptive info */
 export interface BenchmarkResult {
   name: string;
   status: "completed" | "running" | "failed";

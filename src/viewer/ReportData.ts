@@ -14,6 +14,7 @@ export interface ReportData {
   };
 }
 
+/** A named group of benchmarks, optionally compared against a baseline. */
 export interface BenchmarkGroup {
   name: string;
   baseline?: BenchmarkEntry;
@@ -36,6 +37,7 @@ export interface BenchmarkEntry {
   comparisonCI?: DifferenceCI;
 }
 
+/** Summary percentile statistics for a benchmark's samples. */
 export interface BenchmarkStats {
   min: number;
   max: number;
@@ -46,17 +48,20 @@ export interface BenchmarkStats {
   p999: number;
 }
 
+/** A labeled value displayed in a report section card. */
 export interface SectionStat {
   label: string;
   value: string;
   groupTitle?: string;
 }
 
+/** A garbage collection event with timing relative to the benchmark start. */
 export interface GcEvent {
   offset: number;
   duration: number;
 }
 
+/** Marks a sample where adaptive sampling paused for convergence analysis. */
 export interface PausePoint {
   sampleIndex: number;
   durationMs: number;

@@ -264,6 +264,7 @@ async function resolveCases<T>(
   return { casesModule, caseIds };
 }
 
+/** Convert matrix options to runner options */
 function buildRunnerOptions(options: RunMatrixOptions): RunnerOptions {
   return {
     maxIterations: options.iterations,

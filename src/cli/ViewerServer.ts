@@ -99,6 +99,7 @@ export async function viewArchive(filePath: string): Promise<void> {
   });
 }
 
+/** Build HTTP request handler with API routes and static asset fallback */
 function createRequestHandler(
   ctx: ViewerServerOptions,
   sourceCache: Map<string, string>,
@@ -156,6 +157,7 @@ function createRequestHandler(
   };
 }
 
+/** Listen on port, retrying on next port if EADDRINUSE */
 function tryListen(
   server: Server,
   port: number,

@@ -81,6 +81,7 @@ import {
 import { filterBenchmarks } from "./FilterBenchmarks.ts";
 import { startViewerServer } from "./ViewerServer.ts";
 
+/** Options for exporting benchmark results to various formats */
 export interface ExportOptions {
   results: ReportGroup[];
   args: DefaultCliArgs;
@@ -90,6 +91,7 @@ export interface ExportOptions {
   baselineVersion?: GitVersion;
 }
 
+/** Export options specific to matrix benchmarks (no results/args — uses MatrixResults) */
 export interface MatrixExportOptions {
   sections?: any[];
   currentVersion?: GitVersion;
@@ -330,7 +332,6 @@ export async function exportReports(options: ExportOptions): Promise<void> {
   const { results, args, sections, suiteName } = options;
   const { currentVersion, baselineVersion } = options;
 
-  // Prepare report data (needed for --view and --archive)
   const needsReportData = args.view || args.archive != null;
   const reportData = needsReportData
     ? prepareHtmlData(results, {
@@ -343,7 +344,6 @@ export async function exportReports(options: ExportOptions): Promise<void> {
 
   exportFileFormats(results, args, suiteName);
 
-  // Build speedscope files and annotate with coverage if available
   const profileFile = buildSpeedscopeFile(results);
   const timeProfileFile = buildAllTimeProfiles(results);
   await annotateCoverage(results, profileFile, timeProfileFile);
@@ -699,6 +699,7 @@ function cliCommonOptions(args: DefaultCliArgs) {
   };
 }
 
+/** Write JSON, Perfetto, and time profile files if requested by CLI args */
 function exportFileFormats(
   results: ReportGroup[],
   args: DefaultCliArgs,
@@ -735,6 +736,7 @@ async function annotateCoverage(
     annotateFramesWithCounts(timeProfileFile.shared.frames, coverageResult);
 }
 
+/** Start viewer server with profile data and block until Ctrl+C */
 async function openViewer(
   profileFile: ReturnType<typeof buildSpeedscopeFile>,
   timeProfileData: string | undefined,

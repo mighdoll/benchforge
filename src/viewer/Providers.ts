@@ -31,6 +31,7 @@ export interface DataProvider {
 export class ServerProvider implements DataProvider {
   constructor(readonly config: ViewerConfig) {}
 
+  /** Fetch the server config and return a ready-to-use provider. */
   static async create(): Promise<ServerProvider> {
     const resp = await fetch("/api/config");
     return new ServerProvider(await resp.json());
@@ -90,6 +91,7 @@ export class ArchiveProvider implements DataProvider {
     return source;
   }
 
+  /** Return a blob URL for the profile, lazily created and cached. */
   profileUrl(type: "alloc" | "time"): string | null {
     const isAlloc = type === "alloc";
     const data = isAlloc ? this.archive.profile : this.archive.timeProfile;

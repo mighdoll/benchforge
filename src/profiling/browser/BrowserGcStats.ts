@@ -37,6 +37,7 @@ export function browserGcStats(traceEvents: TraceEvent[]): GcStats {
   return aggregateGcStats(parseGcTraceEvents(traceEvents));
 }
 
+/** Map CDP trace event names to GcEvent types. */
 function gcType(name: string): GcEvent["type"] | undefined {
   if (name === "MinorGC") return "scavenge";
   if (name === "MajorGC") return "mark-compact";

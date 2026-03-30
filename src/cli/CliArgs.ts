@@ -135,6 +135,7 @@ export function parseCliArgs<T = DefaultCliArgs>(
   return yargsInstance.parseSync() as T;
 }
 
+/** Assign options to their labeled groups in yargs help output */
 function applyGroups(y: Argv): Argv {
   return Object.entries(optionGroups).reduce(
     (acc, [label, keys]) => acc.group(keys as unknown as string[], label),

@@ -188,6 +188,7 @@ function normalizeTimestamps(events: TraceEvent[]): void {
   for (const e of events) if (e.ts > 0) e.ts -= min;
 }
 
+/** Create a thread-scoped instant event */
 function instant(
   ts: number,
   name: string,
@@ -196,6 +197,7 @@ function instant(
   return { ph: "i", ts, pid, tid, cat: "bench", name, s: "t", args };
 }
 
+/** Create a counter event (shown as a time-series chart in Perfetto) */
 function counter(
   ts: number,
   name: string,

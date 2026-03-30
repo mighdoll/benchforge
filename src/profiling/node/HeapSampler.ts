@@ -113,8 +113,8 @@ async function startSampling(
   }
 }
 
+/** Stop heap sampling and return the profile, casting past incomplete @types/node typings */
 async function stopSampling(session: Session): Promise<HeapProfile> {
   const { profile } = await session.post("HeapProfiler.stopSampling");
-  // V8 returns id/samples fields not in @types/node's incomplete SamplingHeapProfile
   return profile as unknown as HeapProfile;
 }

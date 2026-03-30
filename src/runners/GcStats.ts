@@ -1,6 +1,7 @@
-/** GC statistics aggregated from V8 trace events.
- *  Node (--trace-gc-nvp) provides all fields.
- *  Browser (CDP Tracing) provides counts, collected, and pause only. */
+/**
+ * Aggregated GC statistics from V8 trace events.
+ * Node (--trace-gc-nvp) provides all fields; browser (CDP) provides counts, collected, and pause only.
+ */
 export interface GcStats {
   scavenges: number;
   markCompacts: number;
@@ -21,9 +22,8 @@ export interface GcEvent {
   survived?: number; // Node only
 }
 
-/** Parse a single --trace-gc-nvp stderr line */
+/** Parse a single --trace-gc-nvp stderr line into a GcEvent. */
 export function parseGcLine(line: string): GcEvent | undefined {
-  // V8 format: [pid:addr:gen] N ms: pause=X gc=s ... allocated=N promoted=N ...
   if (!line.includes("pause=")) return undefined;
 
   const fields = parseNvpFields(line);
@@ -38,7 +38,6 @@ export function parseGcLine(line: string): GcEvent | undefined {
   const promoted = int("promoted");
   // V8 uses "new_space_survived" not "survived"
   const survived = int("new_space_survived") || int("survived");
-  // Calculate collected from start/end object size if available
   const start = int("start_object_size");
   const end = int("end_object_size");
   const collected = start > end ? start - end : 0;
@@ -46,7 +45,7 @@ export function parseGcLine(line: string): GcEvent | undefined {
   return { type, pauseMs, allocated, collected, promoted, survived };
 }
 
-/** Aggregate GC events into summary stats */
+/** Aggregate a list of GC events into summary statistics. */
 export function aggregateGcStats(events: GcEvent[]): GcStats {
   let scavenges = 0;
   let markCompacts = 0;
@@ -79,19 +78,18 @@ export function aggregateGcStats(events: GcEvent[]): GcStats {
   };
 }
 
-/** @return GcStats with all counters zeroed */
+/** Create a GcStats with all counters zeroed. */
 export function emptyGcStats(): GcStats {
   return { scavenges: 0, markCompacts: 0, totalCollected: 0, gcPauseTime: 0 };
 }
 
-/** Parse name=value pairs from trace-gc-nvp line */
+/** Parse name=value pairs from a trace-gc-nvp line. */
 function parseNvpFields(line: string): Record<string, string> {
-  // Format: "key=value, key=value, ..." or "key=value key=value"
   const pairs = [...line.matchAll(/(\w+)=([^\s,]+)/g)];
   return Object.fromEntries(pairs.map(([, k, v]) => [k, v]));
 }
 
-/** Map V8 gc type codes to our types */
+/** Map V8 gc type codes to normalized event types. */
 function parseGcType(gcField: string): GcEvent["type"] {
   // V8 uses: s=scavenge, mc=mark-compact, mmc=minor-mc (young gen mark-compact)
   if (gcField === "s" || gcField === "scavenge") return "scavenge";

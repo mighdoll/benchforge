@@ -58,6 +58,7 @@ export function annotateFramesWithCounts(
   }
 }
 
+/** Extract per-function coverage entries from a single script */
 function processScript(
   script: CoverageData["scripts"][number],
   sources: Record<string, string>,
@@ -142,6 +143,7 @@ function offsetToLine(offset: number, lineOffsets: number[]): number {
   return lo + 1; // 1-indexed
 }
 
+/** Find the entry whose startLine is closest to the given line */
 function closestByLine(
   entries: LineCoverage[],
   line: number,

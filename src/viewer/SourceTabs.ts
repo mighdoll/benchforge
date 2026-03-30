@@ -95,6 +95,7 @@ function tabLabelHtml(file: string, line: number): string {
   );
 }
 
+/** Fetch source code, syntax-highlight it, and scroll to the target line. */
 async function updateSourcePanel(
   tabData: SourceTabData,
   file: string,
@@ -146,6 +147,7 @@ async function updateSourcePanel(
   }
 }
 
+/** Lazily create and cache the shiki syntax highlighter. */
 function getHighlighter(): Promise<HighlighterCore> {
   highlighterPromise ??= createHighlighterCore({
     themes: [themeLight, themeDark],

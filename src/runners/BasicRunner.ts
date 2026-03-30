@@ -107,7 +107,7 @@ const statusNames: Record<number, string> = {
   32769: "optimized", // common optimized status
 };
 
-/** @return runner with time and iteration limits */
+/** Timing-based runner that collects samples within time/iteration limits. */
 export class BasicRunner implements BenchRunner {
   async runBench<T = unknown>(
     benchmark: BenchmarkSpec<T>,
@@ -120,7 +120,7 @@ export class BasicRunner implements BenchRunner {
   }
 }
 
-/** @return percentiles and basic statistics */
+/** Compute percentiles and basic statistics from timing samples. */
 export function computeStats(samples: number[]): SampleTimeStats {
   const sorted = [...samples].sort((a, b) => a - b);
   const avg = samples.reduce((sum, s) => sum + s, 0) / samples.length;
@@ -135,7 +135,7 @@ export function computeStats(samples: number[]): SampleTimeStats {
   };
 }
 
-/** @return timing samples and amortized allocation from benchmark execution */
+/** Collect timing samples with warmup, heap tracking, and optional V8 optimization tracing. */
 async function collectSamples<T>(p: CollectParams<T>): Promise<CollectResult> {
   if (!p.maxIterations && !p.maxTime) {
     throw new Error(`At least one of maxIterations or maxTime must be set`);
@@ -168,6 +168,7 @@ async function collectSamples<T>(p: CollectParams<T>): Promise<CollectResult> {
   };
 }
 
+/** Assemble collected data into a MeasuredResults record. */
 function buildMeasuredResults(name: string, c: CollectResult): MeasuredResults {
   const time = computeStats(c.samples);
   const heap = c.heapGrowth;
@@ -185,7 +186,7 @@ function buildMeasuredResults(name: string, c: CollectResult): MeasuredResults {
   };
 }
 
-/** @return percentile value with linear interpolation */
+/** Interpolated percentile from a pre-sorted array. */
 function percentile(sortedArray: number[], p: number): number {
   const index = (sortedArray.length - 1) * p;
   const lower = Math.floor(index);
@@ -214,7 +215,7 @@ async function runWarmup<T>(p: CollectParams<T>): Promise<number[]> {
   return samples;
 }
 
-/** Collect timing samples with periodic pauses for V8 optimization */
+/** Collect timing samples with optional periodic pauses for V8 background compilation. */
 async function runSampleLoop<T>(
   p: CollectParams<T>,
 ): Promise<SampleLoopResult> {
@@ -225,9 +226,8 @@ async function runSampleLoop<T>(
     pauseInterval = 0,
     pauseDuration = 100,
   } = p;
-  const trackHeap = true; // Always track heap for charts
+  const trackHeap = true;
   const getOptStatus = p.traceOpt ? createOptStatusGetter() : undefined;
-  // Assume 0.1ms per iteration minimum for pre-allocation
   const estimated = maxIterations || Math.ceil(maxTime / 0.1);
   const a = createSampleArrays(estimated, trackHeap, !!getOptStatus);
 
@@ -269,7 +269,7 @@ async function runSampleLoop<T>(
   };
 }
 
-/** @return analysis of V8 optimization status per sample */
+/** Group samples by V8 optimization tier and count deoptimizations. */
 function analyzeOptStatus(
   samples: number[],
   statuses: number[],
@@ -300,7 +300,7 @@ function analyzeOptStatus(
   return { byTier, deoptCount };
 }
 
-/** @return runtime gc() or no-op if unavailable */
+/** Get the runtime gc() function, or a no-op if --expose-gc wasn't passed. */
 function gcFunction(): () => void {
   const gc = globalThis.gc ?? (globalThis as any).__gc;
   if (gc) return gc;
@@ -308,7 +308,7 @@ function gcFunction(): () => void {
   return () => {};
 }
 
-/** @return function to get V8 optimization status (requires --allow-natives-syntax) */
+/** Create a function that reads V8 optimization status via %GetOptimizationStatus. */
 function createOptStatusGetter(): ((fn: unknown) => number) | undefined {
   try {
     // %GetOptimizationStatus returns a bitmask

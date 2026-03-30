@@ -220,7 +220,7 @@ export const optSection: ResultsMapper<OptStats> = {
   ],
 };
 
-/** Build generic sections based on CLI flags */
+/** Build default report sections (GC stats if enabled, plus run count) from CLI flags */
 export function buildGenericSections(args: {
   "gc-stats"?: boolean;
   alloc?: boolean;

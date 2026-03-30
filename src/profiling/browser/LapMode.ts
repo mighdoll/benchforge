@@ -5,14 +5,18 @@ import type {
   BrowserProfileResult,
 } from "./BrowserProfiler.ts";
 
+/** Handle for a pending lap-mode benchmark, with cancellation for the timeout. */
 export interface LapModeHandle {
   promise: Promise<BrowserProfileResult>;
   cancel: () => void;
 }
 
-/** Inject __start/__lap as in-page functions, expose __done for results collection.
- *  __start/__lap are pure in-page (zero CDP overhead). First __start() triggers
- *  instrument start. __done() stops instruments and collects timing data. */
+/**
+ * Inject __start/__lap/__done as in-page timing functions.
+ *
+ * __start/__lap are pure in-page (zero CDP overhead). The first __start()
+ * triggers instrument start. __done() stops instruments and collects timing data.
+ */
 export async function setupLapMode(
   page: Page,
   cdp: CDPSession,
@@ -65,8 +69,10 @@ export async function setupLapMode(
   return { promise, cancel: () => clearTimeout(timer) };
 }
 
-/** In-page timing functions injected via addInitScript (zero CDP overhead).
- *  __start/__lap collect timestamps, __done delegates to exposed __benchCollect. */
+/**
+ * In-page timing functions injected via addInitScript (zero CDP overhead).
+ * __start/__lap collect timestamps, __done delegates to exposed __benchCollect.
+ */
 function injectLapFunctions(): void {
   const g = globalThis as any;
   g.__benchSamples = [];

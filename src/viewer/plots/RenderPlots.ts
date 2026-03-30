@@ -45,6 +45,7 @@ export function renderSamplePlots(data: ReportData): void {
   });
 }
 
+/** Render CI plot and stats cards for a single benchmark group */
 function renderGroupStats(
   group: ReportData["groups"][0],
   groupIndex: number,
@@ -67,6 +68,7 @@ function renderGroupStats(
       .join("");
 }
 
+/** Render histogram and time series plots for a single benchmark group */
 function renderGroupPlots(
   group: ReportData["groups"][0],
   groupIndex: number,
@@ -255,6 +257,7 @@ function formatPct(v: number): string {
   return sign + v.toFixed(1) + "%";
 }
 
+/** Running total array, used to map GC event offsets to sample indices */
 function cumulativeSum(arr: number[]): number[] {
   const result: number[] = [];
   let sum = 0;

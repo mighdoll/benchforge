@@ -7,7 +7,7 @@ import type {
   BenchmarkResult,
 } from "./JsonFormat.ts";
 
-/** Export benchmark results to JSON file */
+/** Export benchmark results to a JSON file with stats, metadata, and environment info. */
 export async function exportBenchmarkJson(
   groups: ReportGroup[],
   outputPath: string,

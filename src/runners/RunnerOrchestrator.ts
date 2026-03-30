@@ -128,12 +128,10 @@ function runWorkerWithMessage(
   logTiming(`Starting worker for ${name}`);
 
   return new Promise((resolve, reject) => {
-    // Spawn worker
     const gcEvents: GcEvent[] = [];
     const worker = spawnWorkerProcess(collectGcStats);
     if (collectGcStats && worker.stdout) setupGcCapture(worker, gcEvents);
 
-    // Timeout safety
     const timeoutId = setTimeout(() => {
       killWorker();
       reject(new Error(`Benchmark "${name}" timed out after 60 seconds`));
@@ -144,7 +142,6 @@ function runWorkerWithMessage(
       if (!worker.killed) worker.kill("SIGTERM");
     }
 
-    // Wire handlers
     worker.on("message", (msg: ResultMessage | ErrorMessage) => {
       killWorker();
       if (msg.type === "result") {
@@ -182,7 +179,6 @@ function runWorkerWithMessage(
       }
     });
 
-    // Send message
     worker.send(message);
   });
 }

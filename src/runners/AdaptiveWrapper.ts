@@ -39,7 +39,7 @@ const initialBatch = 100;
 const continueBatch = 100;
 const continueIterations = 10;
 
-/** @return adaptive sampling runner wrapper */
+/** Wrap a runner with adaptive sampling that collects until convergence or timeout. */
 export function createAdaptiveWrapper(
   baseRunner: BenchRunner,
   options: AdaptiveOptions,
@@ -55,7 +55,7 @@ export function createAdaptiveWrapper(
   };
 }
 
-/** @return convergence based on window stability */
+/** Check convergence by comparing stability between sliding windows of samples. */
 export function checkConvergence(samples: number[]): ConvergenceResult {
   const windowSize = getWindowSize(samples);
   const minSamples = windowSize * 2;
@@ -72,7 +72,7 @@ export function checkConvergence(samples: number[]): ConvergenceResult {
   return buildConvergence(metrics);
 }
 
-/** @return results using adaptive sampling strategy */
+/** Run benchmark with adaptive sampling: collect batches until convergence or timeout. */
 async function runAdaptiveBench<T>(
   runner: BenchRunner,
   bench: BenchmarkSpec<T>,
@@ -87,10 +87,9 @@ async function runAdaptiveBench<T>(
   } = opts as AdaptiveOptions;
   const allSamples: number[] = [];
 
-  // Collect initial batch (includes warmup + settle)
   const warmup = await collectInitial(runner, bench, opts, params, allSamples);
 
-  // Start timing AFTER warmup - warmup time doesn't count against maxTime
+  // Start timing after warmup so warmup time doesn't count against maxTime
   const startTime = performance.now();
 
   const limits = {
@@ -106,7 +105,7 @@ async function runAdaptiveBench<T>(
   return buildResults(allSamples, startTime, convergence, bench.name, warmup);
 }
 
-/** @return window size scaled to execution time */
+/** Scale window size inversely with execution time (fast ops need more samples). */
 function getWindowSize(samples: number[]): number {
   if (samples.length < 20) return windowSize; // Default for initial samples
 
@@ -121,7 +120,7 @@ function getWindowSize(samples: number[]): number {
   return 20; // >10ms
 }
 
-/** @return stability metrics between windows */
+/** Compare median and outlier impact between recent and previous windows. */
 function getStability(samples: number[], win: number): Metrics {
   const toMs = (s: number) => s / msToNs;
   const recentMs = samples.slice(-win).map(toMs);
@@ -143,7 +142,7 @@ function getStability(samples: number[], win: number): Metrics {
   };
 }
 
-/** @return convergence from stability metrics */
+/** Convert stability metrics to a convergence result with confidence score. */
 function buildConvergence(metrics: Metrics): ConvergenceResult {
   const { medianDrift, impactDrift, medianStable, impactStable } = metrics;
 
@@ -166,7 +165,7 @@ function buildConvergence(metrics: Metrics): ConvergenceResult {
   return { converged: false, confidence: Math.max(0, confidence), reason };
 }
 
-/** @return warmupSamples from initial batch */
+/** Collect the initial batch (includes warmup + settle) and return warmup samples. */
 async function collectInitial<T>(
   runner: BenchRunner,
   bench: BenchmarkSpec<T>,
@@ -174,7 +173,6 @@ async function collectInitial<T>(
   params: T | undefined,
   allSamples: number[],
 ): Promise<number[] | undefined> {
-  // Don't pass adaptive flag to base runner to avoid double wrapping
   const batchOpts = {
     ...(opts as any),
     maxTime: initialBatch,
@@ -185,7 +183,7 @@ async function collectInitial<T>(
   return results[0].warmupSamples;
 }
 
-/** @return samples until convergence or timeout */
+/** Collect continuation batches until convergence or timeout. */
 async function collectAdaptive<T>(
   runner: BenchRunner,
   bench: BenchmarkSpec<T>,
@@ -219,7 +217,6 @@ async function collectAdaptive<T>(
       break;
     }
 
-    // Skip warmup for continuation batches (warmup done in initial batch)
     const batch = {
       ...(opts as any),
       maxTime: continueBatch,
@@ -232,7 +229,7 @@ async function collectAdaptive<T>(
   process.stderr.write("\r" + " ".repeat(60) + "\r");
 }
 
-/** @return measured results with convergence metrics */
+/** Build final MeasuredResults with time stats and convergence info. */
 function buildResults(
   samples: number[],
   startTime: number,
@@ -245,7 +242,7 @@ function buildResults(
   return [{ name, samples, warmupSamples, time, totalTime, convergence }];
 }
 
-/** @return outlier impact as proportion of total time */
+/** Measure outlier impact as proportion of excess time above the 1.5*IQR threshold. */
 function getOutlierImpact(samples: number[]): { ratio: number; count: number } {
   if (samples.length === 0) return { ratio: 0, count: 0 };
 
@@ -273,7 +270,7 @@ function appendSamples(result: MeasuredResults, samples: number[]): void {
   for (const sample of result.samples) samples.push(sample);
 }
 
-/** @return true if convergence reached or timeout */
+/** True if convergence target met, or minTime elapsed with fallback confidence. */
 function shouldStop(
   c: ConvergenceResult,
   target: number,
@@ -281,12 +278,11 @@ function shouldStop(
   min: number,
 ): boolean {
   if (c.converged && c.confidence >= target) return true;
-  // After minTime, accept whichever is higher: targetConfidence or fallbackThreshold
   const threshold = Math.max(target, fallbackThreshold);
   return elapsed >= min && c.confidence >= threshold;
 }
 
-/** @return time percentiles and statistics in ms */
+/** Compute time percentiles, CV, MAD, and outlier rate from nanosecond samples. */
 function computeTimeStats(samplesNs: number[]) {
   const samplesMs = samplesNs.map(s => s / msToNs);
   const min = samplesNs.reduce(

@@ -113,6 +113,7 @@ export function createSampleTimeSeries(
   });
 }
 
+/** Build scales, unit conversion, and converted data for the time series plot */
 function buildPlotContext(timeSeries: TimeSeriesPoint[]): PlotContext {
   const benchmarks = [...new Set(timeSeries.map(d => d.benchmark))];
   const sampleData = buildSampleData(timeSeries);

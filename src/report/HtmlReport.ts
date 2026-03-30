@@ -9,6 +9,7 @@ import type {
 import type { ReportGroup, ResultsMapper } from "./BenchmarkReport.ts";
 import type { GitVersion } from "./GitUtils.ts";
 
+/** Options for prepareHtmlData: report sections, git versions, and CLI args */
 export interface PrepareHtmlOptions {
   cliArgs?: Record<string, unknown>;
   sections?: ResultsMapper[];
@@ -22,7 +23,7 @@ type ColumnLike = {
   formatter?: (v: unknown) => string | null;
 };
 
-/** Prepare ReportData from benchmark results for HTML rendering */
+/** Convert benchmark results into a ReportData payload for the HTML viewer */
 export function prepareHtmlData(
   groups: ReportGroup[],
   options: PrepareHtmlOptions,
