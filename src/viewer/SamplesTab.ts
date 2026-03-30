@@ -14,6 +14,15 @@ export async function loadSamples(
   renderSamplePlots(data);
 }
 
+/** True if any benchmark in the report collected more than one sample. */
+export function hasSufficientSamples(data: ReportData): boolean {
+  return data.groups.some(
+    g =>
+      g.benchmarks.some(b => b.samples.length > 1) ||
+      (g.baseline !== undefined && g.baseline.samples.length > 1),
+  );
+}
+
 function buildSamplesGroupHtml(
   group: ReportData["groups"][0],
   i: number,
@@ -50,13 +59,4 @@ function buildSamplesGroupHtml(
       </div>
     </div>
   </div>`;
-}
-
-/** True if any benchmark in the report collected more than one sample. */
-export function hasSufficientSamples(data: ReportData): boolean {
-  return data.groups.some(
-    g =>
-      g.benchmarks.some(b => b.samples.length > 1) ||
-      (g.baseline !== undefined && g.baseline.samples.length > 1),
-  );
 }

@@ -25,19 +25,6 @@ const sourceTabs = new Map<string, SourceTabData>();
 
 let highlighterPromise: Promise<HighlighterCore> | undefined;
 
-function getHighlighter(): Promise<HighlighterCore> {
-  highlighterPromise ??= createHighlighterCore({
-    themes: [themeLight, themeDark],
-    langs: [langJs, langTs, langCss, langHtml],
-    engine: createJavaScriptRegexEngine(),
-  });
-  return highlighterPromise;
-}
-
-function sourceTabId(file: string): string {
-  return "src:" + file;
-}
-
 /** Open (or re-focus) a syntax-highlighted source tab for the given file and line. */
 export function openSourceTab(
   file: string,
@@ -99,24 +86,8 @@ export function closeSourceTab(tabId: string, config: ViewerConfig): void {
   }
 }
 
-function buildSourceHeader(
-  file: string,
-  line: number,
-  col: number,
-  editorUri: string | null,
-): string {
-  let header = '<div class="source-header">';
-  header += '<span class="source-path">' + escapeHtml(file) + "</span>";
-  if (editorUri) {
-    const editorHref =
-      editorUri + filePathFromUrl(file) + ":" + (line || 1) + ":" + (col || 1);
-    header +=
-      ' <a class="source-editor-link" href="' +
-      escapeHtml(editorHref) +
-      '">Open in Editor</a>';
-  }
-  header += "</div>";
-  return header;
+function sourceTabId(file: string): string {
+  return "src:" + file;
 }
 
 async function updateSourcePanel(
@@ -172,4 +143,33 @@ async function updateSourcePanel(
       escapeHtml(file) +
       "</p></div>";
   }
+}
+
+function getHighlighter(): Promise<HighlighterCore> {
+  highlighterPromise ??= createHighlighterCore({
+    themes: [themeLight, themeDark],
+    langs: [langJs, langTs, langCss, langHtml],
+    engine: createJavaScriptRegexEngine(),
+  });
+  return highlighterPromise;
+}
+
+function buildSourceHeader(
+  file: string,
+  line: number,
+  col: number,
+  editorUri: string | null,
+): string {
+  let header = '<div class="source-header">';
+  header += '<span class="source-path">' + escapeHtml(file) + "</span>";
+  if (editorUri) {
+    const editorHref =
+      editorUri + filePathFromUrl(file) + ":" + (line || 1) + ":" + (col || 1);
+    header +=
+      ' <a class="source-editor-link" href="' +
+      escapeHtml(editorHref) +
+      '">Open in Editor</a>';
+  }
+  header += "</div>";
+  return header;
 }

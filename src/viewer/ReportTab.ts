@@ -8,6 +8,15 @@ interface VersionInfo {
   dirty?: boolean;
 }
 
+const defaultArgs: Record<string, unknown> = {
+  worker: true,
+  time: 5,
+  warmup: 500,
+  "pause-interval": 0,
+  "pause-duration": 100,
+};
+const skipArgs = new Set(["_", "$0", "view"]);
+
 /** Fetch report data and render the summary tab (stats, CI badges, header). */
 export async function loadSummary(
   provider: DataProvider,
@@ -66,27 +75,6 @@ function buildSummaryGroupHtml(group: BenchmarkGroup, i: number): string {
   </div>`;
 }
 
-function comparisonBadge(group: BenchmarkGroup, i: number): string {
-  const ci = group.benchmarks[0]?.comparisonCI;
-  if (!ci) return "";
-  const labels: Record<string, string> = {
-    faster: "Faster",
-    slower: "Slower",
-    uncertain: "Inconclusive",
-  };
-  return `<span class="badge badge-${ci.direction}">${labels[ci.direction]}</span>
-    <div id="ci-plot-${i}" class="ci-plot-container"></div>`;
-}
-
-const defaultArgs: Record<string, unknown> = {
-  worker: true,
-  time: 5,
-  warmup: 500,
-  "pause-interval": 0,
-  "pause-duration": 100,
-};
-const skipArgs = new Set(["_", "$0", "view"]);
-
 function formatCliArgs(args?: Record<string, unknown>): string {
   if (!args) return "benchforge";
   const parts = ["benchforge"];
@@ -109,6 +97,18 @@ function formatVersionInfo(metadata: Record<string, unknown>): string {
   if (baselineVersion)
     parts.push("Baseline: " + formatVersion(baselineVersion));
   return `<div class="version-info">${parts.join(" | ")}</div>`;
+}
+
+function comparisonBadge(group: BenchmarkGroup, i: number): string {
+  const ci = group.benchmarks[0]?.comparisonCI;
+  if (!ci) return "";
+  const labels: Record<string, string> = {
+    faster: "Faster",
+    slower: "Slower",
+    uncertain: "Inconclusive",
+  };
+  return `<span class="badge badge-${ci.direction}">${labels[ci.direction]}</span>
+    <div id="ci-plot-${i}" class="ci-plot-container"></div>`;
 }
 
 function formatVersion(v: VersionInfo): string {

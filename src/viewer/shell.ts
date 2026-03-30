@@ -32,35 +32,6 @@ let provider: DataProvider;
 let reportData: ReportData | null = null;
 let samplesLoaded = false;
 
-tabBar.addEventListener("click", async (ev: MouseEvent) => {
-  const target = ev.target as HTMLElement;
-  const tabBtn = target.closest<HTMLButtonElement>(".tab[data-tab]");
-  if (tabBtn) {
-    if (tabBtn.disabled) return;
-    if (target.closest(".tab-close")) {
-      closeSourceTab(tabBtn.dataset.tab!, provider.config);
-      return;
-    }
-    const tabId = tabBtn.dataset.tab!;
-    activateTab(tabId);
-    if (tabId === "samples" && !samplesLoaded && reportData) {
-      samplesLoaded = true;
-      loadSamples(reportData, samplesPanel);
-    }
-    return;
-  }
-  if (target.closest('[data-action="archive"]')) {
-    archiveProfile(provider);
-  }
-});
-
-window.addEventListener("message", (ev: MessageEvent) => {
-  if (ev.data?.type === "open-source") {
-    const { file, line, col } = ev.data;
-    if (file) openSourceTab(file, line, col, provider);
-  }
-});
-
 async function initViewer(p: DataProvider): Promise<void> {
   provider = p;
   reportData = null;
@@ -119,5 +90,34 @@ async function main(): Promise<void> {
 
   showDropZone(initViewer);
 }
+
+tabBar.addEventListener("click", async (ev: MouseEvent) => {
+  const target = ev.target as HTMLElement;
+  const tabBtn = target.closest<HTMLButtonElement>(".tab[data-tab]");
+  if (tabBtn) {
+    if (tabBtn.disabled) return;
+    if (target.closest(".tab-close")) {
+      closeSourceTab(tabBtn.dataset.tab!, provider.config);
+      return;
+    }
+    const tabId = tabBtn.dataset.tab!;
+    activateTab(tabId);
+    if (tabId === "samples" && !samplesLoaded && reportData) {
+      samplesLoaded = true;
+      loadSamples(reportData, samplesPanel);
+    }
+    return;
+  }
+  if (target.closest('[data-action="archive"]')) {
+    archiveProfile(provider);
+  }
+});
+
+window.addEventListener("message", (ev: MessageEvent) => {
+  if (ev.data?.type === "open-source") {
+    const { file, line, col } = ev.data;
+    if (file) openSourceTab(file, line, col, provider);
+  }
+});
 
 main();

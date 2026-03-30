@@ -48,6 +48,21 @@ export function showDropZone(onInit: (provider: DataProvider) => void): void {
   document.body.appendChild(zone);
 }
 
+/** Fetch and parse a `.benchforge` archive from a remote URL. */
+export async function loadArchiveFromUrl(
+  url: string,
+): Promise<DataProvider | null> {
+  try {
+    const resp = await fetch(url);
+    if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+    const archive = (await resp.json()) as ArchiveData;
+    return new ArchiveProvider(archive);
+  } catch (err) {
+    console.error("Failed to load archive from URL:", err);
+    return null;
+  }
+}
+
 async function loadArchiveFile(
   file: File,
   zone: HTMLElement,
@@ -69,20 +84,5 @@ async function loadArchiveFile(
       "beforeend",
       `<p class="drop-zone-error">Failed to load file: ${escapeHtml(String(err))}</p>`,
     );
-  }
-}
-
-/** Fetch and parse a `.benchforge` archive from a remote URL. */
-export async function loadArchiveFromUrl(
-  url: string,
-): Promise<DataProvider | null> {
-  try {
-    const resp = await fetch(url);
-    if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
-    const archive = (await resp.json()) as ArchiveData;
-    return new ArchiveProvider(archive);
-  } catch (err) {
-    console.error("Failed to load archive from URL:", err);
-    return null;
   }
 }
