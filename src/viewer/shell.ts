@@ -46,7 +46,8 @@ async function initViewer(p: DataProvider): Promise<void> {
   const allocUrl = p.profileUrl("alloc");
   if (allocUrl) iframe.src = "speedscope/#" + speedscopeHash(allocUrl, config);
   const timeUrl = p.profileUrl("time");
-  if (timeUrl) timeIframe.src = "speedscope/#" + speedscopeHash(timeUrl, config);
+  if (timeUrl)
+    timeIframe.src = "speedscope/#" + speedscopeHash(timeUrl, config);
 
   if (config.hasReport) {
     activateTab("summary");

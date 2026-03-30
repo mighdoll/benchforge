@@ -1,15 +1,15 @@
 import { totalProfileBytes } from "../profiling/node/HeapSampleReport.ts";
 import type { ResultsMapper } from "../report/BenchmarkReport.ts";
 import {
-  type GcStatsInfo,
-  gcStatsSection,
-} from "../report/StandardSections.ts";
-import {
   duration,
   formatBytes,
   formatDiffWithCI,
   truncate,
 } from "../report/Formatters.ts";
+import {
+  type GcStatsInfo,
+  gcStatsSection,
+} from "../report/StandardSections.ts";
 import {
   buildTable,
   type ColumnGroup,

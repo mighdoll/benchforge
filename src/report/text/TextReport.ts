@@ -12,7 +12,6 @@ import {
   truncate,
 } from "../Formatters.ts";
 import {
-  type AnyColumn,
   buildTable,
   type ColumnGroup,
   type ResultGroup,

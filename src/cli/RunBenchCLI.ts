@@ -3,11 +3,6 @@ import { basename, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 import pico from "picocolors";
 import { hideBin } from "yargs/helpers";
-import type {
-  BenchGroup,
-  BenchmarkSpec,
-  BenchSuite,
-} from "../runners/BenchmarkSpec.ts";
 import type { MeasuredResults } from "../core/MeasuredResults.ts";
 import {
   archiveBenchmark,
@@ -57,7 +52,6 @@ import type {
 import { groupReports } from "../report/BenchmarkReport.ts";
 import type { GitVersion } from "../report/GitUtils.ts";
 import { prepareHtmlData } from "../report/HtmlReport.ts";
-import { reportResults } from "../report/text/TextReport.ts";
 import {
   adaptiveSection,
   browserGcStatsSection,
@@ -67,7 +61,13 @@ import {
   timeSection,
   totalTimeSection,
 } from "../report/StandardSections.ts";
+import { reportResults } from "../report/text/TextReport.ts";
 import { computeStats } from "../runners/BasicRunner.ts";
+import type {
+  BenchGroup,
+  BenchmarkSpec,
+  BenchSuite,
+} from "../runners/BenchmarkSpec.ts";
 import type { RunnerOptions } from "../runners/BenchRunner.ts";
 import type { KnownRunner } from "../runners/CreateRunner.ts";
 import { runBenchmark } from "../runners/RunnerOrchestrator.ts";

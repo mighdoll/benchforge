@@ -1,10 +1,10 @@
 import { getHeapStatistics } from "node:v8";
-import type { BenchmarkSpec } from "../core/Benchmark.ts";
 import type {
   MeasuredResults,
   OptStatusInfo,
   PausePoint,
 } from "../core/MeasuredResults.ts";
+import type { BenchmarkSpec } from "./BenchmarkSpec.ts";
 import type { BenchRunner, RunnerOptions } from "./BenchRunner.ts";
 import { executeBenchmark } from "./BenchRunner.ts";
 

@@ -1,10 +1,10 @@
 import { expect, test } from "vitest";
-import type { BenchmarkSpec } from "../core/Benchmark.ts";
 import {
   checkConvergence,
   createAdaptiveWrapper,
 } from "../runners/AdaptiveWrapper.ts";
 import { BasicRunner } from "../runners/BasicRunner.ts";
+import type { BenchmarkSpec } from "../runners/BenchmarkSpec.ts";
 
 test.skip("adaptive runner collects samples for minimum time", {
   timeout: 10000,

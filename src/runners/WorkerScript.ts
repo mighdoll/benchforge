@@ -1,5 +1,4 @@
 #!/usr/bin/env node
-import type { BenchmarkFunction, BenchmarkSpec } from "../core/Benchmark.ts";
 import type { MeasuredResults } from "../core/MeasuredResults.ts";
 import { variantModuleUrl } from "../matrix/VariantLoader.ts";
 import type { CoverageData } from "../profiling/node/CoverageTypes.ts";
@@ -9,6 +8,7 @@ import {
   type AdaptiveOptions,
   createAdaptiveWrapper,
 } from "./AdaptiveWrapper.ts";
+import type { BenchmarkFunction, BenchmarkSpec } from "./BenchmarkSpec.ts";
 import type { BenchRunner, RunnerOptions } from "./BenchRunner.ts";
 import { createRunner, type KnownRunner } from "./CreateRunner.ts";
 import { debugWorkerTiming, getElapsed, getPerfNow } from "./TimingUtils.ts"; // 5 minutes

@@ -1,7 +1,6 @@
 import { type ChildProcess, fork } from "node:child_process";
 import { existsSync } from "node:fs";
 import path from "node:path";
-import type { BenchmarkSpec } from "../core/Benchmark.ts";
 import type { MeasuredResults } from "../core/MeasuredResults.ts";
 import type { CoverageData } from "../profiling/node/CoverageTypes.ts";
 import type { HeapProfile } from "../profiling/node/HeapSampler.ts";
@@ -10,6 +9,7 @@ import {
   type AdaptiveOptions,
   createAdaptiveWrapper,
 } from "./AdaptiveWrapper.ts";
+import type { BenchmarkSpec } from "./BenchmarkSpec.ts";
 import type { RunnerOptions } from "./BenchRunner.ts";
 import { createRunner, type KnownRunner } from "./CreateRunner.ts";
 import { aggregateGcStats, type GcEvent, parseGcLine } from "./GcStats.ts";

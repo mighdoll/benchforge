@@ -1,7 +1,7 @@
 import { expect } from "vitest";
 import { parseBenchArgs } from "../cli/RunBenchCLI.ts";
-import type { BenchSuite } from "../core/Benchmark.ts";
 import type { BenchmarkReport } from "../report/BenchmarkReport.ts";
+import type { BenchSuite } from "../runners/BenchmarkSpec.ts";
 
 const _statisticalSuite: BenchSuite = {
   name: "Statistical Test Suite",

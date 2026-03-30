@@ -1,7 +1,7 @@
 import { test } from "vitest";
-import type { BenchmarkSpec } from "../core/Benchmark.ts";
 import type { MeasuredResults } from "../core/MeasuredResults.ts";
 import { createAdaptiveWrapper } from "../runners/AdaptiveWrapper.ts";
+import type { BenchmarkSpec } from "../runners/BenchmarkSpec.ts";
 import type { BenchRunner } from "../runners/BenchRunner.ts";
 import { bevy30SamplesMs } from "./fixtures/bevy30-samples.ts";
 

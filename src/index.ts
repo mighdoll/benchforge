@@ -18,11 +18,6 @@ export {
   runDefaultMatrixBench,
   runMatrixSuite,
 } from "./cli/RunBenchCLI.ts";
-export type {
-  BenchGroup,
-  BenchmarkSpec,
-  BenchSuite,
-} from "./runners/BenchmarkSpec.ts";
 export type { MeasuredResults } from "./core/MeasuredResults.ts";
 export {
   archiveBenchmark,
@@ -94,6 +89,11 @@ export {
 } from "./report/StandardSections.ts";
 export { formatConvergence } from "./report/text/ConvergenceFormatters.ts";
 export { reportResults } from "./report/text/TextReport.ts";
+export type {
+  BenchGroup,
+  BenchmarkSpec,
+  BenchSuite,
+} from "./runners/BenchmarkSpec.ts";
 export type { RunnerOptions } from "./runners/BenchRunner.ts";
 export { average } from "./stats/StatisticalUtils.ts";
 export {

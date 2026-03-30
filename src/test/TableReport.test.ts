@@ -1,10 +1,10 @@
 import { expect, test } from "vitest";
-import { integer } from "../../Formatters.ts";
+import { integer } from "../report/Formatters.ts";
 import {
   buildTable,
   type ColumnGroup,
   type ResultGroup,
-} from "../TableReport.ts";
+} from "../report/text/TableReport.ts";
 
 interface TestRecord {
   name: string;
