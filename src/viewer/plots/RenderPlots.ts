@@ -1,14 +1,14 @@
 import type { BenchmarkEntry, ReportData } from "../ReportData.ts";
 import { createCIPlot } from "./CIPlot.ts";
 import { createHistogramKde } from "./HistogramKde.ts";
-import { createSampleTimeSeries } from "./SampleTimeSeries.ts";
 import type {
   FlatGcEvent,
   FlatPausePoint,
   HeapPoint,
   Sample,
   TimeSeriesPoint,
-} from "./Types.ts";
+} from "./PlotTypes.ts";
+import { createSampleTimeSeries } from "./SampleTimeSeries.ts";
 
 interface PreparedBenchmark extends BenchmarkEntry {
   isBaseline: boolean;

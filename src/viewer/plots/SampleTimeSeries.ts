@@ -6,7 +6,7 @@ import type {
   FlatPausePoint,
   HeapPoint,
   TimeSeriesPoint,
-} from "./Types.ts";
+} from "./PlotTypes.ts";
 
 interface SampleData {
   benchmark: string;

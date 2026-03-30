@@ -1,9 +1,9 @@
 import type { CDPSession } from "playwright";
+import type { GcStats } from "../../runners/GcStats.ts";
 import type { CoverageData, ScriptCoverage } from "../node/CoverageTypes.ts";
 import type { HeapProfile } from "../node/HeapSampler.ts";
 import type { TimeProfile } from "../node/TimeSampler.ts";
 import { browserGcStats, type TraceEvent } from "./BrowserGcStats.ts";
-import type { GcStats } from "../../runners/GcStats.ts";
 
 /** Start CDP GC tracing, returns the event collector array. */
 export async function startGcTracing(cdp: CDPSession): Promise<TraceEvent[]> {

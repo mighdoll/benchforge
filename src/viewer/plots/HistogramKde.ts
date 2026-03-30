@@ -1,7 +1,7 @@
 import * as Plot from "@observablehq/plot";
 import * as d3 from "d3";
 import { buildLegend, type LegendItem } from "./LegendUtils.ts";
-import type { Sample } from "./Types.ts";
+import type { Sample } from "./PlotTypes.ts";
 
 /** Create histogram + KDE plot for sample distribution */
 export function createHistogramKde(

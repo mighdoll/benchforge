@@ -1,6 +1,9 @@
 import type { CDPSession, Page } from "playwright";
-import type { BrowserProfileParams, BrowserProfileResult } from "./BrowserProfiler.ts";
 import { startInstruments, stopInstruments } from "./BrowserCDP.ts";
+import type {
+  BrowserProfileParams,
+  BrowserProfileResult,
+} from "./BrowserProfiler.ts";
 
 export interface LapModeHandle {
   promise: Promise<BrowserProfileResult>;

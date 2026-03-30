@@ -1,6 +1,9 @@
 import type { CDPSession, Page } from "playwright";
-import type { BrowserProfileParams, BrowserProfileResult } from "./BrowserProfiler.ts";
 import { startInstruments, stopInstruments } from "./BrowserCDP.ts";
+import type {
+  BrowserProfileParams,
+  BrowserProfileResult,
+} from "./BrowserProfiler.ts";
 
 /** Bench function mode: run window.__bench in a timed iteration loop. */
 export async function runBenchLoop(
