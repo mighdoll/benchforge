@@ -5,7 +5,7 @@ import type {
   BenchmarkGroup,
   ReportData,
   SectionStat,
-} from "../viewer/ViewerTypes.ts";
+} from "../viewer/ReportData.ts";
 import type {
   ReportColumnGroup,
   ReportGroup,

@@ -9,7 +9,7 @@ import {
   resolveProfile,
 } from "../profiling/node/ResolvedProfile.ts";
 import { groupReports, type ReportGroup } from "../report/BenchmarkReport.ts";
-import type { ReportData } from "../viewer/ViewerTypes.ts";
+import type { ReportData } from "../viewer/ReportData.ts";
 
 /** speedscope file format (https://www.speedscope.app/file-format-schema.json) */
 interface SpeedscopeFile {

@@ -1,4 +1,4 @@
-import type { BenchmarkEntry, ReportData } from "../ViewerTypes.ts";
+import type { BenchmarkEntry, ReportData } from "../ReportData.ts";
 import { createCIPlot } from "./CIPlot.ts";
 import { createHistogramKde } from "./HistogramKde.ts";
 import { createSampleTimeSeries } from "./SampleTimeSeries.ts";
