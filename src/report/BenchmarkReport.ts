@@ -1,5 +1,5 @@
 import type { MeasuredResults } from "../core/MeasuredResults.ts";
-import type { UnionToIntersection } from "../core/TypeUtil.ts";
+
 import { bootstrapDifferenceCI } from "../stats/StatisticalUtils.ts";
 import {
   formatDiffWithCI,
@@ -57,6 +57,13 @@ interface ReportRowBase {
 /** Row data combining all section statistics */
 type ReportRowData<S extends ReadonlyArray<ResultsMapper<any>>> =
   ReportRowBase & UnionToIntersection<SectionStats<S[number]>>;
+
+/** Convert union to intersection - https://mighdoll.dev/blog/modern-typescript-intersection/ */
+type UnionToIntersection<U> = (
+  U extends any ? (k: U) => void : never
+) extends (k: infer I extends U) => void
+  ? I
+  : never;
 
 /** All reports in a group, including the baseline if present */
 export function groupReports(group: ReportGroup): BenchmarkReport[] {

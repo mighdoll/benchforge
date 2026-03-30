@@ -2,7 +2,7 @@ import type { CoverageData } from "../profiling/coverage/CoverageTypes.ts";
 import type { HeapProfile } from "../profiling/heap/HeapSampler.ts";
 import type { TimeProfile } from "../profiling/time/TimeSampler.ts";
 import type { GcStats } from "../runners/GcStats.ts";
-import type { NodeGCTime } from "./NodeGC.ts";
+import type { NodeGCTime } from "../runners/NodeGC.ts";
 
 /** Benchmark results: times in milliseconds, sizes in kilobytes */
 export interface MeasuredResults {
