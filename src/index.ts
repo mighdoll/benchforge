@@ -71,7 +71,6 @@ export type {
 export { reportResults } from "./report/BenchmarkReport.ts";
 export type { GitVersion } from "./report/GitUtils.ts";
 export {
-  formatDateWithTimezone,
   formatGitVersion,
   getBaselineVersion,
   getCurrentGitVersion,
@@ -97,4 +96,8 @@ export {
 } from "./report/table/Formatters.ts";
 export type { RunnerOptions } from "./runners/BenchRunner.ts";
 export { average } from "./stats/StatisticalUtils.ts";
+export {
+  formatDateWithTimezone,
+  formatRelativeTime,
+} from "./viewer/DateFormat.ts";
 export type { ReportData } from "./viewer/ReportData.ts";

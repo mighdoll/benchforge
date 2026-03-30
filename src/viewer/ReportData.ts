@@ -1,3 +1,4 @@
+import type { GitVersion } from "../report/GitUtils.ts";
 import type { DifferenceCI } from "../stats/StatisticalUtils.ts";
 
 /** Top-level data structure for the HTML benchmark report */
@@ -59,10 +60,4 @@ export interface GcEvent {
 export interface PausePoint {
   sampleIndex: number;
   durationMs: number;
-}
-
-export interface GitVersion {
-  hash: string;
-  date: string;
-  dirty?: boolean;
 }

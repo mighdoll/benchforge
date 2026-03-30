@@ -70,8 +70,8 @@ import { computeStats } from "../runners/BasicRunner.ts";
 import type { RunnerOptions } from "../runners/BenchRunner.ts";
 import type { KnownRunner } from "../runners/CreateRunner.ts";
 import { runBenchmark } from "../runners/RunnerOrchestrator.ts";
-import { startViewerServer } from "../viewer/ViewerServer.ts";
 import type { ReportData } from "../viewer/ReportData.ts";
+import { startViewerServer } from "../viewer/ViewerServer.ts";
 import {
   type Configure,
   type DefaultCliArgs,
