@@ -2,12 +2,12 @@ import { writeFileSync } from "node:fs";
 import { readFile } from "node:fs/promises";
 import { resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import type { HeapProfile } from "../profiling/heap/HeapSampler.ts";
+import type { HeapProfile } from "../profiling/node/HeapSampler.ts";
 import {
   type ResolvedFrame,
   type ResolvedProfile,
   resolveProfile,
-} from "../profiling/heap/ResolvedProfile.ts";
+} from "../profiling/node/ResolvedProfile.ts";
 import { groupReports, type ReportGroup } from "../report/BenchmarkReport.ts";
 import type { ReportData } from "../viewer-types/Types.ts";
 

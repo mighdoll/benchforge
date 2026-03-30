@@ -3,9 +3,9 @@ import { existsSync } from "node:fs";
 import path from "node:path";
 import type { BenchmarkSpec } from "../core/Benchmark.ts";
 import type { MeasuredResults } from "../core/MeasuredResults.ts";
-import type { CoverageData } from "../profiling/coverage/CoverageTypes.ts";
-import type { HeapProfile } from "../profiling/heap/HeapSampler.ts";
-import type { TimeProfile } from "../profiling/time/TimeSampler.ts";
+import type { CoverageData } from "../profiling/node/CoverageTypes.ts";
+import type { HeapProfile } from "../profiling/node/HeapSampler.ts";
+import type { TimeProfile } from "../profiling/node/TimeSampler.ts";
 import {
   type AdaptiveOptions,
   createAdaptiveWrapper,

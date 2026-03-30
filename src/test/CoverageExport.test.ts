@@ -3,7 +3,7 @@ import {
   annotateFramesWithCounts,
   buildCoverageMap,
 } from "../export/CoverageExport.ts";
-import type { CoverageData } from "../profiling/coverage/CoverageTypes.ts";
+import type { CoverageData } from "../profiling/node/CoverageTypes.ts";
 
 const source = `function foo() {
   return 1;

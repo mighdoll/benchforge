@@ -47,8 +47,8 @@ import {
   formatRawSamples,
   type HeapReportOptions,
   isBrowserUserCode,
-} from "../profiling/heap/HeapSampleReport.ts";
-import { resolveProfile } from "../profiling/heap/ResolvedProfile.ts";
+} from "../profiling/node/HeapSampleReport.ts";
+import { resolveProfile } from "../profiling/node/ResolvedProfile.ts";
 import type {
   BenchmarkReport,
   ReportGroup,
@@ -603,7 +603,7 @@ function needsTimeSample(args: DefaultCliArgs): boolean {
 function buildAllTimeProfiles(results: ReportGroup[]) {
   const entries: {
     name: string;
-    profile: import("../profiling/time/TimeSampler.ts").TimeProfile;
+    profile: import("../profiling/node/TimeSampler.ts").TimeProfile;
   }[] = [];
   for (const group of results) {
     for (const report of groupReports(group)) {
@@ -618,7 +618,7 @@ function buildAllTimeProfiles(results: ReportGroup[]) {
 /** Find the first raw V8 TimeProfile in results */
 function findTimeProfile(
   results: ReportGroup[],
-): import("../profiling/time/TimeSampler.ts").TimeProfile | undefined {
+): import("../profiling/node/TimeSampler.ts").TimeProfile | undefined {
   for (const group of results) {
     for (const report of groupReports(group)) {
       if (report.measuredResults.timeProfile)
@@ -631,8 +631,8 @@ function findTimeProfile(
 /** Merge coverage data from all results into a single CoverageData */
 function mergeCoverage(
   results: ReportGroup[],
-): import("../profiling/coverage/CoverageTypes.ts").CoverageData | undefined {
-  const allScripts: import("../profiling/coverage/CoverageTypes.ts").ScriptCoverage[] =
+): import("../profiling/node/CoverageTypes.ts").CoverageData | undefined {
+  const allScripts: import("../profiling/node/CoverageTypes.ts").ScriptCoverage[] =
     [];
   for (const group of results) {
     for (const report of groupReports(group)) {

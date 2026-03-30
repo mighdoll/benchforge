@@ -1,4 +1,4 @@
-import { totalProfileBytes } from "../profiling/heap/HeapSampleReport.ts";
+import { totalProfileBytes } from "../profiling/node/HeapSampleReport.ts";
 import {
   injectDiffColumns,
   type ResultsMapper,

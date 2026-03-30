@@ -2,9 +2,9 @@
 import type { BenchmarkFunction, BenchmarkSpec } from "../core/Benchmark.ts";
 import type { MeasuredResults } from "../core/MeasuredResults.ts";
 import { variantModuleUrl } from "../matrix/VariantLoader.ts";
-import type { CoverageData } from "../profiling/coverage/CoverageTypes.ts";
-import type { HeapProfile } from "../profiling/heap/HeapSampler.ts";
-import type { TimeProfile } from "../profiling/time/TimeSampler.ts";
+import type { CoverageData } from "../profiling/node/CoverageTypes.ts";
+import type { HeapProfile } from "../profiling/node/HeapSampler.ts";
+import type { TimeProfile } from "../profiling/node/TimeSampler.ts";
 import {
   type AdaptiveOptions,
   createAdaptiveWrapper,
@@ -214,7 +214,7 @@ async function runWithProfiling(
   let results: MeasuredResults[];
   if (callCounts) {
     const { withCoverageProfiling } = await import(
-      "../profiling/coverage/CoverageSampler.ts"
+      "../profiling/node/CoverageSampler.ts"
     );
     const r = await withCoverageProfiling(async session => {
       state.profilerSession = session;
@@ -245,7 +245,7 @@ function buildProfilingChain(
   const runMaybeWithTime = timeSample
     ? async () => {
         const { withTimeProfiling } = await import(
-          "../profiling/time/TimeSampler.ts"
+          "../profiling/node/TimeSampler.ts"
         );
         const opts = {
           interval: message.options.timeInterval,
@@ -260,7 +260,7 @@ function buildProfilingChain(
   return alloc
     ? async () => {
         const { withHeapSampling } = await import(
-          "../profiling/heap/HeapSampler.ts"
+          "../profiling/node/HeapSampler.ts"
         );
         const opts = {
           samplingInterval: message.options.allocInterval,

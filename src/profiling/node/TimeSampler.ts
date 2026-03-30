@@ -1,5 +1,5 @@
 import { Session } from "node:inspector/promises";
-import type { CallFrame } from "../heap/HeapSampler.ts";
+import type { CallFrame } from "./HeapSampler.ts";
 
 /** V8 CPU profile node (flat array element, not tree) */
 export interface TimeProfileNode {

@@ -1,6 +1,6 @@
-import type { CoverageData } from "../profiling/coverage/CoverageTypes.ts";
-import type { HeapProfile } from "../profiling/heap/HeapSampler.ts";
-import type { TimeProfile } from "../profiling/time/TimeSampler.ts";
+import type { CoverageData } from "../profiling/node/CoverageTypes.ts";
+import type { HeapProfile } from "../profiling/node/HeapSampler.ts";
+import type { TimeProfile } from "../profiling/node/TimeSampler.ts";
 import type { GcStats } from "../runners/GcStats.ts";
 import type { NodeGCTime } from "../runners/NodeGC.ts";
 

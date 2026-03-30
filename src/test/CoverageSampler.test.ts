@@ -1,5 +1,5 @@
 import { expect, test } from "vitest";
-import { withCoverageProfiling } from "../profiling/coverage/CoverageSampler.ts";
+import { withCoverageProfiling } from "../profiling/node/CoverageSampler.ts";
 
 test("withCoverageProfiling returns function execution counts", async () => {
   function hotFunction() {

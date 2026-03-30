@@ -1,4 +1,4 @@
-import type { CoverageData } from "../profiling/coverage/CoverageTypes.ts";
+import type { CoverageData } from "../profiling/node/CoverageTypes.ts";
 
 /** Resolved per-function execution count at a specific source line */
 export interface LineCoverage {

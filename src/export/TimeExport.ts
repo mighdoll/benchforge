@@ -1,7 +1,7 @@
 import type {
   TimeProfile,
   TimeProfileNode,
-} from "../profiling/time/TimeSampler.ts";
+} from "../profiling/node/TimeSampler.ts";
 
 /** speedscope file format (https://www.speedscope.app/file-format-schema.json) */
 interface SpeedscopeFile {
