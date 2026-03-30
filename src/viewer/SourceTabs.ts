@@ -87,14 +87,6 @@ function sourceTabId(file: string): string {
   return "src:" + file;
 }
 
-function tabLabelHtml(file: string, line: number): string {
-  const shortName = file.split("/").pop() || file;
-  const label = line ? shortName + ":" + line : shortName;
-  return (
-    escapeHtml(label) + ' <span class="tab-close" title="Close">&times;</span>'
-  );
-}
-
 /** Fetch source code, syntax-highlight it, and scroll to the target line. */
 async function updateSourcePanel(
   tabData: SourceTabData,
@@ -145,6 +137,14 @@ async function updateSourcePanel(
       escapeHtml(file) +
       "</p></div>";
   }
+}
+
+function tabLabelHtml(file: string, line: number): string {
+  const shortName = file.split("/").pop() || file;
+  const label = line ? shortName + ":" + line : shortName;
+  return (
+    escapeHtml(label) + ' <span class="tab-close" title="Close">&times;</span>'
+  );
 }
 
 /** Lazily create and cache the shiki syntax highlighter. */

@@ -236,12 +236,6 @@ function formatCompactSite(
   lines.push(isUser(site) ? line : pc.dim(line));
 }
 
-/** Get caller frames (parent stack excluding self, reversed, truncated) */
-function callerFrames(site: HeapSite, depth: number): CallFrame[] {
-  if (!site.stack || site.stack.length <= 1) return [];
-  return site.stack.slice(0, -1).reverse().slice(0, depth);
-}
-
 function fmtBytes(bytes: number): string {
   return formatBytes(bytes, { space: true }) ?? `${bytes} B`;
 }
@@ -254,4 +248,10 @@ function fmtLoc(url: string, line: number, col?: number): string {
 /** Serialize a call stack for dedup comparison */
 function callerKey(stack: CallFrame[]): string {
   return stack.map(f => `${f.url}:${f.line}:${f.col}`).join("|");
+}
+
+/** Get caller frames (parent stack excluding self, reversed, truncated) */
+function callerFrames(site: HeapSite, depth: number): CallFrame[] {
+  if (!site.stack || site.stack.length <= 1) return [];
+  return site.stack.slice(0, -1).reverse().slice(0, depth);
 }

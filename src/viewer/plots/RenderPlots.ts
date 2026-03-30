@@ -141,6 +141,31 @@ function generateStatsHtml(b: PreparedBenchmark, gcEnabled: boolean): string {
   `;
 }
 
+function flattenSamples(benchmarks: PreparedBenchmark[]): FlattenedData {
+  const out: FlattenedData = {
+    allSamples: [],
+    timeSeries: [],
+    heapSeries: [],
+    allGcEvents: [],
+    allPausePoints: [],
+  };
+  for (const b of benchmarks) {
+    if (b.samples?.length) flattenBenchmark(b, out);
+  }
+  return out;
+}
+
+function generateCIHtml(ci: BenchmarkEntry["comparisonCI"]): string {
+  if (!ci) return "";
+  const pct = `${formatPct(ci.percent)} [${formatPct(ci.ci[0])}, ${formatPct(ci.ci[1])}]`;
+  return `
+    <div class="stat-item">
+      <div class="stat-label">vs Baseline</div>
+      <div class="stat-value ci-${ci.direction}">${pct}</div>
+    </div>
+  `;
+}
+
 function sectionStatsHtml(
   sectionStats: NonNullable<PreparedBenchmark["sectionStats"]>,
   gcEnabled: boolean,
@@ -177,31 +202,6 @@ function fallbackStatsHtml(stats: PreparedBenchmark["stats"]): string {
       </div>`,
     )
     .join("");
-}
-
-function flattenSamples(benchmarks: PreparedBenchmark[]): FlattenedData {
-  const out: FlattenedData = {
-    allSamples: [],
-    timeSeries: [],
-    heapSeries: [],
-    allGcEvents: [],
-    allPausePoints: [],
-  };
-  for (const b of benchmarks) {
-    if (b.samples?.length) flattenBenchmark(b, out);
-  }
-  return out;
-}
-
-function generateCIHtml(ci: BenchmarkEntry["comparisonCI"]): string {
-  if (!ci) return "";
-  const pct = `${formatPct(ci.percent)} [${formatPct(ci.ci[0])}, ${formatPct(ci.ci[1])}]`;
-  return `
-    <div class="stat-item">
-      <div class="stat-label">vs Baseline</div>
-      <div class="stat-value ci-${ci.direction}">${pct}</div>
-    </div>
-  `;
 }
 
 /** Extract time series, heap, GC, and pause data from one benchmark */

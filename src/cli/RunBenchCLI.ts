@@ -1,28 +1,7 @@
 import { basename, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 import { hideBin } from "yargs/helpers";
-import type { BrowserProfileResult } from "../profiling/browser/BrowserProfiler.ts";
-import {
-  isBrowserUserCode,
-} from "../profiling/node/HeapSampleReport.ts";
-import type {
-  ReportGroup,
-  ResultsMapper,
-} from "../report/BenchmarkReport.ts";
-import {
-  browserGcStatsSection,
-  runsSection,
-  timeSection,
-} from "../report/StandardSections.ts";
-import { reportResults } from "../report/text/TextReport.ts";
-import colors from "../report/Colors.ts";
-import { computeStats } from "../runners/BasicRunner.ts";
-import type { BenchSuite } from "../runners/BenchmarkSpec.ts";
-import type { MeasuredResults } from "../runners/MeasuredResults.ts";
-import type {
-  MatrixResults,
-  MatrixSuite,
-} from "../matrix/BenchMatrix.ts";
+import type { MatrixResults, MatrixSuite } from "../matrix/BenchMatrix.ts";
 import { runMatrix } from "../matrix/BenchMatrix.ts";
 import { loadCasesModule } from "../matrix/CaseLoader.ts";
 import {
@@ -31,11 +10,29 @@ import {
   parseMatrixFilter,
 } from "../matrix/MatrixFilter.ts";
 import type { MatrixReportOptions } from "../matrix/MatrixReport.ts";
+import type { BrowserProfileResult } from "../profiling/browser/BrowserProfiler.ts";
+import { isBrowserUserCode } from "../profiling/node/HeapSampleReport.ts";
+import type { ReportGroup, ResultsMapper } from "../report/BenchmarkReport.ts";
+import colors from "../report/Colors.ts";
+import {
+  browserGcStatsSection,
+  runsSection,
+  timeSection,
+} from "../report/StandardSections.ts";
+import { reportResults } from "../report/text/TextReport.ts";
+import { computeStats } from "../runners/BasicRunner.ts";
+import type { BenchSuite } from "../runners/BenchmarkSpec.ts";
+import type { MeasuredResults } from "../runners/MeasuredResults.ts";
 import {
   type Configure,
   type DefaultCliArgs,
   parseCliArgs,
 } from "./CliArgs.ts";
+import {
+  exportReports,
+  finishReports,
+  type MatrixExportOptions,
+} from "./CliExport.ts";
 import {
   cliHeapReportOptions,
   cliToMatrixOptions,
@@ -43,18 +40,13 @@ import {
   needsTimeSample,
   validateArgs,
 } from "./CliOptions.ts";
-import { runBenchmarks } from "./SuiteRunner.ts";
 import {
   defaultMatrixReport,
   defaultReport,
   matrixToReportGroups,
   printHeapReports,
 } from "./CliReport.ts";
-import {
-  type MatrixExportOptions,
-  exportReports,
-  finishReports,
-} from "./CliExport.ts";
+import { runBenchmarks } from "./SuiteRunner.ts";
 
 const { yellow } = colors;
 
@@ -233,6 +225,26 @@ async function fileBenchExports(
   }
 }
 
+/** Warn about Node-only flags that are ignored in browser mode. */
+function warnBrowserFlags(args: DefaultCliArgs): void {
+  const ignored = [
+    !args.worker && "--no-worker",
+    args["trace-opt"] && "--trace-opt",
+    args["gc-force"] && "--gc-force",
+    args.adaptive && "--adaptive",
+    args.batches > 1 && "--batches",
+  ].filter(Boolean);
+  if (ignored.length)
+    console.warn(yellow(`Ignored in browser mode: ${ignored.join(", ")}`));
+}
+
+/** Strip surrounding quotes from a chrome arg token. */
+function stripQuotes(s: string): string {
+  const unquote = s.replace(/^(['"])(.*)\1$/s, "$2");
+  const valueUnquote = unquote.replace(/^(-[^=]+=)(['"])(.*)\2$/s, "$1$3");
+  return valueUnquote;
+}
+
 /** Wrap browser profile result as ReportGroup[] for the standard pipeline */
 function browserResultGroups(
   name: string,
@@ -289,24 +301,3 @@ function printBrowserReport(
     });
   }
 }
-
-/** Warn about Node-only flags that are ignored in browser mode. */
-function warnBrowserFlags(args: DefaultCliArgs): void {
-  const ignored = [
-    !args.worker && "--no-worker",
-    args["trace-opt"] && "--trace-opt",
-    args["gc-force"] && "--gc-force",
-    args.adaptive && "--adaptive",
-    args.batches > 1 && "--batches",
-  ].filter(Boolean);
-  if (ignored.length)
-    console.warn(yellow(`Ignored in browser mode: ${ignored.join(", ")}`));
-}
-
-/** Strip surrounding quotes from a chrome arg token. */
-function stripQuotes(s: string): string {
-  const unquote = s.replace(/^(['"])(.*)\1$/s, "$2");
-  const valueUnquote = unquote.replace(/^(-[^=]+=)(['"])(.*)\2$/s, "$1$3");
-  return valueUnquote;
-}
-

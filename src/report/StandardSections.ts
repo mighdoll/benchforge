@@ -188,19 +188,6 @@ export const adaptiveSection: ResultsMapper<AdaptiveStats> = {
   ],
 };
 
-/** Format V8 tier distribution sorted by count (e.g. "turbofan:85% sparkplug:15%") */
-export function formatTierSummary(
-  opt: OptStatusInfo,
-  sep = ":",
-  join = " ",
-): string {
-  const total = Object.values(opt.byTier).reduce((s, t) => s + t.count, 0);
-  return Object.entries(opt.byTier)
-    .sort((a, b) => b[1].count - a[1].count)
-    .map(([name, t]) => `${name}${sep}${((t.count / total) * 100).toFixed(0)}%`)
-    .join(join);
-}
-
 /** Section: V8 optimization tier distribution and deopt count */
 export const optSection: ResultsMapper<OptStats> = {
   extract: (results: MeasuredResults) => {
@@ -230,6 +217,19 @@ export const optSection: ResultsMapper<OptStats> = {
     },
   ],
 };
+
+/** Format V8 tier distribution sorted by count (e.g. "turbofan:85% sparkplug:15%") */
+export function formatTierSummary(
+  opt: OptStatusInfo,
+  sep = ":",
+  join = " ",
+): string {
+  const total = Object.values(opt.byTier).reduce((s, t) => s + t.count, 0);
+  return Object.entries(opt.byTier)
+    .sort((a, b) => b[1].count - a[1].count)
+    .map(([name, t]) => `${name}${sep}${((t.count / total) * 100).toFixed(0)}%`)
+    .join(join);
+}
 
 /** Build default report sections (GC stats if enabled, plus run count) from CLI flags */
 export function buildGenericSections(args: {

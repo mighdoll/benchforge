@@ -202,23 +202,6 @@ function buildColumns(
   return [nameCol, timeCol, ...extraColumnGroups(options?.extraColumns)];
 }
 
-/** Group extra columns by groupTitle into ColumnGroups */
-function extraColumnGroups(
-  extra?: ExtraColumn[],
-): ColumnGroup<MatrixReportRow>[] {
-  if (!extra?.length) return [];
-
-  const byGroup = Map.groupBy(extra, col => col.groupTitle);
-  return [...byGroup].map(([groupTitle, cols]) => ({
-    groupTitle,
-    columns: cols.map(col => ({
-      key: col.key as keyof MatrixReportRow,
-      title: col.title,
-      formatter: col.formatter ?? String,
-    })),
-  }));
-}
-
 /** Build column groups from ResultsMapper sections */
 function buildSectionColumns(
   sections: ResultsMapper[],
@@ -263,4 +246,21 @@ function buildRow(
   }
 
   return row;
+}
+
+/** Group extra columns by groupTitle into ColumnGroups */
+function extraColumnGroups(
+  extra?: ExtraColumn[],
+): ColumnGroup<MatrixReportRow>[] {
+  if (!extra?.length) return [];
+
+  const byGroup = Map.groupBy(extra, col => col.groupTitle);
+  return [...byGroup].map(([groupTitle, cols]) => ({
+    groupTitle,
+    columns: cols.map(col => ({
+      key: col.key as keyof MatrixReportRow,
+      title: col.title,
+      formatter: col.formatter ?? String,
+    })),
+  }));
 }

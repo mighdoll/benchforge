@@ -1,10 +1,5 @@
-import type {
-  MatrixResults,
-  MatrixSuite,
-} from "../matrix/BenchMatrix.ts";
-import type {
-  MatrixReportOptions,
-} from "../matrix/MatrixReport.ts";
+import type { MatrixResults } from "../matrix/BenchMatrix.ts";
+import type { MatrixReportOptions } from "../matrix/MatrixReport.ts";
 import { reportMatrixResults } from "../matrix/MatrixReport.ts";
 import {
   aggregateSites,
@@ -15,10 +10,7 @@ import {
   type HeapReportOptions,
 } from "../profiling/node/HeapSampleReport.ts";
 import { resolveProfile } from "../profiling/node/ResolvedProfile.ts";
-import type {
-  ReportGroup,
-  ResultsMapper,
-} from "../report/BenchmarkReport.ts";
+import type { ReportGroup, ResultsMapper } from "../report/BenchmarkReport.ts";
 import { groupReports } from "../report/BenchmarkReport.ts";
 import colors from "../report/Colors.ts";
 import {

@@ -1,6 +1,6 @@
+import type { RunMatrixOptions } from "../matrix/BenchMatrix.ts";
 import type { HeapReportOptions } from "../profiling/node/HeapSampleReport.ts";
 import type { RunnerOptions } from "../runners/BenchRunner.ts";
-import type { RunMatrixOptions } from "../matrix/BenchMatrix.ts";
 import { type DefaultCliArgs, defaultAdaptiveMaxTime } from "./CliArgs.ts";
 
 /** Validate CLI argument combinations */

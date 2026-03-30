@@ -133,6 +133,42 @@ function buildScales(
   };
 }
 
+function text(
+  x: number,
+  y: number,
+  content: string,
+  anchor = "start",
+  size = "9",
+  fill = "#666",
+  weight = "400",
+): SVGTextElement {
+  const el = document.createElementNS("http://www.w3.org/2000/svg", "text");
+  el.setAttribute("x", String(x));
+  el.setAttribute("y", String(y));
+  el.setAttribute("text-anchor", anchor);
+  el.setAttribute("font-size", size);
+  el.setAttribute("font-weight", weight);
+  el.setAttribute("fill", fill);
+  el.textContent = content;
+  return el;
+}
+
+function rect(
+  x: number,
+  y: number,
+  w: number,
+  h: number,
+  attrs: Record<string, string>,
+): SVGRectElement {
+  const el = document.createElementNS("http://www.w3.org/2000/svg", "rect");
+  el.setAttribute("x", String(x));
+  el.setAttribute("y", String(y));
+  el.setAttribute("width", String(w));
+  el.setAttribute("height", String(h));
+  setAttrs(el, attrs);
+  return el;
+}
+
 function drawSmoothedDist(
   svg: SVGSVGElement,
   histogram: HistogramBin[],
@@ -180,40 +216,26 @@ function drawHistogramBars(
   }
 }
 
-function text(
-  x: number,
-  y: number,
-  content: string,
-  anchor = "start",
-  size = "9",
-  fill = "#666",
-  weight = "400",
-): SVGTextElement {
-  const el = document.createElementNS("http://www.w3.org/2000/svg", "text");
-  el.setAttribute("x", String(x));
-  el.setAttribute("y", String(y));
-  el.setAttribute("text-anchor", anchor);
-  el.setAttribute("font-size", size);
-  el.setAttribute("font-weight", weight);
-  el.setAttribute("fill", fill);
-  el.textContent = content;
+function line(
+  x1: number,
+  y1: number,
+  x2: number,
+  y2: number,
+  attrs: Record<string, string>,
+): SVGLineElement {
+  const el = document.createElementNS("http://www.w3.org/2000/svg", "line");
+  el.setAttribute("x1", String(x1));
+  el.setAttribute("y1", String(y1));
+  el.setAttribute("x2", String(x2));
+  el.setAttribute("y2", String(y2));
+  setAttrs(el, attrs);
   return el;
 }
 
-function rect(
-  x: number,
-  y: number,
-  w: number,
-  h: number,
-  attrs: Record<string, string>,
-): SVGRectElement {
-  const el = document.createElementNS("http://www.w3.org/2000/svg", "rect");
-  el.setAttribute("x", String(x));
-  el.setAttribute("y", String(y));
-  el.setAttribute("width", String(w));
-  el.setAttribute("height", String(h));
-  setAttrs(el, attrs);
-  return el;
+/** Set SVG attributes, converting camelCase keys to kebab-case */
+function setAttrs(el: SVGElement, attrs: Record<string, string>): void {
+  const kebab = (k: string) => k.replace(/[A-Z]/g, c => "-" + c.toLowerCase());
+  for (const [k, v] of Object.entries(attrs)) el.setAttribute(kebab(k), v);
 }
 
 /** Apply gaussian kernel smoothing to histogram bins */
@@ -235,26 +257,4 @@ function path(d: string, attrs: Record<string, string>): SVGPathElement {
   el.setAttribute("d", d);
   setAttrs(el, attrs);
   return el;
-}
-
-function line(
-  x1: number,
-  y1: number,
-  x2: number,
-  y2: number,
-  attrs: Record<string, string>,
-): SVGLineElement {
-  const el = document.createElementNS("http://www.w3.org/2000/svg", "line");
-  el.setAttribute("x1", String(x1));
-  el.setAttribute("y1", String(y1));
-  el.setAttribute("x2", String(x2));
-  el.setAttribute("y2", String(y2));
-  setAttrs(el, attrs);
-  return el;
-}
-
-/** Set SVG attributes, converting camelCase keys to kebab-case */
-function setAttrs(el: SVGElement, attrs: Record<string, string>): void {
-  const kebab = (k: string) => k.replace(/[A-Z]/g, c => "-" + c.toLowerCase());
-  for (const [k, v] of Object.entries(attrs)) el.setAttribute(kebab(k), v);
 }

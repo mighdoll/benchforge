@@ -93,6 +93,27 @@ export async function viewArchive(filePath: string): Promise<void> {
   close();
 }
 
+/** Wait for Ctrl+C before exiting */
+export function waitForCtrlC(): Promise<void> {
+  return new Promise(resolve => {
+    console.log("\nPress Ctrl+C to exit");
+    process.on("SIGINT", () => {
+      console.log();
+      resolve();
+    });
+  });
+}
+
+/** Resolve the package root directory.
+ *  In dev: src/cli/ViewerServer.ts  → dirname is "cli"  → up 2.
+ *  In dist: dist/ViewerServer-*.mjs → dirname is "dist" → up 1. */
+function packageRoot(): string {
+  const thisDir = dirname(fileURLToPath(import.meta.url));
+  const base = thisDir.split("/").pop() || "";
+  if (base === "cli") return join(thisDir, "../..");
+  return join(thisDir, "..");
+}
+
 /** Build HTTP request handler with API routes and static asset fallback */
 function createRequestHandler(
   ctx: ViewerServerOptions,
@@ -180,16 +201,6 @@ function tryListen(
   });
 }
 
-/** Resolve the package root directory.
- *  In dev: src/cli/ViewerServer.ts  → dirname is "cli"  → up 2.
- *  In dist: dist/ViewerServer-*.mjs → dirname is "dist" → up 1. */
-function packageRoot(): string {
-  const thisDir = dirname(fileURLToPath(import.meta.url));
-  const base = thisDir.split("/").pop() || "";
-  if (base === "cli") return join(thisDir, "../..");
-  return join(thisDir, "..");
-}
-
 function sendJson(
   res: Res,
   data: string | undefined,
@@ -275,15 +286,4 @@ async function handleArchiveRequest(
     res.statusCode = 500;
     res.end("Archive failed");
   }
-}
-
-/** Wait for Ctrl+C before exiting */
-export function waitForCtrlC(): Promise<void> {
-  return new Promise(resolve => {
-    console.log("\nPress Ctrl+C to exit");
-    process.on("SIGINT", () => {
-      console.log();
-      resolve();
-    });
-  });
 }

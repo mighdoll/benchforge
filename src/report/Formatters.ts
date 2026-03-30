@@ -114,6 +114,12 @@ export function truncate(str: string, maxLen = 30): string {
   return str.length > maxLen ? str.slice(0, maxLen - 3) + "..." : str;
 }
 
+/** @return signed percentage string (e.g. "+1.2%", "-3.4%") */
+export function formatSignedPercent(v: number): string {
+  const sign = v >= 0 ? "+" : "";
+  return `${sign}${v.toFixed(1)}%`;
+}
+
 /** Format fraction as colored +/- percentage */
 function coloredPercent(
   numerator: number,
@@ -144,10 +150,4 @@ function colorByDirection(text: string, direction: CIDirection): string {
 /** @return formatted "pct [lo, hi]" text for a diff with CI */
 function diffCIText(pct: number, ci: [number, number]): string {
   return `${formatSignedPercent(pct)} [${formatSignedPercent(ci[0])}, ${formatSignedPercent(ci[1])}]`;
-}
-
-/** @return signed percentage string (e.g. "+1.2%", "-3.4%") */
-export function formatSignedPercent(v: number): string {
-  const sign = v >= 0 ? "+" : "";
-  return `${sign}${v.toFixed(1)}%`;
 }

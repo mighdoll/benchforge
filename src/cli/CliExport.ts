@@ -105,18 +105,6 @@ function exportFileFormats(
   if (args["export-time"]) exportTimeProfile(results, args["export-time"]);
 }
 
-/** Export the first raw V8 TimeProfile to a JSON file */
-function exportTimeProfile(results: ReportGroup[], path: string): void {
-  const profile = findTimeProfile(results);
-  if (profile) {
-    const absPath = resolve(path);
-    writeFileSync(absPath, JSON.stringify(profile));
-    console.log(`Time profile exported to: ${path}`);
-  } else {
-    console.log("No time profiles to export.");
-  }
-}
-
 /** Build combined time profile SpeedScope file from all results */
 function buildAllTimeProfiles(results: ReportGroup[]) {
   type TP = import("../profiling/node/TimeSampler.ts").TimeProfile;
@@ -154,6 +142,36 @@ async function annotateCoverage(
     annotateFramesWithCounts(timeProfileFile.shared.frames, coverageResult);
 }
 
+/** Start viewer server with profile data and block until Ctrl+C */
+async function openViewer(
+  profileFile: ReturnType<typeof buildSpeedscopeFile>,
+  timeProfileData: string | undefined,
+  reportData: ReportData | undefined,
+  args: DefaultCliArgs,
+): Promise<void> {
+  const profileData = profileFile ? JSON.stringify(profileFile) : undefined;
+  const viewer = await startViewerServer({
+    profileData,
+    timeProfileData,
+    reportData: reportData ? JSON.stringify(reportData) : undefined,
+    editorUri: resolveEditorUri(args.editor),
+  });
+  await waitForCtrlC();
+  viewer.close();
+}
+
+/** Export the first raw V8 TimeProfile to a JSON file */
+function exportTimeProfile(results: ReportGroup[], path: string): void {
+  const profile = findTimeProfile(results);
+  if (profile) {
+    const absPath = resolve(path);
+    writeFileSync(absPath, JSON.stringify(profile));
+    console.log(`Time profile exported to: ${path}`);
+  } else {
+    console.log("No time profiles to export.");
+  }
+}
+
 /** Merge coverage data from all results into a single CoverageData */
 function mergeCoverage(
   results: ReportGroup[],
@@ -171,22 +189,4 @@ function findTimeProfile(
   const reports = results.flatMap(g => groupReports(g));
   return reports.find(r => r.measuredResults.timeProfile)?.measuredResults
     .timeProfile;
-}
-
-/** Start viewer server with profile data and block until Ctrl+C */
-async function openViewer(
-  profileFile: ReturnType<typeof buildSpeedscopeFile>,
-  timeProfileData: string | undefined,
-  reportData: ReportData | undefined,
-  args: DefaultCliArgs,
-): Promise<void> {
-  const profileData = profileFile ? JSON.stringify(profileFile) : undefined;
-  const viewer = await startViewerServer({
-    profileData,
-    timeProfileData,
-    reportData: reportData ? JSON.stringify(reportData) : undefined,
-    editorUri: resolveEditorUri(args.editor),
-  });
-  await waitForCtrlC();
-  viewer.close();
 }

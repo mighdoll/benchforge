@@ -22,6 +22,15 @@ export interface DifferenceCI {
   histogram?: HistogramBin[];
 }
 
+/** Options for bootstrap resampling methods */
+type BootstrapOptions = {
+  resamples?: number;
+  confidence?: number;
+};
+const confidence = 0.95;
+const outlierMultiplier = 1.5; // Tukey's fence multiplier
+const bootstrapSamples = 10000;
+
 /** Negate percent and CI for "higher is better" metrics (e.g., throughput) */
 export function flipCI(ci: DifferenceCI): DifferenceCI {
   return {
@@ -31,15 +40,6 @@ export function flipCI(ci: DifferenceCI): DifferenceCI {
     histogram: ci.histogram?.map(bin => ({ x: -bin.x, count: bin.count })),
   };
 }
-
-/** Options for bootstrap resampling methods */
-type BootstrapOptions = {
-  resamples?: number;
-  confidence?: number;
-};
-const confidence = 0.95;
-const outlierMultiplier = 1.5; // Tukey's fence multiplier
-const bootstrapSamples = 10000;
 
 /** @return relative standard deviation (coefficient of variation) */
 export function coefficientOfVariation(samples: number[]): number {

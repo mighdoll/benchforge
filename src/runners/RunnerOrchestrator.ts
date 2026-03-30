@@ -105,6 +105,31 @@ async function resolveModuleSpec<T>(
   return { spec: { ...spec, fn }, params: resolvedParams };
 }
 
+/** Create message for worker execution */
+function createRunMessage<T>(
+  spec: BenchmarkSpec<T>,
+  runnerName: KnownRunner,
+  options: RunnerOptions,
+  params?: T,
+): RunMessage {
+  const { fn, ...rest } = spec;
+  const message: RunMessage = {
+    type: "run",
+    spec: rest as BenchmarkSpec,
+    runnerName,
+    options,
+    params,
+  };
+  if (spec.modulePath) {
+    message.modulePath = spec.modulePath;
+    message.exportName = spec.exportName;
+    if (spec.setupExportName) message.setupExportName = spec.setupExportName;
+  } else {
+    message.fnCode = fn.toString();
+  }
+  return message;
+}
+
 /** Spawn worker, wire handlers, send message, return results */
 function runWorkerWithMessage(
   name: string,
@@ -169,31 +194,6 @@ function runWorkerWithMessage(
 
     worker.send(message);
   });
-}
-
-/** Create message for worker execution */
-function createRunMessage<T>(
-  spec: BenchmarkSpec<T>,
-  runnerName: KnownRunner,
-  options: RunnerOptions,
-  params?: T,
-): RunMessage {
-  const { fn, ...rest } = spec;
-  const message: RunMessage = {
-    type: "run",
-    spec: rest as BenchmarkSpec,
-    runnerName,
-    options,
-    params,
-  };
-  if (spec.modulePath) {
-    message.modulePath = spec.modulePath;
-    message.exportName = spec.exportName;
-    if (spec.setupExportName) message.setupExportName = spec.setupExportName;
-  } else {
-    message.fnCode = fn.toString();
-  }
-  return message;
 }
 
 /** Spawn worker process with V8 flags */

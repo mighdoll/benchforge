@@ -59,6 +59,18 @@ async function runSuite(params: SuiteParams): Promise<ReportGroup[]> {
   );
 }
 
+/** Sequential map - like Promise.all(arr.map(fn)) but runs one at a time */
+async function serialMap<T, R>(
+  arr: T[],
+  fn: (item: T) => Promise<R>,
+): Promise<R[]> {
+  const results: R[] = [];
+  for (const item of arr) {
+    results.push(await fn(item));
+  }
+  return results;
+}
+
 /** Execute group with shared setup, optionally batching to reduce ordering bias */
 async function runGroup(
   group: BenchGroup,
@@ -82,6 +94,23 @@ async function runGroup(
     return runSingleBatch(name, benchmarks, baseline, runParams);
   }
   return runMultipleBatches(name, benchmarks, baseline, runParams, batches);
+}
+
+/** Warn if parameterized benchmarks lack setup */
+function validateBenchmarkParameters(group: BenchGroup): void {
+  if (group.setup) return;
+
+  const allBenchmarks = group.baseline
+    ? [...group.benchmarks, group.baseline]
+    : group.benchmarks;
+
+  for (const bench of allBenchmarks) {
+    if (bench.fn.length > 0) {
+      console.warn(
+        `Benchmark "${bench.name}" in group "${group.name}" expects parameters but no setup() provided.`,
+      );
+    }
+  }
 }
 
 /** Run benchmarks in a single batch */
@@ -139,6 +168,17 @@ async function runMultipleBatches(
   );
 }
 
+/** Run single benchmark and create report */
+async function runSingleBenchmark(
+  spec: BenchmarkSpec,
+  runParams: RunParams,
+): Promise<BenchmarkReport> {
+  const { runner, options, useWorker, params, metadata } = runParams;
+  const benchmarkParams = { spec, runner, options, useWorker, params };
+  const [result] = await runBenchmark(benchmarkParams);
+  return { name: spec.name, measuredResults: result, metadata };
+}
+
 /** Run one batch iteration in either order */
 async function runBatchIteration(
   benchmarks: BenchmarkSpec[],
@@ -170,17 +210,6 @@ async function runBatchIteration(
   }
 }
 
-/** Run single benchmark and create report */
-async function runSingleBenchmark(
-  spec: BenchmarkSpec,
-  runParams: RunParams,
-): Promise<BenchmarkReport> {
-  const { runner, options, useWorker, params, metadata } = runParams;
-  const benchmarkParams = { spec, runner, options, useWorker, params };
-  const [result] = await runBenchmark(benchmarkParams);
-  return { name: spec.name, measuredResults: result, metadata };
-}
-
 /** Merge batch results into final ReportGroup */
 function mergeBatchResults(
   name: string,
@@ -203,6 +232,15 @@ function mergeBatchResults(
     metadata,
   }));
   return { name, reports, baseline: mergedBaseline };
+}
+
+function appendToMap(
+  map: Map<string, MeasuredResults[]>,
+  key: string,
+  value: MeasuredResults,
+) {
+  if (!map.has(key)) map.set(key, []);
+  map.get(key)!.push(value);
 }
 
 /** Merge multiple batch results into a single MeasuredResults */
@@ -234,42 +272,4 @@ function mergeResults(results: MeasuredResults[]): MeasuredResults {
     totalTime: results.reduce((sum, r) => sum + (r.totalTime || 0), 0),
     pausePoints: allPausePoints.length ? allPausePoints : undefined,
   };
-}
-
-/** Warn if parameterized benchmarks lack setup */
-function validateBenchmarkParameters(group: BenchGroup): void {
-  if (group.setup) return;
-
-  const allBenchmarks = group.baseline
-    ? [...group.benchmarks, group.baseline]
-    : group.benchmarks;
-
-  for (const bench of allBenchmarks) {
-    if (bench.fn.length > 0) {
-      console.warn(
-        `Benchmark "${bench.name}" in group "${group.name}" expects parameters but no setup() provided.`,
-      );
-    }
-  }
-}
-
-/** Sequential map - like Promise.all(arr.map(fn)) but runs one at a time */
-async function serialMap<T, R>(
-  arr: T[],
-  fn: (item: T) => Promise<R>,
-): Promise<R[]> {
-  const results: R[] = [];
-  for (const item of arr) {
-    results.push(await fn(item));
-  }
-  return results;
-}
-
-function appendToMap(
-  map: Map<string, MeasuredResults[]>,
-  key: string,
-  value: MeasuredResults,
-) {
-  if (!map.has(key)) map.set(key, []);
-  map.get(key)!.push(value);
 }
