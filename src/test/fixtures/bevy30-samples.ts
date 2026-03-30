@@ -155,4 +155,6 @@ export const bevy30SamplesMs = [
 ] as number[];
 
 /** Get samples in nanoseconds */
-export const bevy30SamplesNs = bevy30SamplesMs.map(s => s * 1_000_000);
+export const bevy30SamplesNs: number[] = bevy30SamplesMs.map(
+  s => s * 1_000_000,
+);

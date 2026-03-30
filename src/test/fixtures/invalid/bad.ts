@@ -1,1 +1,1 @@
-export const notRun = () => {};
+export const notRun = (): void => {};

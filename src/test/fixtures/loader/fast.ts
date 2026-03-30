@@ -1,1 +1,1 @@
-export const run = () => {};
+export const run = (): void => {};

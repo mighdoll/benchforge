@@ -25,7 +25,7 @@
   "exclude": [
     "**/node_modules",
     "**/dist",
-    "src/tests/fixtures",
+    "src/test/fixtures",
     "src/viewer/plots",
     "src/viewer/shell.ts",
     "*.config.ts"

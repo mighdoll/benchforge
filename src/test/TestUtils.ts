@@ -8,7 +8,11 @@ import { average, percentile } from "../stats/StatisticalUtils.ts";
 import { bevy30SamplesMs } from "./fixtures/bevy30-samples.ts";
 
 /** Validation helpers for statistical tests */
-export const assertValid = {
+export const assertValid: {
+  pValue: (value: number) => void;
+  percentileOrder: (p25: number, p50: number, p75: number, p99: number) => void;
+  significance: (level: string) => void;
+} = {
   pValue: (value: number) => {
     if (value < 0 || value > 1) {
       throw new Error(`Expected p-value between 0 and 1, got ${value}`);

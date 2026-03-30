@@ -30,7 +30,11 @@ export async function collectTracing(
   return browserGcStats(traceEvents);
 }
 
-export function heapSamplingParams(samplingInterval: number) {
+export function heapSamplingParams(samplingInterval: number): {
+  samplingInterval: number;
+  includeObjectsCollectedByMajorGC: boolean;
+  includeObjectsCollectedByMinorGC: boolean;
+} {
   return {
     samplingInterval,
     includeObjectsCollectedByMajorGC: true,
