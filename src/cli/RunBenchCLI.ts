@@ -38,7 +38,7 @@ import {
   type MatrixReportOptions,
   reportMatrixResults,
 } from "../matrix/MatrixReport.ts";
-import type { BrowserProfileResult } from "../profiling/browser/BrowserHeapSampler.ts";
+import type { BrowserProfileResult } from "../profiling/browser/BrowserProfiler.ts";
 import {
   aggregateSites,
   filterSites,
@@ -169,10 +169,10 @@ export async function benchExports(
 export async function browserBenchExports(args: DefaultCliArgs): Promise<void> {
   warnBrowserFlags(args);
 
-  let profileBrowser: typeof import("../profiling/browser/BrowserHeapSampler.ts").profileBrowser;
+  let profileBrowser: typeof import("../profiling/browser/BrowserProfiler.ts").profileBrowser;
   try {
     ({ profileBrowser } = await import(
-      "../profiling/browser/BrowserHeapSampler.ts"
+      "../profiling/browser/BrowserProfiler.ts"
     ));
   } catch {
     throw new Error(

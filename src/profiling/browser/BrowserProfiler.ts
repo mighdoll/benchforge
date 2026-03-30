@@ -338,5 +338,3 @@ async function collectCoverage(cdp: CDPSession): Promise<CoverageData> {
   );
   return { scripts };
 }
-
-export { profileBrowser as profileBrowserHeap };
