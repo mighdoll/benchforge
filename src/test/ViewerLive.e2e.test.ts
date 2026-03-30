@@ -60,7 +60,7 @@ afterAll(() => {
   proc?.kill();
 });
 
-test("live viewer: report tab shows chart SVG", {
+test("live viewer: summary tab shows stats", {
   timeout: 30_000,
 }, async () => {
   const browser = await chromium.launch();
@@ -73,8 +73,40 @@ test("live viewer: report tab shows chart SVG", {
     });
     await page.goto(`http://localhost:${port}`, { waitUntil: "networkidle" });
 
-    const reportPanel = page.locator("#report-panel");
-    const svg = reportPanel.locator("svg").first();
+    const summaryPanel = page.locator("#summary-panel");
+    const stats = summaryPanel.locator(".stats-grid").first();
+    await stats.waitFor({ state: "visible", timeout: 15_000 });
+    const statItems = await summaryPanel.locator(".stat-item").count();
+    expect(statItems).toBeGreaterThan(0);
+  } finally {
+    await browser.close();
+  }
+  expect(consoleErrors).toEqual([]);
+});
+
+test("live viewer: samples tab shows chart SVG", {
+  timeout: 30_000,
+}, async () => {
+  const browser = await chromium.launch();
+  const consoleErrors: string[] = [];
+  try {
+    const page = await browser.newPage();
+    page.on("console", msg => {
+      if (msg.type() === "error" && !msg.text().includes("WebGL"))
+        consoleErrors.push(msg.text());
+    });
+    await page.goto(`http://localhost:${port}`, { waitUntil: "networkidle" });
+
+    // Wait for summary to load (samples tab becomes enabled)
+    await page
+      .locator("#summary-panel .stats-grid")
+      .first()
+      .waitFor({ state: "visible", timeout: 15_000 });
+
+    await page.locator("#tab-samples").click();
+
+    const samplesPanel = page.locator("#samples-panel");
+    const svg = samplesPanel.locator("svg").first();
     await svg.waitFor({ state: "visible", timeout: 15_000 });
     const childCount = await svg
       .locator("path, rect, circle, line, text")

@@ -114,6 +114,7 @@
 .report-panel .stat-value { font-size: 18px; font-weight: 600; color: #333; margin-top: 4px; }
 
 .report-panel .loading { color: #666; font-style: italic; padding: 20px; text-align: center; }
+.report-panel .single-sample-notice { color: #999; font-style: italic; padding: 20px; text-align: center; }
 .report-panel .error { color: #d32f2f; background: #ffebee; padding: 15px; border-radius: 4px; margin: 10px 0; }
 
 .report-panel .ci-faster { color: #22c55e; }

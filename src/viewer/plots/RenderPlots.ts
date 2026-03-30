@@ -22,34 +22,36 @@ interface FlattenedData {
   allPausePoints: FlatPausePoint[];
 }
 
-/** Render all plots for the benchmark report */
-export function renderPlots(data: ReportData): void {
+/** Render stats and CI plots for the summary tab */
+export function renderSummaryStats(data: ReportData): void {
   const gcEnabled = data.metadata.gcTrackingEnabled ?? false;
   data.groups.forEach((group, groupIndex) => {
     try {
-      renderGroup(group, groupIndex, gcEnabled);
+      renderGroupStats(group, groupIndex, gcEnabled);
     } catch (error) {
-      console.error("Error rendering plots for group", groupIndex, error);
-      showError(
-        groupIndex,
-        `Error rendering visualizations: ${(error as Error).message}`,
-      );
+      console.error("Error rendering stats for group", groupIndex, error);
     }
   });
 }
 
-function renderGroup(
+/** Render time series and histogram plots for the samples tab */
+export function renderSamplePlots(data: ReportData): void {
+  data.groups.forEach((group, groupIndex) => {
+    try {
+      renderGroupPlots(group, groupIndex);
+    } catch (error) {
+      console.error("Error rendering plots for group", groupIndex, error);
+    }
+  });
+}
+
+function renderGroupStats(
   group: ReportData["groups"][0],
   groupIndex: number,
   gcEnabled: boolean,
 ): void {
   const benchmarks = prepareBenchmarks(group);
-  if (benchmarks.length === 0 || !benchmarks[0].samples?.length) {
-    showError(groupIndex, "No sample data available for visualization");
-    return;
-  }
-  const flattened = flattenSamples(benchmarks);
-  const benchmarkNames = benchmarks.map(b => b.name);
+  if (benchmarks.length === 0) return;
 
   const currentBenchmark = benchmarks.find(b => !b.isBaseline);
   if (currentBenchmark?.comparisonCI?.histogram) {
@@ -57,6 +59,23 @@ function renderGroup(
       createCIPlot(currentBenchmark.comparisonCI!),
     );
   }
+
+  const statsContainer = document.querySelector(`#stats-${groupIndex}`);
+  if (statsContainer)
+    statsContainer.innerHTML = benchmarks
+      .map(b => generateStatsHtml(b, gcEnabled))
+      .join("");
+}
+
+function renderGroupPlots(
+  group: ReportData["groups"][0],
+  groupIndex: number,
+): void {
+  const benchmarks = prepareBenchmarks(group);
+  if (benchmarks.length === 0 || !benchmarks[0].samples?.length) return;
+
+  const flattened = flattenSamples(benchmarks);
+  const benchmarkNames = benchmarks.map(b => b.name);
 
   renderToContainer(
     `#histogram-${groupIndex}`,
@@ -75,17 +94,6 @@ function renderGroup(
         heapSeries,
       ),
   );
-
-  const statsContainer = document.querySelector(`#stats-${groupIndex}`);
-  if (statsContainer)
-    statsContainer.innerHTML = benchmarks
-      .map(b => generateStatsHtml(b, gcEnabled))
-      .join("");
-}
-
-function showError(groupIndex: number, message: string): void {
-  const container = document.querySelector(`#group-${groupIndex}`);
-  if (container) container.innerHTML = `<div class="error">${message}</div>`;
 }
 
 /** Combine baseline and benchmarks into a single list with display names */

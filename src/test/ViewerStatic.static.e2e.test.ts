@@ -48,7 +48,7 @@ test("static viewer: drop zone appears on load", {
   }
 });
 
-test("static viewer: archive upload shows report with chart", {
+test("static viewer: archive upload shows summary with stats", {
   timeout: 30_000,
 }, async () => {
   const browser = await chromium.launch();
@@ -67,14 +67,12 @@ test("static viewer: archive upload shows report with chart", {
     await page
       .locator(".drop-zone")
       .waitFor({ state: "detached", timeout: 15_000 });
-    const reportPanel = page.locator("#report-panel");
 
-    const svg = reportPanel.locator("svg").first();
-    await svg.waitFor({ state: "visible", timeout: 15_000 });
-    const childCount = await svg
-      .locator("path, rect, circle, line, text")
-      .count();
-    expect(childCount).toBeGreaterThan(0);
+    const summaryPanel = page.locator("#summary-panel");
+    const stats = summaryPanel.locator(".stats-grid").first();
+    await stats.waitFor({ state: "visible", timeout: 15_000 });
+    const statItems = await summaryPanel.locator(".stat-item").count();
+    expect(statItems).toBeGreaterThan(0);
   } finally {
     await browser.close();
   }
@@ -100,8 +98,17 @@ test("static viewer: tab navigation after archive upload", {
       .locator(".drop-zone")
       .waitFor({ state: "detached", timeout: 15_000 });
 
-    const reportPanel = page.locator("#report-panel");
-    await reportPanel
+    // Wait for summary to load
+    const summaryPanel = page.locator("#summary-panel");
+    await summaryPanel
+      .locator(".stats-grid")
+      .first()
+      .waitFor({ state: "visible", timeout: 15_000 });
+
+    // Samples tab
+    await page.locator("#tab-samples").click();
+    const samplesPanel = page.locator("#samples-panel");
+    await samplesPanel
       .locator("svg")
       .first()
       .waitFor({ state: "visible", timeout: 15_000 });
@@ -114,17 +121,12 @@ test("static viewer: tab navigation after archive upload", {
       .first()
       .waitFor({ state: "visible", timeout: 15_000 });
 
-    // Timing tab
-    await page.locator("#tab-time-flamechart").click();
-    const timeFrame = page.frameLocator("#time-speedscope-iframe");
-    await timeFrame
-      .locator("body *")
+    // Back to Summary
+    await page.locator("#tab-summary").click();
+    await summaryPanel
+      .locator(".stats-grid")
       .first()
-      .waitFor({ state: "visible", timeout: 15_000 });
-
-    // Back to Report
-    await page.locator("#tab-report").click();
-    await reportPanel.locator("svg").first().waitFor({ state: "visible" });
+      .waitFor({ state: "visible" });
   } finally {
     await browser.close();
   }
