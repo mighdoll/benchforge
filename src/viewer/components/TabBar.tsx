@@ -6,8 +6,9 @@ import {
   reportData,
   samplesLoaded,
   sourceTabs,
-} from "../state.ts";
+} from "../State.ts";
 import { hasSufficientSamples } from "./SamplesPanel.tsx";
+import { ThemeToggle } from "./ThemeToggle.tsx";
 
 export function TabBar() {
   const p = provider.value!;
@@ -50,6 +51,7 @@ export function TabBar() {
       ))}
 
       <div class="tab-spacer" />
+      <ThemeToggle />
       <ArchiveButton provider={p} />
     </div>
   );

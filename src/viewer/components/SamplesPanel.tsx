@@ -4,7 +4,7 @@ import {
   flattenSamples,
   prepareBenchmarks,
 } from "../plots/RenderPlots.ts";
-import { reportData, samplesLoaded } from "../state.ts";
+import { reportData, samplesLoaded } from "../State.ts";
 
 export function hasSufficientSamples(data: ReportData): boolean {
   return data.groups.some(groupHasSamples);

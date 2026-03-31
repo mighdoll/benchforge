@@ -4,6 +4,10 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Benchforge Viewer</title>
+<script>
+  var m = document.cookie.match(/(?:^|; )theme=(light|dark)/);
+  if (m) document.documentElement.dataset.theme = m[1];
+</script>
 <link rel="stylesheet" href="./shell.css">
 <link rel="stylesheet" href="./report.css">
 

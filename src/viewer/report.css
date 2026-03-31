@@ -138,23 +138,42 @@
   font-size: 13px;
 }
 
-/* Dark mode */
+/* Dark mode — system preference (not overridden to light) */
 @media (prefers-color-scheme: dark) {
-  .report-panel { background: #181818; }
-  .report-panel .report-header { background: #252525; box-shadow: 0 2px 4px rgba(0,0,0,0.3); }
-  .report-panel .cli-args { color: #bbb; background: #333; }
-  .report-panel .metadata { color: #999; }
-  .report-panel .version-info { color: #999; }
-  .report-panel h2 { color: #ccc; border-color: #444; }
-  .report-panel .group-header { border-color: #444; }
-  .report-panel .plot-container { background: #252525; box-shadow: 0 2px 4px rgba(0,0,0,0.3); }
-  .report-panel .plot-title { color: #ddd; }
-  .report-panel .plot-description { color: #999; }
-  .report-panel .summary-stats { background: #222; }
-  .report-panel .stat-item { background: #2a2a2a; }
-  .report-panel .stat-label { color: #999; }
-  .report-panel .stat-value { color: #ddd; }
-  .report-panel .loading { color: #999; }
-  .report-panel .empty-state { color: #666; }
-  .report-panel .empty-state code { background: #333; }
+  :root:not([data-theme="light"]) .report-panel { background: #181818; }
+  :root:not([data-theme="light"]) .report-panel .report-header { background: #252525; box-shadow: 0 2px 4px rgba(0,0,0,0.3); }
+  :root:not([data-theme="light"]) .report-panel .cli-args { color: #bbb; background: #333; }
+  :root:not([data-theme="light"]) .report-panel .metadata { color: #999; }
+  :root:not([data-theme="light"]) .report-panel .version-info { color: #999; }
+  :root:not([data-theme="light"]) .report-panel h2 { color: #ccc; border-color: #444; }
+  :root:not([data-theme="light"]) .report-panel .group-header { border-color: #444; }
+  :root:not([data-theme="light"]) .report-panel .plot-container { background: #252525; box-shadow: 0 2px 4px rgba(0,0,0,0.3); }
+  :root:not([data-theme="light"]) .report-panel .plot-title { color: #ddd; }
+  :root:not([data-theme="light"]) .report-panel .plot-description { color: #999; }
+  :root:not([data-theme="light"]) .report-panel .summary-stats { background: #222; }
+  :root:not([data-theme="light"]) .report-panel .stat-item { background: #2a2a2a; }
+  :root:not([data-theme="light"]) .report-panel .stat-label { color: #999; }
+  :root:not([data-theme="light"]) .report-panel .stat-value { color: #ddd; }
+  :root:not([data-theme="light"]) .report-panel .loading { color: #999; }
+  :root:not([data-theme="light"]) .report-panel .empty-state { color: #666; }
+  :root:not([data-theme="light"]) .report-panel .empty-state code { background: #333; }
 }
+
+/* Dark mode — user forced */
+:root[data-theme="dark"] .report-panel { background: #181818; }
+:root[data-theme="dark"] .report-panel .report-header { background: #252525; box-shadow: 0 2px 4px rgba(0,0,0,0.3); }
+:root[data-theme="dark"] .report-panel .cli-args { color: #bbb; background: #333; }
+:root[data-theme="dark"] .report-panel .metadata { color: #999; }
+:root[data-theme="dark"] .report-panel .version-info { color: #999; }
+:root[data-theme="dark"] .report-panel h2 { color: #ccc; border-color: #444; }
+:root[data-theme="dark"] .report-panel .group-header { border-color: #444; }
+:root[data-theme="dark"] .report-panel .plot-container { background: #252525; box-shadow: 0 2px 4px rgba(0,0,0,0.3); }
+:root[data-theme="dark"] .report-panel .plot-title { color: #ddd; }
+:root[data-theme="dark"] .report-panel .plot-description { color: #999; }
+:root[data-theme="dark"] .report-panel .summary-stats { background: #222; }
+:root[data-theme="dark"] .report-panel .stat-item { background: #2a2a2a; }
+:root[data-theme="dark"] .report-panel .stat-label { color: #999; }
+:root[data-theme="dark"] .report-panel .stat-value { color: #ddd; }
+:root[data-theme="dark"] .report-panel .loading { color: #999; }
+:root[data-theme="dark"] .report-panel .empty-state { color: #666; }
+:root[data-theme="dark"] .report-panel .empty-state code { background: #333; }

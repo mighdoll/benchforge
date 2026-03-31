@@ -14,7 +14,7 @@
 }
 
 @media (prefers-color-scheme: dark) {
-  :root {
+  :root:not([data-theme="light"]) {
     --tab-bar-bg: #1e1e1e;
     --tab-border: #555;
     --tab-color: #999;
@@ -26,6 +26,19 @@
     --source-highlight: #3a3a00;
     --source-line-color: #666;
   }
+}
+
+:root[data-theme="dark"] {
+  --tab-bar-bg: #1e1e1e;
+  --tab-border: #555;
+  --tab-color: #999;
+  --tab-active-color: #fff;
+  --tab-accent: #7b7dea;
+  --body-bg: #181818;
+  --source-bg: #1e1e1e;
+  --source-color: #d4d4d4;
+  --source-highlight: #3a3a00;
+  --source-line-color: #666;
 }
 
 html, body {
@@ -112,6 +125,26 @@ body { display: flex; flex-direction: column; }
 .tab .tab-close:hover { opacity: 1; }
 
 .tab-spacer { flex: 1; }
+
+.theme-toggle { display: flex; align-items: center; gap: 2px; margin-right: 8px; }
+
+.theme-btn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 4px;
+  border-radius: 4px;
+  color: var(--tab-color);
+  opacity: 0.6;
+  display: flex;
+  align-items: center;
+}
+.theme-btn:hover { opacity: 1; }
+.theme-btn.active {
+  color: var(--tab-accent);
+  opacity: 1;
+  background: color-mix(in srgb, var(--tab-accent) 15%, transparent);
+}
 
 .archive-btn {
   font-size: 12px;
@@ -238,20 +271,34 @@ body { display: flex; flex-direction: column; }
 .source-code .line .gutter-time  { color: #2563eb; }
 
 @media (prefers-color-scheme: dark) {
-  .source-code .line.heat {
+  :root:not([data-theme="light"]) .source-code .line.heat {
     background: rgba(234, 179, 8, calc(var(--heat, 0) * 0.12));
   }
-  .source-code .line .gutter-count { color: #aaa; }
-  .source-code .line .gutter-alloc { color: #fbbf24; }
-  .source-code .line .gutter-time  { color: #60a5fa; }
+  :root:not([data-theme="light"]) .source-code .line .gutter-count { color: #aaa; }
+  :root:not([data-theme="light"]) .source-code .line .gutter-alloc { color: #fbbf24; }
+  :root:not([data-theme="light"]) .source-code .line .gutter-time  { color: #60a5fa; }
 }
 
-/* Shiki dual-theme wiring */
-@media (prefers-color-scheme: light) {
-  .shiki, .shiki span { color: var(--shiki-light); background-color: var(--shiki-light-bg); }
+:root[data-theme="dark"] .source-code .line.heat {
+  background: rgba(234, 179, 8, calc(var(--heat, 0) * 0.12));
 }
+:root[data-theme="dark"] .source-code .line .gutter-count { color: #aaa; }
+:root[data-theme="dark"] .source-code .line .gutter-alloc { color: #fbbf24; }
+:root[data-theme="dark"] .source-code .line .gutter-time  { color: #60a5fa; }
+
+/* Shiki dual-theme wiring */
+.shiki, .shiki span { color: var(--shiki-light); background-color: var(--shiki-light-bg); }
+
 @media (prefers-color-scheme: dark) {
-  .shiki, .shiki span { color: var(--shiki-dark); background-color: var(--shiki-dark-bg); }
+  :root:not([data-theme="light"]) .shiki,
+  :root:not([data-theme="light"]) .shiki span {
+    color: var(--shiki-dark); background-color: var(--shiki-dark-bg);
+  }
+}
+
+:root[data-theme="dark"] .shiki,
+:root[data-theme="dark"] .shiki span {
+  color: var(--shiki-dark); background-color: var(--shiki-dark-bg);
 }
 
 .source-placeholder {

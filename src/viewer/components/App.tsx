@@ -11,7 +11,7 @@ import {
   reportData,
   samplesLoaded,
   sourceTabs,
-} from "../state.ts";
+} from "../State.ts";
 import { DropZone } from "./DropZone.tsx";
 import { Shell } from "./Shell.tsx";
 

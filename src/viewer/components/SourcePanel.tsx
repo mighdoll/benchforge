@@ -24,7 +24,7 @@ import {
   provider,
   sourceTabs,
   type SourceTabState,
-} from "../state.ts";
+} from "../State.ts";
 
 let highlighterPromise: Promise<HighlighterCore> | undefined;
 

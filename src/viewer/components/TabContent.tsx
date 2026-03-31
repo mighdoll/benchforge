@@ -1,5 +1,5 @@
 import type { ViewerConfig } from "../Providers.ts";
-import { activeTabId, provider, sourceTabs } from "../state.ts";
+import { activeTabId, provider, sourceTabs } from "../State.ts";
 import { SamplesPanel } from "./SamplesPanel.tsx";
 import { SourcePanel } from "./SourcePanel.tsx";
 import { SummaryPanel } from "./SummaryPanel.tsx";

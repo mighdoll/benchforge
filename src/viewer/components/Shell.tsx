@@ -1,5 +1,5 @@
 import { useEffect } from "preact/hooks";
-import { provider, sourceTabs } from "../state.ts";
+import { provider, sourceTabs } from "../State.ts";
 import { openSourceTab } from "./SourcePanel.tsx";
 import { TabBar } from "./TabBar.tsx";
 import { TabContent } from "./TabContent.tsx";

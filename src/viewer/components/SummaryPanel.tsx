@@ -6,7 +6,7 @@ import type { BenchmarkGroup, BenchmarkStats, SectionStat } from "../ReportData.
 import type { ReportData } from "../ReportData.ts";
 import { formatPct } from "../plots/PlotTypes.ts";
 import { prepareBenchmarks, type PreparedBenchmark } from "../plots/RenderPlots.ts";
-import { provider, reportData } from "../state.ts";
+import { provider, reportData } from "../State.ts";
 
 const defaultArgs: Record<string, unknown> = {
   worker: true,
