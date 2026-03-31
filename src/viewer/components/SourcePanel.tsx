@@ -36,11 +36,7 @@ function getHighlighter(): Promise<HighlighterCore> {
   return highlighterPromise;
 }
 
-export function openSourceTab(
-  file: string,
-  line: number,
-  col: number,
-): void {
+export function openSourceTab(file: string, line: number, col: number): void {
   const id = "src:" + file;
   const existing = sourceTabs.value.find(t => t.id === id);
   if (existing) {
@@ -76,8 +72,9 @@ export function SourcePanel({ tab }: { tab: SourceTabState }): preact.JSX.Elemen
         if (stale) return;
         const highlighter = await getHighlighter();
         if (stale) return;
+        const lang = guessLang(tab.file);
         const themes = { light: "github-light", dark: "github-dark" };
-        setHtml(highlighter.codeToHtml(code, { lang: guessLang(tab.file), themes, defaultColor: false }));
+        setHtml(highlighter.codeToHtml(code, { lang, themes, defaultColor: false }));
       } catch {
         if (!stale) setError(tab.file);
       }
@@ -102,9 +99,8 @@ export function SourcePanel({ tab }: { tab: SourceTabState }): preact.JSX.Elemen
       renderGutters(panelRef.current, tab.file, alloc, time, coverage);
 
       if (tab.line) {
-        const target = panelRef.current.querySelectorAll(
-          ".source-code .line",
-        )[tab.line - 1];
+        const lines = panelRef.current.querySelectorAll(".source-code .line");
+        const target = lines[tab.line - 1];
         if (target) {
           target.classList.add("highlighted");
           target.scrollIntoView({ block: "center" });
@@ -201,6 +197,7 @@ function renderGutters(
   const maxAlloc = hasAlloc ? Math.max(...lineData.allocBytes.values()) : 0;
   const maxTime = hasTime ? Math.max(...lineData.selfTimeUs.values()) : 0;
 
+  const heat = (h: number) => (h > 0.01 ? h : undefined);
   const lines = codeEl.querySelectorAll(".line");
   for (let i = 0; i < lines.length; i++) {
     const lineNum = i + 1;
@@ -212,8 +209,8 @@ function renderGutters(
     const timeHeat = time && maxTime > 0 ? time / maxTime : 0;
     let gutterHtml = "";
     if (hasCounts) gutterHtml += gutter("count", formatGutterCount(counts));
-    if (hasAlloc) gutterHtml += gutter("alloc", formatGutterBytes(alloc), allocHeat > 0.01 ? allocHeat : undefined);
-    if (hasTime) gutterHtml += gutter("time", formatGutterTime(time), timeHeat > 0.01 ? timeHeat : undefined);
+    if (hasAlloc) gutterHtml += gutter("alloc", formatGutterBytes(alloc), heat(allocHeat));
+    if (hasTime) gutterHtml += gutter("time", formatGutterTime(time), heat(timeHeat));
 
     el.insertAdjacentHTML("afterbegin", gutterHtml);
   }

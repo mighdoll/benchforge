@@ -30,13 +30,9 @@ export function SamplesPanel() {
   );
 }
 
-function SamplesGroup({
-  group,
-  index,
-}: {
-  group: BenchmarkGroup;
-  index: number;
-}) {
+interface GroupPlotProps { group: BenchmarkGroup; index: number }
+
+function SamplesGroup({ group, index }: GroupPlotProps) {
   if (!group.benchmarks?.length) return null;
 
   if (!groupHasSamples(group))
@@ -76,13 +72,7 @@ function SamplesGroup({
   );
 }
 
-function TimeSeriesPlot({
-  group,
-  index,
-}: {
-  group: BenchmarkGroup;
-  index: number;
-}) {
+function TimeSeriesPlot({ group, index }: GroupPlotProps) {
   const ref = useRef<HTMLDivElement>(null);
   useEffect(() => {
     const benchmarks = prepareBenchmarks(group);
@@ -91,14 +81,9 @@ function TimeSeriesPlot({
     import("../plots/SampleTimeSeries.ts").then(({ createSampleTimeSeries }) => {
       if (!ref.current) return;
       ref.current.innerHTML = "";
-      ref.current.appendChild(
-        createSampleTimeSeries(
-          f.timeSeries,
-          f.allGcEvents,
-          f.allPausePoints,
-          f.heapSeries,
-        ),
-      );
+      const { timeSeries, allGcEvents, allPausePoints, heapSeries } = f;
+      const el = createSampleTimeSeries(timeSeries, allGcEvents, allPausePoints, heapSeries);
+      ref.current.appendChild(el);
     });
   }, [group]);
   return (
@@ -108,13 +93,7 @@ function TimeSeriesPlot({
   );
 }
 
-function HistogramPlot({
-  group,
-  index,
-}: {
-  group: BenchmarkGroup;
-  index: number;
-}) {
+function HistogramPlot({ group, index }: GroupPlotProps) {
   const ref = useRef<HTMLDivElement>(null);
   useEffect(() => {
     const benchmarks = prepareBenchmarks(group);

@@ -57,19 +57,15 @@ export function TabBar() {
   );
 }
 
-function TabButton({
-  id,
-  tabId,
-  disabled,
-  onActivate,
-  children,
-}: {
+interface TabButtonProps {
   id: string;
   tabId: string;
   disabled: boolean;
   onActivate?: () => void;
   children: preact.ComponentChildren;
-}) {
+}
+
+function TabButton({ id, tabId, disabled, onActivate, children }: TabButtonProps) {
   const active = activeTabId.value === tabId;
   return (
     <button
@@ -87,15 +83,7 @@ function TabButton({
   );
 }
 
-function SourceTabBtn({
-  tabId,
-  file,
-  line,
-}: {
-  tabId: string;
-  file: string;
-  line: number;
-}) {
+function SourceTabBtn({ tabId, file, line }: { tabId: string; file: string; line: number }) {
   const active = activeTabId.value === tabId;
   const shortName = file.split("/").pop() || file;
   const label = line ? `${shortName}:${line}` : shortName;

@@ -54,8 +54,8 @@ async function resolve(): Promise<void> {
     }
   }
 
-  const preloaded = (window as unknown as Record<string, unknown>)
-    .__benchforgeArchive as ArchiveData | undefined;
+  const win = window as unknown as Record<string, unknown>;
+  const preloaded = win.__benchforgeArchive as ArchiveData | undefined;
   if (preloaded) {
     initViewer(new ArchiveProvider(preloaded));
     return;
