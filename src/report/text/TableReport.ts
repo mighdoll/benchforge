@@ -183,17 +183,25 @@ function createGroupHeaders<T>(
   return [sectionRow, blankRow];
 }
 
+/** @return cumulative column offsets for each group boundary */
+function groupOffsets<T>(groups: ColumnGroup<T>[]): number[] {
+  let offset = 0;
+  return groups.map(g => {
+    const start = offset;
+    offset += g.columns.length;
+    return start;
+  });
+}
+
 /** @return spanning cell configs for group title headers */
 function createSectionSpans<T>(groups: ColumnGroup<T>[]): SpanningCellConfig[] {
-  const alignment: Alignment = "center";
-  const spans: SpanningCellConfig[] = [];
-  let col = 0;
-  for (const g of groups) {
-    const colSpan = g.columns.length;
-    spans.push({ row: 0, col, colSpan, alignment });
-    col += colSpan;
-  }
-  return spans;
+  const offsets = groupOffsets(groups);
+  return groups.map((g, i) => ({
+    row: 0,
+    col: offsets[i],
+    colSpan: g.columns.length,
+    alignment: "center" as Alignment,
+  }));
 }
 
 /** Calculate column widths based on content, including group titles */
@@ -208,17 +216,17 @@ function calcColumnWidths<T>(
   const widths = titles.map((t, i) => Math.max(cellWidth(t), maxData(i)));
 
   // Second pass: ensure group titles fit (accounting for column separators)
-  let col = 0;
-  for (const group of groups) {
+  const offsets = groupOffsets(groups);
+  for (const [i, group] of groups.entries()) {
     const gw = cellWidth(group.groupTitle);
     const n = group.columns.length;
     if (gw > 0) {
+      const col = offsets[i];
       const sepWidth = (n - 1) * 3; // " | " between columns
       const curWidth = widths.slice(col, col + n).reduce((a, b) => a + b, 0);
       const needed = gw - curWidth - sepWidth;
       if (needed > 0) widths[col + n - 1] += needed;
     }
-    col += n;
   }
 
   // Convert to table config format
@@ -259,11 +267,7 @@ function calcBorders<T>(groups: ColumnGroup<T>[]): {
 } {
   if (groups.length === 0) return { sectionBorders: [], headerBottom: 1 };
 
-  const sectionBorders: number[] = [];
-  let border = 0;
-  for (const g of groups) {
-    border += g.columns.length;
-    sectionBorders.push(border);
-  }
+  const offsets = groupOffsets(groups);
+  const sectionBorders = offsets.map((o, i) => o + groups[i].columns.length);
   return { sectionBorders, headerBottom: 3 };
 }

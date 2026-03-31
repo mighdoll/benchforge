@@ -100,8 +100,7 @@ function shuffleAndSplit(combined: number[], n1: number) {
     const j = Math.floor(Math.random() * (i + 1));
     [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
   }
-  const resample1 = shuffled.slice(0, n1);
-  return { resample1, resample2: shuffled.slice(n1) };
+  return { resample1: shuffled.slice(0, n1), resample2: shuffled.slice(n1) };
 }
 
 /** @return significance level based on p-value thresholds */

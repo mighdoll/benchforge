@@ -102,13 +102,13 @@ function validateBenchmarkParameters(group: BenchGroup): void {
   const all = group.baseline
     ? [...group.benchmarks, group.baseline]
     : group.benchmarks;
-  all
-    .filter(bench => bench.fn.length > 0)
-    .forEach(bench => {
+  for (const bench of all) {
+    if (bench.fn.length > 0) {
       console.warn(
         `Benchmark "${bench.name}" in group "${group.name}" expects parameters but no setup() provided.`,
       );
-    });
+    }
+  }
 }
 
 /** Run benchmarks in a single batch */

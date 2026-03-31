@@ -7,6 +7,7 @@ import { loadCasesModule } from "../matrix/CaseLoader.ts";
 import {
   type FilteredMatrix,
   filterMatrix,
+  type MatrixFilter,
   parseMatrixFilter,
 } from "../matrix/MatrixFilter.ts";
 import type { MatrixReportOptions } from "../matrix/MatrixReport.ts";
@@ -86,22 +87,7 @@ export async function benchExports(
 /** Run browser profiling via Playwright + CDP, report with standard pipeline */
 export async function browserBenchExports(args: DefaultCliArgs): Promise<void> {
   warnBrowserFlags(args);
-
-  type BrowserMod = typeof import("../profiling/browser/BrowserProfiler.ts");
-  let profileBrowser: BrowserMod["profileBrowser"];
-  try {
-    ({ profileBrowser } = await import(
-      "../profiling/browser/BrowserProfiler.ts"
-    ));
-  } catch {
-    throw new Error(
-      "playwright is required for browser benchmarking (--url).\n\n" +
-        "Quick start:  npx benchforge-browser <your-url>\n\n" +
-        "Or install manually:\n" +
-        "  npm install playwright\n" +
-        "  npx playwright install chromium",
-    );
-  }
+  const profileBrowser = await loadBrowserProfiler();
 
   const url = args.url!;
   const { iterations, duration } = args;
@@ -130,6 +116,25 @@ export async function browserBenchExports(args: DefaultCliArgs): Promise<void> {
   const results = browserResultGroups(name, result);
   printBrowserReport(result, results, args);
   await exportReports({ results, args });
+}
+
+/** Dynamically import the browser profiler (requires Playwright) */
+async function loadBrowserProfiler() {
+  type BrowserMod = typeof import("../profiling/browser/BrowserProfiler.ts");
+  try {
+    const mod: BrowserMod = await import(
+      "../profiling/browser/BrowserProfiler.ts"
+    );
+    return mod.profileBrowser;
+  } catch {
+    throw new Error(
+      "playwright is required for browser benchmarking (--url).\n\n" +
+        "Quick start:  npx benchforge-browser <your-url>\n\n" +
+        "Or install manually:\n" +
+        "  npm install playwright\n" +
+        "  npx playwright install chromium",
+    );
+  }
 }
 
 /** Run matrix suite with full CLI handling (parse, run, report, export) */
@@ -170,28 +175,36 @@ export async function runMatrixSuite(
 
   const results: MatrixResults[] = [];
   for (const matrix of suite.matrices) {
-    const casesModule = matrix.casesModule
-      ? await loadCasesModule(matrix.casesModule)
-      : undefined;
-
-    let filtered: FilteredMatrix<any> = matrix;
-    if (!args.all && casesModule) {
-      filtered = {
-        ...matrix,
-        filteredCases: casesModule.defaultCases,
-        filteredVariants: casesModule.defaultVariants,
-      };
-    }
-
-    if (filter) {
-      filtered = await filterMatrix(filtered, filter);
-    }
-
+    const filtered = await applyMatrixFilters(matrix, args.all, filter);
     const { filteredCases, filteredVariants } = filtered;
     const opts = { ...options, filteredCases, filteredVariants };
     results.push(await runMatrix(filtered, opts));
   }
   return results;
+}
+
+/** Apply default-case narrowing and user filter to a matrix */
+async function applyMatrixFilters(
+  matrix: FilteredMatrix<any>,
+  runAll: boolean,
+  filter?: MatrixFilter,
+): Promise<FilteredMatrix<any>> {
+  const casesModule = matrix.casesModule
+    ? await loadCasesModule(matrix.casesModule)
+    : undefined;
+
+  let filtered: FilteredMatrix<any> = matrix;
+  if (!runAll && casesModule) {
+    filtered = {
+      ...matrix,
+      filteredCases: casesModule.defaultCases,
+      filteredVariants: casesModule.defaultVariants,
+    };
+  }
+  if (filter) {
+    filtered = await filterMatrix(filtered, filter);
+  }
+  return filtered;
 }
 
 /** Import a file and run it as a benchmark based on what it exports */
@@ -217,15 +230,15 @@ async function fileBenchExports(
 
 /** Warn about Node-only flags that are ignored in browser mode. */
 function warnBrowserFlags(args: DefaultCliArgs): void {
-  const ignored = [
+  const ignoredFlags = [
     !args.worker && "--no-worker",
     args["trace-opt"] && "--trace-opt",
     args["gc-force"] && "--gc-force",
     args.adaptive && "--adaptive",
     args.batches > 1 && "--batches",
-  ].filter(Boolean);
-  if (ignored.length)
-    console.warn(yellow(`Ignored in browser mode: ${ignored.join(", ")}`));
+  ].filter(Boolean) as string[];
+  if (ignoredFlags.length > 0)
+    console.warn(yellow(`Ignored in browser mode: ${ignoredFlags.join(", ")}`));
 }
 
 /** Strip surrounding quotes from a chrome arg token. */
@@ -278,6 +291,6 @@ function toBrowserMeasured(
     return { ...base, samples, time: computeStats(samples), totalTime };
   }
 
-  const w = result.wallTimeMs ?? 0;
-  return { ...base, samples: [w], time: computeStats([w]) };
+  const wallTime = result.wallTimeMs ?? 0;
+  return { ...base, samples: [wallTime], time: computeStats([wallTime]) };
 }

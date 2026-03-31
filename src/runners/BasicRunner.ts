@@ -160,24 +160,28 @@ export function outlierImpactRatio(samples: number[]): number {
 }
 
 /** Collect timing samples with warmup, heap tracking, and optional V8 optimization tracing. */
-async function collectSamples<T>(p: CollectParams<T>): Promise<CollectResult> {
-  if (!p.maxIterations && !p.maxTime) {
+async function collectSamples<T>(
+  config: CollectParams<T>,
+): Promise<CollectResult> {
+  if (!config.maxIterations && !config.maxTime) {
     throw new Error(`At least one of maxIterations or maxTime must be set`);
   }
-  const warmupSamples = p.skipWarmup ? [] : await runWarmup(p);
+  const warmupSamples = config.skipWarmup ? [] : await runWarmup(config);
   const heapBefore = process.memoryUsage().heapUsed;
-  const loop = await runSampleLoop(p);
+  const loop = await runSampleLoop(config);
   const { samples, heapSamples, timestamps, optStatuses, pausePoints } = loop;
   if (samples.length === 0) {
-    throw new Error(`No samples collected for benchmark: ${p.benchmark.name}`);
+    throw new Error(
+      `No samples collected for benchmark: ${config.benchmark.name}`,
+    );
   }
   const heapDelta = process.memoryUsage().heapUsed - heapBefore;
   const heapGrowth = Math.max(0, heapDelta) / 1024 / samples.length;
-  const optStatus = p.traceOpt
+  const optStatus = config.traceOpt
     ? analyzeOptStatus(samples, optStatuses)
     : undefined;
   const optSamples =
-    p.traceOpt && optStatuses.length > 0 ? optStatuses : undefined;
+    config.traceOpt && optStatuses.length > 0 ? optStatuses : undefined;
   return {
     samples,
     warmupSamples,
@@ -205,8 +209,8 @@ function buildMeasuredResults(
     pausePoints,
   } = collected;
   const time = computeStats(samples);
-  const heap = collected.heapGrowth;
-  const heapSize = { avg: heap, min: heap, max: heap };
+  const heapGrowth = collected.heapGrowth;
+  const heapSize = { avg: heapGrowth, min: heapGrowth, max: heapGrowth };
   return {
     name,
     samples,
@@ -222,16 +226,16 @@ function buildMeasuredResults(
 }
 
 /** Run warmup iterations with gc + settle time for V8 optimization. Returns warmup timings. */
-async function runWarmup<T>(p: CollectParams<T>): Promise<number[]> {
+async function runWarmup<T>(config: CollectParams<T>): Promise<number[]> {
   const gc = gcFunction();
-  const samples = new Array<number>(p.warmup);
-  for (let i = 0; i < p.warmup; i++) {
+  const samples = new Array<number>(config.warmup);
+  for (let i = 0; i < config.warmup; i++) {
     const start = performance.now();
-    executeBenchmark(p.benchmark, p.params);
+    executeBenchmark(config.benchmark, config.params);
     samples[i] = performance.now() - start;
   }
   gc();
-  if (!p.noSettle) {
+  if (!config.noSettle) {
     await new Promise(r => setTimeout(r, gcSettleTime));
     gc();
   }
@@ -240,12 +244,12 @@ async function runWarmup<T>(p: CollectParams<T>): Promise<number[]> {
 
 /** Collect timing samples with optional periodic pauses for V8 background compilation. */
 async function runSampleLoop<T>(
-  p: CollectParams<T>,
+  config: CollectParams<T>,
 ): Promise<SampleLoopResult> {
-  const { maxTime, maxIterations, pauseFirst } = p;
-  const { pauseInterval = 0, pauseDuration = 100 } = p;
+  const { maxTime, maxIterations, pauseFirst } = config;
+  const { pauseInterval = 0, pauseDuration = 100 } = config;
   const trackHeap = true;
-  const getOptStatus = p.traceOpt ? createOptStatusGetter() : undefined;
+  const getOptStatus = config.traceOpt ? createOptStatusGetter() : undefined;
   const estimated = maxIterations || Math.ceil(maxTime / 0.1);
   const arrays = createSampleArrays(estimated, trackHeap, !!getOptStatus);
 
@@ -259,13 +263,14 @@ async function runSampleLoop<T>(
     (!maxTime || elapsed < maxTime)
   ) {
     const start = performance.now();
-    executeBenchmark(p.benchmark, p.params);
+    executeBenchmark(config.benchmark, config.params);
     const end = performance.now();
     arrays.samples[count] = end - start;
     arrays.timestamps[count] = Number(process.hrtime.bigint() / 1000n);
     if (trackHeap)
       arrays.heapSamples[count] = getHeapStatistics().used_heap_size;
-    if (getOptStatus) arrays.optStatuses[count] = getOptStatus(p.benchmark.fn);
+    if (getOptStatus)
+      arrays.optStatuses[count] = getOptStatus(config.benchmark.fn);
     count++;
 
     if (shouldPause(count, pauseFirst, pauseInterval)) {
@@ -364,12 +369,12 @@ function shouldPause(
 
 /** Trim arrays to actual sample count */
 function trimArrays(
-  a: SampleArrays,
+  arrays: SampleArrays,
   count: number,
   trackHeap: boolean,
   trackOpt: boolean,
 ): void {
-  a.samples.length = a.timestamps.length = count;
-  if (trackHeap) a.heapSamples.length = count;
-  if (trackOpt) a.optStatuses.length = count;
+  arrays.samples.length = arrays.timestamps.length = count;
+  if (trackHeap) arrays.heapSamples.length = count;
+  if (trackOpt) arrays.optStatuses.length = count;
 }

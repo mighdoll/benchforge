@@ -54,13 +54,10 @@ export async function setupLapMode(args: {
   await page.addInitScript(injectLapFunctions);
 
   const timer = setTimeout(() => {
-    const lines = [`Timed out after ${timeout}s`];
-    if (pageErrors.length) {
-      lines.push("Page JS errors:", ...pageErrors.map(e => `  ${e}`));
-    } else {
-      lines.push("Page did not call __done() or define window.__bench");
-    }
-    reject(new Error(lines.join("\n")));
+    const detail = pageErrors.length
+      ? ["Page JS errors:", ...pageErrors.map(e => `  ${e}`)]
+      : ["Page did not call __done() or define window.__bench"];
+    reject(new Error([`Timed out after ${timeout}s`, ...detail].join("\n")));
   }, timeout * 1000);
 
   return { promise, cancel: () => clearTimeout(timer) };

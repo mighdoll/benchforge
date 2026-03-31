@@ -15,21 +15,16 @@ export interface TraceEvent {
 
 /** Parse CDP trace events (MinorGC/MajorGC) into GcEvent[] */
 export function parseGcTraceEvents(traceEvents: TraceEvent[]): GcEvent[] {
-  return traceEvents.flatMap(e => {
-    if (e.ph !== "X") return [];
-    const type = gcType(e.name);
-    if (!type) return [];
-    const durUs = e.dur ?? 0;
-    const heapBefore: number = e.args?.usedHeapSizeBefore ?? 0;
-    const heapAfter: number = e.args?.usedHeapSizeAfter ?? 0;
-    return [
-      {
-        type,
-        pauseMs: durUs / 1000,
-        collected: Math.max(0, heapBefore - heapAfter),
-      },
-    ];
-  });
+  return traceEvents
+    .filter(e => e.ph === "X" && gcType(e.name))
+    .map(e => ({
+      type: gcType(e.name)!,
+      pauseMs: (e.dur ?? 0) / 1000,
+      collected: Math.max(
+        0,
+        (e.args?.usedHeapSizeBefore ?? 0) - (e.args?.usedHeapSizeAfter ?? 0),
+      ),
+    }));
 }
 
 /** Parse CDP trace events and aggregate into GcStats */

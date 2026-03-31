@@ -84,10 +84,10 @@ export function reportOptStatus(groups: ReportGroup[]): void {
     console.log(`  ${name}: ${tierParts} ${dim(`(${samples} samples)`)}`);
   }
 
-  const deopts = optData.reduce((s, d) => s + d.opt.deoptCount, 0);
-  if (deopts > 0) {
-    const s = deopts > 1 ? "s" : "";
-    console.log(yellow(`  ⚠ ${deopts} deoptimization${s} detected`));
+  const totalDeopts = optData.reduce((sum, d) => sum + d.opt.deoptCount, 0);
+  if (totalDeopts > 0) {
+    const plural = totalDeopts > 1 ? "s" : "";
+    console.log(yellow(`  ⚠ ${totalDeopts} deoptimization${plural} detected`));
   }
 }
 

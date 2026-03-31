@@ -169,37 +169,19 @@ export async function resolveCases<T>(
 /** Convert matrix options to runner options */
 export function buildRunnerOptions(opts: RunMatrixOptions): RunnerOptions {
   const {
-    gcForce,
-    traceOpt,
-    noSettle,
-    gcStats,
-    callCounts,
-    alloc,
-    allocInterval,
-    allocDepth,
-    pauseFirst,
-    pauseInterval,
-    pauseDuration,
-    timeSample,
-    timeInterval,
+    iterations,
+    maxTime,
+    warmup,
+    filteredCases,
+    filteredVariants,
+    useWorker,
+    ...rest
   } = opts;
   return {
-    maxIterations: opts.iterations,
-    maxTime: opts.maxTime ?? 1000,
-    warmup: opts.warmup ?? 0,
-    gcForce,
-    traceOpt,
-    noSettle,
-    gcStats,
-    callCounts,
-    alloc,
-    allocInterval,
-    allocDepth,
-    pauseFirst,
-    pauseInterval,
-    pauseDuration,
-    timeSample,
-    timeInterval,
+    maxIterations: iterations,
+    maxTime: maxTime ?? 1000,
+    warmup: warmup ?? 0,
+    ...rest,
   };
 }
 

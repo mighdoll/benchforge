@@ -152,6 +152,11 @@ export class ArchiveProvider implements DataProvider {
     };
   }
 
+  /** Select the raw profile data for the given type from the archive. */
+  private rawProfile(type: "alloc" | "time"): unknown {
+    return type === "alloc" ? this.archive.profile : this.archive.timeProfile;
+  }
+
   async fetchReportData(): Promise<unknown> {
     if (!this.archive.report) throw new Error("No report data");
     return this.archive.report;
@@ -166,9 +171,7 @@ export class ArchiveProvider implements DataProvider {
   async fetchProfileData(
     type: "alloc" | "time",
   ): Promise<ViewerSpeedscopeFile | null> {
-    const { profile, timeProfile } = this.archive;
-    const data = type === "alloc" ? profile : timeProfile;
-    return (data as ViewerSpeedscopeFile) ?? null;
+    return (this.rawProfile(type) as ViewerSpeedscopeFile) ?? null;
   }
 
   async fetchCoverageData(): Promise<ViewerCoverageData | null> {
@@ -177,8 +180,7 @@ export class ArchiveProvider implements DataProvider {
 
   /** Return a blob URL for the profile, lazily created and cached. */
   profileUrl(type: "alloc" | "time"): string | null {
-    const { profile, timeProfile } = this.archive;
-    const data = type === "alloc" ? profile : timeProfile;
+    const data = this.rawProfile(type);
     if (!data) return null;
     let url = this.blobUrls.get(type);
     if (!url) {

@@ -190,8 +190,11 @@ function buildColumns(
     columns: [{ key: "name", title }],
   };
 
-  const ciKey = "diffCI" as keyof MatrixReportRow;
-  const diffCol = { key: ciKey, title: "Δ% CI", formatter: formatDiffWithCI };
+  const diffCol = {
+    key: "diffCI" as keyof MatrixReportRow,
+    title: "Δ% CI",
+    formatter: formatDiffWithCI,
+  };
   const timeCol: ColumnGroup<MatrixReportRow> = {
     columns: [
       { key: "time", title: "time", formatter: duration },

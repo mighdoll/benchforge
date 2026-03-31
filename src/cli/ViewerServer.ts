@@ -178,8 +178,9 @@ function tryListen(
       });
       server.listen(p, () => {
         server.removeAllListeners("error");
-        const a = server.address();
-        resolve({ server, port: typeof a === "object" && a ? a.port : p });
+        const addr = server.address();
+        const boundPort = typeof addr === "object" && addr ? addr.port : p;
+        resolve({ server, port: boundPort });
       });
     };
     listen(port);

@@ -92,13 +92,16 @@ async function runDirVariantCases<T>(
       options: runnerOpts,
     });
 
-    const loaded = await loadCaseData(casesModule, caseId);
-    const args = { variantId, caseId, caseData, ctx };
-    const baseline = await runBaselineIfExists(args);
+    const { metadata } = await loadCaseData(casesModule, caseId);
+    const baseline = await runBaselineIfExists({
+      variantId,
+      caseId,
+      caseData,
+      ctx,
+    });
     const deltaPercent = baseline
       ? computeDeltaPercent(baseline, measured)
       : undefined;
-    const { metadata } = loaded;
     cases.push({ caseId, measured, metadata, baseline, deltaPercent });
   }
   return cases;

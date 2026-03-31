@@ -71,15 +71,8 @@ function buildTimeProfile(
   const resolve = (id: number) =>
     resolveStack(id, nodeMap, parentMap, stackCache, sharedFrames, frameIndex);
 
-  const samples: number[][] = [];
-  const weights: number[] = [];
-
-  for (let i = 0; i < sampleIds.length; i++) {
-    samples.push(resolve(sampleIds[i]));
-    weights.push(timeDeltas[i]);
-  }
-
-  const total = weights.reduce((sum, w) => sum + w, 0);
+  const samples = sampleIds.map(resolve);
+  const total = timeDeltas.reduce((sum, w) => sum + w, 0);
   return {
     type: "sampled",
     name,
@@ -87,7 +80,7 @@ function buildTimeProfile(
     startValue: 0,
     endValue: total,
     samples,
-    weights,
+    weights: timeDeltas,
   };
 }
 

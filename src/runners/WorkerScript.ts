@@ -76,11 +76,8 @@ const maxLifetime = 5 * 60 * 1000;
 /** Log timing with consistent format */
 const logTiming = debugWorkerTiming ? _logTiming : () => {};
 function _logTiming(operation: string, duration?: number) {
-  if (duration === undefined) {
-    console.log(`[Worker] ${operation}`);
-  } else {
-    console.log(`[Worker] ${operation} ${duration.toFixed(1)}ms`);
-  }
+  const suffix = duration !== undefined ? ` ${duration.toFixed(1)}ms` : "";
+  console.log(`[Worker] ${operation}${suffix}`);
 }
 
 /** Send message and exit with duration log */
@@ -191,23 +188,20 @@ async function runWithProfiling(
   const state: ProfilingState = {};
   const runBench = buildProfilingChain(message, runner, state);
 
-  const { callCounts } = message.options;
-  let results: MeasuredResults[];
-  if (callCounts) {
-    const { withCoverageProfiling } = await import(
-      "../profiling/node/CoverageSampler.ts"
-    );
-    const r = await withCoverageProfiling(async session => {
-      state.profilerSession = session;
-      return runBench();
-    });
-    state.coverage = r.coverage;
-    results = r.result;
-  } else {
-    results = await runBench();
+  if (!message.options.callCounts) {
+    const results = await runBench();
+    return { type: "result", results, ...state };
   }
 
-  return { type: "result", results, ...state };
+  const { withCoverageProfiling } = await import(
+    "../profiling/node/CoverageSampler.ts"
+  );
+  const r = await withCoverageProfiling(async session => {
+    state.profilerSession = session;
+    return runBench();
+  });
+  state.coverage = r.coverage;
+  return { type: "result", results: r.result, ...state };
 }
 
 /** Build nested profiling chain: outer heap, inner time */

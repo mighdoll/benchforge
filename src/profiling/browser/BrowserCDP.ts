@@ -87,10 +87,15 @@ export async function startCoverageCollection(cdp: CDPSession): Promise<void> {
 export async function collectCoverage(cdp: CDPSession): Promise<CoverageData> {
   const { result } = await cdp.send("Profiler.takePreciseCoverage");
   await cdp.send("Profiler.stopPreciseCoverage");
-  const scripts = (result as unknown as ScriptCoverage[]).filter(
-    s => s.url && !s.url.startsWith("chrome") && !s.url.startsWith("devtools"),
-  );
+  const scripts = (result as unknown as ScriptCoverage[]).filter(isPageScript);
   return { scripts };
+}
+
+/** True for user page scripts, excluding browser-internal URLs. */
+function isPageScript(s: ScriptCoverage): boolean {
+  return (
+    !!s.url && !s.url.startsWith("chrome") && !s.url.startsWith("devtools")
+  );
 }
 
 /** Stop all active CDP instruments and return collected profiles/coverage. */

@@ -128,8 +128,10 @@ export function percentile(values: number[], p: number): number {
 /** @return bootstrap resample with replacement */
 export function createResample(samples: number[]): number[] {
   const n = samples.length;
-  const rand = () => samples[Math.floor(Math.random() * n)];
-  return Array.from({ length: n }, rand);
+  return Array.from(
+    { length: n },
+    () => samples[Math.floor(Math.random() * n)],
+  );
 }
 
 /**
@@ -159,8 +161,10 @@ export function bootstrapDifferenceCI(
   }
 
   const ci = computeInterval(diffs, conf);
+  const ciExcludesZero = ci[0] > 0 || ci[1] < 0;
   let direction: CIDirection = "uncertain";
-  if (ci[0] > 0 || ci[1] < 0) direction = observedPct < 0 ? "faster" : "slower";
+  if (ciExcludesZero && observedPct < 0) direction = "faster";
+  else if (ciExcludesZero) direction = "slower";
   const histogram = binValues(diffs);
   return { percent: observedPct, ci, direction, histogram };
 }

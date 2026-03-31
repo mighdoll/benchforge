@@ -165,13 +165,13 @@ async function openViewer(
 /** Export the first raw V8 TimeProfile to a JSON file */
 function exportTimeProfile(results: ReportGroup[], path: string): void {
   const profile = findTimeProfile(results);
-  if (profile) {
-    const absPath = resolve(path);
-    writeFileSync(absPath, JSON.stringify(profile));
-    console.log(`Time profile exported to: ${path}`);
-  } else {
+  if (!profile) {
     console.log("No time profiles to export.");
+    return;
   }
+  const absPath = resolve(path);
+  writeFileSync(absPath, JSON.stringify(profile));
+  console.log(`Time profile exported to: ${path}`);
 }
 
 /** Merge coverage data from all results into a single CoverageData */

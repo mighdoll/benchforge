@@ -29,7 +29,7 @@ export function parseGcLine(line: string): GcEvent | undefined {
   const fields = parseNvpFields(line);
   if (!fields.gc) return undefined;
 
-  const intField = (k: string) => Number.parseInt(fields[k] || "0", 10);
+  const intField = (name: string) => Number.parseInt(fields[name] || "0", 10);
   const type = parseGcType(fields.gc);
   const pauseMs = Number.parseFloat(fields.pause || "0");
   if (Number.isNaN(pauseMs)) return undefined;
@@ -56,16 +56,16 @@ export function aggregateGcStats(events: GcEvent[]): GcStats {
   let totalPromoted = 0;
   let totalSurvived = 0;
 
-  for (const e of events) {
-    if (e.type === "scavenge" || e.type === "minor-ms") scavenges++;
-    else if (e.type === "mark-compact") markCompacts++;
-    gcPauseTime += e.pauseMs;
-    totalCollected += e.collected;
-    if (e.allocated != null) {
+  for (const event of events) {
+    if (event.type === "scavenge" || event.type === "minor-ms") scavenges++;
+    else if (event.type === "mark-compact") markCompacts++;
+    gcPauseTime += event.pauseMs;
+    totalCollected += event.collected;
+    if (event.allocated != null) {
       hasNode = true;
-      totalAllocated += e.allocated;
-      totalPromoted += e.promoted ?? 0;
-      totalSurvived += e.survived ?? 0;
+      totalAllocated += event.allocated;
+      totalPromoted += event.promoted ?? 0;
+      totalSurvived += event.survived ?? 0;
     }
   }
 
@@ -86,7 +86,7 @@ export function emptyGcStats(): GcStats {
 /** Parse name=value pairs from a trace-gc-nvp line. */
 function parseNvpFields(line: string): Record<string, string> {
   const pairs = [...line.matchAll(/(\w+)=([^\s,]+)/g)];
-  return Object.fromEntries(pairs.map(([, k, v]) => [k, v]));
+  return Object.fromEntries(pairs.map(([, key, value]) => [key, value]));
 }
 
 /** Map V8 gc type codes to normalized event types. */

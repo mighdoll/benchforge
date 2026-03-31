@@ -106,9 +106,9 @@ async function startSampling(
   try {
     await session.post("HeapProfiler.startSampling", params);
   } catch {
-    const msg =
-      "HeapProfiler: include-collected params not supported, falling back";
-    console.warn(msg);
+    console.warn(
+      "HeapProfiler: include-collected params not supported, falling back",
+    );
     await session.post("HeapProfiler.startSampling", base);
   }
 }

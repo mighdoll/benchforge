@@ -107,12 +107,10 @@ function extractSectionStats(
 ): SectionStat[] {
   return sections.flatMap(section => {
     const vals = section.extract(report.measuredResults, report.metadata);
-    return section.columns().flatMap(g =>
-      g.columns.flatMap(c => {
-        const stat = formatColumnStat(vals, c, g.groupTitle);
-        return stat ? [stat] : [];
-      }),
-    );
+    return section
+      .columns()
+      .flatMap(g => g.columns.map(c => formatColumnStat(vals, c, g.groupTitle)))
+      .filter((stat): stat is SectionStat => stat !== undefined);
   });
 }
 

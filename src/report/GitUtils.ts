@@ -65,8 +65,7 @@ export function getMostRecentModifiedDate(dir: string): string | undefined {
 
     const mtime = (f: string): number => {
       try {
-        const p = join(dir, f);
-        return existsSync(p) ? statSync(p).mtimeMs : 0;
+        return statSync(join(dir, f)).mtimeMs;
       } catch {
         return 0;
       }

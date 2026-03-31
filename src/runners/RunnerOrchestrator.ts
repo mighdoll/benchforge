@@ -170,14 +170,16 @@ function runWorkerWithMessage(
     });
     worker.on("error", (error: Error) => {
       killWorker();
-      const reason = `Worker process failed for "${name}"`;
-      reject(new Error(`${reason}: ${error.message}`));
+      reject(
+        new Error(`Worker process failed for "${name}": ${error.message}`),
+      );
     });
     worker.on("exit", (code: number | null) => {
       if (code !== 0 && code !== null) {
         killWorker();
-        const msg = `Worker exited with code ${code}`;
-        reject(new Error(`${msg} for benchmark "${name}"`));
+        reject(
+          new Error(`Worker exited with code ${code} for benchmark "${name}"`),
+        );
       }
     });
 
@@ -208,12 +210,8 @@ function setupGcCapture(worker: ChildProcess, gcEvents: GcEvent[]): void {
     buffer = lines.pop() || ""; // Keep incomplete line in buffer
     for (const line of lines) {
       const event = parseGcLine(line);
-      if (event) {
-        gcEvents.push(event);
-      } else if (line.trim()) {
-        // Forward non-GC stdout to console (worker status messages)
-        process.stdout.write(line + "\n");
-      }
+      if (event) gcEvents.push(event);
+      else if (line.trim()) process.stdout.write(line + "\n"); // Forward non-GC output
     }
   });
 }

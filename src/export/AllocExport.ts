@@ -183,28 +183,19 @@ function buildProfile(
   const intern = (f: Frame) =>
     internFrame(f.name, f.url, f.line, f.col, sharedFrames, frameIndex);
 
-  const nodeStacks = new Map<number, number[]>();
-  for (const node of resolved.nodes) {
-    nodeStacks.set(node.nodeId, node.stack.map(intern));
+  const nodeStacks = new Map(
+    resolved.nodes.map(node => [node.nodeId, node.stack.map(intern)] as const),
+  );
+
+  if (!resolved.sortedSamples?.length) {
+    console.error(
+      `Speedscope export: no samples in heap profile for "${name}", skipping`,
+    );
+    return emptyProfile(name);
   }
 
   const samples: number[][] = [];
   const weights: number[] = [];
-
-  if (!resolved.sortedSamples?.length) {
-    const msg = `Speedscope export: no samples in heap profile for "${name}", skipping`;
-    console.error(msg);
-    return {
-      type: "sampled",
-      name,
-      unit: "bytes",
-      startValue: 0,
-      endValue: 0,
-      samples,
-      weights,
-    };
-  }
-
   for (const sample of resolved.sortedSamples) {
     const stack = nodeStacks.get(sample.nodeId);
     if (stack) {
@@ -214,7 +205,6 @@ function buildProfile(
   }
 
   const totalBytes = weights.reduce((sum, w) => sum + w, 0);
-
   return {
     type: "sampled",
     name,
@@ -223,5 +213,17 @@ function buildProfile(
     endValue: totalBytes,
     samples,
     weights,
+  };
+}
+
+function emptyProfile(name: string): SpeedscopeHeapProfile {
+  return {
+    type: "sampled",
+    name,
+    unit: "bytes",
+    startValue: 0,
+    endValue: 0,
+    samples: [],
+    weights: [],
   };
 }

@@ -45,9 +45,9 @@ export interface BrowserProfileResult {
 export async function profileBrowser(
   params: BrowserProfileParams,
 ): Promise<BrowserProfileResult> {
-  const { url, headless = true, chromeArgs } = params;
-  const { timeout = 60, gcStats: collectGc } = params;
-  const { samplingInterval = 32768 } = params.allocOptions ?? {};
+  const { url, headless = true, chromeArgs, timeout = 60 } = params;
+  const collectGc = params.gcStats;
+  const samplingInterval = params.allocOptions?.samplingInterval ?? 32768;
 
   const server = await chromium.launchServer({ headless, args: chromeArgs });
   pipeChromeOutput(server);
@@ -101,10 +101,12 @@ function pipeChromeOutput(server: BrowserServer): void {
   const proc = server.process();
   const forward = (stream: NodeJS.ReadableStream | null) =>
     stream?.on("data", (chunk: Buffer) => {
-      for (const line of chunk.toString().split("\n")) {
-        const trimmed = line.trim();
-        if (trimmed) process.stderr.write(`[chrome] ${trimmed}\n`);
-      }
+      const lines = chunk
+        .toString()
+        .split("\n")
+        .map(l => l.trim())
+        .filter(Boolean);
+      for (const line of lines) process.stderr.write(`[chrome] ${line}\n`);
     });
   forward(proc.stdout);
   forward(proc.stderr);
