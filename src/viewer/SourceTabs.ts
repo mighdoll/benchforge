@@ -160,6 +160,39 @@ async function updateSourcePanel(
   }
 }
 
+function tabLabelHtml(file: string, line: number): string {
+  const shortName = file.split("/").pop() || file;
+  const label = line ? shortName + ":" + line : shortName;
+  return (
+    escapeHtml(label) + ' <span class="tab-close" title="Close">&times;</span>'
+  );
+}
+
+/** Lazily create and cache the shiki syntax highlighter. */
+function getHighlighter(): Promise<HighlighterCore> {
+  highlighterPromise ??= createHighlighterCore({
+    themes: [themeLight, themeDark],
+    langs: [langJs, langTs, langCss, langHtml],
+    engine: createJavaScriptRegexEngine(),
+  });
+  return highlighterPromise;
+}
+
+function buildSourceHeader(
+  file: string,
+  line: number,
+  col: number,
+  editorUri: string | null,
+): string {
+  const path = escapeHtml(file);
+  const editorLink = editorUri
+    ? ` <a class="source-editor-link" href="${escapeHtml(
+        editorUri + filePathFromUrl(file) + `:${line || 1}:${col || 1}`,
+      )}">Open in Editor</a>`
+    : "";
+  return `<div class="source-header"><span class="source-path">${path}</span>${editorLink}</div>`;
+}
+
 /** Render per-line gutter columns (counts, alloc, time) with heat-map backgrounds. */
 function renderGutters(
   panel: HTMLElement,
@@ -226,37 +259,4 @@ function applyHeatMap(
     el.style.setProperty("--heat", heat.toFixed(3));
     el.classList.add("heat");
   }
-}
-
-function tabLabelHtml(file: string, line: number): string {
-  const shortName = file.split("/").pop() || file;
-  const label = line ? shortName + ":" + line : shortName;
-  return (
-    escapeHtml(label) + ' <span class="tab-close" title="Close">&times;</span>'
-  );
-}
-
-/** Lazily create and cache the shiki syntax highlighter. */
-function getHighlighter(): Promise<HighlighterCore> {
-  highlighterPromise ??= createHighlighterCore({
-    themes: [themeLight, themeDark],
-    langs: [langJs, langTs, langCss, langHtml],
-    engine: createJavaScriptRegexEngine(),
-  });
-  return highlighterPromise;
-}
-
-function buildSourceHeader(
-  file: string,
-  line: number,
-  col: number,
-  editorUri: string | null,
-): string {
-  const path = escapeHtml(file);
-  const editorLink = editorUri
-    ? ` <a class="source-editor-link" href="${escapeHtml(
-        editorUri + filePathFromUrl(file) + `:${line || 1}:${col || 1}`,
-      )}">Open in Editor</a>`
-    : "";
-  return `<div class="source-header"><span class="source-path">${path}</span>${editorLink}</div>`;
 }

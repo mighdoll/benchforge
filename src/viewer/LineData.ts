@@ -20,6 +20,27 @@ export function computeLineData(
   };
 }
 
+export function formatGutterBytes(bytes: number | undefined): string {
+  if (!bytes) return "";
+  if (bytes >= 1_000_000) return (bytes / 1_000_000).toFixed(1) + " MB";
+  if (bytes >= 1_000) return (bytes / 1_000).toFixed(1) + " KB";
+  return bytes + " B";
+}
+
+export function formatGutterTime(us: number | undefined): string {
+  if (!us) return "";
+  if (us >= 1_000_000) return (us / 1_000_000).toFixed(1) + " s";
+  if (us >= 1_000) return (us / 1_000).toFixed(1) + " ms";
+  return us.toFixed(0) + " us";
+}
+
+export function formatGutterCount(count: number | undefined): string {
+  if (!count) return "";
+  if (count >= 1_000_000) return (count / 1_000_000).toFixed(1) + "M";
+  if (count >= 1_000) return (count / 1_000).toFixed(1) + "K";
+  return String(count);
+}
+
 /**
  * For each sample, find the deepest frame matching `file` and accumulate its weight.
  * This gives "self" attribution — the innermost call site in this file.
@@ -79,14 +100,6 @@ function extractCallCounts(
   return result;
 }
 
-/** Find coverage entries by URL matching when exact key lookup fails. */
-function findCoverageEntries(file: string, coverage: ViewerCoverageData) {
-  for (const url of Object.keys(coverage)) {
-    if (fileMatches(url, file)) return coverage[url];
-  }
-  return undefined;
-}
-
 /** Check if a frame's file URL matches the target file path. */
 function fileMatches(frameFile: string, target: string): boolean {
   if (frameFile === target) return true;
@@ -98,23 +111,10 @@ function fileMatches(frameFile: string, target: string): boolean {
   return frameFile.endsWith(target) || target.endsWith(frameFile);
 }
 
-export function formatGutterBytes(bytes: number | undefined): string {
-  if (!bytes) return "";
-  if (bytes >= 1_000_000) return (bytes / 1_000_000).toFixed(1) + " MB";
-  if (bytes >= 1_000) return (bytes / 1_000).toFixed(1) + " KB";
-  return bytes + " B";
-}
-
-export function formatGutterTime(us: number | undefined): string {
-  if (!us) return "";
-  if (us >= 1_000_000) return (us / 1_000_000).toFixed(1) + " s";
-  if (us >= 1_000) return (us / 1_000).toFixed(1) + " ms";
-  return us.toFixed(0) + " us";
-}
-
-export function formatGutterCount(count: number | undefined): string {
-  if (!count) return "";
-  if (count >= 1_000_000) return (count / 1_000_000).toFixed(1) + "M";
-  if (count >= 1_000) return (count / 1_000).toFixed(1) + "K";
-  return String(count);
+/** Find coverage entries by URL matching when exact key lookup fails. */
+function findCoverageEntries(file: string, coverage: ViewerCoverageData) {
+  for (const url of Object.keys(coverage)) {
+    if (fileMatches(url, file)) return coverage[url];
+  }
+  return undefined;
 }
