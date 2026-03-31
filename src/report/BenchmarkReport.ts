@@ -39,6 +39,18 @@ export interface ResultsMapper<
 }
 export type UnknownRecord = Record<string, unknown>;
 
+/** Run each section's extract() and merge all key-value pairs into one record */
+export function extractSectionValues(
+  measuredResults: MeasuredResults,
+  sections: ReadonlyArray<ResultsMapper<any>>,
+  metadata?: UnknownRecord,
+): UnknownRecord {
+  const entries = sections.flatMap(s =>
+    Object.entries(s.extract(measuredResults, metadata)),
+  );
+  return Object.fromEntries(entries);
+}
+
 /** All reports in a group, including the baseline if present */
 export function groupReports(group: ReportGroup): BenchmarkReport[] {
   return group.baseline ? [...group.reports, group.baseline] : group.reports;

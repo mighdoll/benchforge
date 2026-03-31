@@ -1,11 +1,11 @@
 import { bootstrapDifferenceCI } from "../../stats/StatisticalUtils.ts";
 import {
   type BenchmarkReport,
+  extractSectionValues,
   isHigherIsBetter,
   type ReportColumnGroup,
   type ReportGroup,
   type ResultsMapper,
-  type UnknownRecord,
 } from "../BenchmarkReport.ts";
 import {
   formatDiffWithCI,
@@ -52,7 +52,7 @@ export function valuesForReports<S extends ReadonlyArray<ResultsMapper<any>>>(
 ): ReportRowData<S>[] {
   return reports.map(report => ({
     name: truncate(report.name),
-    ...extractReportValues(report, sections),
+    ...extractSectionValues(report.measuredResults, sections, report.metadata),
   })) as ReportRowData<S>[];
 }
 
@@ -95,7 +95,11 @@ function resultGroupValues<S extends ReadonlyArray<ResultsMapper<any>>>(
 
     return {
       name: truncate(report.name),
-      ...extractReportValues(report, sections),
+      ...extractSectionValues(
+        report.measuredResults,
+        sections,
+        report.metadata,
+      ),
       ...(diffCI && { diffCI }),
     } as ReportRowData<S>;
   });
@@ -104,24 +108,26 @@ function resultGroupValues<S extends ReadonlyArray<ResultsMapper<any>>>(
   return { results, baseline: baseRow };
 }
 
+/** Build table columns from sections, with name column and optional CI diff columns */
+export function sectionColumnGroups<T extends { name: string }>(
+  sections: ReadonlyArray<ResultsMapper<any>>,
+  hasBaseline: boolean,
+  nameTitle = "name",
+): ColumnGroup<T>[] {
+  const nameCol: ColumnGroup<T> = {
+    columns: [{ key: "name" as keyof T, title: nameTitle }],
+  };
+  const groups = sections.flatMap(s => s.columns());
+  return [
+    nameCol,
+    ...(hasBaseline ? injectDiffColumns(groups) : (groups as ColumnGroup<T>[])),
+  ];
+}
+
 /** Build table columns from sections, injecting CI diff columns when baseline is present */
 function createColumnGroups<S extends ReadonlyArray<ResultsMapper<any>>>(
   sections: S,
   hasBaseline: boolean,
 ): ColumnGroup<ReportRowData<S>>[] {
-  type Row = ReportRowData<S>;
-  const key = "name" as keyof Row;
-  const nameCol: ColumnGroup<Row> = { columns: [{ key, title: "name" }] };
-  const groups = sections.flatMap(s => s.columns());
-  return [nameCol, ...(hasBaseline ? injectDiffColumns(groups) : groups)];
-}
-
-/** Run each section's extract() and merge all key-value pairs into one record */
-function extractReportValues(
-  report: BenchmarkReport,
-  sections: ReadonlyArray<ResultsMapper<any>>,
-): UnknownRecord {
-  const { measuredResults: m, metadata } = report;
-  const entries = sections.flatMap(s => Object.entries(s.extract(m, metadata)));
-  return Object.fromEntries(entries);
+  return sectionColumnGroups<ReportRowData<S>>(sections, hasBaseline);
 }

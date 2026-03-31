@@ -8,34 +8,24 @@ import {
   resolveProfile,
 } from "./ResolvedProfile.ts";
 
-/** A resolved call frame with display-ready source positions */
-export interface CallFrame {
-  fn: string;
-  url: string;
-  /** 1-indexed */
-  line: number;
-  /** 1-indexed */
-  col?: number;
-}
-
 /** An allocation site with byte totals, call stack, and optional raw samples */
 export interface HeapSite {
-  fn: string;
+  name: string;
   url: string;
   /** 1-indexed */
   line: number;
   col?: number;
   bytes: number;
   /** Call stack from root to this frame */
-  stack?: CallFrame[];
+  stack?: ResolvedFrame[];
   /** Individual allocation samples at this site */
   samples?: HeapSample[];
   /** Distinct caller paths with byte weights (populated by {@link aggregateSites}) */
-  callers?: { stack: CallFrame[]; bytes: number }[];
+  callers?: { stack: ResolvedFrame[]; bytes: number }[];
 }
 
 /** Predicate that returns true for user code (vs. runtime internals) */
-export type UserCodeFilter = (site: CallFrame) => boolean;
+export type UserCodeFilter = (site: ResolvedFrame) => boolean;
 
 /** Options for {@link formatHeapReport} */
 export interface HeapReportOptions {
@@ -71,8 +61,7 @@ export function flattenProfile(resolved: ResolvedProfile): HeapSite[] {
   const nodeIdToSites = new Map<number, HeapSite[]>();
 
   for (const node of resolved.allocationNodes) {
-    const frame = toCallFrame(node.frame);
-    const stack = node.stack.map(toCallFrame);
+    const { frame, stack } = node;
     const site: HeapSite = { ...frame, bytes: node.selfSize, stack };
     sites.push(site);
     let bucket = nodeIdToSites.get(node.nodeId);
@@ -96,7 +85,7 @@ export function flattenProfile(resolved: ResolvedProfile): HeapSite[] {
 }
 
 /** Return true if the call frame is user code (excludes node: and internal/ URLs) */
-export function isNodeUserCode(site: CallFrame): boolean {
+export function isNodeUserCode(site: ResolvedFrame): boolean {
   const { url } = site;
   if (!url) return false;
   return (
@@ -107,7 +96,7 @@ export function isNodeUserCode(site: CallFrame): boolean {
 }
 
 /** Return true if the call frame is user code (excludes chrome-extension:// and devtools:// URLs) */
-export function isBrowserUserCode(site: CallFrame): boolean {
+export function isBrowserUserCode(site: ResolvedFrame): boolean {
   const { url } = site;
   if (!url) return false;
   return (
@@ -131,9 +120,9 @@ export function aggregateSites(sites: HeapSite[]): HeapSite[] {
   const byLocation = new Map<string, HeapSite>();
 
   for (const site of sites) {
-    // When column is unknown, include fn name to avoid merging distinct sites
-    const { url, line, col, fn } = site;
-    const colKey = col != null ? `${col}` : `?:${fn}`;
+    // When column is unknown, include name to avoid merging distinct sites
+    const { url, line, col, name } = site;
+    const colKey = col != null ? `${col}` : `?:${name}`;
     const key = `${url}:${line}:${colKey}`;
     const existing = byLocation.get(key);
     if (existing) {
@@ -206,10 +195,6 @@ export function formatRawSamples(resolved: ResolvedProfile): string {
   return [header, ...rows].join("\n");
 }
 
-function toCallFrame(f: ResolvedFrame): CallFrame {
-  return { fn: f.name, url: f.url, line: f.line, col: f.col };
-}
-
 /** Add a caller stack to an aggregated site, merging if the same path exists */
 function addCaller(existing: HeapSite, site: HeapSite): void {
   if (!site.stack) return;
@@ -230,13 +215,13 @@ function formatVerboseSite(
   const bytes = fmtBytes(site.bytes).padStart(10);
   const loc = site.url ? fmtLoc(site.url, site.line, site.col) : "(unknown)";
   const dim = isUser(site) ? (s: string) => s : pc.dim;
-  lines.push(dim(`${bytes}  ${site.fn}  ${loc}`));
+  lines.push(dim(`${bytes}  ${site.name}  ${loc}`));
 
   callerFrames(site, stackDepth)
     .filter(frame => frame.url && isUser(frame))
     .forEach(frame => {
       const callerLoc = fmtLoc(frame.url, frame.line, frame.col);
-      lines.push(dim(`            <- ${frame.fn}  ${callerLoc}`));
+      lines.push(dim(`            <- ${frame.name}  ${callerLoc}`));
     });
 }
 
@@ -250,8 +235,8 @@ function formatCompactSite(
   const bytes = fmtBytes(site.bytes).padStart(10);
   const callers = callerFrames(site, stackDepth)
     .filter(f => f.url && isUser(f))
-    .map(f => f.fn);
-  const line = `${bytes}  ${[site.fn, ...callers].join(" <- ")}`;
+    .map(f => f.name);
+  const line = `${bytes}  ${[site.name, ...callers].join(" <- ")}`;
   lines.push(isUser(site) ? line : pc.dim(line));
 }
 
@@ -265,12 +250,12 @@ function fmtLoc(url: string, line: number, col?: number): string {
 }
 
 /** Serialize a call stack for dedup comparison */
-function callerKey(stack: CallFrame[]): string {
+function callerKey(stack: ResolvedFrame[]): string {
   return stack.map(f => `${f.url}:${f.line}:${f.col}`).join("|");
 }
 
 /** Get caller frames (parent stack excluding self, reversed, truncated) */
-function callerFrames(site: HeapSite, depth: number): CallFrame[] {
+function callerFrames(site: HeapSite, depth: number): ResolvedFrame[] {
   if (!site.stack || site.stack.length <= 1) return [];
   return site.stack.slice(0, -1).reverse().slice(0, depth);
 }

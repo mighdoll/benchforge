@@ -1,5 +1,8 @@
 import { totalProfileBytes } from "../profiling/node/HeapSampleReport.ts";
-import type { ResultsMapper } from "../report/BenchmarkReport.ts";
+import {
+  extractSectionValues,
+  type ResultsMapper,
+} from "../report/BenchmarkReport.ts";
 import {
   duration,
   formatBytes,
@@ -11,7 +14,7 @@ import {
   gcStatsSection,
 } from "../report/StandardSections.ts";
 import { buildTable, type ColumnGroup } from "../report/text/TableReport.ts";
-import { injectDiffColumns } from "../report/text/TextReport.ts";
+import { sectionColumnGroups } from "../report/text/TextReport.ts";
 import {
   average,
   bootstrapDifferenceCI,
@@ -147,14 +150,15 @@ function buildSectionTable(
   const sections = options.sections!;
   const variantTitle = options.variantTitle ?? "name";
 
-  const rows = results.variants.flatMap(variant => {
+  type Row = Record<string, unknown> & { name: string };
+  const rows: Row[] = results.variants.flatMap(variant => {
     const cr = variant.cases.find(c => c.caseId === caseId);
     if (!cr) return [];
 
-    const row: Record<string, unknown> = { name: truncate(variant.id, 25) };
-    for (const section of sections) {
-      Object.assign(row, section.extract(cr.measured, cr.metadata));
-    }
+    const row: Row = {
+      name: truncate(variant.id, 25),
+      ...extractSectionValues(cr.measured, sections, cr.metadata),
+    };
     if (cr.baseline) {
       const { samples } = cr.measured;
       row.diffCI = bootstrapDifferenceCI(cr.baseline.samples, samples);
@@ -163,7 +167,7 @@ function buildSectionTable(
   });
 
   const hasBaseline = rows.some(r => r.diffCI);
-  const cols = buildSectionColumns(sections, variantTitle, hasBaseline);
+  const cols = sectionColumnGroups<Row>(sections, hasBaseline, variantTitle);
   const table = buildTable(cols, [{ results: rows }]);
   return `${caseTitle}\n${table}`;
 }
@@ -203,23 +207,6 @@ function buildColumns(
   };
 
   return [nameCol, timeCol, ...extraColumnGroups(options?.extraColumns)];
-}
-
-/** Build column groups from ResultsMapper sections */
-function buildSectionColumns(
-  sections: ResultsMapper[],
-  variantTitle: string,
-  hasBaseline: boolean,
-): ColumnGroup<Record<string, unknown>>[] {
-  type Rec = Record<string, unknown>;
-  const nameCol: ColumnGroup<Rec> = {
-    columns: [{ key: "name", title: variantTitle }],
-  };
-  const cols = sections.flatMap(s => s.columns());
-  const groups = hasBaseline
-    ? injectDiffColumns(cols)
-    : (cols as ColumnGroup<Rec>[]);
-  return [nameCol, ...groups];
 }
 
 /** Build a table row from a variant's case result */

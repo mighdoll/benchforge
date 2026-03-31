@@ -6,6 +6,7 @@ import open from "open";
 import sirv from "sirv";
 import {
   archiveFileName,
+  buildArchiveObject,
   collectSources,
   fetchSource,
 } from "../export/AllocExport.ts";
@@ -70,18 +71,22 @@ export async function viewArchive(filePath: string): Promise<void> {
     process.exit(1);
   }
 
-  const toJson = (v: unknown) => (v ? JSON.stringify(v) : undefined);
   const sources = archive.sources as Record<string, string> | undefined;
   const { close } = await startViewerServer({
-    profileData: toJson(archive.profile),
-    timeProfileData: toJson(archive.timeProfile),
-    coverageData: toJson(archive.coverage),
-    reportData: toJson(archive.report),
+    profileData: optionalJson(archive.profile),
+    timeProfileData: optionalJson(archive.timeProfile),
+    coverageData: optionalJson(archive.coverage),
+    reportData: optionalJson(archive.report),
     sources,
   });
 
   await waitForCtrlC();
   close();
+}
+
+/** Serialize a value to JSON if truthy, otherwise return undefined. */
+export function optionalJson(v: unknown): string | undefined {
+  return v ? JSON.stringify(v) : undefined;
 }
 
 /** Wait for Ctrl+C (SIGINT) before resolving. */
@@ -242,6 +247,7 @@ async function handleArchiveRequest(
     const parse = (s?: string) => (s ? JSON.parse(s) : null);
     const profile = parse(ctx.profileData);
     const timeProfile = parse(ctx.timeProfileData);
+    const coverage = parse(ctx.coverageData);
     const report = parse(ctx.reportData);
     const allFrames = [
       ...(profile?.shared?.frames ?? []),
@@ -250,16 +256,13 @@ async function handleArchiveRequest(
     const sources = allFrames.length
       ? await collectSources(allFrames, sourceCache)
       : Object.fromEntries(sourceCache);
-    const timestamp = new Date().toISOString().replace(/[:.]/g, "-");
-    const version = process.env.npm_package_version || "unknown";
-    const archive = {
-      schema: 1,
+    const { archive, timestamp } = buildArchiveObject({
       profile,
       timeProfile,
+      coverage,
       report,
       sources,
-      metadata: { timestamp, benchforgeVersion: version },
-    };
+    });
     const body = JSON.stringify(archive);
     const filename = profile
       ? archiveFileName(profile, timestamp)

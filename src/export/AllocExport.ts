@@ -114,6 +114,36 @@ export async function collectSources(
   return sources;
 }
 
+/** Options for building a .benchforge archive object */
+export interface ArchiveInput {
+  profile: SpeedscopeFile | null;
+  timeProfile: unknown;
+  coverage: unknown;
+  report: ReportData | null;
+  sources: Record<string, string>;
+}
+
+/** Assemble a .benchforge archive object (shared by CLI and viewer server). */
+export function buildArchiveObject(input: ArchiveInput): {
+  archive: Record<string, unknown>;
+  timestamp: string;
+} {
+  const timestamp = new Date().toISOString().replace(/[:.]/g, "-");
+  const archive = {
+    schema: 1,
+    profile: input.profile ?? null,
+    timeProfile: input.timeProfile ?? null,
+    coverage: input.coverage ?? null,
+    report: input.report ?? null,
+    sources: input.sources,
+    metadata: {
+      timestamp,
+      benchforgeVersion: process.env.npm_package_version || "unknown",
+    },
+  };
+  return { archive, timestamp };
+}
+
 /** Build a .benchforge archive containing profile + report + sources.
  *  @returns resolved output path, or undefined if nothing to archive */
 export async function archiveBenchmark(
@@ -132,20 +162,14 @@ export async function archiveBenchmark(
   const timeFrames = timeProfile?.shared?.frames ?? [];
   const allFrames = [...heapFrames, ...timeFrames];
   const sources = allFrames.length ? await collectSources(allFrames) : {};
-  const timestamp = new Date().toISOString().replace(/[:.]/g, "-");
   const coverage = coverageData ? JSON.parse(coverageData) : null;
-  const archive = {
-    schema: 1,
+  const { archive, timestamp } = buildArchiveObject({
     profile: file ?? null,
     timeProfile,
     coverage,
     report: reportData ?? null,
     sources,
-    metadata: {
-      timestamp,
-      benchforgeVersion: process.env.npm_package_version || "unknown",
-    },
-  };
+  });
 
   const fallback = file
     ? archiveFileName(file, timestamp)

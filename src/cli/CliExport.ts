@@ -21,7 +21,11 @@ import type { ReportData } from "../viewer/ReportData.ts";
 import type { DefaultCliArgs } from "./CliArgs.ts";
 import { cliHeapReportOptions, needsAlloc } from "./CliOptions.ts";
 import { printHeapReports } from "./CliReport.ts";
-import { startViewerServer, waitForCtrlC } from "./ViewerServer.ts";
+import {
+  optionalJson,
+  startViewerServer,
+  waitForCtrlC,
+} from "./ViewerServer.ts";
 
 /** Options for exporting benchmark results to various formats */
 export interface ExportOptions {
@@ -149,12 +153,11 @@ async function openViewer(
   reportData: ReportData | undefined,
   args: DefaultCliArgs,
 ): Promise<void> {
-  const toJson = (v: unknown) => (v ? JSON.stringify(v) : undefined);
   const viewer = await startViewerServer({
-    profileData: toJson(profileFile),
+    profileData: optionalJson(profileFile),
     timeProfileData: timeData,
     coverageData,
-    reportData: toJson(reportData),
+    reportData: optionalJson(reportData),
     editorUri: resolveEditorUri(args.editor),
   });
   await waitForCtrlC();
