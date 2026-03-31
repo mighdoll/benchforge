@@ -189,7 +189,7 @@ body { display: flex; flex-direction: column; }
 .source-code .line {
   display: block;
   counter-increment: line;
-  padding: 0 16px 0 calc(60px + var(--gutter-count, 0) * 72px);
+  padding: 0 16px 0 60px;
   position: relative;
   white-space: pre;
 }
@@ -226,6 +226,10 @@ body { display: flex; flex-direction: column; }
   padding-right: 8px;
   user-select: none;
   opacity: 0.85;
+}
+
+.source-code .line .gutter:last-of-type {
+  margin-right: 8px;
 }
 
 .source-code .line .gutter-count { color: #888; }

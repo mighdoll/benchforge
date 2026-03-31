@@ -175,7 +175,6 @@ function renderGutters(
   if (gutterCount === 0) return;
 
   const codeEl = panel.querySelector(".source-code") as HTMLElement;
-  codeEl.style.setProperty("--gutter-count", String(gutterCount));
   const maxAlloc = hasAlloc ? Math.max(...lineData.allocBytes.values()) : 0;
   const maxTime = hasTime ? Math.max(...lineData.selfTimeUs.values()) : 0;
 
