@@ -50,6 +50,35 @@ const optTierColors: Record<string, string> = {
   interpreted: "#dc3545",
 };
 
+/** Build the marks array for the time series plot */
+function buildMarks(
+  ctx: PlotContext,
+  heapData: ReturnType<typeof prepareHeapData>,
+  gcEvents: FlatGcEvent[],
+  pausePoints: FlatPausePoint[],
+  legendItems: LegendItem[],
+): Plot.Markish[] {
+  const warmupRule = ctx.hasWarmup
+    ? [
+        Plot.ruleX([0], {
+          stroke: "#999",
+          strokeWidth: 1,
+          strokeDasharray: "4,4",
+        }),
+      ]
+    : [];
+  const bounds = { xMin: ctx.xMin, xMax: ctx.xMax, yMax: ctx.yMax };
+  return [
+    ...heapMarks(heapData, ctx.yMin),
+    ...warmupRule,
+    gcMark(gcEvents, ctx.yMin, ctx.convertValue),
+    ...pauseMarks(pausePoints, ctx.yMin, ctx.yMax),
+    ...sampleDotMarks(ctx),
+    Plot.ruleY([ctx.yMin], { stroke: "black", strokeWidth: 1 }),
+    ...buildLegend(bounds, legendItems),
+  ];
+}
+
 /** Create sample time series showing each sample in order */
 export function createSampleTimeSeries(
   timeSeries: TimeSeriesPoint[],
@@ -92,26 +121,7 @@ export function createSampleTimeSeries(
       tickFormat: ctx.formatValue,
     },
     color: { legend: false, scheme: "observable10" },
-    marks: [
-      ...heapMarks(heapData, ctx.yMin),
-      ...(ctx.hasWarmup
-        ? [
-            Plot.ruleX([0], {
-              stroke: "#999",
-              strokeWidth: 1,
-              strokeDasharray: "4,4",
-            }),
-          ]
-        : []),
-      gcMark(gcEvents, ctx.yMin, ctx.convertValue),
-      ...pauseMarks(pausePoints, ctx.yMin, ctx.yMax),
-      ...sampleDotMarks(ctx),
-      Plot.ruleY([ctx.yMin], { stroke: "black", strokeWidth: 1 }),
-      ...buildLegend(
-        { xMin: ctx.xMin, xMax: ctx.xMax, yMax: ctx.yMax },
-        legendItems,
-      ),
-    ],
+    marks: buildMarks(ctx, heapData, gcEvents, pausePoints, legendItems),
   });
 }
 
