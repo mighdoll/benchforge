@@ -13,7 +13,6 @@ import {
   formatGutterBytes,
   formatGutterCount,
   formatGutterTime,
-  type LineGutterData,
 } from "../LineData.ts";
 import type {
   ViewerCoverageData,
@@ -178,8 +177,10 @@ function SourceHeader({
   );
 }
 
-function gutter(kind: string, text: string): string {
-  return `<span class="gutter gutter-${kind}">${text}</span>`;
+function gutter(kind: string, text: string, heat?: number): string {
+  const style = heat ? ` style="--heat:${heat.toFixed(3)}"` : "";
+  const cls = heat ? ` heat` : "";
+  return `<span class="gutter gutter-${kind}${cls}"${style}>${text}</span>`;
 }
 
 function renderGutters(
@@ -207,30 +208,14 @@ function renderGutters(
     const counts = lineData.callCounts.get(lineNum);
     const alloc = lineData.allocBytes.get(lineNum);
     const time = lineData.selfTimeUs.get(lineNum);
+    const allocHeat = alloc && maxAlloc > 0 ? alloc / maxAlloc : 0;
+    const timeHeat = time && maxTime > 0 ? time / maxTime : 0;
     let gutterHtml = "";
     if (hasCounts) gutterHtml += gutter("count", formatGutterCount(counts));
-    if (hasAlloc) gutterHtml += gutter("alloc", formatGutterBytes(alloc));
-    if (hasTime) gutterHtml += gutter("time", formatGutterTime(time));
+    if (hasAlloc) gutterHtml += gutter("alloc", formatGutterBytes(alloc), allocHeat > 0.01 ? allocHeat : undefined);
+    if (hasTime) gutterHtml += gutter("time", formatGutterTime(time), timeHeat > 0.01 ? timeHeat : undefined);
 
     el.insertAdjacentHTML("afterbegin", gutterHtml);
-    applyHeatMap(el, lineNum, lineData, maxAlloc, maxTime);
   }
 }
 
-function applyHeatMap(
-  el: HTMLElement,
-  lineNum: number,
-  lineData: LineGutterData,
-  maxAlloc: number,
-  maxTime: number,
-): void {
-  const alloc = lineData.allocBytes.get(lineNum) || 0;
-  const time = lineData.selfTimeUs.get(lineNum) || 0;
-  const allocRatio = maxAlloc > 0 ? alloc / maxAlloc : 0;
-  const timeRatio = maxTime > 0 ? time / maxTime : 0;
-  const heat = Math.max(allocRatio, timeRatio);
-  if (heat > 0.01) {
-    el.style.setProperty("--heat", heat.toFixed(3));
-    el.classList.add("heat");
-  }
-}
