@@ -119,9 +119,15 @@ function resolveStack(
     // Skip the synthetic (root) node
     if (!functionName && !url && lineNumber <= 0) continue;
     const f = resolveCallFrame(node.callFrame);
-    stack.push(
-      internFrame(f.name, f.url, f.line, f.col, sharedFrames, frameIndex),
+    const idx = internFrame(
+      f.name,
+      f.url,
+      f.line,
+      f.col,
+      sharedFrames,
+      frameIndex,
     );
+    stack.push(idx);
   }
 
   cache.set(nodeId, stack);

@@ -151,6 +151,15 @@ export const runsSection: ResultsMapper<RunStats> = {
   ],
 };
 
+const fmtString = (v: unknown): string => (typeof v === "string" ? v : "");
+const fmtNumber = (v: unknown): string =>
+  typeof v === "number" ? String(v) : "";
+
+function formatTotalTime(v: unknown): string {
+  if (typeof v !== "number") return "";
+  return v >= 30 ? `[${v.toFixed(1)}s]` : `${v.toFixed(1)}s`;
+}
+
 /** Section: total sampling duration in seconds (brackets if >= 30s) */
 export const totalTimeSection: ResultsMapper<{ totalTime?: number }> = {
   extract: (results: MeasuredResults) => ({
@@ -159,14 +168,7 @@ export const totalTimeSection: ResultsMapper<{ totalTime?: number }> = {
   columns: (): ReportColumnGroup<{ totalTime?: number }>[] => [
     {
       columns: [
-        {
-          key: "totalTime",
-          title: "time",
-          formatter: v => {
-            if (typeof v !== "number") return "";
-            return v >= 30 ? `[${v.toFixed(1)}s]` : `${v.toFixed(1)}s`;
-          },
-        },
+        { key: "totalTime", title: "time", formatter: formatTotalTime },
       ],
     },
   ],
@@ -212,16 +214,8 @@ export const optSection: ResultsMapper<OptStats> = {
     {
       groupTitle: "v8 opt",
       columns: [
-        {
-          key: "tiers",
-          title: "tiers",
-          formatter: v => (typeof v === "string" ? v : ""),
-        },
-        {
-          key: "deopt",
-          title: "deopt",
-          formatter: v => (typeof v === "number" ? String(v) : ""),
-        },
+        { key: "tiers", title: "tiers", formatter: fmtString },
+        { key: "deopt", title: "deopt", formatter: fmtNumber },
       ],
     },
   ],

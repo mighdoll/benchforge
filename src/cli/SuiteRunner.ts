@@ -168,13 +168,8 @@ async function runSingleBenchmark(
   spec: BenchmarkSpec,
   { runner, options, useWorker, params, metadata }: RunParams,
 ): Promise<BenchmarkReport> {
-  const [result] = await runBenchmark({
-    spec,
-    runner,
-    options,
-    useWorker,
-    params,
-  });
+  const args = { spec, runner, options, useWorker, params };
+  const [result] = await runBenchmark(args);
   return { name: spec.name, measuredResults: result, metadata };
 }
 

@@ -109,5 +109,6 @@ function colorByDirection(text: string, direction: CIDirection): string {
 
 /** @return formatted "pct [lo, hi]" text for a diff with CI */
 function diffCIText(pct: number, ci: [number, number]): string {
-  return `${formatSignedPercent(pct)} [${formatSignedPercent(ci[0])}, ${formatSignedPercent(ci[1])}]`;
+  const [lo, hi] = ci.map(formatSignedPercent);
+  return `${formatSignedPercent(pct)} [${lo}, ${hi}]`;
 }

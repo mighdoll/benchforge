@@ -148,11 +148,8 @@ function buildConvergence(metrics: Metrics): ConvergenceResult {
   const { medianDrift, impactDrift, medianStable, impactStable } = metrics;
 
   if (medianStable && impactStable) {
-    return {
-      converged: true,
-      confidence: 100,
-      reason: "Stable performance pattern",
-    };
+    const reason = "Stable performance pattern";
+    return { converged: true, confidence: 100, reason };
   }
 
   const raw =

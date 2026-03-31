@@ -169,11 +169,8 @@ function mergeMatrixDefaults(
   if (!merged.sections?.length) {
     const groups = matrixToReportGroups(results);
     const hasOpt = args["trace-opt"] && hasField(groups, "optStatus");
-    merged.sections = buildReportSections(
-      args.adaptive,
-      args["gc-stats"],
-      hasOpt,
-    );
+    const { adaptive, "gc-stats": gcStats } = args;
+    merged.sections = buildReportSections(adaptive, gcStats, hasOpt);
   }
   return merged;
 }

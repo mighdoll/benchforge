@@ -35,16 +35,15 @@ export async function withTimeProfiling<T>(
   options: TimeProfileOptions,
   fn: () => Promise<T> | T,
 ): Promise<{ result: T; profile: TimeProfile }> {
+  const { interval } = options;
   const ownSession = !options.session;
   const session = options.session ?? new Session();
   if (ownSession) session.connect();
 
   try {
     if (ownSession) await session.post("Profiler.enable");
-    if (options.interval)
-      await session.post("Profiler.setSamplingInterval", {
-        interval: options.interval,
-      });
+    if (interval)
+      await session.post("Profiler.setSamplingInterval", { interval });
     await session.post("Profiler.start");
     const result = await fn();
     const { profile } = await session.post("Profiler.stop");

@@ -45,13 +45,8 @@ export interface BrowserProfileResult {
 export async function profileBrowser(
   params: BrowserProfileParams,
 ): Promise<BrowserProfileResult> {
-  const {
-    url,
-    headless = true,
-    chromeArgs,
-    timeout = 60,
-    gcStats: collectGc,
-  } = params;
+  const { url, headless = true, chromeArgs } = params;
+  const { timeout = 60, gcStats: collectGc } = params;
   const { samplingInterval = 32768 } = params.allocOptions ?? {};
 
   const server = await chromium.launchServer({ headless, args: chromeArgs });
@@ -66,14 +61,15 @@ export async function profileBrowser(
     page.on("pageerror", err => pageErrors.push(err.message));
 
     const traceEvents = collectGc ? await startGcTracing(cdp) : [];
-    const lapMode = await setupLapMode(
+    const lapArgs = {
       page,
       cdp,
       params,
       samplingInterval,
       timeout,
       pageErrors,
-    );
+    };
+    const lapMode = await setupLapMode(lapArgs);
 
     await page.goto(url, { waitUntil: "load" });
     const hasBench = await page.evaluate(
@@ -105,14 +101,10 @@ function pipeChromeOutput(server: BrowserServer): void {
   const proc = server.process();
   const forward = (stream: NodeJS.ReadableStream | null) =>
     stream?.on("data", (chunk: Buffer) => {
-      chunk
-        .toString()
-        .split("\n")
-        .map(l => l.trim())
-        .filter(Boolean)
-        .forEach(line => {
-          process.stderr.write(`[chrome] ${line}\n`);
-        });
+      for (const line of chunk.toString().split("\n")) {
+        const trimmed = line.trim();
+        if (trimmed) process.stderr.write(`[chrome] ${trimmed}\n`);
+      }
     });
   forward(proc.stdout);
   forward(proc.stderr);

@@ -21,14 +21,15 @@ export interface LapModeHandle {
  * __start/__lap are pure in-page (zero CDP overhead). The first __start()
  * triggers instrument start. __done() stops instruments and collects timing data.
  */
-export async function setupLapMode(
-  page: Page,
-  cdp: CDPSession,
-  params: BrowserProfileParams,
-  samplingInterval: number,
-  timeout: number,
-  pageErrors: string[],
-): Promise<LapModeHandle> {
+export async function setupLapMode(args: {
+  page: Page;
+  cdp: CDPSession;
+  params: BrowserProfileParams;
+  samplingInterval: number;
+  timeout: number;
+  pageErrors: string[];
+}): Promise<LapModeHandle> {
+  const { page, cdp, params, samplingInterval, timeout, pageErrors } = args;
   const { promise, resolve, reject } =
     Promise.withResolvers<BrowserProfileResult>();
   let instrumentsStarted = false;

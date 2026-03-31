@@ -145,10 +145,9 @@ export function bootstrapDifferenceCI(
   const { resamples = bootstrapSamples, confidence: conf = defaultConfidence } =
     options;
 
-  const baselineMedian = percentile(baseline, 0.5);
-  const currentMedian = percentile(current, 0.5);
-  const observedPercent =
-    ((currentMedian - baselineMedian) / baselineMedian) * 100;
+  const baseMed = percentile(baseline, 0.5);
+  const currMed = percentile(current, 0.5);
+  const observedPct = ((currMed - baseMed) / baseMed) * 100;
 
   const diffs: number[] = [];
   for (let i = 0; i < resamples; i++) {
@@ -160,11 +159,10 @@ export function bootstrapDifferenceCI(
   }
 
   const ci = computeInterval(diffs, conf);
-  const ciExcludesZero = ci[0] > 0 || ci[1] < 0;
   let direction: CIDirection = "uncertain";
-  if (ciExcludesZero) direction = observedPercent < 0 ? "faster" : "slower";
+  if (ci[0] > 0 || ci[1] < 0) direction = observedPct < 0 ? "faster" : "slower";
   const histogram = binValues(diffs);
-  return { percent: observedPercent, ci, direction, histogram };
+  return { percent: observedPct, ci, direction, histogram };
 }
 
 /** @return confidence interval [lower, upper] */

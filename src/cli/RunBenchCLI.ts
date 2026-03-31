@@ -187,12 +187,8 @@ export async function runMatrixSuite(
       filtered = await filterMatrix(filtered, filter);
     }
 
-    const { filteredCases: cases, filteredVariants: variants } = filtered;
-    const opts = {
-      ...options,
-      filteredCases: cases,
-      filteredVariants: variants,
-    };
+    const { filteredCases, filteredVariants } = filtered;
+    const opts = { ...options, filteredCases, filteredVariants };
     results.push(await runMatrix(filtered, opts));
   }
   return results;

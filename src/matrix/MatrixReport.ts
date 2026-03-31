@@ -156,10 +156,8 @@ function buildSectionTable(
       Object.assign(row, section.extract(cr.measured, cr.metadata));
     }
     if (cr.baseline) {
-      row.diffCI = bootstrapDifferenceCI(
-        cr.baseline.samples,
-        cr.measured.samples,
-      );
+      const { samples } = cr.measured;
+      row.diffCI = bootstrapDifferenceCI(cr.baseline.samples, samples);
     }
     return [row];
   });

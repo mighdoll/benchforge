@@ -46,14 +46,8 @@ type FrameContainer = {
 
 /** Export reports (JSON, Perfetto, archive, viewer) based on CLI args */
 export async function exportReports(options: ExportOptions): Promise<void> {
-  const {
-    results,
-    args,
-    sections,
-    suiteName,
-    currentVersion,
-    baselineVersion,
-  } = options;
+  const { results, args, suiteName } = options;
+  const { sections, currentVersion, baselineVersion } = options;
 
   const needsReportData = args.view || args.archive != null;
   const htmlOptions = {

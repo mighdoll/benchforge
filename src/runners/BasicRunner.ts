@@ -195,19 +195,29 @@ function buildMeasuredResults(
   name: string,
   collected: CollectResult,
 ): MeasuredResults {
-  const time = computeStats(collected.samples);
+  const {
+    samples,
+    warmupSamples,
+    heapSamples,
+    timestamps,
+    optStatus,
+    optSamples,
+    pausePoints,
+  } = collected;
+  const time = computeStats(samples);
   const heap = collected.heapGrowth;
+  const heapSize = { avg: heap, min: heap, max: heap };
   return {
     name,
-    samples: collected.samples,
-    warmupSamples: collected.warmupSamples,
-    heapSamples: collected.heapSamples,
-    timestamps: collected.timestamps,
+    samples,
+    warmupSamples,
+    heapSamples,
+    timestamps,
     time,
-    heapSize: { avg: heap, min: heap, max: heap },
-    optStatus: collected.optStatus,
-    optSamples: collected.optSamples,
-    pausePoints: collected.pausePoints,
+    heapSize,
+    optStatus,
+    optSamples,
+    pausePoints,
   };
 }
 
@@ -271,14 +281,9 @@ async function runSampleLoop<T>(
   }
 
   trimArrays(arrays, count, trackHeap, !!getOptStatus);
+  const { samples, timestamps, optStatuses, pausePoints } = arrays;
   const heapSamples = trackHeap ? arrays.heapSamples : undefined;
-  return {
-    samples: arrays.samples,
-    heapSamples,
-    timestamps: arrays.timestamps,
-    optStatuses: arrays.optStatuses,
-    pausePoints: arrays.pausePoints,
-  };
+  return { samples, heapSamples, timestamps, optStatuses, pausePoints };
 }
 
 /** Group samples by V8 optimization tier and count deoptimizations. */

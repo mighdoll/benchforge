@@ -93,12 +93,8 @@ async function runDirVariantCases<T>(
     });
 
     const loaded = await loadCaseData(casesModule, caseId);
-    const baseline = await runBaselineIfExists(
-      variantId,
-      caseId,
-      caseData,
-      ctx,
-    );
+    const args = { variantId, caseId, caseData, ctx };
+    const baseline = await runBaselineIfExists(args);
     const deltaPercent = baseline
       ? computeDeltaPercent(baseline, measured)
       : undefined;
@@ -109,12 +105,13 @@ async function runDirVariantCases<T>(
 }
 
 /** Run baseline variant if it exists in baselineDir */
-async function runBaselineIfExists<T>(
-  variantId: string,
-  caseId: string,
-  caseData: unknown,
-  ctx: DirMatrixContext<T>,
-): Promise<MeasuredResults | undefined> {
+async function runBaselineIfExists<T>(params: {
+  variantId: string;
+  caseId: string;
+  caseData: unknown;
+  ctx: DirMatrixContext<T>;
+}): Promise<MeasuredResults | undefined> {
+  const { variantId, caseId, caseData, ctx } = params;
   const { matrix, baselineIds, runnerOpts } = ctx;
   if (!matrix.baselineDir || !baselineIds.includes(variantId)) return undefined;
 

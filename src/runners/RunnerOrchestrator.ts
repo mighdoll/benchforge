@@ -85,15 +85,16 @@ async function resolveModuleSpec<T>(
   spec: BenchmarkSpec<T>,
   params: T | undefined,
 ): Promise<{ spec: BenchmarkSpec<T>; params: T | undefined }> {
-  const result = await importBenchFn(
-    spec.modulePath!,
-    spec.exportName,
-    spec.setupExportName,
+  const { modulePath, exportName, setupExportName } = spec;
+  const r = await importBenchFn(
+    modulePath!,
+    exportName,
+    setupExportName,
     params,
   );
   return {
-    spec: { ...spec, fn: result.fn as BenchmarkFunction<T> },
-    params: result.params as T | undefined,
+    spec: { ...spec, fn: r.fn as BenchmarkFunction<T> },
+    params: r.params as T | undefined,
   };
 }
 
@@ -190,13 +191,11 @@ function spawnWorkerProcess(gcStats: boolean) {
   const execArgv = ["--expose-gc", "--allow-natives-syntax"];
   if (gcStats) execArgv.push("--trace-gc-nvp");
 
+  const env = { ...process.env, NODE_OPTIONS: "" };
   return fork(workerPath, [], {
     execArgv,
     silent: gcStats, // Capture stdout/stderr when collecting GC stats
-    env: {
-      ...process.env,
-      NODE_OPTIONS: "",
-    },
+    env,
   });
 }
 

@@ -71,17 +71,12 @@ export async function viewArchive(filePath: string): Promise<void> {
   }
 
   const toJson = (v: unknown) => (v ? JSON.stringify(v) : undefined);
-  const profileData = toJson(archive.profile);
-  const timeProfileData = toJson(archive.timeProfile);
-  const coverageData = toJson(archive.coverage);
-  const reportData = toJson(archive.report);
   const sources = archive.sources as Record<string, string> | undefined;
-
   const { close } = await startViewerServer({
-    profileData,
-    timeProfileData,
-    coverageData,
-    reportData,
+    profileData: toJson(archive.profile),
+    timeProfileData: toJson(archive.timeProfile),
+    coverageData: toJson(archive.coverage),
+    reportData: toJson(archive.report),
     sources,
   });
 
@@ -141,13 +136,7 @@ function createRequestHandler(
         res.statusCode = 405;
         return void res.end("Method not allowed");
       }
-      return handleArchiveRequest(
-        res,
-        ctx.profileData,
-        ctx.timeProfileData,
-        ctx.reportData,
-        sourceCache,
-      );
+      return handleArchiveRequest(res, ctx, sourceCache);
     },
   };
 
@@ -245,16 +234,14 @@ async function handleSourceRequest(
 /** Build a .benchforge archive from current session data and send as download */
 async function handleArchiveRequest(
   res: Res,
-  profileData: string | undefined,
-  timeProfileData: string | undefined,
-  reportData: string | undefined,
+  ctx: ViewerServerOptions,
   sourceCache: Map<string, string>,
 ): Promise<void> {
   try {
     const parse = (s?: string) => (s ? JSON.parse(s) : null);
-    const profile = parse(profileData);
-    const timeProfile = parse(timeProfileData);
-    const report = parse(reportData);
+    const profile = parse(ctx.profileData);
+    const timeProfile = parse(ctx.timeProfileData);
+    const report = parse(ctx.reportData);
     const allFrames = [
       ...(profile?.shared?.frames ?? []),
       ...(timeProfile?.shared?.frames ?? []),

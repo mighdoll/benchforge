@@ -73,10 +73,9 @@ function buildTraceEvents(
 
 /** Merge V8 trace events from a previous run, aligning timestamps */
 function mergeV8Trace(events: TraceEvent[]): TraceEvent[] {
-  const files = readdirSync(".").filter(
-    f => f.startsWith("node_trace.") && f.endsWith(".log"),
-  );
-  const v8Events = loadV8Events(files[0]);
+  const isTrace = (f: string) =>
+    f.startsWith("node_trace.") && f.endsWith(".log");
+  const v8Events = loadV8Events(readdirSync(".").find(isTrace));
   normalizeTimestamps(events);
   if (!v8Events) return events;
   normalizeTimestamps(v8Events);

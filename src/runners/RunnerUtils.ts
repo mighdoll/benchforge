@@ -35,12 +35,12 @@ export async function importBenchFn(
   const fn = getModuleExport<BenchmarkFunction>(module, exportName, modulePath);
 
   if (setupExportName) {
-    const setupFn = getModuleExport<BenchmarkFunction>(
+    const setup = getModuleExport<BenchmarkFunction>(
       module,
       setupExportName,
       modulePath,
     );
-    return { fn, params: await setupFn(params) };
+    return { fn, params: await setup(params) };
   }
 
   return { fn, params };

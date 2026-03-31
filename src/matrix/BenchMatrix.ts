@@ -167,24 +167,39 @@ export async function resolveCases<T>(
 }
 
 /** Convert matrix options to runner options */
-export function buildRunnerOptions(options: RunMatrixOptions): RunnerOptions {
+export function buildRunnerOptions(opts: RunMatrixOptions): RunnerOptions {
+  const {
+    gcForce,
+    traceOpt,
+    noSettle,
+    gcStats,
+    callCounts,
+    alloc,
+    allocInterval,
+    allocDepth,
+    pauseFirst,
+    pauseInterval,
+    pauseDuration,
+    timeSample,
+    timeInterval,
+  } = opts;
   return {
-    maxIterations: options.iterations,
-    maxTime: options.maxTime ?? 1000,
-    warmup: options.warmup ?? 0,
-    gcForce: options.gcForce,
-    traceOpt: options.traceOpt,
-    noSettle: options.noSettle,
-    pauseFirst: options.pauseFirst,
-    pauseInterval: options.pauseInterval,
-    pauseDuration: options.pauseDuration,
-    gcStats: options.gcStats,
-    alloc: options.alloc,
-    allocInterval: options.allocInterval,
-    allocDepth: options.allocDepth,
-    timeSample: options.timeSample,
-    timeInterval: options.timeInterval,
-    callCounts: options.callCounts,
+    maxIterations: opts.iterations,
+    maxTime: opts.maxTime ?? 1000,
+    warmup: opts.warmup ?? 0,
+    gcForce,
+    traceOpt,
+    noSettle,
+    gcStats,
+    callCounts,
+    alloc,
+    allocInterval,
+    allocDepth,
+    pauseFirst,
+    pauseInterval,
+    pauseDuration,
+    timeSample,
+    timeInterval,
   };
 }
 

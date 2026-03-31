@@ -127,10 +127,9 @@ export async function archiveBenchmark(
     return undefined;
   }
 
-  const allFrames = [
-    ...(file?.shared?.frames ?? []),
-    ...(timeProfile?.shared?.frames ?? []),
-  ];
+  const heapFrames = file?.shared?.frames ?? [];
+  const timeFrames = timeProfile?.shared?.frames ?? [];
+  const allFrames = [...heapFrames, ...timeFrames];
   const sources = allFrames.length ? await collectSources(allFrames) : {};
   const timestamp = new Date().toISOString().replace(/[:.]/g, "-");
   const coverage = coverageData ? JSON.parse(coverageData) : null;
@@ -180,12 +179,9 @@ function buildProfile(
   sharedFrames: SpeedscopeFrame[],
   frameIndex: Map<string, number>,
 ): SpeedscopeHeapProfile {
-  const intern = (f: {
-    name: string;
-    url: string;
-    line: number;
-    col?: number | null;
-  }) => internFrame(f.name, f.url, f.line, f.col, sharedFrames, frameIndex);
+  type Frame = { name: string; url: string; line: number; col?: number | null };
+  const intern = (f: Frame) =>
+    internFrame(f.name, f.url, f.line, f.col, sharedFrames, frameIndex);
 
   const nodeStacks = new Map<number, number[]>();
   for (const node of resolved.nodes) {

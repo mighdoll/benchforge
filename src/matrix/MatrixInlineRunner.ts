@@ -43,13 +43,8 @@ export async function runMatrixInline<T>(
     for (const caseId of caseIds) {
       const loaded = await loadCaseData(casesModule, caseId);
       const data = casesModule || matrix.cases ? loaded.data : (undefined as T);
-      const measured = await runVariant(
-        variant,
-        data,
-        variantId,
-        runner,
-        runnerOpts,
-      );
+      const params = { variant, data, variantId, runner, runnerOpts };
+      const measured = await runVariant(params);
       cases.push({ caseId, measured, metadata: loaded.metadata });
     }
     variants.push({ id: variantId, cases });
@@ -63,20 +58,21 @@ export async function runMatrixInline<T>(
 }
 
 /** Run a single variant with case data */
-async function runVariant<T>(
-  variant: AnyVariant<T>,
-  caseData: T,
-  name: string,
-  runner: BasicRunner,
-  options: RunnerOptions,
-): Promise<MeasuredResults> {
+async function runVariant<T>(params: {
+  variant: AnyVariant<T>;
+  data: T;
+  variantId: string;
+  runner: BasicRunner;
+  runnerOpts: RunnerOptions;
+}): Promise<MeasuredResults> {
+  const { variant, data, variantId, runner, runnerOpts } = params;
   let fn: () => void;
   if (isStatefulVariant(variant)) {
-    const state = await variant.setup(caseData);
+    const state = await variant.setup(data);
     fn = () => variant.run(state);
   } else {
-    fn = () => variant(caseData);
+    fn = () => variant(data);
   }
-  const [result] = await runner.runBench({ name, fn }, options);
+  const [result] = await runner.runBench({ name: variantId, fn }, runnerOpts);
   return result;
 }

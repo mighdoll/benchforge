@@ -46,14 +46,9 @@ export function annotateFramesWithCounts(
   const { map, byName } = coverage;
   for (const frame of frames) {
     const entries = frame.file ? map.get(frame.file) : undefined;
-    const count = entries
-      ? findCount(frame.name, frame.line, entries)
-      : undefined;
-    const resolved =
-      count ??
-      (frame.name.startsWith("(anonymous")
-        ? undefined
-        : byName.get(frame.name));
+    const count = entries && findCount(frame.name, frame.line, entries);
+    const isAnon = frame.name.startsWith("(anonymous");
+    const resolved = count ?? (isAnon ? undefined : byName.get(frame.name));
 
     if (resolved !== undefined && resolved > 0) {
       frame.name = `${frame.name} [${formatCount(resolved)}]`;

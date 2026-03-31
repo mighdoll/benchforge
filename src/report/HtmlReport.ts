@@ -55,9 +55,10 @@ function prepareGroupData(
   higherIsBetter?: boolean,
 ): BenchmarkGroup {
   const base = group.baseline;
-  const baselineSamples = base?.measuredResults.samples;
-  const baseline = base
-    ? { ...prepareBenchmarkData(base, sections), comparisonCI: undefined }
+  const baseSamples = base?.measuredResults.samples;
+  const baseData = base ? prepareBenchmarkData(base, sections) : undefined;
+  const baseline = baseData
+    ? { ...baseData, comparisonCI: undefined }
     : undefined;
   return {
     name: group.name,
@@ -65,8 +66,8 @@ function prepareGroupData(
     benchmarks: group.reports.map(report => {
       const samples = report.measuredResults.samples;
       const rawCI =
-        baselineSamples && samples
-          ? bootstrapDifferenceCI(baselineSamples, samples)
+        baseSamples && samples
+          ? bootstrapDifferenceCI(baseSamples, samples)
           : undefined;
       const comparisonCI = rawCI && higherIsBetter ? flipCI(rawCI) : rawCI;
       return { ...prepareBenchmarkData(report, sections), comparisonCI };
@@ -83,18 +84,18 @@ function prepareBenchmarkData(
   },
   sections?: ResultsMapper[],
 ): Omit<BenchmarkEntry, "comparisonCI"> {
-  const { measuredResults } = report;
+  const m = report.measuredResults;
   return {
     name: report.name,
-    samples: measuredResults.samples,
-    warmupSamples: measuredResults.warmupSamples,
-    allocationSamples: measuredResults.allocationSamples,
-    heapSamples: measuredResults.heapSamples,
-    gcEvents: measuredResults.nodeGcTime?.events,
-    optSamples: measuredResults.optSamples,
-    pausePoints: measuredResults.pausePoints,
-    stats: measuredResults.time,
-    heapSize: measuredResults.heapSize,
+    samples: m.samples,
+    warmupSamples: m.warmupSamples,
+    allocationSamples: m.allocationSamples,
+    heapSamples: m.heapSamples,
+    gcEvents: m.nodeGcTime?.events,
+    optSamples: m.optSamples,
+    pausePoints: m.pausePoints,
+    stats: m.time,
+    heapSize: m.heapSize,
     sectionStats: sections ? extractSectionStats(report, sections) : undefined,
   };
 }

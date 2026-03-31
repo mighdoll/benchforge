@@ -110,9 +110,8 @@ function createColumnGroups<S extends ReadonlyArray<ResultsMapper<any>>>(
   hasBaseline: boolean,
 ): ColumnGroup<ReportRowData<S>>[] {
   type Row = ReportRowData<S>;
-  const nameCol: ColumnGroup<Row> = {
-    columns: [{ key: "name" as keyof Row, title: "name" }],
-  };
+  const key = "name" as keyof Row;
+  const nameCol: ColumnGroup<Row> = { columns: [{ key, title: "name" }] };
   const groups = sections.flatMap(s => s.columns());
   return [nameCol, ...(hasBaseline ? injectDiffColumns(groups) : groups)];
 }

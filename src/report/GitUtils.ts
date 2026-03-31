@@ -53,10 +53,8 @@ export function formatGitVersion(version: GitVersion): string {
 /** Get most recent modified file date in a directory (for dirty repos) */
 export function getMostRecentModifiedDate(dir: string): string | undefined {
   try {
-    const raw = execSync("git status --porcelain", {
-      encoding: "utf-8",
-      cwd: dir,
-    });
+    const opts = { encoding: "utf-8" as const, cwd: dir };
+    const raw = execSync("git status --porcelain", opts);
     const modifiedFiles = raw
       .trim()
       .split("\n")
