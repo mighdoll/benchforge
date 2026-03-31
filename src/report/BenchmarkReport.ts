@@ -16,11 +16,13 @@ export interface BenchmarkReport {
   metadata?: UnknownRecord;
 }
 
+/** A titled group of related columns in a report table */
 export interface ReportColumnGroup<T> {
   groupTitle?: string;
   columns: ReportColumn<T>[];
 }
 
+/** A table column with optional comparison behavior */
 export type ReportColumn<T> = AnyColumn<T> & {
   /** Add diff column after this column when baseline exists */
   comparable?: boolean;

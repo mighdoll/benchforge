@@ -187,7 +187,6 @@ function buildProfile(
     col?: number | null;
   }) => internFrame(f.name, f.url, f.line, f.col, sharedFrames, frameIndex);
 
-  // Build nodeId -> stack of frame indices
   const nodeStacks = new Map<number, number[]>();
   for (const node of resolved.nodes) {
     nodeStacks.set(node.nodeId, node.stack.map(intern));

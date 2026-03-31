@@ -23,7 +23,8 @@ import type { CaseResult, MatrixResults } from "./BenchMatrix.ts";
 export interface ExtraColumn {
   key: string;
   title: string;
-  groupTitle?: string; // optional column group header
+  /** Column group header */
+  groupTitle?: string;
   extract: (caseResult: CaseResult) => unknown;
   formatter?: (value: unknown) => string;
 }
@@ -31,8 +32,10 @@ export interface ExtraColumn {
 /** Options for matrix report generation */
 export interface MatrixReportOptions {
   extraColumns?: ExtraColumn[];
-  sections?: ResultsMapper[]; // ResultsMapper sections (like BenchSuite)
-  variantTitle?: string; // custom title for the variant column (default: "variant")
+  /** ResultsMapper sections (like BenchSuite) */
+  sections?: ResultsMapper[];
+  /** Custom title for the variant column (default: "variant") */
+  variantTitle?: string;
 }
 
 /** Row data for matrix report table */

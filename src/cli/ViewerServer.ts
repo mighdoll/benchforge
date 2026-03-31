@@ -197,6 +197,7 @@ function tryListen(
   });
 }
 
+/** Send pre-serialized JSON or 404 if data is absent */
 function sendJson(
   res: Res,
   data: string | undefined,
@@ -213,6 +214,7 @@ function sendJson(
   res.end(data);
 }
 
+/** Fetch source text by URL query param, caching for subsequent requests */
 async function handleSourceRequest(
   res: Res,
   query: string,
@@ -240,6 +242,7 @@ async function handleSourceRequest(
   }
 }
 
+/** Build a .benchforge archive from current session data and send as download */
 async function handleArchiveRequest(
   res: Res,
   profileData: string | undefined,

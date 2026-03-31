@@ -6,16 +6,20 @@ import type { ReportColumnGroup, ResultsMapper } from "./BenchmarkReport.ts";
 import { formatBytes, integer, percent, timeMs } from "./Formatters.ts";
 import { formatConvergence } from "./text/ConvergenceFormatters.ts";
 
+/** Extracted timing statistics for a benchmark */
 export interface TimeStats {
   mean?: number;
   p50?: number;
   p99?: number;
 }
 
+/** GC overhead from Node performance hooks */
 export interface GcSectionStats {
-  gc?: number; // GC time as fraction of total bench time
+  /** GC time as fraction of total bench time */
+  gc?: number;
 }
 
+/** Detailed GC stats from --trace-gc-nvp parsing */
 export interface GcStatsInfo {
   allocPerIter?: number;
   collected?: number;
@@ -25,10 +29,12 @@ export interface GcStatsInfo {
   pausePerIter?: number;
 }
 
+/** Iteration count for a benchmark run */
 export interface RunStats {
   runs?: number;
 }
 
+/** Stats for adaptive sampling mode including convergence confidence */
 export interface AdaptiveStats {
   median?: number;
   mean?: number;
@@ -36,9 +42,12 @@ export interface AdaptiveStats {
   convergence?: number;
 }
 
+/** V8 optimization tier distribution and deoptimization count */
 export interface OptStats {
-  tiers?: string; // tier distribution summary
-  deopt?: number; // deopt count
+  /** Tier distribution summary (e.g. "turbofan:85% sparkplug:15%") */
+  tiers?: string;
+  /** Number of deoptimizations observed */
+  deopt?: number;
 }
 
 /** Section: mean, p50, p99 timing */

@@ -93,6 +93,7 @@ export class ServerProvider implements DataProvider {
     return resp.text();
   }
 
+  /** Fetch a speedscope profile, caching the result by type. */
   fetchProfileData(
     type: "alloc" | "time",
   ): Promise<ViewerSpeedscopeFile | null> {
@@ -123,6 +124,7 @@ export class ServerProvider implements DataProvider {
     return this.config.hasTimeProfile ? "/api/profile/time" : null;
   }
 
+  /** Request a `.benchforge` archive from the server, extracting the filename from Content-Disposition. */
   async createArchive(): Promise<{ blob: Blob; filename: string }> {
     const resp = await fetch("/api/archive", { method: "POST" });
     if (!resp.ok) throw new Error("Archive failed");

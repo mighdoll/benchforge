@@ -1,3 +1,4 @@
+/** Enable to log worker process timing to console (manual toggle) */
 export const debugWorkerTiming = false;
 
 /** Get current time or 0 if debugging disabled */

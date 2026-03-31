@@ -5,6 +5,7 @@ import {
 import type { BenchRunner, RunnerOptions } from "./BenchRunner.ts";
 import { createRunner, type KnownRunner } from "./CreateRunner.ts";
 
+/** Milliseconds to nanoseconds conversion factor */
 export const msToNs = 1e6;
 
 /** Get named or default export from module, throw if not a function */

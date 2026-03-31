@@ -58,7 +58,6 @@ function buildTimeProfile(
     };
   }
 
-  // Build node lookup and parent map for stack resolution
   const nodeMap = new Map<number, TimeProfileNode>(nodes.map(n => [n.id, n]));
   const parentMap = new Map<number, number>(); // childId -> parentId
   for (const node of nodes) {
@@ -67,7 +66,6 @@ function buildTimeProfile(
     }
   }
 
-  // Cache resolved stacks per node ID
   const stackCache = new Map<number, number[]>();
   const resolve = (id: number) =>
     resolveStack(id, nodeMap, parentMap, stackCache, sharedFrames, frameIndex);
@@ -104,7 +102,6 @@ function resolveStack(
   const cached = cache.get(nodeId);
   if (cached) return cached;
 
-  // Walk up to root, collecting node IDs
   const path: number[] = [];
   let current: number | undefined = nodeId;
   while (current !== undefined) {
@@ -112,7 +109,7 @@ function resolveStack(
     current = parentMap.get(current);
   }
 
-  // Reverse to get root-first order, intern frames
+  // Reverse to root-first order
   const stack: number[] = [];
   for (let i = path.length - 1; i >= 0; i--) {
     const node = nodeMap.get(path[i]);

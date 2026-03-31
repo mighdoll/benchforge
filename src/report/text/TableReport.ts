@@ -11,7 +11,7 @@ export interface ColumnGroup<T> {
 
 export type AnyColumn<T> = Column<T> | DiffColumn<T>;
 
-/** Column with optional formatter */
+/** Standard column: formats a single value from the row */
 export interface Column<T> extends ColumnFormat<T> {
   formatter?: (value: unknown) => string | null;
   diffKey?: undefined;

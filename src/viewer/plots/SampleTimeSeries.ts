@@ -32,6 +32,7 @@ interface PlotContext {
   benchmarks: string[];
 }
 
+/** V8 GetOptimizationStatus() return codes mapped to human-readable tier names */
 const optStatusNames: Record<number, string> = {
   1: "interpreted",
   129: "sparkplug",
@@ -163,6 +164,7 @@ function prepareHeapData(heapSeries: HeapPoint[], yMin: number, yMax: number) {
   }));
 }
 
+/** Create area + tooltip marks for the heap usage overlay */
 function heapMarks(
   heapData: { sample: number; y: number; heapMB: number }[],
   yMin: number,
@@ -190,6 +192,7 @@ function heapMarks(
   ];
 }
 
+/** Create vertical bar marks for GC events, height proportional to duration */
 function gcMark(
   gcEvents: FlatGcEvent[],
   yMin: number,
@@ -214,6 +217,7 @@ function gcMark(
   });
 }
 
+/** Create dashed vertical rules marking pause points across the full Y range */
 function pauseMarks(
   pausePoints: FlatPausePoint[],
   yMin: number,
@@ -232,6 +236,7 @@ function pauseMarks(
   );
 }
 
+/** Create dot marks for warmup, baseline, and measured samples with opt tier colors */
 function sampleDotMarks(ctx: PlotContext): any[] {
   const { convertedData, unitSuffix, formatValue } = ctx;
   const fmtVal = (d: SampleData) =>
@@ -282,6 +287,7 @@ function sampleDotMarks(ctx: PlotContext): any[] {
   ];
 }
 
+/** Assemble legend entries based on which data series are present */
 function buildLegendItems(
   hasWarmup: boolean,
   gcCount: number,
@@ -333,6 +339,7 @@ function buildLegendItems(
   return items;
 }
 
+/** Convert raw time series points to sample data with baseline/optimization metadata */
 function buildSampleData(
   timeSeries: TimeSeriesPoint[],
 ): Omit<SampleData, "displayValue">[] {

@@ -1,7 +1,7 @@
 import type { BenchmarkSpec } from "./BenchmarkSpec.ts";
 import type { MeasuredResults } from "./MeasuredResults.ts";
 
-/** Interface for benchmark execution libraries */
+/** Benchmark execution strategy. Implementations collect timing samples from benchmark functions. */
 export interface BenchRunner {
   runBench<T = unknown>(
     benchmark: BenchmarkSpec<T>,

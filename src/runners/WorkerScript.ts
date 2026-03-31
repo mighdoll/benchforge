@@ -305,4 +305,5 @@ setTimeout(() => {
   process.exit(1);
 }, maxLifetime);
 
+// Prevent stdin from keeping the worker process alive
 process.stdin.pause();

@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+/** CLI entry point: dispatches to `view` subcommand or default benchmark runner. */
 import { hideBin } from "yargs/helpers";
 
 const argv = hideBin(process.argv);

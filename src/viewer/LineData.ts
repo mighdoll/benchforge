@@ -1,5 +1,6 @@
 import type { ViewerCoverageData, ViewerSpeedscopeFile } from "./Providers.ts";
 
+/** Per-line profiling metrics (allocations, CPU time, call counts) for source gutter display. */
 export interface LineGutterData {
   allocBytes: Map<number, number>;
   selfTimeUs: Map<number, number>;
@@ -20,6 +21,7 @@ export function computeLineData(
   };
 }
 
+/** Format byte count for gutter display, scaling to KB/MB as appropriate. */
 export function formatGutterBytes(bytes: number | undefined): string {
   if (!bytes) return "";
   if (bytes >= 1_000_000) return (bytes / 1_000_000).toFixed(1) + " MB";
@@ -27,6 +29,7 @@ export function formatGutterBytes(bytes: number | undefined): string {
   return bytes + " B";
 }
 
+/** Format microsecond duration for gutter display, scaling to ms/s as appropriate. */
 export function formatGutterTime(us: number | undefined): string {
   if (!us) return "";
   if (us >= 1_000_000) return (us / 1_000_000).toFixed(1) + " s";
@@ -34,6 +37,7 @@ export function formatGutterTime(us: number | undefined): string {
   return us.toFixed(0) + " us";
 }
 
+/** Format a call count for gutter display, scaling to K/M as appropriate. */
 export function formatGutterCount(count: number | undefined): string {
   if (!count) return "";
   if (count >= 1_000_000) return (count / 1_000_000).toFixed(1) + "M";

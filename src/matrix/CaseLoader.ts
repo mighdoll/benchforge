@@ -3,8 +3,10 @@ import type { LoadedCase } from "./BenchMatrix.ts";
 /** Module that exports case definitions */
 export interface CasesModule<T = unknown> {
   cases: string[];
-  defaultCases?: string[]; // subset for quick runs
-  defaultVariants?: string[]; // subset for quick runs
+  /** Subset of cases for quick runs */
+  defaultCases?: string[];
+  /** Subset of variants for quick runs */
+  defaultVariants?: string[];
   loadCase?: (id: string) => LoadedCase<T> | Promise<LoadedCase<T>>;
 }
 

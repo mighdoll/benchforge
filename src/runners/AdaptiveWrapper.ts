@@ -5,12 +5,18 @@ import type { BenchRunner, RunnerOptions } from "./BenchRunner.ts";
 import type { MeasuredResults } from "./MeasuredResults.ts";
 import { msToNs } from "./RunnerUtils.ts";
 
+/** Options for adaptive sampling that collects until statistical convergence or timeout. */
 export interface AdaptiveOptions extends RunnerOptions {
+  /** Enable adaptive sampling (default: true when using adaptive runner) */
   adaptive?: boolean;
+  /** Minimum measurement time in ms before convergence can stop sampling (default: 1000) */
   minTime?: number;
+  /** Maximum measurement time in ms, hard stop (default: 10000) */
   maxTime?: number;
+  /** Target confidence percentage to stop early (default: 95) */
   targetConfidence?: number;
-  convergence?: number; // Confidence threshold (0-100)
+  /** Confidence threshold 0-100 (alias for targetConfidence) */
+  convergence?: number;
 }
 
 type Metrics = {

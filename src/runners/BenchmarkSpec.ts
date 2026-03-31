@@ -10,6 +10,7 @@ export interface BenchmarkSpec<T = unknown> {
   setupExportName?: string;
 }
 
+/** Benchmark function, optionally receiving setup parameters. */
 export type BenchmarkFunction<T = unknown> =
   | ((params: T) => void)
   | (() => void);

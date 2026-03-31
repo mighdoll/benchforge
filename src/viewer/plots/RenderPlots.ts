@@ -121,6 +121,7 @@ function renderToContainer(
   container.appendChild(create());
 }
 
+/** Build HTML for a benchmark's stats card (CI comparison + metric grid) */
 function generateStatsHtml(b: PreparedBenchmark, gcEnabled: boolean): string {
   const ciHtml = generateCIHtml(b.comparisonCI);
   const statsHtml = b.sectionStats?.length
@@ -135,6 +136,7 @@ function generateStatsHtml(b: PreparedBenchmark, gcEnabled: boolean): string {
   `;
 }
 
+/** Collect all sample data across benchmarks into flat arrays for plotting */
 function flattenSamples(benchmarks: PreparedBenchmark[]): FlattenedData {
   const out: FlattenedData = {
     allSamples: [],
@@ -149,6 +151,7 @@ function flattenSamples(benchmarks: PreparedBenchmark[]): FlattenedData {
   return out;
 }
 
+/** Format the "vs Baseline" confidence interval as a stat card item */
 function generateCIHtml(ci: BenchmarkEntry["comparisonCI"]): string {
   if (!ci) return "";
   const pct = `${formatPct(ci.percent)} [${formatPct(ci.ci[0])}, ${formatPct(ci.ci[1])}]`;
@@ -160,6 +163,7 @@ function generateCIHtml(ci: BenchmarkEntry["comparisonCI"]): string {
   `;
 }
 
+/** Render section-based stats, filtering out GC section when tracking is disabled */
 function sectionStatsHtml(
   sectionStats: NonNullable<PreparedBenchmark["sectionStats"]>,
   gcEnabled: boolean,
@@ -178,6 +182,7 @@ function sectionStatsHtml(
     .join("");
 }
 
+/** Render basic percentile stats when section-based stats are unavailable */
 function fallbackStatsHtml(stats: PreparedBenchmark["stats"]): string {
   const items: [string, number][] = [
     ["Min", stats.min],

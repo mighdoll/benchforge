@@ -4,6 +4,7 @@ import { escapeHtml } from "./Helpers.ts";
 import type { DataProvider } from "./Providers.ts";
 import type { BenchmarkGroup, ReportData } from "./ReportData.ts";
 
+/** CLI args with their default values, hidden from the display header. */
 const defaultArgs: Record<string, unknown> = {
   worker: true,
   time: 5,
@@ -11,6 +12,8 @@ const defaultArgs: Record<string, unknown> = {
   "pause-interval": 0,
   "pause-duration": 100,
 };
+
+/** Internal yargs keys and viewer-only flags, excluded from the CLI display. */
 const skipArgs = new Set(["_", "$0", "view"]);
 
 /** Fetch report data and render the summary tab (stats, CI badges, header). */
@@ -57,6 +60,7 @@ function buildReportHeader(metadata: Record<string, unknown>): string {
   </div>`;
 }
 
+/** Build the HTML for one benchmark group: header, comparison badge, and stats container. */
 function buildSummaryGroupHtml(group: BenchmarkGroup, i: number): string {
   if (!group.benchmarks || group.benchmarks.length === 0) {
     return `<div><div class="error">No benchmark data available for this group</div></div>`;
@@ -87,6 +91,7 @@ function formatCliArgs(args?: Record<string, unknown>): string {
   return ["benchforge", ...flags].join(" ");
 }
 
+/** Build the "Current: hash | Baseline: hash" version badge, if git info is present. */
 function formatVersionInfo(metadata: Record<string, unknown>): string {
   const cur = metadata.currentVersion as GitVersion | undefined;
   const base = metadata.baselineVersion as GitVersion | undefined;

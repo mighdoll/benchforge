@@ -35,7 +35,6 @@ export function exportPerfettoTrace(
   const absPath = resolve(outputPath);
   const events = buildTraceEvents(groups, args);
 
-  // Try to merge any existing V8 trace from a previous run
   const merged = mergeV8Trace(events);
   writeTraceFile(absPath, merged);
   console.log(`Perfetto trace exported to: ${outputPath}`);

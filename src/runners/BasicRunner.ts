@@ -102,7 +102,10 @@ const statusNames: Record<number, string> = {
   32769: "optimized", // common optimized status
 };
 
-/** Timing-based runner that collects samples within time/iteration limits. */
+/**
+ * Timing-based runner that collects samples within time/iteration limits.
+ * Handles warmup, heap tracking, V8 optimization tracing, and periodic pauses.
+ */
 export class BasicRunner implements BenchRunner {
   async runBench<T = unknown>(
     benchmark: BenchmarkSpec<T>,
@@ -208,7 +211,7 @@ function buildMeasuredResults(
   };
 }
 
-/** Run warmup iterations with gc + settle time for V8 optimization */
+/** Run warmup iterations with gc + settle time for V8 optimization. Returns warmup timings. */
 async function runWarmup<T>(p: CollectParams<T>): Promise<number[]> {
   const gc = gcFunction();
   const samples = new Array<number>(p.warmup);

@@ -1,17 +1,21 @@
+/** A single timing sample from a benchmark run */
 export interface Sample {
   benchmark: string;
   value: number;
   iteration: number;
 }
 
+/** A sample with warmup/optimization metadata for time series plots */
 export interface TimeSeriesPoint {
   benchmark: string;
   iteration: number;
   value: number;
   isWarmup: boolean;
+  /** V8 optimization status code (e.g. 17=turbofan, 33=maglev) */
   optStatus?: number;
 }
 
+/** Heap usage sample (in bytes) at a given iteration */
 export interface HeapPoint {
   benchmark: string;
   iteration: number;

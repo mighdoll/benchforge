@@ -29,6 +29,7 @@ export interface LoadedCase<T = unknown> {
   metadata?: Record<string, unknown>;
 }
 
+/** Default runner settings applied to all matrix benchmarks */
 export interface MatrixDefaults {
   warmup?: number;
   maxTime?: number;
@@ -79,10 +80,12 @@ export interface RunMatrixOptions {
   iterations?: number;
   maxTime?: number;
   warmup?: number;
-  useWorker?: boolean; // use worker process isolation (default: true for variantDir)
-  filteredCases?: string[]; // run only these cases (from filter)
-  filteredVariants?: string[]; // run only these variants (from filter)
-  // Runner options passthrough
+  /** Use worker process isolation (default: true for variantDir) */
+  useWorker?: boolean;
+  /** Run only these cases (from --filter) */
+  filteredCases?: string[];
+  /** Run only these variants (from --filter) */
+  filteredVariants?: string[];
   gcForce?: boolean;
   traceOpt?: boolean;
   noSettle?: boolean;
@@ -98,7 +101,7 @@ export interface RunMatrixOptions {
   callCounts?: boolean;
 }
 
-/** @return true if variant is a StatefulVariant (has setup + run) */
+/** Check if variant is a StatefulVariant (has setup + run) */
 export function isStatefulVariant<T, S>(
   v: Variant<T, S>,
 ): v is StatefulVariant<T, S> {

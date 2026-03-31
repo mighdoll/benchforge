@@ -95,6 +95,7 @@ export function closeSourceTab(tabId: string, config: ViewerConfig): void {
   else if (config.hasTimeProfile) activateTab("time-flamechart");
 }
 
+/** Derive a unique tab id from a source file path. */
 function sourceTabId(file: string): string {
   return "src:" + file;
 }
@@ -129,7 +130,6 @@ async function updateSourcePanel(
     const header = buildSourceHeader(file, line, col, uri);
     panel.innerHTML = header + '<div class="source-code">' + html + "</div>";
 
-    // Fetch profiles and coverage, then render gutter columns
     const [allocProfile, timeProfile, coverage] = await Promise.all([
       provider.fetchProfileData("alloc"),
       provider.fetchProfileData("time"),
@@ -154,6 +154,7 @@ async function updateSourcePanel(
   }
 }
 
+/** Build the tab button label: basename[:line] with a close icon. */
 function tabLabelHtml(file: string, line: number): string {
   const shortName = file.split("/").pop() || file;
   const label = line ? shortName + ":" + line : shortName;
@@ -172,6 +173,7 @@ function getHighlighter(): Promise<HighlighterCore> {
   return highlighterPromise;
 }
 
+/** Build the file path header bar, with an optional "Open in Editor" link. */
 function buildSourceHeader(
   file: string,
   line: number,
@@ -188,6 +190,7 @@ function buildSourceHeader(
   return `<div class="source-header"><span class="source-path">${path}</span>${editorLink}</div>`;
 }
 
+/** Wrap a gutter cell value in a styled span. */
 function gutter(kind: string, text: string): string {
   return `<span class="gutter gutter-${kind}">${text}</span>`;
 }
@@ -228,6 +231,7 @@ function renderGutters(
   }
 }
 
+/** Set a CSS `--heat` variable on lines with significant alloc or time cost. */
 function applyHeatMap(
   el: HTMLElement,
   lineNum: number,

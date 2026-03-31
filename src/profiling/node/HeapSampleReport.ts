@@ -8,36 +8,55 @@ import {
   resolveProfile,
 } from "./ResolvedProfile.ts";
 
+/** A resolved call frame with display-ready source positions */
 export interface CallFrame {
   fn: string;
   url: string;
-  line: number; // 1-indexed for display
-  col?: number; // 1-indexed for display
+  /** 1-indexed */
+  line: number;
+  /** 1-indexed */
+  col?: number;
 }
 
+/** An allocation site with byte totals, call stack, and optional raw samples */
 export interface HeapSite {
   fn: string;
   url: string;
-  line: number; // 1-indexed for display
+  /** 1-indexed */
+  line: number;
   col?: number;
   bytes: number;
-  stack?: CallFrame[]; // call stack from root to this frame
-  samples?: HeapSample[]; // individual allocation samples at this site
-  callers?: { stack: CallFrame[]; bytes: number }[]; // distinct caller paths
+  /** Call stack from root to this frame */
+  stack?: CallFrame[];
+  /** Individual allocation samples at this site */
+  samples?: HeapSample[];
+  /** Distinct caller paths with byte weights (populated by {@link aggregateSites}) */
+  callers?: { stack: CallFrame[]; bytes: number }[];
 }
 
+/** Predicate that returns true for user code (vs. runtime internals) */
 export type UserCodeFilter = (site: CallFrame) => boolean;
 
+/** Options for {@link formatHeapReport} */
 export interface HeapReportOptions {
+  /** Max sites to display */
   topN: number;
+  /** Caller stack frames to show per site (default 3) */
   stackDepth?: number;
+  /** Multi-line format with file paths (default false) */
   verbose?: boolean;
-  raw?: boolean; // dump every raw sample
-  userOnly?: boolean; // filter to user code only (hide node internals)
-  isUserCode?: UserCodeFilter; // predicate for user vs internal code
-  totalAll?: number; // total across all nodes (before filtering)
-  totalUserCode?: number; // total for user code only
-  sampleCount?: number; // number of samples taken
+  /** Dump every raw sample */
+  raw?: boolean;
+  /** Filter to user code only, hiding runtime internals */
+  userOnly?: boolean;
+  /** Predicate for user vs internal code (default {@link isNodeUserCode}) */
+  isUserCode?: UserCodeFilter;
+  /** Total bytes across all nodes (before filtering) */
+  totalAll?: number;
+  /** Total bytes for user code only */
+  totalUserCode?: number;
+  /** Number of samples taken */
+  sampleCount?: number;
 }
 
 /** Sum selfSize across all nodes in profile (before any filtering) */
@@ -129,7 +148,6 @@ export function aggregateSites(sites: HeapSite[]): HeapSite[] {
     }
   }
 
-  // Sort callers by bytes descending, use top caller as primary stack
   for (const site of byLocation.values()) {
     if (!site.callers || site.callers.length <= 1) continue;
     site.callers.sort((a, b) => b.bytes - a.bytes);

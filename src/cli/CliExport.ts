@@ -141,7 +141,6 @@ async function annotateCoverage(
   if (profileFile) annotateFramesWithCounts(profileFile.shared.frames, result);
   if (timeFile) annotateFramesWithCounts(timeFile.shared.frames, result);
 
-  // Serialize the coverage map for archive/viewer
   return JSON.stringify(Object.fromEntries(result.map));
 }
 

@@ -95,6 +95,7 @@ export function createCIPlot(
   });
 }
 
+/** Compute plot layout dimensions from outer width/height and default margins */
 function buildLayout(width: number, height: number): Layout {
   const margin = defaultMargin;
   const w = width - margin.left - margin.right;
@@ -163,6 +164,7 @@ function rect(
   return el;
 }
 
+/** Draw a filled area + stroke path using gaussian-smoothed histogram data */
 function drawSmoothedDist(
   svg: SVGSVGElement,
   histogram: HistogramBin[],
@@ -184,6 +186,7 @@ function drawSmoothedDist(
   );
 }
 
+/** Draw individual histogram bars centered on each bin position */
 function drawHistogramBars(
   svg: SVGSVGElement,
   histogram: HistogramBin[],

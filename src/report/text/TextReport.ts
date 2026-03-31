@@ -34,7 +34,7 @@ type UnionToIntersection<U> = (U extends any ? (k: U) => void : never) extends (
   ? I
   : never;
 
-/** @return formatted table report with optional baseline comparisons */
+/** Build a formatted text table from benchmark groups, with baseline diff columns when present */
 export function reportResults<S extends ReadonlyArray<ResultsMapper<any>>>(
   groups: ReportGroup[],
   sections: S,
@@ -44,7 +44,7 @@ export function reportResults<S extends ReadonlyArray<ResultsMapper<any>>>(
   return buildTable(createColumnGroups(sections, hasBaseline), results);
 }
 
-/** @return rows with stats from sections */
+/** Extract stats from all sections into typed row objects for each report */
 export function valuesForReports<S extends ReadonlyArray<ResultsMapper<any>>>(
   reports: BenchmarkReport[],
   sections: S,
@@ -55,7 +55,7 @@ export function valuesForReports<S extends ReadonlyArray<ResultsMapper<any>>>(
   })) as ReportRowData<S>[];
 }
 
-/** @return groups with single CI column after first comparable field */
+/** Insert a single "delta% CI" column after the first comparable column in each group */
 export function injectDiffColumns<T>(
   reportGroups: ReportColumnGroup<T>[],
 ): ColumnGroup<T>[] {

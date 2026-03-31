@@ -1,7 +1,10 @@
-/** Bootstrap estimate with confidence interval and raw resample data */
+/** Bootstrap estimate with confidence interval and raw resample distribution */
 export interface BootstrapResult {
+  /** Point estimate from the original sample */
   estimate: number;
+  /** Confidence interval [lower, upper] from bootstrap resampling */
   ci: [number, number];
+  /** Bootstrap resample distribution (for visualization) */
   samples: number[];
 }
 
@@ -13,18 +16,26 @@ export interface HistogramBin {
   count: number;
 }
 
-/** Bootstrap confidence interval for percentage difference between two samples */
+/**
+ * Bootstrap confidence interval for percentage difference between two sample medians.
+ * Used for baseline comparisons: negative percent means current is faster.
+ */
 export interface DifferenceCI {
+  /** Observed percentage difference (current - baseline) / baseline */
   percent: number;
+  /** Confidence interval [lower, upper] in percent */
   ci: [number, number];
+  /** Whether the CI excludes zero: "faster", "slower", or "uncertain" */
   direction: CIDirection;
-  /** Histogram of bootstrap distribution for visualization */
+  /** Bootstrap distribution histogram for visualization */
   histogram?: HistogramBin[];
 }
 
 /** Options for bootstrap resampling methods */
 type BootstrapOptions = {
+  /** Number of bootstrap resamples (default: 10000) */
   resamples?: number;
+  /** Confidence level 0-1 (default: 0.95) */
   confidence?: number;
 };
 const defaultConfidence = 0.95;
@@ -121,7 +132,11 @@ export function createResample(samples: number[]): number[] {
   return Array.from({ length: n }, rand);
 }
 
-/** @return bootstrap CI for percentage difference between baseline and current medians */
+/**
+ * @return bootstrap CI for percentage difference between baseline and current medians.
+ * Resamples both distributions independently and computes the median difference
+ * distribution to derive a confidence interval.
+ */
 export function bootstrapDifferenceCI(
   baseline: number[],
   current: number[],

@@ -3,6 +3,7 @@ import { existsSync, readFileSync, statSync } from "node:fs";
 import { join } from "node:path";
 import { formatDateWithTimezone } from "../viewer/DateFormat.ts";
 
+/** Git commit hash, date, and dirty status for version tracking */
 export interface GitVersion {
   hash: string;
   date: string;

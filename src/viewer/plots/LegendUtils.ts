@@ -1,11 +1,13 @@
 import * as Plot from "@observablehq/plot";
 
+/** Plot data bounds used to position the legend overlay */
 export interface LegendBounds {
   xMin: number;
   xMax: number;
   yMax: number;
 }
 
+/** A single entry in the plot legend with color, label, and symbol style */
 export interface LegendItem {
   color: string;
   label: string;
@@ -68,6 +70,7 @@ function legendBackground(bounds: LegendBounds): any {
   });
 }
 
+/** Dispatch to the appropriate mark builder for a legend item's symbol style */
 function symbolMark(pos: LegendPos, item: LegendItem): any {
   switch (item.style) {
     case "filled-dot":
