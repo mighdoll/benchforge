@@ -11,8 +11,8 @@ import { hasSufficientSamples } from "./SamplesPanel.tsx";
 import { ThemeToggle } from "./ThemeToggle.tsx";
 
 export function TabBar() {
-  const p = provider.value!;
-  const { config } = p;
+  const dataProvider = provider.value!;
+  const { config } = dataProvider;
   const data = reportData.value;
   const samplesEnabled = !!data && hasSufficientSamples(data);
 
@@ -52,7 +52,7 @@ export function TabBar() {
 
       <div class="tab-spacer" />
       <ThemeToggle />
-      <ArchiveButton provider={p} />
+      <ArchiveButton provider={dataProvider} />
     </div>
   );
 }
@@ -118,20 +118,20 @@ function closeSourceTab(tabId: string): void {
   else if (config.hasTimeProfile) activeTabId.value = "time-flamechart";
 }
 
-function ArchiveButton({ provider: p }: { provider: DataProvider }) {
+function ArchiveButton({ provider: dataProvider }: { provider: DataProvider }) {
   const [archiving, setArchiving] = useState(false);
 
   async function handleArchive(): Promise<void> {
     setArchiving(true);
     try {
-      const { blob, filename } = await p.createArchive();
-      const a = document.createElement("a");
-      a.href = URL.createObjectURL(blob);
-      a.download = filename;
-      document.body.appendChild(a);
-      a.click();
-      a.remove();
-      URL.revokeObjectURL(a.href);
+      const { blob, filename } = await dataProvider.createArchive();
+      const link = document.createElement("a");
+      link.href = URL.createObjectURL(blob);
+      link.download = filename;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      URL.revokeObjectURL(link.href);
     } catch (err) {
       console.error("Archive failed:", err);
     } finally {

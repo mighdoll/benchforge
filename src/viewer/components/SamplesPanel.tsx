@@ -76,12 +76,12 @@ function TimeSeriesPlot({ group, index }: GroupPlotProps) {
   const ref = useRef<HTMLDivElement>(null);
   useEffect(() => {
     const benchmarks = prepareBenchmarks(group);
-    const f = flattenSamples(benchmarks);
-    if (f.timeSeries.length === 0) return;
+    const flat = flattenSamples(benchmarks);
+    if (flat.timeSeries.length === 0) return;
     import("../plots/SampleTimeSeries.ts").then(({ createSampleTimeSeries }) => {
       if (!ref.current) return;
       ref.current.innerHTML = "";
-      const { timeSeries, allGcEvents, allPausePoints, heapSeries } = f;
+      const { timeSeries, allGcEvents, allPausePoints, heapSeries } = flat;
       const el = createSampleTimeSeries(timeSeries, allGcEvents, allPausePoints, heapSeries);
       ref.current.appendChild(el);
     });
@@ -97,13 +97,13 @@ function HistogramPlot({ group, index }: GroupPlotProps) {
   const ref = useRef<HTMLDivElement>(null);
   useEffect(() => {
     const benchmarks = prepareBenchmarks(group);
-    const f = flattenSamples(benchmarks);
+    const flat = flattenSamples(benchmarks);
     const names = benchmarks.map(b => b.name);
-    if (f.allSamples.length === 0) return;
+    if (flat.allSamples.length === 0) return;
     import("../plots/HistogramKde.ts").then(({ createHistogramKde }) => {
       if (!ref.current) return;
       ref.current.innerHTML = "";
-      ref.current.appendChild(createHistogramKde(f.allSamples, names));
+      ref.current.appendChild(createHistogramKde(flat.allSamples, names));
     });
   }, [group]);
   return (

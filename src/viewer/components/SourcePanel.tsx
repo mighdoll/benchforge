@@ -121,29 +121,52 @@ export function SourcePanel({ tab }: { tab: SourceTabState }): preact.JSX.Elemen
       data-tab={tab.id}
       ref={panelRef}
     >
-      {error ? (
-        <div class="source-placeholder">
-          <p>Source unavailable for {error}</p>
-        </div>
-      ) : !html ? (
-        <div class="source-placeholder">
-          <p>Loading source&hellip;</p>
-        </div>
-      ) : (
-        <>
-          <SourceHeader
-            file={tab.file}
-            line={tab.line}
-            col={tab.col}
-            editorUri={editorUri}
-          />
-          <div
-            class="source-code"
-            dangerouslySetInnerHTML={{ __html: html }}
-          />
-        </>
-      )}
+      <SourceBody
+        file={tab.file}
+        line={tab.line}
+        col={tab.col}
+        html={html}
+        error={error}
+        editorUri={editorUri}
+      />
     </div>
+  );
+}
+
+function SourceBody({
+  file,
+  line,
+  col,
+  html,
+  error,
+  editorUri,
+}: {
+  file: string;
+  line: number;
+  col: number;
+  html: string | null;
+  error: string | null;
+  editorUri: string | null;
+}) {
+  if (error) {
+    return (
+      <div class="source-placeholder">
+        <p>Source unavailable for {error}</p>
+      </div>
+    );
+  }
+  if (!html) {
+    return (
+      <div class="source-placeholder">
+        <p>Loading source&hellip;</p>
+      </div>
+    );
+  }
+  return (
+    <>
+      <SourceHeader file={file} line={line} col={col} editorUri={editorUri} />
+      <div class="source-code" dangerouslySetInnerHTML={{ __html: html }} />
+    </>
   );
 }
 
