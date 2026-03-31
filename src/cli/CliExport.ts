@@ -33,7 +33,7 @@ export interface ExportOptions {
   baselineVersion?: GitVersion;
 }
 
-/** Export options specific to matrix benchmarks (no results/args — uses MatrixResults) */
+/** Export options for matrix benchmarks (results and args come from the matrix pipeline). */
 export interface MatrixExportOptions {
   sections?: any[];
   currentVersion?: GitVersion;
@@ -44,7 +44,7 @@ type FrameContainer = {
   shared: { frames: { name: string; file?: string; line?: number }[] };
 };
 
-/** Export reports (JSON, Perfetto, archive, viewer) based on CLI args */
+/** Export reports (JSON, Perfetto, archive, viewer) based on CLI args. */
 export async function exportReports(options: ExportOptions): Promise<void> {
   const { results, args, suiteName } = options;
   const { sections, currentVersion, baselineVersion } = options;
@@ -83,7 +83,7 @@ export async function exportReports(options: ExportOptions): Promise<void> {
   }
 }
 
-/** Print heap reports (if enabled) and export results */
+/** Print heap reports (if enabled) and export results. */
 export async function finishReports(
   results: ReportGroup[],
   args: DefaultCliArgs,
@@ -96,7 +96,7 @@ export async function finishReports(
   await exportReports({ results, args, suiteName, ...exportOptions });
 }
 
-/** Write JSON, Perfetto, and time profile files if requested by CLI args */
+/** Write JSON, Perfetto, and time profile files if requested by CLI args. */
 function exportFileFormats(
   results: ReportGroup[],
   args: DefaultCliArgs,
@@ -109,7 +109,7 @@ function exportFileFormats(
   if (args["export-time"]) exportTimeProfile(results, args["export-time"]);
 }
 
-/** Build combined time profile SpeedScope file from all results */
+/** Build combined Speedscope file from all time profiles in results. */
 function buildAllTimeProfiles(results: ReportGroup[]) {
   type TP = import("../profiling/node/TimeSampler.ts").TimeProfile;
   const entries = results.flatMap(group =>
@@ -123,8 +123,7 @@ function buildAllTimeProfiles(results: ReportGroup[]) {
   return buildTimeSpeedscopeFile(entries);
 }
 
-/** Annotate speedscope frame names with coverage counts if available.
- *  Returns serialized coverage map for archive/viewer use. */
+/** Annotate speedscope frame names with coverage counts. Returns serialized coverage map. */
 async function annotateCoverage(
   results: ReportGroup[],
   profileFile?: FrameContainer,
@@ -142,7 +141,7 @@ async function annotateCoverage(
   return JSON.stringify(Object.fromEntries(result.map));
 }
 
-/** Start viewer server with profile data and block until Ctrl+C */
+/** Start viewer server with profile data and block until Ctrl+C. */
 async function openViewer(
   profileFile: ReturnType<typeof buildSpeedscopeFile>,
   timeData: string | undefined,
@@ -162,7 +161,7 @@ async function openViewer(
   viewer.close();
 }
 
-/** Export the first raw V8 TimeProfile to a JSON file */
+/** Export the first raw V8 TimeProfile to a JSON file. */
 function exportTimeProfile(results: ReportGroup[], path: string): void {
   const profile = findTimeProfile(results);
   if (!profile) {
@@ -174,7 +173,7 @@ function exportTimeProfile(results: ReportGroup[], path: string): void {
   console.log(`Time profile exported to: ${path}`);
 }
 
-/** Merge coverage data from all results into a single CoverageData */
+/** Merge coverage data from all results into a single CoverageData. */
 function mergeCoverage(
   results: ReportGroup[],
 ): import("../profiling/node/CoverageTypes.ts").CoverageData | undefined {
@@ -184,7 +183,7 @@ function mergeCoverage(
   return scripts.length > 0 ? { scripts } : undefined;
 }
 
-/** Find the first raw V8 TimeProfile in results */
+/** Find the first raw V8 TimeProfile in results. */
 function findTimeProfile(
   results: ReportGroup[],
 ): import("../profiling/node/TimeSampler.ts").TimeProfile | undefined {

@@ -340,7 +340,7 @@ function createOptStatusGetter(): ((fn: unknown) => number) | undefined {
   }
 }
 
-/** Pre-allocate arrays to reduce GC pressure during measurement */
+/** Pre-allocate arrays to reduce GC pressure during measurement. */
 function createSampleArrays(
   n: number,
   trackHeap: boolean,
@@ -355,7 +355,7 @@ function createSampleArrays(
   };
 }
 
-/** Check if we should pause at this iteration for V8 optimization */
+/** Check if we should pause at this iteration for V8 background compilation. */
 function shouldPause(
   iter: number,
   first: number | undefined,
@@ -367,7 +367,7 @@ function shouldPause(
   return (iter - first) % interval === 0;
 }
 
-/** Trim arrays to actual sample count */
+/** Trim pre-allocated arrays to actual sample count. */
 function trimArrays(
   arrays: SampleArrays,
   count: number,

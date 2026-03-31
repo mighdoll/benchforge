@@ -1,9 +1,12 @@
 import { Session } from "node:inspector/promises";
 import type { CoverageData, ScriptCoverage } from "./CoverageTypes.ts";
 
-/** Run a function while collecting precise coverage, return execution counts.
- *  The returned session can be shared with TimeSampler to avoid
- *  Profiler.disable resetting coverage counters. */
+/**
+ * Run a function while collecting precise coverage, return execution counts.
+ *
+ * The returned session can be shared with TimeSampler to avoid
+ * Profiler.disable resetting coverage counters.
+ */
 export async function withCoverageProfiling<T>(
   fn: (session: Session) => Promise<T> | T,
 ): Promise<{ result: T; coverage: CoverageData }> {

@@ -98,7 +98,7 @@ async function resolveModuleSpec<T>(
   };
 }
 
-/** Create message for worker execution */
+/** Serialize a BenchmarkSpec into a worker-safe message (modulePath or fnCode) */
 function createRunMessage<T>(
   spec: BenchmarkSpec<T>,
   runnerName: KnownRunner,
@@ -194,11 +194,8 @@ function spawnWorkerProcess(gcStats: boolean) {
   if (gcStats) execArgv.push("--trace-gc-nvp");
 
   const env = { ...process.env, NODE_OPTIONS: "" };
-  return fork(workerPath, [], {
-    execArgv,
-    silent: gcStats, // Capture stdout/stderr when collecting GC stats
-    env,
-  });
+  // silent mode captures stdout so we can parse --trace-gc-nvp output
+  return fork(workerPath, [], { execArgv, silent: gcStats, env });
 }
 
 /** Capture and parse GC lines from stdout (V8's --trace-gc-nvp outputs to stdout) */
@@ -207,11 +204,11 @@ function setupGcCapture(worker: ChildProcess, gcEvents: GcEvent[]): void {
   worker.stdout!.on("data", (data: Buffer) => {
     buffer += data.toString();
     const lines = buffer.split("\n");
-    buffer = lines.pop() || ""; // Keep incomplete line in buffer
+    buffer = lines.pop() || "";
     for (const line of lines) {
       const event = parseGcLine(line);
       if (event) gcEvents.push(event);
-      else if (line.trim()) process.stdout.write(line + "\n"); // Forward non-GC output
+      else if (line.trim()) process.stdout.write(line + "\n");
     }
   });
 }
@@ -219,7 +216,7 @@ function setupGcCapture(worker: ChildProcess, gcEvents: GcEvent[]): void {
 // Consider: --no-compilation-cache, --max-old-space-size=512, --no-lazy
 // for consistency (less realistic)
 
-/** Attach profiling data to all results in a batch */
+/** Mutate results to include GC stats, heap/time profiles, and coverage */
 function attachProfilingData(
   results: MeasuredResults[],
   gcEvents: GcEvent[] | undefined,

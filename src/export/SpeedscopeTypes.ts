@@ -10,6 +10,7 @@ export interface SpeedscopeFile {
   exporter?: string;
 }
 
+/** A single call frame with optional source location */
 export interface SpeedscopeFrame {
   name: string;
   file?: string;
@@ -20,6 +21,7 @@ export interface SpeedscopeFrame {
 /** Union of heap and time profile shapes (unit differs) */
 export type SpeedscopeProfile = SpeedscopeHeapProfile | SpeedscopeTimeProfile;
 
+/** Heap allocation profile weighted by bytes */
 export interface SpeedscopeHeapProfile {
   type: "sampled";
   name: string;
@@ -30,6 +32,7 @@ export interface SpeedscopeHeapProfile {
   weights: number[];
 }
 
+/** CPU time profile weighted by microseconds */
 export interface SpeedscopeTimeProfile {
   type: "sampled";
   name: string;

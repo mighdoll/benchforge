@@ -55,6 +55,7 @@ export function isHigherIsBetter(
   return col?.higherIsBetter ?? false;
 }
 
+/** Type guard: distinguishes ResultsMapper[] from ReportColumnGroup[] */
 function isMappers(
   v: ResultsMapper[] | ReportColumnGroup<any>[],
 ): v is ResultsMapper[] {

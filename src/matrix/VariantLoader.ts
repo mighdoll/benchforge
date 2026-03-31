@@ -2,7 +2,7 @@ import fs from "node:fs/promises";
 import { fileURLToPath } from "node:url";
 import type { Variant } from "./BenchMatrix.ts";
 
-/** Discover variant ids from a directory of .ts files */
+/** List variant IDs by scanning .ts files in a directory */
 export async function discoverVariants(dirUrl: string): Promise<string[]> {
   const dirPath = fileURLToPath(dirUrl);
   const entries = await fs.readdir(dirPath, { withFileTypes: true });
@@ -12,7 +12,7 @@ export async function discoverVariants(dirUrl: string): Promise<string[]> {
     .sort();
 }
 
-/** Load a variant module and extract run/setup exports */
+/** Import a variant module and return its run/setup exports as a Variant */
 export async function loadVariant<T = unknown>(
   dirUrl: string,
   variantId: string,
@@ -22,12 +22,12 @@ export async function loadVariant<T = unknown>(
   return extractVariant(module, variantId, moduleUrl);
 }
 
-/** Get module URL for a variant in a directory */
+/** Resolve the import URL for a variant file */
 export function variantModuleUrl(dirUrl: string, variantId: string): string {
   return new URL(`${variantId}.ts`, dirUrl).href;
 }
 
-/** Extract variant from module exports */
+/** Validate and extract a Variant from a module's exports */
 function extractVariant<T>(
   module: Record<string, unknown>,
   variantId: string,

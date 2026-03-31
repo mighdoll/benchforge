@@ -2,6 +2,7 @@ import { signal } from "@preact/signals";
 import type { DataProvider } from "./Providers.ts";
 import type { ReportData } from "./ReportData.ts";
 
+/** Tracked state for an open source-code tab in the viewer. */
 export interface SourceTabState {
   id: string;
   file: string;

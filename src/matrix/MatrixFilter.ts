@@ -49,7 +49,7 @@ export async function filterMatrix<T>(
   return { ...matrix, filteredCases, filteredVariants };
 }
 
-/** Get case IDs matching filter pattern */
+/** Return case IDs matching a substring pattern, or all if no pattern */
 async function getFilteredCases<T>(
   matrix: BenchMatrix<T>,
   casePattern?: string,
@@ -68,7 +68,7 @@ async function getFilteredCases<T>(
   return filtered;
 }
 
-/** Get variant IDs matching filter pattern */
+/** Return variant IDs matching a substring pattern, or all if no pattern */
 async function getFilteredVariants<T>(
   matrix: BenchMatrix<T>,
   variantPattern?: string,
@@ -84,12 +84,12 @@ async function getFilteredVariants<T>(
   return filtered;
 }
 
-/** Match id against pattern (case-insensitive substring) */
+/** Case-insensitive substring match */
 function matchPattern(id: string, pattern: string): boolean {
   return id.toLowerCase().includes(pattern.toLowerCase());
 }
 
-/** Resolve all variant IDs from inline variants or variantDir */
+/** Collect all variant IDs from either inline variants or variantDir */
 async function resolveVariantIds<T>(matrix: BenchMatrix<T>): Promise<string[]> {
   if (matrix.variants) return Object.keys(matrix.variants);
   if (matrix.variantDir) return discoverVariants(matrix.variantDir);

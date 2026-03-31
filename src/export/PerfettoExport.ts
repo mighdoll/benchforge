@@ -7,15 +7,19 @@ import type { MeasuredResults } from "../runners/MeasuredResults.ts";
 
 /** Chrome Trace Event format event */
 interface TraceEvent {
-  ph: string; // event type: M=metadata, C=counter, i=instant, B/E=begin/end
-  ts: number; // timestamp in microseconds
+  /** Event type: M=metadata, C=counter, i=instant, B/E=begin/end */
+  ph: string;
+  /** Timestamp in microseconds */
+  ts: number;
   pid?: number;
   tid?: number;
   cat?: string;
   name: string;
   args?: Record<string, unknown>;
-  s?: string; // scope for instant events: "t"=thread, "p"=process, "g"=global
-  dur?: number; // duration for complete events
+  /** Scope for instant events: "t"=thread, "p"=process, "g"=global */
+  s?: string;
+  /** Duration for complete events */
+  dur?: number;
 }
 
 /** Chrome Trace Event format file structure */

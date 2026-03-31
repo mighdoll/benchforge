@@ -3,7 +3,7 @@ import type { HeapReportOptions } from "../profiling/node/HeapSampleReport.ts";
 import type { RunnerOptions } from "../runners/BenchRunner.ts";
 import { type DefaultCliArgs, defaultAdaptiveMaxTime } from "./CliArgs.ts";
 
-/** Validate CLI argument combinations */
+/** Validate CLI argument combinations. */
 export function validateArgs(args: DefaultCliArgs): void {
   if (args["gc-stats"] && !args.worker && !args.url) {
     throw new Error(
@@ -12,7 +12,7 @@ export function validateArgs(args: DefaultCliArgs): void {
   }
 }
 
-/** Convert CLI args to runner options */
+/** Convert CLI args to runner options. */
 export function cliToRunnerOptions(args: DefaultCliArgs): RunnerOptions {
   const { inspect, iterations } = args;
   const gcForce = args["gc-force"];
@@ -27,7 +27,7 @@ export function cliToRunnerOptions(args: DefaultCliArgs): RunnerOptions {
   };
 }
 
-/** Convert CLI args to matrix run options */
+/** Convert CLI args to matrix run options. */
 export function cliToMatrixOptions(args: DefaultCliArgs): RunMatrixOptions {
   const { duration, iterations, worker } = args;
   return {
@@ -38,7 +38,7 @@ export function cliToMatrixOptions(args: DefaultCliArgs): RunMatrixOptions {
   };
 }
 
-/** @return HeapReportOptions from CLI args */
+/** Build HeapReportOptions from CLI args. */
 export function cliHeapReportOptions(args: DefaultCliArgs): HeapReportOptions {
   return {
     topN: args["alloc-rows"],
@@ -49,7 +49,7 @@ export function cliHeapReportOptions(args: DefaultCliArgs): HeapReportOptions {
   };
 }
 
-/** @return true if any alloc-related flag implies allocation sampling */
+/** True if any alloc-related flag implies allocation sampling. */
 export function needsAlloc(args: DefaultCliArgs): boolean {
   return (
     args.alloc ||
@@ -60,12 +60,12 @@ export function needsAlloc(args: DefaultCliArgs): boolean {
   );
 }
 
-/** @return true if time sampling should be enabled */
+/** True if time sampling should be enabled. */
 export function needsTimeSample(args: DefaultCliArgs): boolean {
   return args["time-sample"] || !!args["export-time"];
 }
 
-/** Create options for adaptive mode */
+/** Create runner options for adaptive sampling mode. */
 function createAdaptiveOptions(args: DefaultCliArgs): RunnerOptions {
   return {
     minTime: (args["min-time"] ?? 1) * 1000,
@@ -76,7 +76,7 @@ function createAdaptiveOptions(args: DefaultCliArgs): RunnerOptions {
   } as any;
 }
 
-/** Runner/matrix options shared across all CLI modes */
+/** Runner/matrix options shared across all CLI modes. */
 function cliCommonOptions(args: DefaultCliArgs) {
   const { warmup } = args;
   const { "gc-force": gcForce, "gc-stats": gcStats } = args;

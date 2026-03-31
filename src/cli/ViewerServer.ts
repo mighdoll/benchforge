@@ -36,7 +36,7 @@ type RouteHandler = (
   method: string,
 ) => Promise<void> | void;
 
-/** Start the viewer server and open in browser */
+/** Start the viewer HTTP server and open in browser. */
 export async function startViewerServer(
   options: ViewerServerOptions,
 ): Promise<{ server: Server; port: number; close: () => void }> {
@@ -57,7 +57,7 @@ export async function startViewerServer(
   return { server: srv, port: actualPort, close: () => srv.close() };
 }
 
-/** Open a .benchforge archive in the viewer */
+/** Open a .benchforge archive in the viewer. */
 export async function viewArchive(filePath: string): Promise<void> {
   const absPath = resolve(filePath);
   const content = await readFile(absPath, "utf-8");
@@ -84,7 +84,7 @@ export async function viewArchive(filePath: string): Promise<void> {
   close();
 }
 
-/** Wait for Ctrl+C before exiting */
+/** Wait for Ctrl+C (SIGINT) before resolving. */
 export function waitForCtrlC(): Promise<void> {
   return new Promise(resolve => {
     console.log("\nPress Ctrl+C to exit");
@@ -96,8 +96,8 @@ export function waitForCtrlC(): Promise<void> {
 }
 
 /** Resolve the package root directory.
- *  In dev: src/cli/ViewerServer.ts  → dirname is "cli"  → up 2.
- *  In dist: dist/ViewerServer-*.mjs → dirname is "dist" → up 1. */
+ *
+ *  Dev: src/cli/ -> up 2. Dist: dist/ -> up 1. */
 function packageRoot(): string {
   const thisDir = dirname(fileURLToPath(import.meta.url));
   const base = thisDir.split("/").pop() || "";
@@ -105,7 +105,7 @@ function packageRoot(): string {
   return join(thisDir, "..");
 }
 
-/** Build HTTP request handler with API routes and static asset fallback */
+/** Build HTTP request handler with API routes and static asset fallback. */
 function createRequestHandler(
   ctx: ViewerServerOptions,
   sourceCache: Map<string, string>,
@@ -159,7 +159,7 @@ function createRequestHandler(
   };
 }
 
-/** Listen on port, retrying on next port if EADDRINUSE */
+/** Listen on port, retrying on next port if EADDRINUSE. */
 function tryListen(
   server: Server,
   port: number,
@@ -187,7 +187,7 @@ function tryListen(
   });
 }
 
-/** Send pre-serialized JSON or 404 if data is absent */
+/** Send pre-serialized JSON or 404 if data is absent. */
 function sendJson(
   res: Res,
   data: string | undefined,
@@ -204,7 +204,7 @@ function sendJson(
   res.end(data);
 }
 
-/** Fetch source text by URL query param, caching for subsequent requests */
+/** Fetch source text by URL query param, caching for subsequent requests. */
 async function handleSourceRequest(
   res: Res,
   query: string,
@@ -232,7 +232,7 @@ async function handleSourceRequest(
   }
 }
 
-/** Build a .benchforge archive from current session data and send as download */
+/** Build a .benchforge archive from current session data and send as download. */
 async function handleArchiveRequest(
   res: Res,
   ctx: ViewerServerOptions,

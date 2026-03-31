@@ -51,7 +51,7 @@ import { runBenchmarks } from "./SuiteRunner.ts";
 
 const { yellow } = colors;
 
-/** Parse CLI with custom configuration */
+/** Parse CLI args with optional custom yargs configuration. */
 export function parseBenchArgs<T = DefaultCliArgs>(
   configureArgs?: Configure<T>,
 ): T & DefaultCliArgs {
@@ -59,7 +59,7 @@ export function parseBenchArgs<T = DefaultCliArgs>(
   return parseCliArgs(argv, configureArgs) as T & DefaultCliArgs;
 }
 
-/** Run benchmarks and display table. Suite is optional with --url (browser mode). */
+/** Run benchmarks and display results. Suite is optional with --url (browser mode). */
 export async function runDefaultBench(
   suite?: BenchSuite,
   configureArgs?: Configure<any>,
@@ -73,7 +73,7 @@ export async function runDefaultBench(
   );
 }
 
-/** Run benchmarks, display table, and optionally generate HTML report */
+/** Run benchmarks, display results, and export reports. */
 export async function benchExports(
   suite: BenchSuite,
   args: DefaultCliArgs,
@@ -84,7 +84,7 @@ export async function benchExports(
   await finishReports(results, args, suite.name);
 }
 
-/** Run browser profiling via Playwright + CDP, report with standard pipeline */
+/** Run browser profiling via Playwright + CDP and report with standard pipeline. */
 export async function browserBenchExports(args: DefaultCliArgs): Promise<void> {
   warnBrowserFlags(args);
   const profileBrowser = await loadBrowserProfiler();
@@ -118,7 +118,7 @@ export async function browserBenchExports(args: DefaultCliArgs): Promise<void> {
   await exportReports({ results, args });
 }
 
-/** Dynamically import the browser profiler (requires Playwright) */
+/** Dynamically import the browser profiler. Throws a helpful error if Playwright is missing. */
 async function loadBrowserProfiler() {
   type BrowserMod = typeof import("../profiling/browser/BrowserProfiler.ts");
   try {
@@ -137,7 +137,7 @@ async function loadBrowserProfiler() {
   }
 }
 
-/** Run matrix suite with full CLI handling (parse, run, report, export) */
+/** Run matrix suite with full CLI handling (parse, run, report, export). */
 export async function runDefaultMatrixBench(
   suite: MatrixSuite,
   configureArgs?: Configure<any>,
@@ -147,7 +147,7 @@ export async function runDefaultMatrixBench(
   await matrixBenchExports(suite, args, reportOptions);
 }
 
-/** Run matrix benchmarks, display table, and generate exports */
+/** Run matrix benchmarks, display results, and generate exports. */
 export async function matrixBenchExports(
   suite: MatrixSuite,
   args: DefaultCliArgs,
@@ -163,8 +163,9 @@ export async function matrixBenchExports(
 }
 
 /** Run matrix suite with CLI arguments.
- *  no options ==> defaultCases/defaultVariants, --filter ==> subset of defaults,
- *  --all --filter ==> subset of all, --all ==> all cases/variants */
+ *
+ *  Default runs defaultCases/defaultVariants. --filter narrows defaults,
+ *  --all --filter narrows all, --all runs everything. */
 export async function runMatrixSuite(
   suite: MatrixSuite,
   args: DefaultCliArgs,
@@ -183,7 +184,7 @@ export async function runMatrixSuite(
   return results;
 }
 
-/** Apply default-case narrowing and user filter to a matrix */
+/** Apply default-case narrowing and user filter to a matrix. */
 async function applyMatrixFilters(
   matrix: FilteredMatrix<any>,
   runAll: boolean,
@@ -207,7 +208,7 @@ async function applyMatrixFilters(
   return filtered;
 }
 
-/** Import a file and run it as a benchmark based on what it exports */
+/** Import a file and run it as a benchmark based on what it exports. */
 async function fileBenchExports(
   filePath: string,
   args: DefaultCliArgs,
@@ -228,7 +229,7 @@ async function fileBenchExports(
   }
 }
 
-/** Warn about Node-only flags that are ignored in browser mode. */
+/** Warn about Node-only flags ignored in browser mode. */
 function warnBrowserFlags(args: DefaultCliArgs): void {
   const ignoredFlags = [
     !args.worker && "--no-worker",
@@ -241,13 +242,13 @@ function warnBrowserFlags(args: DefaultCliArgs): void {
     console.warn(yellow(`Ignored in browser mode: ${ignoredFlags.join(", ")}`));
 }
 
-/** Strip surrounding quotes from a chrome arg token. */
+/** Strip surrounding quotes from a chrome-args token. */
 function stripQuotes(s: string): string {
   const bare = s.replace(/^(['"])(.*)\1$/s, "$2");
   return bare.replace(/^(-[^=]+=)(['"])(.*)\2$/s, "$1$3");
 }
 
-/** Wrap browser profile result as ReportGroup[] for the standard pipeline */
+/** Wrap browser profile result as ReportGroup[] for the standard export pipeline. */
 function browserResultGroups(
   name: string,
   result: BrowserProfileResult,
@@ -256,7 +257,7 @@ function browserResultGroups(
   return [{ name, reports: [{ name, measuredResults: measured }] }];
 }
 
-/** Print browser benchmark tables and heap reports */
+/** Print browser benchmark tables and heap reports. */
 function printBrowserReport(
   result: BrowserProfileResult,
   results: ReportGroup[],
@@ -277,7 +278,7 @@ function printBrowserReport(
   }
 }
 
-/** Convert browser profile result to MeasuredResults */
+/** Convert browser profile result to MeasuredResults. */
 function toBrowserMeasured(
   name: string,
   result: BrowserProfileResult,

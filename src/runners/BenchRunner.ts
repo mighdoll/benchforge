@@ -55,7 +55,7 @@ export interface RunnerOptions {
   callCounts?: boolean;
 }
 
-/** Execute benchmark with optional parameters */
+/** Invoke the benchmark function, forwarding setup params if provided. */
 export function executeBenchmark<T>(
   benchmark: BenchmarkSpec<T>,
   params?: T,

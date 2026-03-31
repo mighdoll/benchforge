@@ -55,7 +55,6 @@ interface Lines {
 
 const { bold } = colors;
 
-// Regex to strip ANSI escape codes (ESC [ ... m sequences)
 const ansiEscapeRegex = new RegExp(
   String.fromCharCode(27) + "\\[[0-9;]*m",
   "g",
@@ -88,7 +87,7 @@ export function toRows<T extends Record<string, any>>(
   return rawRows.map(row => row.map(cell => cell ?? " "));
 }
 
-/** Flatten groups with spacing */
+/** Merge result groups into a flat array, inserting blank rows between groups */
 function flattenGroups<T extends Record<string, any>>(
   columnGroups: ColumnGroup<T>[],
   resultGroups: ResultGroup<T>[],
@@ -102,7 +101,7 @@ function flattenGroups<T extends Record<string, any>>(
   });
 }
 
-/** Convert columns and records to formatted table */
+/** Render column groups and records into a formatted table string */
 function createTable<T extends Record<string, any>>(
   groups: ColumnGroup<T>[],
   records: T[],
@@ -113,7 +112,7 @@ function createTable<T extends Record<string, any>>(
   return table(allRows, config);
 }
 
-/** Process results with baseline comparisons */
+/** Append baseline row and inject diff values into result rows */
 function addBaseline<T extends Record<string, any>>(
   columnGroups: ColumnGroup<T>[],
   group: ResultGroup<T>,
@@ -131,7 +130,7 @@ function addBaseline<T extends Record<string, any>>(
   return [...diffResults, marked];
 }
 
-/** Create headers and table configuration */
+/** Build header rows, spanning cells, column widths, and border rules */
 function setup<T>(groups: ColumnGroup<T>[], dataRows: string[][]): TableSetup {
   const titles = getTitles(groups);
   const headerRows = [...createGroupHeaders(groups, titles.length), titles];
@@ -143,7 +142,7 @@ function setup<T>(groups: ColumnGroup<T>[], dataRows: string[][]): TableSetup {
   return { headerRows, config };
 }
 
-/** Add comparison values for diff columns */
+/** Compute formatted diff values by comparing main row against baseline */
 function addComparisons<T extends Record<string, any>>(
   groups: ColumnGroup<T>[],
   main: T,
@@ -229,7 +228,6 @@ function calcColumnWidths<T>(
     }
   }
 
-  // Convert to table config format
   return Object.fromEntries(
     widths.map((w, i) => [i, { width: w, wrapWord: false }]),
   );

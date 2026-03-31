@@ -1,6 +1,6 @@
 import type { LoadedCase } from "./BenchMatrix.ts";
 
-/** Module that exports case definitions */
+/** Module exporting case IDs and an optional loader for case data */
 export interface CasesModule<T = unknown> {
   cases: string[];
   /** Subset of cases for quick runs */
@@ -10,7 +10,7 @@ export interface CasesModule<T = unknown> {
   loadCase?: (id: string) => LoadedCase<T> | Promise<LoadedCase<T>>;
 }
 
-/** Load a cases module by URL */
+/** Import and validate a cases module, which must export a `cases` array */
 export async function loadCasesModule<T = unknown>(
   moduleUrl: string,
 ): Promise<CasesModule<T>> {
@@ -26,7 +26,7 @@ export async function loadCasesModule<T = unknown>(
   };
 }
 
-/** Load case data from a CasesModule or pass through the caseId */
+/** Load case data from a CasesModule, or use the caseId as data if no module */
 export async function loadCaseData<T>(
   casesModule: CasesModule<T> | undefined,
   caseId: string,

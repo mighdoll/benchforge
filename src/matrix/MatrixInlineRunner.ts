@@ -16,7 +16,7 @@ import {
 } from "./BenchMatrix.ts";
 import { loadCaseData } from "./CaseLoader.ts";
 
-/** Run matrix with inline variants (non-worker mode) */
+/** Run matrix with in-memory variant functions (no worker isolation) */
 export async function runMatrixInline<T>(
   matrix: BenchMatrix<T>,
   options: RunMatrixOptions,
@@ -57,7 +57,7 @@ export async function runMatrixInline<T>(
   return { name: matrix.name, variants };
 }
 
-/** Run a single variant with case data */
+/** Set up and benchmark a single variant, returning measured results */
 async function runVariant<T>(params: {
   variant: AnyVariant<T>;
   data: T;

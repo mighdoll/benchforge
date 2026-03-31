@@ -12,7 +12,8 @@ export type CIDirection = "faster" | "slower" | "uncertain";
 
 /** Binned histogram for efficient transfer to browser */
 export interface HistogramBin {
-  x: number; // bin center
+  /** Bin center value */
+  x: number;
   count: number;
 }
 

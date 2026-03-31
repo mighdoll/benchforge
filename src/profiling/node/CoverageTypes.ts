@@ -1,5 +1,7 @@
-/** Per-function execution counts from V8 Profiler.takePreciseCoverage.
- *  Works with both node:inspector (Node.js) and CDP (browser). */
+/**
+ * Per-function execution counts from V8 Profiler.takePreciseCoverage.
+ * Works with both node:inspector (Node.js) and CDP (browser).
+ */
 export interface CoverageData {
   scripts: ScriptCoverage[];
 }

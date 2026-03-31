@@ -73,14 +73,13 @@ interface ProfilingState {
 const workerStartTime = getPerfNow();
 const maxLifetime = 5 * 60 * 1000;
 
-/** Log timing with consistent format */
 const logTiming = debugWorkerTiming ? _logTiming : () => {};
 function _logTiming(operation: string, duration?: number) {
   const suffix = duration !== undefined ? ` ${duration.toFixed(1)}ms` : "";
   console.log(`[Worker] ${operation}${suffix}`);
 }
 
-/** Send message and exit with duration log */
+/** Send IPC message to parent then exit the worker process */
 function sendAndExit(msg: ResultMessage | ErrorMessage, exitCode: number) {
   process.send!(msg, undefined, undefined, (err: Error | null): void => {
     if (err) {
@@ -148,7 +147,7 @@ async function importBenchmarkWithSetup(
   return importBenchFn(modulePath!, exportName, setupExportName, params);
 }
 
-/** Reconstruct function from string code */
+/** Eval serialized function body back into a callable (trusted worker context) */
 function reconstructFunction(fnCode: string): BenchmarkFunction {
   // biome-ignore lint/security/noGlobalEval: Necessary for worker process isolation, code is from trusted source
   const fn = eval(`(${fnCode})`); // eslint-disable-line no-eval
@@ -158,7 +157,7 @@ function reconstructFunction(fnCode: string): BenchmarkFunction {
   return fn;
 }
 
-/** Load case data from a cases module */
+/** Import cases module and call loadCase(), falling back to caseId as data */
 async function loadCaseFromModule(
   casesModuleUrl: string,
   caseId: string,
@@ -171,7 +170,6 @@ async function loadCaseFromModule(
   return { data: caseId };
 }
 
-/** Create error message from exception */
 function createErrorMessage(error: unknown): ErrorMessage {
   return {
     type: "error",

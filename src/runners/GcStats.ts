@@ -5,11 +5,16 @@
 export interface GcStats {
   scavenges: number;
   markCompacts: number;
-  totalCollected: number; // bytes freed
-  gcPauseTime: number; // total pause time (ms)
-  totalAllocated?: number; // bytes allocated (Node only)
-  totalPromoted?: number; // bytes promoted to old gen (Node only)
-  totalSurvived?: number; // bytes survived in young gen (Node only)
+  /** Bytes freed by GC. */
+  totalCollected: number;
+  /** Total GC pause time in milliseconds. */
+  gcPauseTime: number;
+  /** Bytes allocated (Node only). */
+  totalAllocated?: number;
+  /** Bytes promoted to old generation (Node only). */
+  totalPromoted?: number;
+  /** Bytes survived in young generation (Node only). */
+  totalSurvived?: number;
 }
 
 /** Single GC event. Node provides all fields; browser provides type, pauseMs, collected. */
@@ -17,9 +22,12 @@ export interface GcEvent {
   type: "scavenge" | "mark-compact" | "minor-ms" | "unknown";
   pauseMs: number;
   collected: number;
-  allocated?: number; // Node only
-  promoted?: number; // Node only
-  survived?: number; // Node only
+  /** Node only. */
+  allocated?: number;
+  /** Node only. */
+  promoted?: number;
+  /** Node only. */
+  survived?: number;
 }
 
 /** Parse a single --trace-gc-nvp stderr line into a GcEvent. */

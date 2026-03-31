@@ -1,6 +1,6 @@
 import type { BenchSuite } from "../runners/BenchmarkSpec.ts";
 
-/** Filter benchmarks by name pattern */
+/** Filter suite benchmarks by name pattern (substring or regex). */
 export function filterBenchmarks(
   suite: BenchSuite,
   filter?: string,
@@ -26,7 +26,7 @@ export function filterBenchmarks(
   return { name: suite.name, groups };
 }
 
-/** Create regex from filter (literal unless regex-like) */
+/** Create regex from filter string. Uses literal prefix match unless the string looks like regex. */
 function createFilterRegex(filter: string): RegExp {
   const isSlashed = filter.startsWith("/") && filter.endsWith("/");
   const looksLikeRegex =
@@ -47,12 +47,12 @@ function createFilterRegex(filter: string): RegExp {
   return new RegExp("^" + escapeRegex(filter), "i");
 }
 
-/** Strip case suffix like " [large]" from benchmark name for filtering */
+/** Strip case suffix like " [large]" from benchmark name for filtering. */
 function stripCaseSuffix(name: string): string {
   return name.replace(/ \[.*?\]$/, "");
 }
 
-/** Escape regex special characters */
+/** Escape regex special characters. */
 function escapeRegex(str: string): string {
   return str.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }

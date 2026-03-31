@@ -32,7 +32,7 @@ type SuiteParams = {
   batches: number;
 };
 
-/** Run suite with CLI arguments */
+/** Run a benchmark suite with CLI arguments. */
 export async function runBenchmarks(
   suite: BenchSuite,
   args: DefaultCliArgs,
@@ -51,7 +51,7 @@ export async function runBenchmarks(
   });
 }
 
-/** Execute all groups in suite */
+/** Execute all groups in a suite sequentially. */
 async function runSuite(params: SuiteParams): Promise<ReportGroup[]> {
   const { suite, runner, options, useWorker, batches } = params;
   return serialMap(suite.groups, g =>
@@ -59,7 +59,7 @@ async function runSuite(params: SuiteParams): Promise<ReportGroup[]> {
   );
 }
 
-/** Sequential map - like Promise.all(arr.map(fn)) but runs one at a time */
+/** Like Promise.all(arr.map(fn)) but runs one at a time. */
 async function serialMap<T, R>(
   arr: T[],
   fn: (item: T) => Promise<R>,
@@ -71,7 +71,7 @@ async function serialMap<T, R>(
   return results;
 }
 
-/** Execute group with shared setup, optionally batching to reduce ordering bias */
+/** Execute group with shared setup, optionally batching to reduce ordering bias. */
 async function runGroup(
   group: BenchGroup,
   runner: KnownRunner,
@@ -96,7 +96,7 @@ async function runGroup(
   return runMultipleBatches(name, benchmarks, baseline, runParams, batches);
 }
 
-/** Warn if parameterized benchmarks lack setup */
+/** Warn if parameterized benchmarks lack a setup function. */
 function validateBenchmarkParameters(group: BenchGroup): void {
   if (group.setup) return;
   const all = group.baseline
@@ -111,7 +111,7 @@ function validateBenchmarkParameters(group: BenchGroup): void {
   }
 }
 
-/** Run benchmarks in a single batch */
+/** Run benchmarks in a single batch. */
 async function runSingleBatch(
   name: string,
   benchmarks: BenchmarkSpec[],
@@ -127,7 +127,7 @@ async function runSingleBatch(
   return { name, reports, baseline: baselineReport };
 }
 
-/** Run benchmarks in multiple batches, alternating order to reduce bias */
+/** Run benchmarks in multiple batches, alternating order to reduce bias. */
 async function runMultipleBatches(
   name: string,
   benchmarks: BenchmarkSpec[],
@@ -163,7 +163,7 @@ async function runMultipleBatches(
   );
 }
 
-/** Run single benchmark and create report */
+/** Run single benchmark and create report. */
 async function runSingleBenchmark(
   spec: BenchmarkSpec,
   { runner, options, useWorker, params, metadata }: RunParams,
@@ -173,7 +173,7 @@ async function runSingleBenchmark(
   return { name: spec.name, measuredResults: result, metadata };
 }
 
-/** Run one batch iteration in either order */
+/** Run one batch iteration, optionally reversing benchmark/baseline order. */
 async function runBatchIteration(
   benchmarks: BenchmarkSpec[],
   baseline: BenchmarkSpec | undefined,
@@ -204,7 +204,7 @@ async function runBatchIteration(
   }
 }
 
-/** Merge batch results into final ReportGroup */
+/** Merge batch results into final ReportGroup. */
 function mergeBatchResults(
   name: string,
   benchmarks: BenchmarkSpec[],
@@ -228,6 +228,7 @@ function mergeBatchResults(
   return { name, reports, baseline: mergedBaseline };
 }
 
+/** Append a value to a map of arrays, creating the array if needed. */
 function appendToMap(
   map: Map<string, MeasuredResults[]>,
   key: string,
@@ -237,7 +238,7 @@ function appendToMap(
   map.get(key)!.push(value);
 }
 
-/** Merge multiple batch results into a single MeasuredResults */
+/** Merge multiple batch results into a single MeasuredResults, concatenating samples and pauses. */
 function mergeResults(results: MeasuredResults[]): MeasuredResults {
   if (results.length === 0) {
     throw new Error("Cannot merge empty results array");

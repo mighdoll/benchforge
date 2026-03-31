@@ -19,7 +19,7 @@ import {
 } from "../stats/StatisticalUtils.ts";
 import type { CaseResult, MatrixResults } from "./BenchMatrix.ts";
 
-/** Custom column definition for extra computed metrics */
+/** User-defined column that extracts and formats a metric from case results */
 export interface ExtraColumn {
   key: string;
   title: string;
@@ -29,7 +29,7 @@ export interface ExtraColumn {
   formatter?: (value: unknown) => string;
 }
 
-/** Options for matrix report generation */
+/** Options for {@link reportMatrixResults} */
 export interface MatrixReportOptions {
   extraColumns?: ExtraColumn[];
   /** ResultsMapper sections (like BenchSuite) */
@@ -46,7 +46,7 @@ interface MatrixReportRow extends Record<string, unknown> {
   diffCI?: DifferenceCI;
 }
 
-/** GC statistics columns - derived from gcStatsSection for consistency */
+/** GC statistics columns, derived from gcStatsSection for consistency */
 export const gcStatsColumns: ExtraColumn[] = gcStatsSection
   .columns()[0]
   .columns.map(col => ({
@@ -79,7 +79,7 @@ export const heapTotalColumn: ExtraColumn = {
   formatter: formatBytesOrDash,
 };
 
-/** Format matrix results as one table per case */
+/** Format matrix results as text, with one table per case */
 export function reportMatrixResults(
   results: MatrixResults,
   options?: MatrixReportOptions,
@@ -89,7 +89,7 @@ export function reportMatrixResults(
   return [header, ...tables].join("\n\n");
 }
 
-/** Format bytes with fallback to "-" for missing values */
+/** Format bytes or "-" for missing values */
 function formatBytesOrDash(value: unknown): string {
   return formatBytes(value) ?? "-";
 }
@@ -180,7 +180,7 @@ function buildCaseRows(
   });
 }
 
-/** Build column configuration */
+/** Build default column groups (name, time, extras) */
 function buildColumns(
   hasBaseline: boolean,
   options?: MatrixReportOptions,
@@ -222,7 +222,7 @@ function buildSectionColumns(
   return [nameCol, ...groups];
 }
 
-/** Build a single row from case result */
+/** Build a table row from a variant's case result */
 function buildRow(
   variantId: string,
   caseResult: CaseResult,
@@ -251,7 +251,7 @@ function buildRow(
   return row;
 }
 
-/** Group extra columns by groupTitle into ColumnGroups */
+/** Group extra columns by groupTitle */
 function extraColumnGroups(
   extra?: ExtraColumn[],
 ): ColumnGroup<MatrixReportRow>[] {

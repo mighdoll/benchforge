@@ -17,7 +17,7 @@ import type { CasesModule } from "./CaseLoader.ts";
 import { loadCaseData } from "./CaseLoader.ts";
 import { discoverVariants } from "./VariantLoader.ts";
 
-/** Context for running matrix benchmarks in worker mode */
+/** Shared state for directory-based matrix execution */
 interface DirMatrixContext<T> {
   matrix: BenchMatrix<T>;
   casesModule?: CasesModule<T>;
@@ -26,7 +26,7 @@ interface DirMatrixContext<T> {
   runnerOpts: RunnerOptions;
 }
 
-/** Run matrix with variantDir (worker mode for memory isolation) */
+/** Run matrix using variant files from a directory, each in a worker process */
 export async function runMatrixWithDir<T>(
   matrix: BenchMatrix<T>,
   options: RunMatrixOptions,
@@ -107,7 +107,7 @@ async function runDirVariantCases<T>(
   return cases;
 }
 
-/** Run baseline variant if it exists in baselineDir */
+/** Run the matching baseline variant for delta comparison, if configured */
 async function runBaselineIfExists<T>(params: {
   variantId: string;
   caseId: string;

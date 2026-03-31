@@ -17,6 +17,7 @@ import {
   speedscopeFile,
 } from "./SpeedscopeTypes.ts";
 
+/** Options for creating a .benchforge archive file */
 export interface ArchiveOptions {
   groups: ReportGroup[];
   reportData?: ReportData;

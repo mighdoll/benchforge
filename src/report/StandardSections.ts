@@ -155,6 +155,7 @@ const fmtString = (v: unknown): string => (typeof v === "string" ? v : "");
 const fmtNumber = (v: unknown): string =>
   typeof v === "number" ? String(v) : "";
 
+/** Format total time; brackets indicate runs exceeding 30s threshold */
 function formatTotalTime(v: unknown): string {
   if (typeof v !== "number") return "";
   return v >= 30 ? `[${v.toFixed(1)}s]` : `${v.toFixed(1)}s`;

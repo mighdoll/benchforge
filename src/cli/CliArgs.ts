@@ -3,7 +3,7 @@ import yargs from "yargs";
 
 export type Configure<T> = (yargs: Argv) => Argv<T>;
 
-/** CLI args type inferred from cliOptions, plus optional file positional */
+/** CLI args type inferred from cliOptions, plus optional file positional. */
 export type DefaultCliArgs = InferredOptionTypes<typeof cliOptions> & {
   file?: string;
 };
@@ -94,7 +94,7 @@ const optionGroups = {
 
 const { url: _url, ...browserOnlyOptions } = cliOptions;
 
-/** @return yargs configured for browser benchmarking (url as required positional) */
+/** Configure yargs for browser benchmarking with url as a required positional. */
 export function browserCliArgs(yargsInstance: Argv): Argv<DefaultCliArgs> {
   return applyGroups(
     yargsInstance
@@ -110,7 +110,7 @@ export function browserCliArgs(yargsInstance: Argv): Argv<DefaultCliArgs> {
   ) as Argv<DefaultCliArgs>;
 }
 
-/** @return yargs with standard benchmark options */
+/** Configure yargs with standard benchmark options and file positional. */
 export function defaultCliArgs(yargsInstance: Argv): Argv<DefaultCliArgs> {
   return applyGroups(
     yargsInstance
@@ -126,7 +126,7 @@ export function defaultCliArgs(yargsInstance: Argv): Argv<DefaultCliArgs> {
   ) as Argv<DefaultCliArgs>;
 }
 
-/** @return parsed command line arguments */
+/** Parse command line arguments with optional custom yargs configuration. */
 export function parseCliArgs<T = DefaultCliArgs>(
   args: string[],
   configure: Configure<T> = defaultCliArgs as Configure<T>,
@@ -135,8 +135,7 @@ export function parseCliArgs<T = DefaultCliArgs>(
   return yargsInstance.parseSync() as T;
 }
 
-/** Strip yargs internals and undefined values from CLI args for serialization.
- *  Converts kebab-case keys to camelCase. */
+/** Strip yargs internals (`_`, `$0`) and undefined values, converting kebab-case to camelCase. */
 export function cleanCliArgs(args: DefaultCliArgs): Record<string, unknown> {
   const skip = new Set(["_", "$0"]);
   const toCamelCase = (k: string) =>

@@ -108,12 +108,11 @@ async function runAdaptiveBench<T>(
 
 /** Scale window size inversely with execution time (fast ops need more samples). */
 function getWindowSize(samples: number[]): number {
-  if (samples.length < 20) return windowSize; // Default for initial samples
+  if (samples.length < 20) return windowSize;
 
   const recentMs = samples.slice(-20).map(s => s / msToNs);
   const recentMedian = percentile(recentMs, 0.5);
 
-  // Inverse scaling with execution time
   if (recentMedian < 0.01) return 200; // <10μs
   if (recentMedian < 0.1) return 100; // <100μs
   if (recentMedian < 1) return 50; // <1ms

@@ -78,7 +78,7 @@ export function injectDiffColumns<T>(
   }));
 }
 
-/** @return values for report group */
+/** Extract section stats and bootstrap CI diffs for all reports in a group */
 function resultGroupValues<S extends ReadonlyArray<ResultsMapper<any>>>(
   group: ReportGroup,
   sections: S,
@@ -104,7 +104,7 @@ function resultGroupValues<S extends ReadonlyArray<ResultsMapper<any>>>(
   return { results, baseline: baseRow };
 }
 
-/** @return column groups with diff columns if baseline exists */
+/** Build table columns from sections, injecting CI diff columns when baseline is present */
 function createColumnGroups<S extends ReadonlyArray<ResultsMapper<any>>>(
   sections: S,
   hasBaseline: boolean,
@@ -116,7 +116,7 @@ function createColumnGroups<S extends ReadonlyArray<ResultsMapper<any>>>(
   return [nameCol, ...(hasBaseline ? injectDiffColumns(groups) : groups)];
 }
 
-/** @return merged statistics from all sections */
+/** Run each section's extract() and merge all key-value pairs into one record */
 function extractReportValues(
   report: BenchmarkReport,
   sections: ReadonlyArray<ResultsMapper<any>>,

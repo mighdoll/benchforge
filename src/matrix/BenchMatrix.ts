@@ -23,7 +23,7 @@ export type Variant<T = unknown, S = unknown> =
 /** Variant with any state type - used in BenchMatrix to allow mixed variants */
 export type AnyVariant<T = unknown> = VariantFn<T> | StatefulVariant<T, any>;
 
-/** Result from casesModule.loadCase() */
+/** Case data and optional metadata returned by a cases module */
 export interface LoadedCase<T = unknown> {
   data: T;
   metadata?: Record<string, unknown>;
@@ -36,7 +36,7 @@ export interface MatrixDefaults {
   iterations?: number;
 }
 
-/** Bench matrix configuration */
+/** Configuration for a cases x variants benchmark matrix */
 export interface BenchMatrix<T = unknown> {
   name: string;
   variantDir?: string;
@@ -48,7 +48,7 @@ export interface BenchMatrix<T = unknown> {
   defaults?: MatrixDefaults;
 }
 
-/** Collection of matrices */
+/** Named collection of benchmark matrices */
 export interface MatrixSuite {
   name: string;
   matrices: BenchMatrix<any>[];
@@ -69,13 +69,13 @@ export interface CaseResult {
   deltaPercent?: number;
 }
 
-/** Results from running a matrix */
+/** Aggregated results from running a benchmark matrix */
 export interface MatrixResults {
   name: string;
   variants: VariantResult[];
 }
 
-/** Options for runMatrix */
+/** Options for {@link runMatrix} */
 export interface RunMatrixOptions {
   iterations?: number;
   maxTime?: number;
@@ -101,7 +101,7 @@ export interface RunMatrixOptions {
   callCounts?: boolean;
 }
 
-/** Check if variant is a StatefulVariant (has setup + run) */
+/** Type guard for StatefulVariant */
 export function isStatefulVariant<T, S>(
   v: Variant<T, S>,
 ): v is StatefulVariant<T, S> {
@@ -185,7 +185,7 @@ export function buildRunnerOptions(opts: RunMatrixOptions): RunnerOptions {
   };
 }
 
-/** Compute delta percentage: (current - baseline) / baseline * 100 */
+/** Compute percentage change of current vs baseline mean */
 export function computeDeltaPercent(
   base: MeasuredResults,
   cur: MeasuredResults,

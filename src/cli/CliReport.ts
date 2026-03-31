@@ -28,7 +28,7 @@ import type { DefaultCliArgs } from "./CliArgs.ts";
 
 const { yellow, dim } = colors;
 
-/** Generate table with standard sections */
+/** Generate text report table with standard sections based on CLI args. */
 export function defaultReport(
   groups: ReportGroup[],
   args: DefaultCliArgs,
@@ -39,7 +39,7 @@ export function defaultReport(
   return reportResults(groups, sections);
 }
 
-/** Build report sections based on CLI options */
+/** Build report sections based on CLI options. */
 export function buildReportSections(
   adaptive: boolean,
   gcStats: boolean,
@@ -53,7 +53,7 @@ export function buildReportSections(
   ];
 }
 
-/** @return true if any result has the specified field with a defined value */
+/** True if any result has the specified field with a defined value. */
 export function hasField(
   results: ReportGroup[],
   field: keyof MeasuredResults,
@@ -65,7 +65,7 @@ export function hasField(
   );
 }
 
-/** Log V8 optimization tier distribution and deoptimizations */
+/** Log V8 optimization tier distribution and deoptimizations. */
 export function reportOptStatus(groups: ReportGroup[]): void {
   const optData = groups.flatMap(group =>
     groupReports(group)
@@ -91,7 +91,7 @@ export function reportOptStatus(groups: ReportGroup[]): void {
   }
 }
 
-/** Print heap allocation reports for benchmarks with heap profiles */
+/** Print heap allocation reports for benchmarks with heap profiles. */
 export function printHeapReports(
   groups: ReportGroup[],
   options: HeapReportOptions,
@@ -119,7 +119,7 @@ export function printHeapReports(
   }
 }
 
-/** Generate report for matrix results */
+/** Generate text report for matrix results. */
 export function defaultMatrixReport(
   results: MatrixResults[],
   reportOptions?: MatrixReportOptions,
@@ -131,7 +131,7 @@ export function defaultMatrixReport(
   return results.map(r => reportMatrixResults(r, options)).join("\n\n");
 }
 
-/** Convert MatrixResults to ReportGroup[] for export compatibility */
+/** Convert MatrixResults to ReportGroup[] for the standard export pipeline. */
 export function matrixToReportGroups(results: MatrixResults[]): ReportGroup[] {
   return results.flatMap(matrix =>
     matrix.variants.flatMap(variant =>
@@ -159,7 +159,7 @@ export function matrixToReportGroups(results: MatrixResults[]): ReportGroup[] {
   );
 }
 
-/** Apply default sections and extra columns for matrix reports */
+/** Apply default sections and extra columns for matrix reports. */
 function mergeMatrixDefaults(
   reportOptions: MatrixReportOptions | undefined,
   args: DefaultCliArgs,

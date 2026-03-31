@@ -83,7 +83,6 @@ export function flattenProfile(resolved: ResolvedProfile): HeapSite[] {
     bucket.push(site);
   }
 
-  // Attach raw samples to their corresponding sites
   for (const sample of resolved.sortedSamples ?? []) {
     const matchingSites = nodeIdToSites.get(sample.nodeId);
     if (!matchingSites) continue;
