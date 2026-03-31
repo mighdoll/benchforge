@@ -7,7 +7,18 @@ import themeDark from "shiki/dist/themes/github-dark.mjs";
 import themeLight from "shiki/dist/themes/github-light.mjs";
 import { createJavaScriptRegexEngine } from "shiki/engine/javascript";
 import { escapeHtml, filePathFromUrl, guessLang } from "./Helpers.ts";
-import type { DataProvider, ViewerConfig } from "./Providers.ts";
+import {
+  computeLineData,
+  formatGutterBytes,
+  formatGutterCount,
+  formatGutterTime,
+} from "./LineData.ts";
+import type {
+  DataProvider,
+  ViewerConfig,
+  ViewerCoverageData,
+  ViewerSpeedscopeFile,
+} from "./Providers.ts";
 import { activateTab, getActiveTabId } from "./TabSwitcher.ts";
 
 interface SourceTabData {
@@ -123,6 +134,15 @@ async function updateSourcePanel(
     );
     panel.innerHTML = header + '<div class="source-code">' + html + "</div>";
 
+    // Fetch profiles and coverage, then render gutter columns
+    const [allocProfile, timeProfile, coverage] = await Promise.all([
+      provider.fetchProfileData("alloc"),
+      provider.fetchProfileData("time"),
+      provider.fetchCoverageData(),
+    ]);
+    if (tabData.generation !== gen) return;
+    renderGutters(panel, file, allocProfile, timeProfile, coverage);
+
     const target = line
       ? panel.querySelectorAll(".source-code .line")[line - 1]
       : undefined;
@@ -136,6 +156,66 @@ async function updateSourcePanel(
       '<div class="source-placeholder"><p>Source unavailable for ' +
       escapeHtml(file) +
       "</p></div>";
+  }
+}
+
+/** Render per-line gutter columns (counts, alloc, time) with heat-map backgrounds. */
+function renderGutters(
+  panel: HTMLElement,
+  file: string,
+  allocProfile: ViewerSpeedscopeFile | null,
+  timeProfile: ViewerSpeedscopeFile | null,
+  coverage: ViewerCoverageData | null,
+): void {
+  const lineData = computeLineData(file, allocProfile, timeProfile, coverage);
+  const hasCounts = lineData.callCounts.size > 0;
+  const hasAlloc = lineData.allocBytes.size > 0;
+  const hasTime = lineData.selfTimeUs.size > 0;
+  const gutterCount = +hasCounts + +hasAlloc + +hasTime;
+  if (gutterCount === 0) return;
+
+  const codeEl = panel.querySelector(".source-code") as HTMLElement;
+  codeEl.style.setProperty("--gutter-count", String(gutterCount));
+  const maxAlloc = hasAlloc ? Math.max(...lineData.allocBytes.values()) : 0;
+  const maxTime = hasTime ? Math.max(...lineData.selfTimeUs.values()) : 0;
+
+  const lines = codeEl.querySelectorAll(".line");
+  for (let i = 0; i < lines.length; i++) {
+    const lineNum = i + 1;
+    const el = lines[i] as HTMLElement;
+    let gutterHtml = "";
+
+    if (hasCounts) {
+      gutterHtml +=
+        '<span class="gutter gutter-count">' +
+        formatGutterCount(lineData.callCounts.get(lineNum)) +
+        "</span>";
+    }
+    if (hasAlloc) {
+      gutterHtml +=
+        '<span class="gutter gutter-alloc">' +
+        formatGutterBytes(lineData.allocBytes.get(lineNum)) +
+        "</span>";
+    }
+    if (hasTime) {
+      gutterHtml +=
+        '<span class="gutter gutter-time">' +
+        formatGutterTime(lineData.selfTimeUs.get(lineNum)) +
+        "</span>";
+    }
+
+    el.insertAdjacentHTML("afterbegin", gutterHtml);
+
+    // Heat-map background: use the hottest column's ratio
+    const allocRatio =
+      maxAlloc > 0 ? (lineData.allocBytes.get(lineNum) || 0) / maxAlloc : 0;
+    const timeRatio =
+      maxTime > 0 ? (lineData.selfTimeUs.get(lineNum) || 0) / maxTime : 0;
+    const heat = Math.max(allocRatio, timeRatio);
+    if (heat > 0.01) {
+      el.style.setProperty("--heat", heat.toFixed(3));
+      el.classList.add("heat");
+    }
   }
 }
 

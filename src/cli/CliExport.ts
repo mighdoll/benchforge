@@ -59,7 +59,11 @@ export async function exportReports(options: ExportOptions): Promise<void> {
 
   const profileFile = buildSpeedscopeFile(results);
   const timeProfileFile = buildAllTimeProfiles(results);
-  await annotateCoverage(results, profileFile, timeProfileFile);
+  const coverageData = await annotateCoverage(
+    results,
+    profileFile,
+    timeProfileFile,
+  );
 
   const timeData = timeProfileFile
     ? JSON.stringify(timeProfileFile)
@@ -70,12 +74,13 @@ export async function exportReports(options: ExportOptions): Promise<void> {
       groups: results,
       reportData,
       timeProfileData: timeData,
+      coverageData,
       outputPath: archivePath,
     });
   }
 
   if (args.view) {
-    await openViewer(profileFile, timeData, reportData, args);
+    await openViewer(profileFile, timeData, coverageData, reportData, args);
   }
 }
 
@@ -119,7 +124,8 @@ function buildAllTimeProfiles(results: ReportGroup[]) {
   return buildTimeSpeedscopeFile(entries);
 }
 
-/** Annotate speedscope frame names with coverage counts if available */
+/** Annotate speedscope frame names with coverage counts if available.
+ *  Returns serialized coverage map for archive/viewer use. */
 async function annotateCoverage(
   results: ReportGroup[],
   profileFile?: {
@@ -128,10 +134,9 @@ async function annotateCoverage(
   timeProfileFile?: {
     shared: { frames: { name: string; file?: string; line?: number }[] };
   },
-): Promise<void> {
+): Promise<string | undefined> {
   const coverage = mergeCoverage(results);
-  if (!coverage) return;
-  if (!profileFile && !timeProfileFile) return;
+  if (!coverage) return undefined;
 
   const coverageUrls = coverage.scripts.map(s => ({ file: s.url }));
   const sources = await collectSources(coverageUrls);
@@ -140,12 +145,17 @@ async function annotateCoverage(
     annotateFramesWithCounts(profileFile.shared.frames, coverageResult);
   if (timeProfileFile)
     annotateFramesWithCounts(timeProfileFile.shared.frames, coverageResult);
+
+  // Serialize the coverage map for archive/viewer
+  const serializable = Object.fromEntries(coverageResult.map);
+  return JSON.stringify(serializable);
 }
 
 /** Start viewer server with profile data and block until Ctrl+C */
 async function openViewer(
   profileFile: ReturnType<typeof buildSpeedscopeFile>,
   timeProfileData: string | undefined,
+  coverageData: string | undefined,
   reportData: ReportData | undefined,
   args: DefaultCliArgs,
 ): Promise<void> {
@@ -153,6 +163,7 @@ async function openViewer(
   const viewer = await startViewerServer({
     profileData,
     timeProfileData,
+    coverageData,
     reportData: reportData ? JSON.stringify(reportData) : undefined,
     editorUri: resolveEditorUri(args.editor),
   });

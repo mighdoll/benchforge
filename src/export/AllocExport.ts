@@ -21,6 +21,7 @@ export interface ArchiveOptions {
   groups: ReportGroup[];
   reportData?: ReportData;
   timeProfileData?: string;
+  coverageData?: string;
   outputPath?: string;
 }
 
@@ -121,7 +122,8 @@ export async function collectSources(
 export async function archiveBenchmark(
   options: ArchiveOptions,
 ): Promise<string | undefined> {
-  const { groups, reportData, timeProfileData, outputPath } = options;
+  const { groups, reportData, timeProfileData, coverageData, outputPath } =
+    options;
   const file = buildSpeedscopeFile(groups);
   const timeProfile = timeProfileData ? JSON.parse(timeProfileData) : null;
   if (!file && !timeProfile && !reportData) {
@@ -135,10 +137,12 @@ export async function archiveBenchmark(
   ];
   const sources = allFrames.length ? await collectSources(allFrames) : {};
   const timestamp = new Date().toISOString().replace(/[:.]/g, "-");
+  const coverage = coverageData ? JSON.parse(coverageData) : null;
   const archive = {
     schema: 1,
     profile: file ?? null,
     timeProfile,
+    coverage,
     report: reportData ?? null,
     sources,
     metadata: {

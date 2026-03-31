@@ -15,6 +15,8 @@ export interface ViewerServerOptions {
   profileData?: string;
   /** Speedscope JSON profile data (time/CPU) */
   timeProfileData?: string;
+  /** Per-function coverage data (JSON-serialized Record<url, LineCoverage[]>) */
+  coverageData?: string;
   /** HTML report JSON data */
   reportData?: string;
   /** Editor URI prefix for Cmd+Shift+click (e.g. "vscode://file") */
@@ -79,12 +81,14 @@ export async function viewArchive(filePath: string): Promise<void> {
   const toJson = (v: unknown) => (v ? JSON.stringify(v) : undefined);
   const profileData = toJson(archive.profile);
   const timeProfileData = toJson(archive.timeProfile);
+  const coverageData = toJson(archive.coverage);
   const reportData = toJson(archive.report);
   const sources = archive.sources as Record<string, string> | undefined;
 
   const { close } = await startViewerServer({
     profileData,
     timeProfileData,
+    coverageData,
     reportData,
     sources,
   });
@@ -127,11 +131,13 @@ function createRequestHandler(
         hasReport: !!ctx.reportData,
         hasProfile: !!ctx.profileData,
         hasTimeProfile: !!ctx.timeProfileData,
+        hasCoverage: !!ctx.coverageData,
       };
       res.setHeader("Content-Type", "application/json");
       res.end(JSON.stringify(config));
     },
     "/api/report-data": res => sendJson(res, ctx.reportData, "report data"),
+    "/api/coverage": res => sendJson(res, ctx.coverageData, "coverage data"),
     "/api/profile": res => sendJson(res, ctx.profileData, "profile data", true),
     "/api/profile/alloc": res =>
       sendJson(res, ctx.profileData, "profile data", true),

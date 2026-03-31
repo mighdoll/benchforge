@@ -4,6 +4,37 @@ export interface ViewerConfig {
   hasReport: boolean;
   hasProfile: boolean;
   hasTimeProfile: boolean;
+  hasCoverage: boolean;
+}
+
+/** Per-function coverage entry at a source line */
+export interface ViewerLineCoverage {
+  startLine: number;
+  functionName: string;
+  count: number;
+}
+
+/** Coverage data keyed by source URL */
+export type ViewerCoverageData = Record<string, ViewerLineCoverage[]>;
+
+/** Minimal speedscope profile types needed by the viewer (avoids importing server-side exports). */
+export interface ViewerSpeedscopeFrame {
+  name: string;
+  file?: string;
+  line?: number;
+  col?: number;
+}
+
+export interface ViewerSpeedscopeProfile {
+  type: "sampled";
+  unit: "bytes" | "microseconds";
+  samples: number[][];
+  weights: number[];
+}
+
+export interface ViewerSpeedscopeFile {
+  shared: { frames: ViewerSpeedscopeFrame[] };
+  profiles: ViewerSpeedscopeProfile[];
 }
 
 /** Serialized `.benchforge` archive containing report data, profiles, and sources. */
@@ -11,6 +42,7 @@ export interface ArchiveData {
   schema?: number;
   profile: unknown;
   timeProfile: unknown;
+  coverage?: unknown;
   report: unknown;
   sources: Record<string, string>;
   metadata?: { timestamp: string; benchforgeVersion: string };
@@ -21,6 +53,10 @@ export interface DataProvider {
   readonly config: ViewerConfig;
   fetchReportData(): Promise<unknown>;
   fetchSource(url: string): Promise<string>;
+  fetchProfileData(
+    type: "alloc" | "time",
+  ): Promise<ViewerSpeedscopeFile | null>;
+  fetchCoverageData(): Promise<ViewerCoverageData | null>;
   // LATER once we replace the speedscope iframe with an integrated viewer,
   // we can pass profile data directly instead of returning URLs.
   profileUrl(type: "alloc" | "time"): string | null;
@@ -29,6 +65,11 @@ export interface DataProvider {
 
 /** Fetches data from the live CLI viewer HTTP server. */
 export class ServerProvider implements DataProvider {
+  private profileCache = new Map<
+    string,
+    Promise<ViewerSpeedscopeFile | null>
+  >();
+
   constructor(readonly config: ViewerConfig) {}
 
   /** Fetch the server config and return a ready-to-use provider. */
@@ -47,6 +88,31 @@ export class ServerProvider implements DataProvider {
     const resp = await fetch("/api/source?url=" + encodeURIComponent(url));
     if (!resp.ok) throw new Error("Source unavailable");
     return resp.text();
+  }
+
+  fetchProfileData(
+    type: "alloc" | "time",
+  ): Promise<ViewerSpeedscopeFile | null> {
+    const url = this.profileUrl(type);
+    if (!url) return Promise.resolve(null);
+    let cached = this.profileCache.get(type);
+    if (!cached) {
+      cached = fetch(url).then(r =>
+        r.ok ? (r.json() as Promise<ViewerSpeedscopeFile>) : null,
+      );
+      this.profileCache.set(type, cached);
+    }
+    return cached;
+  }
+
+  private coverageCache?: Promise<ViewerCoverageData | null>;
+
+  fetchCoverageData(): Promise<ViewerCoverageData | null> {
+    if (!this.config.hasCoverage) return Promise.resolve(null);
+    this.coverageCache ??= fetch("/api/coverage").then(r =>
+      r.ok ? (r.json() as Promise<ViewerCoverageData>) : null,
+    );
+    return this.coverageCache;
   }
 
   profileUrl(type: "alloc" | "time"): string | null {
@@ -77,6 +143,7 @@ export class ArchiveProvider implements DataProvider {
       hasReport: !!archive.report,
       hasProfile: !!archive.profile,
       hasTimeProfile: !!archive.timeProfile,
+      hasCoverage: !!archive.coverage,
     };
   }
 
@@ -89,6 +156,18 @@ export class ArchiveProvider implements DataProvider {
     const source = this.archive.sources?.[url];
     if (source === undefined) throw new Error("Source unavailable");
     return source;
+  }
+
+  async fetchProfileData(
+    type: "alloc" | "time",
+  ): Promise<ViewerSpeedscopeFile | null> {
+    const data =
+      type === "alloc" ? this.archive.profile : this.archive.timeProfile;
+    return (data as ViewerSpeedscopeFile) ?? null;
+  }
+
+  async fetchCoverageData(): Promise<ViewerCoverageData | null> {
+    return (this.archive.coverage as ViewerCoverageData) ?? null;
   }
 
   /** Return a blob URL for the profile, lazily created and cached. */
