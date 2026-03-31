@@ -46,28 +46,23 @@ export async function exportReports(options: ExportOptions): Promise<void> {
   const { currentVersion, baselineVersion } = options;
 
   const needsReportData = args.view || args.archive != null;
+  const htmlOptions = {
+    cliArgs: args,
+    sections,
+    currentVersion,
+    baselineVersion,
+  };
   const reportData = needsReportData
-    ? prepareHtmlData(results, {
-        cliArgs: args,
-        sections,
-        currentVersion,
-        baselineVersion,
-      })
+    ? prepareHtmlData(results, htmlOptions)
     : undefined;
 
   exportFileFormats(results, args, suiteName);
 
   const profileFile = buildSpeedscopeFile(results);
-  const timeProfileFile = buildAllTimeProfiles(results);
-  const coverageData = await annotateCoverage(
-    results,
-    profileFile,
-    timeProfileFile,
-  );
+  const timeFile = buildAllTimeProfiles(results);
+  const coverageData = await annotateCoverage(results, profileFile, timeFile);
 
-  const timeData = timeProfileFile
-    ? JSON.stringify(timeProfileFile)
-    : undefined;
+  const timeData = timeFile ? JSON.stringify(timeFile) : undefined;
   if (args.archive != null) {
     const archivePath = args.archive || undefined;
     await archiveBenchmark({
@@ -128,43 +123,40 @@ function buildAllTimeProfiles(results: ReportGroup[]) {
  *  Returns serialized coverage map for archive/viewer use. */
 async function annotateCoverage(
   results: ReportGroup[],
-  profileFile?: {
-    shared: { frames: { name: string; file?: string; line?: number }[] };
-  },
-  timeProfileFile?: {
-    shared: { frames: { name: string; file?: string; line?: number }[] };
-  },
+  profileFile?: FrameContainer,
+  timeFile?: FrameContainer,
 ): Promise<string | undefined> {
   const coverage = mergeCoverage(results);
   if (!coverage) return undefined;
 
   const coverageUrls = coverage.scripts.map(s => ({ file: s.url }));
   const sources = await collectSources(coverageUrls);
-  const coverageResult = buildCoverageMap(coverage, sources);
-  if (profileFile)
-    annotateFramesWithCounts(profileFile.shared.frames, coverageResult);
-  if (timeProfileFile)
-    annotateFramesWithCounts(timeProfileFile.shared.frames, coverageResult);
+  const result = buildCoverageMap(coverage, sources);
+  if (profileFile) annotateFramesWithCounts(profileFile.shared.frames, result);
+  if (timeFile) annotateFramesWithCounts(timeFile.shared.frames, result);
 
   // Serialize the coverage map for archive/viewer
-  const serializable = Object.fromEntries(coverageResult.map);
-  return JSON.stringify(serializable);
+  return JSON.stringify(Object.fromEntries(result.map));
 }
+
+type FrameContainer = {
+  shared: { frames: { name: string; file?: string; line?: number }[] };
+};
 
 /** Start viewer server with profile data and block until Ctrl+C */
 async function openViewer(
   profileFile: ReturnType<typeof buildSpeedscopeFile>,
-  timeProfileData: string | undefined,
+  timeData: string | undefined,
   coverageData: string | undefined,
   reportData: ReportData | undefined,
   args: DefaultCliArgs,
 ): Promise<void> {
-  const profileData = profileFile ? JSON.stringify(profileFile) : undefined;
+  const toJson = (v: unknown) => (v ? JSON.stringify(v) : undefined);
   const viewer = await startViewerServer({
-    profileData,
-    timeProfileData,
+    profileData: toJson(profileFile),
+    timeProfileData: timeData,
     coverageData,
-    reportData: reportData ? JSON.stringify(reportData) : undefined,
+    reportData: toJson(reportData),
     editorUri: resolveEditorUri(args.editor),
   });
   await waitForCtrlC();

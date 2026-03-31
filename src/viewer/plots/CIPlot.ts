@@ -4,6 +4,8 @@ import type {
 } from "../../stats/StatisticalUtils.ts";
 import { formatPct } from "./PlotTypes.ts";
 
+const svgNS = "http://www.w3.org/2000/svg";
+
 export interface DistributionPlotOptions {
   width?: number;
   height?: number;
@@ -49,43 +51,36 @@ export function createDistributionPlot(
 
   const { fill, stroke } = colors[opts.direction];
   const scales = buildScales(histogram, ci, layout);
+  const { margin, plot } = layout;
+  const add = (el: SVGElement) => svg.appendChild(el);
 
-  svg.appendChild(
-    text(layout.margin.left, 14, opts.title, "start", "13", "#333", "600"),
-  );
+  add(text(margin.left, 14, opts.title, "start", "13", "#333", "600"));
   const ciX = scales.x(ci[0]);
   const ciW = scales.x(ci[1]) - ciX;
-  svg.appendChild(
-    rect(ciX, layout.margin.top, ciW, layout.plot.h, { fill, opacity: "0.5" }),
-  );
+  add(rect(ciX, margin.top, ciW, plot.h, { fill, opacity: "0.5" }));
   opts.smooth
     ? drawSmoothedDist(svg, histogram, scales, stroke)
     : drawHistogramBars(svg, histogram, scales, layout, stroke);
   const zeroX = scales.x(0);
-  if (
-    zeroX >= layout.margin.left &&
-    zeroX <= layout.width - layout.margin.right
-  ) {
-    svg.appendChild(
-      line(zeroX, layout.margin.top, zeroX, layout.margin.top + layout.plot.h, {
-        stroke: "#666",
-        strokeWidth: "1",
-        strokeDasharray: "3,2",
-      }),
-    );
+  const inRange = zeroX >= margin.left && zeroX <= layout.width - margin.right;
+  if (inRange) {
+    const zeroAttrs = {
+      stroke: "#666",
+      strokeWidth: "1",
+      strokeDasharray: "3,2",
+    };
+    add(line(zeroX, margin.top, zeroX, margin.top + plot.h, zeroAttrs));
   }
   const ptX = scales.x(pointEstimate);
-  const ptTop = layout.margin.top;
-  svg.appendChild(
-    line(ptX, ptTop, ptX, ptTop + layout.plot.h, { stroke, strokeWidth: "2" }),
+  add(
+    line(ptX, margin.top, ptX, margin.top + plot.h, {
+      stroke,
+      strokeWidth: "2",
+    }),
   );
   const labelY = layout.height - 4;
-  svg.appendChild(
-    text(scales.x(ci[0]), labelY, formatPct(ci[0], 0), "middle", "12"),
-  );
-  svg.appendChild(
-    text(scales.x(ci[1]), labelY, formatPct(ci[1], 0), "middle", "12"),
-  );
+  add(text(scales.x(ci[0]), labelY, formatPct(ci[0], 0), "middle", "12"));
+  add(text(scales.x(ci[1]), labelY, formatPct(ci[1], 0), "middle", "12"));
   return svg;
 }
 
@@ -109,7 +104,7 @@ function buildLayout(width: number, height: number): Layout {
 }
 
 function createSvg(w: number, h: number): SVGSVGElement {
-  const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+  const svg = document.createElementNS(svgNS, "svg");
   svg.setAttribute("width", String(w));
   svg.setAttribute("height", String(h));
   if (w && h) svg.setAttribute("viewBox", `0 0 ${w} ${h}`);
@@ -142,7 +137,7 @@ function text(
   fill = "#666",
   weight = "400",
 ): SVGTextElement {
-  const el = document.createElementNS("http://www.w3.org/2000/svg", "text");
+  const el = document.createElementNS(svgNS, "text");
   el.setAttribute("x", String(x));
   el.setAttribute("y", String(y));
   el.setAttribute("text-anchor", anchor);
@@ -160,7 +155,7 @@ function rect(
   h: number,
   attrs: Record<string, string>,
 ): SVGRectElement {
-  const el = document.createElementNS("http://www.w3.org/2000/svg", "rect");
+  const el = document.createElementNS(svgNS, "rect");
   el.setAttribute("x", String(x));
   el.setAttribute("y", String(y));
   el.setAttribute("width", String(w));
@@ -201,18 +196,13 @@ function drawHistogramBars(
   const binW = sorted.length > 1 ? sorted[1].x - sorted[0].x : 1;
   const yMax = Math.max(...histogram.map(b => b.count));
   const xRange = scales.x(sorted.at(-1)!.x) - scales.x(sorted[0].x) + binW;
+  const barW = (binW / xRange) * layout.plot.w * 0.9;
+  const base = layout.margin.top + layout.plot.h;
+  const attrs = { fill: stroke, opacity: "0.6" };
   for (const bin of sorted) {
-    const barW = (binW / xRange) * layout.plot.w * 0.9;
     const barH = (bin.count / yMax) * layout.plot.h;
-    svg.appendChild(
-      rect(
-        scales.x(bin.x) - barW / 2,
-        layout.margin.top + layout.plot.h - barH,
-        barW,
-        barH,
-        { fill: stroke, opacity: "0.6" },
-      ),
-    );
+    const x = scales.x(bin.x) - barW / 2;
+    svg.appendChild(rect(x, base - barH, barW, barH, attrs));
   }
 }
 
@@ -223,7 +213,7 @@ function line(
   y2: number,
   attrs: Record<string, string>,
 ): SVGLineElement {
-  const el = document.createElementNS("http://www.w3.org/2000/svg", "line");
+  const el = document.createElementNS(svgNS, "line");
   el.setAttribute("x1", String(x1));
   el.setAttribute("y1", String(y1));
   el.setAttribute("x2", String(x2));
@@ -253,7 +243,7 @@ function gaussianSmooth(bins: HistogramBin[], sigma: number): HistogramBin[] {
 }
 
 function path(d: string, attrs: Record<string, string>): SVGPathElement {
-  const el = document.createElementNS("http://www.w3.org/2000/svg", "path");
+  const el = document.createElementNS(svgNS, "path");
   el.setAttribute("d", d);
   setAttrs(el, attrs);
   return el;

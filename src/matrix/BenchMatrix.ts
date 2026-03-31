@@ -111,9 +111,9 @@ export async function runMatrix<T>(
   options: RunMatrixOptions = {},
 ): Promise<MatrixResults> {
   if (matrix.baselineDir && matrix.baselineVariant) {
-    throw new Error(
-      "BenchMatrix cannot have both 'baselineDir' and 'baselineVariant'",
-    );
+    const msg =
+      "BenchMatrix cannot have both 'baselineDir' and 'baselineVariant'";
+    throw new Error(msg);
   }
   const effectiveOptions = { ...matrix.defaults, ...options };
 

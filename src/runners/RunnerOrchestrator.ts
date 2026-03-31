@@ -85,19 +85,21 @@ async function resolveModuleSpec<T>(
   spec: BenchmarkSpec<T>,
   params: T | undefined,
 ): Promise<{ spec: BenchmarkSpec<T>; params: T | undefined }> {
-  const module = await import(spec.modulePath!);
+  const modPath = spec.modulePath!;
+  const module = await import(modPath);
   const fn = getModuleExport<BenchmarkFunction<T>>(
     module,
     spec.exportName,
-    spec.modulePath!,
+    modPath,
   );
 
   let resolvedParams = params;
   if (spec.setupExportName) {
-    const setupFn = getModuleExport<(p: T | undefined) => T | Promise<T>>(
+    type SetupFn = (p: T | undefined) => T | Promise<T>;
+    const setupFn = getModuleExport<SetupFn>(
       module,
       spec.setupExportName,
-      spec.modulePath!,
+      modPath,
     );
     resolvedParams = await setupFn(params);
   }
@@ -158,17 +160,17 @@ function runWorkerWithMessage(
     worker.on("message", (msg: ResultMessage | ErrorMessage) => {
       killWorker();
       if (msg.type === "result") {
-        logTiming(
-          `Total worker time for ${name}: ${getElapsed(startTime).toFixed(1)}ms`,
-        );
+        const elapsed = getElapsed(startTime).toFixed(1);
+        logTiming(`Total worker time for ${name}: ${elapsed}ms`);
+        const { results, heapProfile, timeProfile, coverage } = msg;
         attachProfilingData(
-          msg.results,
+          results,
           gcEvents,
-          msg.heapProfile,
-          msg.timeProfile,
-          msg.coverage,
+          heapProfile,
+          timeProfile,
+          coverage,
         );
-        resolve(msg.results);
+        resolve(results);
       } else if (msg.type === "error") {
         const error = new Error(`Benchmark "${name}" failed: ${msg.error}`);
         if (msg.stack) error.stack = msg.stack;
@@ -177,18 +179,14 @@ function runWorkerWithMessage(
     });
     worker.on("error", (error: Error) => {
       killWorker();
-      reject(
-        new Error(
-          `Worker process failed for benchmark "${name}": ${error.message}`,
-        ),
-      );
+      const reason = `Worker process failed for "${name}"`;
+      reject(new Error(`${reason}: ${error.message}`));
     });
     worker.on("exit", (code: number | null) => {
       if (code !== 0 && code !== null) {
         killWorker();
-        reject(
-          new Error(`Worker exited with code ${code} for benchmark "${name}"`),
-        );
+        const msg = `Worker exited with code ${code}`;
+        reject(new Error(`${msg} for benchmark "${name}"`));
       }
     });
 

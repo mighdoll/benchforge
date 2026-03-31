@@ -77,24 +77,20 @@ function renderGroupPlots(
   const benchmarks = prepareBenchmarks(group);
   if (benchmarks.length === 0 || !benchmarks[0].samples?.length) return;
 
-  const flattened = flattenSamples(benchmarks);
-  const benchmarkNames = benchmarks.map(b => b.name);
+  const f = flattenSamples(benchmarks);
+  const names = benchmarks.map(b => b.name);
 
-  const { allSamples, timeSeries, allGcEvents, allPausePoints, heapSeries } =
-    flattened;
-  renderToContainer(`#histogram-${groupIndex}`, allSamples.length > 0, () =>
-    createHistogramKde(allSamples, benchmarkNames),
+  renderToContainer(`#histogram-${groupIndex}`, f.allSamples.length > 0, () =>
+    createHistogramKde(f.allSamples, names),
   );
-  renderToContainer(
-    `#sample-timeseries-${groupIndex}`,
-    timeSeries.length > 0,
-    () =>
-      createSampleTimeSeries(
-        timeSeries,
-        allGcEvents,
-        allPausePoints,
-        heapSeries,
-      ),
+  const tsId = `#sample-timeseries-${groupIndex}`;
+  renderToContainer(tsId, f.timeSeries.length > 0, () =>
+    createSampleTimeSeries(
+      f.timeSeries,
+      f.allGcEvents,
+      f.allPausePoints,
+      f.heapSeries,
+    ),
   );
 }
 
@@ -102,16 +98,14 @@ function renderGroupPlots(
 function prepareBenchmarks(
   group: ReportData["groups"][0],
 ): PreparedBenchmark[] {
-  const baseline: PreparedBenchmark[] = group.baseline
-    ? [
-        {
-          ...group.baseline,
-          name: group.baseline.name + " (baseline)",
-          isBaseline: true,
-        },
-      ]
+  const base = group.baseline;
+  const baseline: PreparedBenchmark[] = base
+    ? [{ ...base, name: base.name + " (baseline)", isBaseline: true }]
     : [];
-  const current = group.benchmarks.map(b => ({ ...b, isBaseline: false }));
+  const current = group.benchmarks.map(b => ({
+    ...b,
+    isBaseline: false,
+  }));
   return [...baseline, ...current];
 }
 
@@ -206,21 +200,18 @@ function fallbackStatsHtml(stats: PreparedBenchmark["stats"]): string {
 
 /** Extract time series, heap, GC, and pause data from one benchmark */
 function flattenBenchmark(b: PreparedBenchmark, out: FlattenedData): void {
+  const name = b.name;
   const warmupCount = b.warmupSamples?.length || 0;
   b.warmupSamples?.forEach((value, i) => {
-    out.timeSeries.push({
-      benchmark: b.name,
-      iteration: i - warmupCount,
-      value,
-      isWarmup: true,
-    });
+    const iteration = i - warmupCount;
+    out.timeSeries.push({ benchmark: name, iteration, value, isWarmup: true });
   });
 
-  const sampleEndTimes = cumulativeSum(b.samples);
+  const endTimes = cumulativeSum(b.samples);
   b.samples.forEach((value, i) => {
-    out.allSamples.push({ benchmark: b.name, value, iteration: i });
+    out.allSamples.push({ benchmark: name, value, iteration: i });
     out.timeSeries.push({
-      benchmark: b.name,
+      benchmark: name,
       iteration: i,
       value,
       isWarmup: false,
@@ -228,7 +219,7 @@ function flattenBenchmark(b: PreparedBenchmark, out: FlattenedData): void {
     });
     if (b.heapSamples?.[i] !== undefined) {
       out.heapSeries.push({
-        benchmark: b.name,
+        benchmark: name,
         iteration: i,
         value: b.heapSamples[i],
       });
@@ -236,17 +227,17 @@ function flattenBenchmark(b: PreparedBenchmark, out: FlattenedData): void {
   });
 
   b.gcEvents?.forEach(gc => {
-    const idx = sampleEndTimes.findIndex(t => t >= gc.offset);
+    const idx = endTimes.findIndex(t => t >= gc.offset);
     const sampleIndex = idx >= 0 ? idx : b.samples.length - 1;
     out.allGcEvents.push({
-      benchmark: b.name,
+      benchmark: name,
       sampleIndex,
       duration: gc.duration,
     });
   });
   b.pausePoints?.forEach(p => {
     out.allPausePoints.push({
-      benchmark: b.name,
+      benchmark: name,
       sampleIndex: p.sampleIndex,
       durationMs: p.durationMs,
     });

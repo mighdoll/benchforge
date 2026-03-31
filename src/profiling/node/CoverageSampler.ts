@@ -17,13 +17,9 @@ export async function withCoverageProfiling<T>(
       detailed: true,
     });
     const result = await fn(session);
-    const { result: scripts } = await session.post(
-      "Profiler.takePreciseCoverage",
-    );
-    return {
-      result,
-      coverage: { scripts: scripts as unknown as ScriptCoverage[] },
-    };
+    const raw = await session.post("Profiler.takePreciseCoverage");
+    const scripts = raw.result as unknown as ScriptCoverage[];
+    return { result, coverage: { scripts } };
   } finally {
     await session.post("Profiler.stopPreciseCoverage");
     await session.post("Profiler.disable");

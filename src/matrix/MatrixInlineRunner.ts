@@ -22,9 +22,9 @@ export async function runMatrixInline<T>(
   options: RunMatrixOptions,
 ): Promise<{ name: string; variants: VariantResult[] }> {
   if (matrix.baselineDir) {
-    throw new Error(
-      "BenchMatrix with inline 'variants' cannot use 'baselineDir'. Use 'variantDir' instead.",
-    );
+    const msg =
+      "BenchMatrix with inline 'variants' cannot use 'baselineDir'. Use 'variantDir' instead.";
+    throw new Error(msg);
   }
 
   const { casesModule, caseIds } = await resolveCases(matrix, options);

@@ -92,7 +92,8 @@ export async function benchExports(
 export async function browserBenchExports(args: DefaultCliArgs): Promise<void> {
   warnBrowserFlags(args);
 
-  let profileBrowser: typeof import("../profiling/browser/BrowserProfiler.ts").profileBrowser;
+  type BrowserMod = typeof import("../profiling/browser/BrowserProfiler.ts");
+  let profileBrowser: BrowserMod["profileBrowser"];
   try {
     ({ profileBrowser } = await import(
       "../profiling/browser/BrowserProfiler.ts"
@@ -191,14 +192,13 @@ export async function runMatrixSuite(
       filtered = await filterMatrix(filtered, filter);
     }
 
-    const { filteredCases, filteredVariants } = filtered;
-    results.push(
-      await runMatrix(filtered, {
-        ...options,
-        filteredCases,
-        filteredVariants,
-      }),
-    );
+    const { filteredCases: cases, filteredVariants: variants } = filtered;
+    const opts = {
+      ...options,
+      filteredCases: cases,
+      filteredVariants: variants,
+    };
+    results.push(await runMatrix(filtered, opts));
   }
   return results;
 }
@@ -218,10 +218,9 @@ async function fileBenchExports(
     await benchExports(candidate as BenchSuite, args);
   } else if (typeof candidate === "function") {
     const name = basename(filePath).replace(/\.[^.]+$/, "");
-    await benchExports(
-      { name, groups: [{ name, benchmarks: [{ name, fn: candidate }] }] },
-      args,
-    );
+    const bench = { name, fn: candidate };
+    const suite = { name, groups: [{ name, benchmarks: [bench] }] };
+    await benchExports(suite, args);
   }
 }
 
@@ -240,9 +239,8 @@ function warnBrowserFlags(args: DefaultCliArgs): void {
 
 /** Strip surrounding quotes from a chrome arg token. */
 function stripQuotes(s: string): string {
-  const unquote = s.replace(/^(['"])(.*)\1$/s, "$2");
-  const valueUnquote = unquote.replace(/^(-[^=]+=)(['"])(.*)\2$/s, "$1$3");
-  return valueUnquote;
+  const bare = s.replace(/^(['"])(.*)\1$/s, "$2");
+  return bare.replace(/^(-[^=]+=)(['"])(.*)\2$/s, "$1$3");
 }
 
 /** Wrap browser profile result as ReportGroup[] for the standard pipeline */
@@ -264,17 +262,9 @@ function browserResultGroups(
       totalTime,
     };
   } else {
-    const wallMs = result.wallTimeMs ?? 0;
-    const time = {
-      min: wallMs,
-      max: wallMs,
-      avg: wallMs,
-      p50: wallMs,
-      p75: wallMs,
-      p99: wallMs,
-      p999: wallMs,
-    };
-    measured = { ...base, samples: [wallMs], time };
+    const w = result.wallTimeMs ?? 0;
+    const time = { min: w, max: w, avg: w, p50: w, p75: w, p99: w, p999: w };
+    measured = { ...base, samples: [w], time };
   }
 
   return [{ name, reports: [{ name, measuredResults: measured }] }];
@@ -286,8 +276,8 @@ function printBrowserReport(
   results: ReportGroup[],
   args: DefaultCliArgs,
 ): void {
-  const hasTime =
-    (result.samples && result.samples.length > 0) || result.wallTimeMs != null;
+  const hasSamples = result.samples && result.samples.length > 0;
+  const hasTime = hasSamples || result.wallTimeMs != null;
   const sections: ResultsMapper<any>[] = [
     ...(hasTime ? [timeSection] : []),
     ...(result.gcStats ? [browserGcStatsSection] : []),

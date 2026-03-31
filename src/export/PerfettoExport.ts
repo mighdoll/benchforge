@@ -49,16 +49,13 @@ function buildTraceEvents(
   groups: ReportGroup[],
   cliArgs: DefaultCliArgs,
 ): TraceEvent[] {
-  const meta = (
-    name: string,
-    metaArgs: Record<string, unknown>,
-  ): TraceEvent => ({
+  const meta = (name: string, args: Record<string, unknown>): TraceEvent => ({
     ph: "M",
     ts: 0,
     pid,
     tid,
     name,
-    args: metaArgs,
+    args,
   });
   const events: TraceEvent[] = [
     meta("process_name", { name: "wesl-bench" }),
@@ -170,10 +167,9 @@ function loadV8Events(
   if (!v8TracePath) return undefined;
   try {
     const v8Data = JSON.parse(readFileSync(v8TracePath, "utf-8")) as TraceFile;
-    console.log(
-      `Merged ${v8Data.traceEvents.length} V8 events from ${v8TracePath}`,
-    );
-    return v8Data.traceEvents;
+    const { traceEvents } = v8Data;
+    console.log(`Merged ${traceEvents.length} V8 events from ${v8TracePath}`);
+    return traceEvents;
   } catch {
     console.warn(`Could not parse V8 trace file: ${v8TracePath}`);
     return undefined;

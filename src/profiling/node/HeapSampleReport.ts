@@ -112,8 +112,8 @@ export function aggregateSites(sites: HeapSite[]): HeapSite[] {
   for (const site of sites) {
     // When column is unknown, include fn name to avoid merging distinct sites
     const { url, line, col, fn } = site;
-    const key =
-      col != null ? `${url}:${line}:${col}` : `${url}:${line}:?:${fn}`;
+    const suffix = col != null ? `${col}` : `?:${fn}`;
+    const key = `${url}:${line}:${suffix}`;
     const existing = byLocation.get(key);
     if (existing) {
       existing.bytes += site.bytes;
@@ -142,8 +142,8 @@ export function formatHeapReport(
   options: HeapReportOptions,
 ): string {
   const { topN, stackDepth = 3, verbose = false } = options;
-  const { totalAll, totalUserCode, sampleCount, isUserCode } = options;
-  const isUser = isUserCode ?? isNodeUserCode;
+  const { totalAll, totalUserCode, sampleCount } = options;
+  const isUser = options.isUserCode ?? isNodeUserCode;
   const formatSite = verbose ? formatVerboseSite : formatCompactSite;
   const lines: string[] = [];
   lines.push(`Heap allocation sites (top ${topN}, garbage included):`);
@@ -177,12 +177,10 @@ export function formatRawSamples(resolved: ResolvedProfile): string {
 
   const header = "ordinal\tsize\tfunction\tlocation";
   const rows = sortedSamples.map(s => {
-    const node = nodeMap.get(s.nodeId);
-    const fn = node?.frame.name || "(unknown)";
-    const url = node?.frame.url || "";
-    const loc = url
-      ? fmtLoc(url, node!.frame.line, node!.frame.col)
-      : "(unknown)";
+    const f = nodeMap.get(s.nodeId)?.frame;
+    const fn = f?.name || "(unknown)";
+    const url = f?.url || "";
+    const loc = url ? fmtLoc(url, f!.line, f!.col) : "(unknown)";
     return `${s.ordinal}\t${s.size}\t${fn}\t${loc}`;
   });
   return [header, ...rows].join("\n");

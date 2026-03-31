@@ -122,17 +122,11 @@ async function updateSourcePanel(
     const highlighter = await getHighlighter();
     if (tabData.generation !== gen) return;
 
-    const html = highlighter.codeToHtml(code, {
-      lang,
-      themes: { light: "github-light", dark: "github-dark" },
-    });
+    const themes = { light: "github-light", dark: "github-dark" };
+    const html = highlighter.codeToHtml(code, { lang, themes });
 
-    const header = buildSourceHeader(
-      file,
-      line,
-      col,
-      provider.config.editorUri,
-    );
+    const uri = provider.config.editorUri;
+    const header = buildSourceHeader(file, line, col, uri);
     panel.innerHTML = header + '<div class="source-code">' + html + "</div>";
 
     // Fetch profiles and coverage, then render gutter columns
@@ -185,12 +179,17 @@ function buildSourceHeader(
   editorUri: string | null,
 ): string {
   const path = escapeHtml(file);
-  const editorLink = editorUri
-    ? ` <a class="source-editor-link" href="${escapeHtml(
-        editorUri + filePathFromUrl(file) + `:${line || 1}:${col || 1}`,
-      )}">Open in Editor</a>`
-    : "";
+  let editorLink = "";
+  if (editorUri) {
+    const loc = `${line || 1}:${col || 1}`;
+    const href = escapeHtml(editorUri + filePathFromUrl(file) + ":" + loc);
+    editorLink = ` <a class="source-editor-link" href="${href}">Open in Editor</a>`;
+  }
   return `<div class="source-header"><span class="source-path">${path}</span>${editorLink}</div>`;
+}
+
+function gutter(kind: string, text: string): string {
+  return `<span class="gutter gutter-${kind}">${text}</span>`;
 }
 
 /** Render per-line gutter columns (counts, alloc, time) with heat-map backgrounds. */
@@ -216,26 +215,13 @@ function renderGutters(
   for (let i = 0; i < lines.length; i++) {
     const lineNum = i + 1;
     const el = lines[i] as HTMLElement;
+    const counts = lineData.callCounts.get(lineNum);
+    const alloc = lineData.allocBytes.get(lineNum);
+    const time = lineData.selfTimeUs.get(lineNum);
     let gutterHtml = "";
-
-    if (hasCounts) {
-      gutterHtml +=
-        '<span class="gutter gutter-count">' +
-        formatGutterCount(lineData.callCounts.get(lineNum)) +
-        "</span>";
-    }
-    if (hasAlloc) {
-      gutterHtml +=
-        '<span class="gutter gutter-alloc">' +
-        formatGutterBytes(lineData.allocBytes.get(lineNum)) +
-        "</span>";
-    }
-    if (hasTime) {
-      gutterHtml +=
-        '<span class="gutter gutter-time">' +
-        formatGutterTime(lineData.selfTimeUs.get(lineNum)) +
-        "</span>";
-    }
+    if (hasCounts) gutterHtml += gutter("count", formatGutterCount(counts));
+    if (hasAlloc) gutterHtml += gutter("alloc", formatGutterBytes(alloc));
+    if (hasTime) gutterHtml += gutter("time", formatGutterTime(time));
 
     el.insertAdjacentHTML("afterbegin", gutterHtml);
 
@@ -250,10 +236,10 @@ function applyHeatMap(
   maxAlloc: number,
   maxTime: number,
 ): void {
-  const allocRatio =
-    maxAlloc > 0 ? (lineData.allocBytes.get(lineNum) || 0) / maxAlloc : 0;
-  const timeRatio =
-    maxTime > 0 ? (lineData.selfTimeUs.get(lineNum) || 0) / maxTime : 0;
+  const alloc = lineData.allocBytes.get(lineNum) || 0;
+  const time = lineData.selfTimeUs.get(lineNum) || 0;
+  const allocRatio = maxAlloc > 0 ? alloc / maxAlloc : 0;
+  const timeRatio = maxTime > 0 ? time / maxTime : 0;
   const heat = Math.max(allocRatio, timeRatio);
   if (heat > 0.01) {
     el.style.setProperty("--heat", heat.toFixed(3));

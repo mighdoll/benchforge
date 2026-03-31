@@ -224,10 +224,12 @@ export function formatTierSummary(
   sep = ":",
   join = " ",
 ): string {
-  const total = Object.values(opt.byTier).reduce((s, t) => s + t.count, 0);
-  return Object.entries(opt.byTier)
+  const tiers = Object.entries(opt.byTier);
+  const total = tiers.reduce((s, [, t]) => s + t.count, 0);
+  const pct = (n: number) => `${((n / total) * 100).toFixed(0)}%`;
+  return tiers
     .sort((a, b) => b[1].count - a[1].count)
-    .map(([name, t]) => `${name}${sep}${((t.count / total) * 100).toFixed(0)}%`)
+    .map(([name, t]) => `${name}${sep}${pct(t.count)}`)
     .join(join);
 }
 

@@ -58,6 +58,14 @@ export function createSampleTimeSeries(
 ): SVGSVGElement | HTMLElement {
   const ctx = buildPlotContext(timeSeries);
   const heapData = prepareHeapData(heapSeries, ctx.yMin, ctx.yMax);
+  const legendItems = buildLegendItems(
+    ctx.hasWarmup,
+    gcEvents.length,
+    pausePoints.length,
+    heapData.length > 0,
+    ctx.optTiers,
+    ctx.benchmarks,
+  );
 
   return Plot.plot({
     marginTop: 24,
@@ -100,14 +108,7 @@ export function createSampleTimeSeries(
       Plot.ruleY([ctx.yMin], { stroke: "black", strokeWidth: 1 }),
       ...buildLegend(
         { xMin: ctx.xMin, xMax: ctx.xMax, yMax: ctx.yMax },
-        buildLegendItems(
-          ctx.hasWarmup,
-          gcEvents.length,
-          pausePoints.length,
-          heapData.length > 0,
-          ctx.optTiers,
-          ctx.benchmarks,
-        ),
+        legendItems,
       ),
     ],
   });
@@ -117,9 +118,8 @@ export function createSampleTimeSeries(
 function buildPlotContext(timeSeries: TimeSeriesPoint[]): PlotContext {
   const benchmarks = [...new Set(timeSeries.map(d => d.benchmark))];
   const sampleData = buildSampleData(timeSeries);
-  const { unitSuffix, convertValue, formatValue } = getTimeUnit(
-    sampleData.map(d => d.value),
-  );
+  const units = getTimeUnit(sampleData.map(d => d.value));
+  const { unitSuffix, convertValue, formatValue } = units;
   const convertedData = sampleData.map(d => ({
     ...d,
     displayValue: convertValue(d.value),
@@ -234,10 +234,12 @@ function pauseMarks(
 
 function sampleDotMarks(ctx: PlotContext): any[] {
   const { convertedData, unitSuffix, formatValue } = ctx;
+  const fmtVal = (d: SampleData) =>
+    `${formatValue(d.displayValue)}${unitSuffix}`;
   const tipTitle = (d: SampleData) =>
     d.optTier
-      ? `Sample ${d.sample}: ${formatValue(d.displayValue)}${unitSuffix} [${d.optTier}]`
-      : `Sample ${d.sample}: ${formatValue(d.displayValue)}${unitSuffix}`;
+      ? `Sample ${d.sample}: ${fmtVal(d)} [${d.optTier}]`
+      : `Sample ${d.sample}: ${fmtVal(d)}`;
   return [
     Plot.dot(
       convertedData.filter(d => d.isWarmup),
@@ -249,8 +251,7 @@ function sampleDotMarks(ctx: PlotContext): any[] {
         strokeWidth: 1.5,
         r: 3,
         opacity: 0.7,
-        title: (d: SampleData) =>
-          `Warmup ${d.sample}: ${formatValue(d.displayValue)}${unitSuffix}`,
+        title: (d: SampleData) => `Warmup ${d.sample}: ${fmtVal(d)}`,
       },
     ),
     Plot.dot(
@@ -313,17 +314,16 @@ function buildLegendItems(
       style: "filled-dot",
     });
   if (optTiers.length === 0) {
-    const sorted = [...benchmarks].sort((a, b) => {
-      return (
-        Number(a.includes("(baseline)")) - Number(b.includes("(baseline)"))
-      );
-    });
+    const isBase = (s: string) => s.includes("(baseline)");
+    const sorted = [...benchmarks].sort(
+      (a, b) => Number(isBase(a)) - Number(isBase(b)),
+    );
     for (const bm of sorted) {
-      const isBase = bm.includes("(baseline)");
+      const base = isBase(bm);
       items.push({
-        color: isBase ? "#ffa500" : "#4682b4",
+        color: base ? "#ffa500" : "#4682b4",
         label: bm,
-        style: isBase ? "hollow-dot" : "filled-dot",
+        style: base ? "hollow-dot" : "filled-dot",
       });
     }
   }

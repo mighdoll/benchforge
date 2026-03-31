@@ -93,8 +93,8 @@ function resultGroupValues<S extends ReadonlyArray<ResultsMapper<any>>>(
       ...extractReportValues(report, sections),
     } as ReportRowData<S>;
 
-    if (baseSamples && report.measuredResults.samples) {
-      const samples = report.measuredResults.samples;
+    const samples = report.measuredResults.samples;
+    if (baseSamples && samples) {
       (row as any).diffCI = bootstrapDifferenceCI(baseSamples, samples);
     }
     return row;

@@ -200,13 +200,9 @@ function calcColumnWidths<T>(
   dataRows: unknown[][],
 ): Record<number, { width: number; wrapWord: boolean }> {
   // First pass: calculate base widths from titles and data
-  const widths = titles.map((title, i) => {
-    const maxData = dataRows.reduce(
-      (max, row) => Math.max(max, cellWidth(row[i])),
-      0,
-    );
-    return Math.max(cellWidth(title), maxData);
-  });
+  const maxData = (i: number) =>
+    dataRows.reduce((m, row) => Math.max(m, cellWidth(row[i])), 0);
+  const widths = titles.map((t, i) => Math.max(cellWidth(t), maxData(i)));
 
   // Second pass: ensure group titles fit (accounting for column separators)
   let col = 0;

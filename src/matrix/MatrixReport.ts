@@ -117,9 +117,8 @@ function buildCaseTable(
 
   const rows = buildCaseRows(results, caseId, options?.extraColumns);
   const hasBaseline = rows.some(r => r.diffCI);
-  const table = buildTable(buildColumns(hasBaseline, options), [
-    { results: rows },
-  ]);
+  const cols = buildColumns(hasBaseline, options);
+  const table = buildTable(cols, [{ results: rows }]);
   return `${caseTitle}\n${table}`;
 }
 

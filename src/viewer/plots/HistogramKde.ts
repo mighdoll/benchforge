@@ -3,15 +3,20 @@ import * as d3 from "d3";
 import { buildLegend, type LegendItem } from "./LegendUtils.ts";
 import type { Sample } from "./PlotTypes.ts";
 
+interface Bar {
+  benchmark: string;
+  count: number;
+  x1: number;
+  x2: number;
+}
+
 /** Create histogram + KDE plot for sample distribution */
 export function createHistogramKde(
   allSamples: Sample[],
   benchmarkNames: string[],
 ): SVGSVGElement | HTMLElement {
-  const { barData, binMin, binMax, yMax } = buildBarData(
-    allSamples,
-    benchmarkNames,
-  );
+  const bars = buildBarData(allSamples, benchmarkNames);
+  const { barData, binMin, binMax, yMax } = bars;
   const { colorMap, legendItems } = buildColorData(benchmarkNames);
   const xMax = binMax + (binMax - binMin) * 0.45; // extend for legend
 
@@ -43,10 +48,10 @@ export function createHistogramKde(
         x1: "x1",
         x2: "x2",
         y: "count",
-        fill: (d: (typeof barData)[0]) => colorMap.get(d.benchmark),
+        fill: (d: Bar) => colorMap.get(d.benchmark),
         fillOpacity: 0.6,
         tip: true,
-        title: (d: (typeof barData)[0]) => `${d.benchmark}: ${d.count}`,
+        title: (d: Bar) => `${d.benchmark}: ${d.count}`,
       }),
       Plot.ruleY([0]),
       ...buildLegend({ xMin: binMin, xMax, yMax }, legendItems),
@@ -70,12 +75,7 @@ function buildBarData(allSamples: Sample[], benchmarkNames: string[]) {
     .thresholds(thresholds)
     .value(d => d.value)(allSamples);
 
-  const barData: {
-    benchmark: string;
-    count: number;
-    x1: number;
-    x2: number;
-  }[] = [];
+  const barData: Bar[] = [];
   const n = benchmarkNames.length;
   const unitsPerPx = (binMax - binMin) / plotWidth;
   const groupGapPx = 8;

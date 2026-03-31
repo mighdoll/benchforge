@@ -42,24 +42,19 @@ export async function startViewerServer(
 ): Promise<{ server: Server; port: number; close: () => void }> {
   const port = options.port ?? 3939;
 
-  const entries = Object.entries(options.sources ?? {});
-  const sourceCache = new Map<string, string>(entries);
+  const sourceCache = new Map(Object.entries(options.sources ?? {}));
 
   const assets = sirv(join(packageRoot(), "dist/viewer"), { single: true });
   const handler = createRequestHandler(options, sourceCache, assets);
   const server = createServer(handler);
 
-  const result = await tryListen(server, port);
-  const openUrl = `http://localhost:${result.port}`;
+  const { server: srv, port: actualPort } = await tryListen(server, port);
+  const url = `http://localhost:${actualPort}`;
   if (options.open !== false && !process.env.BENCHFORGE_NO_OPEN)
-    await open(openUrl);
-  console.log(`Viewer: ${openUrl}`);
+    await open(url);
+  console.log(`Viewer: ${url}`);
 
-  return {
-    server: result.server,
-    port: result.port,
-    close: () => result.server.close(),
-  };
+  return { server: srv, port: actualPort, close: () => srv.close() };
 }
 
 /** Open a .benchforge archive in the viewer */
@@ -68,13 +63,10 @@ export async function viewArchive(filePath: string): Promise<void> {
   const content = await readFile(absPath, "utf-8");
   const archive = JSON.parse(content);
 
-  const knownSchema = 1;
   const schema = archive.schema ?? 0;
-  if (schema > knownSchema) {
-    console.error(
-      `Archive schema version ${schema} is newer than supported (${knownSchema}). ` +
-        `Please update benchforge to view this archive.`,
-    );
+  if (schema > 1) {
+    const msg = `Archive schema version ${schema} is newer than supported (1).`;
+    console.error(`${msg} Please update benchforge to view this archive.`);
     process.exit(1);
   }
 
@@ -147,8 +139,7 @@ function createRequestHandler(
     "/api/archive": (res, _q, method) => {
       if (method !== "POST") {
         res.statusCode = 405;
-        res.end("Method not allowed");
-        return;
+        return void res.end("Method not allowed");
       }
       return handleArchiveRequest(
         res,
@@ -198,9 +189,8 @@ function tryListen(
       });
       server.listen(p, () => {
         server.removeAllListeners("error");
-        const addr = server.address();
-        const actualPort = typeof addr === "object" && addr ? addr.port : p;
-        resolve({ server, port: actualPort });
+        const a = server.address();
+        resolve({ server, port: typeof a === "object" && a ? a.port : p });
       });
     };
     listen(port);
@@ -269,22 +259,20 @@ async function handleArchiveRequest(
     const sources = allFrames.length
       ? await collectSources(allFrames, sourceCache)
       : Object.fromEntries(sourceCache);
-    const timestamp = new Date().toISOString().replace(/[:.]/g, "-");
+    const ts = new Date().toISOString().replace(/[:.]/g, "-");
+    const version = process.env.npm_package_version || "unknown";
     const archive = {
       schema: 1,
       profile,
       timeProfile,
       report,
       sources,
-      metadata: {
-        timestamp,
-        benchforgeVersion: process.env.npm_package_version || "unknown",
-      },
+      metadata: { timestamp: ts, benchforgeVersion: version },
     };
     const body = JSON.stringify(archive);
     const filename = profile
-      ? archiveFileName(profile, timestamp)
-      : `benchforge-${timestamp}.benchforge`;
+      ? archiveFileName(profile, ts)
+      : `benchforge-${ts}.benchforge`;
     res.setHeader("Content-Type", "application/json");
     res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
     res.end(body);

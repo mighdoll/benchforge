@@ -46,7 +46,7 @@ function buildTimeProfile(
 ): SpeedscopeTimeProfile {
   const { samples: sampleIds, timeDeltas, nodes } = profile;
 
-  if (!sampleIds || !timeDeltas || sampleIds.length === 0) {
+  if (!sampleIds?.length || !timeDeltas) {
     return {
       type: "sampled",
       name,
@@ -72,20 +72,14 @@ function buildTimeProfile(
 
   // Cache resolved stacks per node ID
   const stackCache = new Map<number, number[]>();
+  const resolve = (id: number) =>
+    resolveStack(id, nodeMap, parentMap, stackCache, sharedFrames, frameIndex);
 
   const samples: number[][] = [];
   const weights: number[] = [];
 
   for (let i = 0; i < sampleIds.length; i++) {
-    const stack = resolveStack(
-      sampleIds[i],
-      nodeMap,
-      parentMap,
-      stackCache,
-      sharedFrames,
-      frameIndex,
-    );
-    samples.push(stack);
+    samples.push(resolve(sampleIds[i]));
     weights.push(timeDeltas[i]);
   }
 

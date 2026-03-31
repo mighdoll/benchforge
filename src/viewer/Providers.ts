@@ -119,8 +119,9 @@ export class ServerProvider implements DataProvider {
   }
 
   profileUrl(type: "alloc" | "time"): string | null {
-    if (type === "alloc") return this.config.hasProfile ? "/api/profile" : null;
-    return this.config.hasTimeProfile ? "/api/profile/time" : null;
+    const { hasProfile, hasTimeProfile } = this.config;
+    if (type === "alloc") return hasProfile ? "/api/profile" : null;
+    return hasTimeProfile ? "/api/profile/time" : null;
   }
 
   async createArchive(): Promise<{ blob: Blob; filename: string }> {
@@ -164,8 +165,8 @@ export class ArchiveProvider implements DataProvider {
   async fetchProfileData(
     type: "alloc" | "time",
   ): Promise<ViewerSpeedscopeFile | null> {
-    const data =
-      type === "alloc" ? this.archive.profile : this.archive.timeProfile;
+    const { profile, timeProfile } = this.archive;
+    const data = type === "alloc" ? profile : timeProfile;
     return (data as ViewerSpeedscopeFile) ?? null;
   }
 
@@ -175,14 +176,14 @@ export class ArchiveProvider implements DataProvider {
 
   /** Return a blob URL for the profile, lazily created and cached. */
   profileUrl(type: "alloc" | "time"): string | null {
-    const isAlloc = type === "alloc";
-    const data = isAlloc ? this.archive.profile : this.archive.timeProfile;
+    const { profile, timeProfile } = this.archive;
+    const data = type === "alloc" ? profile : timeProfile;
     if (!data) return null;
     let url = this.blobUrls.get(type);
     if (!url) {
-      url = URL.createObjectURL(
-        new Blob([JSON.stringify(data)], { type: "application/json" }),
-      );
+      const json = JSON.stringify(data);
+      const blob = new Blob([json], { type: "application/json" });
+      url = URL.createObjectURL(blob);
       this.blobUrls.set(type, url);
     }
     return url;
@@ -191,9 +192,8 @@ export class ArchiveProvider implements DataProvider {
   async createArchive(): Promise<{ blob: Blob; filename: string }> {
     const json = JSON.stringify(this.archive);
     const blob = new Blob([json], { type: "application/json" });
-    const ts =
-      this.archive.metadata?.timestamp ||
-      new Date().toISOString().replace(/[:.]/g, "-");
+    const fallback = new Date().toISOString().replace(/[:.]/g, "-");
+    const ts = this.archive.metadata?.timestamp || fallback;
     return { blob, filename: `benchforge-${ts}.benchforge` };
   }
 }

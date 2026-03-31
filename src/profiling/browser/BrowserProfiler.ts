@@ -45,13 +45,8 @@ export interface BrowserProfileResult {
 export async function profileBrowser(
   params: BrowserProfileParams,
 ): Promise<BrowserProfileResult> {
-  const {
-    url,
-    headless = true,
-    chromeArgs,
-    timeout = 60,
-    gcStats: collectGc,
-  } = params;
+  const { url, headless = true, chromeArgs } = params;
+  const { timeout = 60, gcStats: collectGc } = params;
   const { samplingInterval = 32768 } = params.allocOptions ?? {};
 
   const server = await chromium.launchServer({ headless, args: chromeArgs });

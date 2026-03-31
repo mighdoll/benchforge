@@ -122,8 +122,8 @@ export async function collectSources(
 export async function archiveBenchmark(
   options: ArchiveOptions,
 ): Promise<string | undefined> {
-  const { groups, reportData, timeProfileData, coverageData, outputPath } =
-    options;
+  const { groups, reportData, timeProfileData, coverageData } = options;
+  const { outputPath } = options;
   const file = buildSpeedscopeFile(groups);
   const timeProfile = timeProfileData ? JSON.parse(timeProfileData) : null;
   if (!file && !timeProfile && !reportData) {
@@ -184,19 +184,23 @@ function buildProfile(
   sharedFrames: SpeedscopeFrame[],
   frameIndex: Map<string, number>,
 ): SpeedscopeHeapProfile {
+  const intern = (f: {
+    name: string;
+    url: string;
+    line: number;
+    col?: number | null;
+  }) => internFrame(f.name, f.url, f.line, f.col, sharedFrames, frameIndex);
+
   // Build nodeId -> stack of frame indices
   const nodeStacks = new Map<number, number[]>();
   for (const node of resolved.nodes) {
-    const stack = node.stack.map(f =>
-      internFrame(f.name, f.url, f.line, f.col, sharedFrames, frameIndex),
-    );
-    nodeStacks.set(node.nodeId, stack);
+    nodeStacks.set(node.nodeId, node.stack.map(intern));
   }
 
   const samples: number[][] = [];
   const weights: number[] = [];
 
-  if (!resolved.sortedSamples || resolved.sortedSamples.length === 0) {
+  if (!resolved.sortedSamples?.length) {
     const msg = `Speedscope export: no samples in heap profile for "${name}", skipping`;
     console.error(msg);
     return {

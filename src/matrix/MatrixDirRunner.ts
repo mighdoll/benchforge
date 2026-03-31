@@ -101,13 +101,8 @@ async function runDirVariantCases<T>(
     const deltaPercent = baseline
       ? computeDeltaPercent(baseline, measured)
       : undefined;
-    cases.push({
-      caseId,
-      measured,
-      metadata: loaded.metadata,
-      baseline,
-      deltaPercent,
-    });
+    const { metadata } = loaded;
+    cases.push({ caseId, measured, metadata, baseline, deltaPercent });
   }
   return cases;
 }

@@ -58,11 +58,9 @@ export function checkConvergence(samples: number[]): ConvergenceResult {
   const minSamples = windowSize * 2;
 
   if (samples.length < minSamples) {
-    return {
-      converged: false,
-      confidence: (samples.length / minSamples) * 100,
-      reason: `Collecting samples: ${samples.length}/${minSamples}`,
-    };
+    const confidence = (samples.length / minSamples) * 100;
+    const reason = `Collecting samples: ${samples.length}/${minSamples}`;
+    return { converged: false, confidence, reason };
   }
 
   const metrics = getStability(samples, windowSize);
@@ -77,11 +75,10 @@ async function runAdaptiveBench<T>(
   adaptive: AdaptiveOptions,
   params?: T,
 ): Promise<MeasuredResults[]> {
-  const {
-    minTime: min = adaptive.minTime ?? minTime,
-    maxTime: max = adaptive.maxTime ?? maxTime,
-    targetConfidence: target = adaptive.convergence ?? targetConfidence,
-  } = opts as AdaptiveOptions;
+  const a = opts as AdaptiveOptions;
+  const min = a.minTime ?? adaptive.minTime ?? minTime;
+  const max = a.maxTime ?? adaptive.maxTime ?? maxTime;
+  const target = a.convergence ?? adaptive.convergence ?? targetConfidence;
   const allSamples: number[] = [];
 
   const warmup = await collectInitial(runner, bench, opts, params, allSamples);
@@ -202,11 +199,10 @@ async function collectAdaptive<T>(
     const elapsed = performance.now() - startTime;
 
     if (elapsed - lastLog > 1000) {
-      const elapsedSec = (elapsed / 1000).toFixed(1);
+      const sec = (elapsed / 1000).toFixed(1);
       const conf = convergence.confidence.toFixed(0);
-      process.stderr.write(
-        `\r◊ ${bench.name}: ${conf}% confident (${elapsedSec}s)   `,
-      );
+      const msg = `\r◊ ${bench.name}: ${conf}% confident (${sec}s)   `;
+      process.stderr.write(msg);
       lastLog = elapsed;
     }
 

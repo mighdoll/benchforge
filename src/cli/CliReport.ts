@@ -84,13 +84,10 @@ export function reportOptStatus(groups: ReportGroup[]): void {
     console.log(`  ${name}: ${tierParts} ${dim(`(${samples} samples)`)}`);
   }
 
-  const totalDeopts = optData.reduce((s, d) => s + d.opt.deoptCount, 0);
-  if (totalDeopts > 0) {
-    console.log(
-      yellow(
-        `  ⚠ ${totalDeopts} deoptimization${totalDeopts > 1 ? "s" : ""} detected`,
-      ),
-    );
+  const deopts = optData.reduce((s, d) => s + d.opt.deoptCount, 0);
+  if (deopts > 0) {
+    const s = deopts > 1 ? "s" : "";
+    console.log(yellow(`  ⚠ ${deopts} deoptimization${s} detected`));
   }
 }
 
@@ -108,14 +105,13 @@ export function printHeapReports(
       const resolved = resolveProfile(heapProfile);
       const sites = flattenProfile(resolved);
       const userSites = filterSites(sites, options.isUserCode);
-      const totalUserCode = userSites.reduce((sum, s) => sum + s.bytes, 0);
-      const aggregated = aggregateSites(options.userOnly ? userSites : sites);
+      const agg = aggregateSites(options.userOnly ? userSites : sites);
       const extra = {
         totalAll: resolved.totalBytes,
-        totalUserCode,
+        totalUserCode: userSites.reduce((sum, s) => sum + s.bytes, 0),
         sampleCount: resolved.sortedSamples?.length,
       };
-      console.log(formatHeapReport(aggregated, { ...options, ...extra }));
+      console.log(formatHeapReport(agg, { ...options, ...extra }));
       if (options.raw) {
         console.log(dim(`\n─── Raw samples: ${report.name} ───`));
         console.log(formatRawSamples(resolved));
@@ -170,16 +166,15 @@ function mergeMatrixDefaults(
   args: DefaultCliArgs,
   results: MatrixResults[],
 ): MatrixReportOptions {
-  const result: MatrixReportOptions = { ...reportOptions };
-
-  if (!result.sections?.length) {
+  const merged: MatrixReportOptions = { ...reportOptions };
+  if (!merged.sections?.length) {
     const groups = matrixToReportGroups(results);
-    result.sections = buildReportSections(
+    const hasOpt = args["trace-opt"] && hasField(groups, "optStatus");
+    merged.sections = buildReportSections(
       args.adaptive,
       args["gc-stats"],
-      args["trace-opt"] && hasField(groups, "optStatus"),
+      hasOpt,
     );
   }
-
-  return result;
+  return merged;
 }

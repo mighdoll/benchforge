@@ -168,15 +168,11 @@ async function collectSamples<T>(p: CollectParams<T>): Promise<CollectResult> {
   if (samples.length === 0) {
     throw new Error(`No samples collected for benchmark: ${p.benchmark.name}`);
   }
-  const heapGrowth =
-    Math.max(0, process.memoryUsage().heapUsed - heapBefore) /
-    1024 /
-    samples.length;
-  const optStatus = p.traceOpt
-    ? analyzeOptStatus(samples, optStatuses)
-    : undefined;
-  const optSamples =
-    p.traceOpt && optStatuses.length > 0 ? optStatuses : undefined;
+  const heapDelta = process.memoryUsage().heapUsed - heapBefore;
+  const heapGrowth = Math.max(0, heapDelta) / 1024 / samples.length;
+  const trace = p.traceOpt;
+  const optStatus = trace ? analyzeOptStatus(samples, optStatuses) : undefined;
+  const optSamples = trace && optStatuses.length > 0 ? optStatuses : undefined;
   return {
     samples,
     warmupSamples,
@@ -228,13 +224,8 @@ async function runWarmup<T>(p: CollectParams<T>): Promise<number[]> {
 async function runSampleLoop<T>(
   p: CollectParams<T>,
 ): Promise<SampleLoopResult> {
-  const {
-    maxTime,
-    maxIterations,
-    pauseFirst,
-    pauseInterval = 0,
-    pauseDuration = 100,
-  } = p;
+  const { maxTime, maxIterations, pauseFirst } = p;
+  const { pauseInterval = 0, pauseDuration = 100 } = p;
   const trackHeap = true;
   const getOptStatus = p.traceOpt ? createOptStatusGetter() : undefined;
   const estimated = maxIterations || Math.ceil(maxTime / 0.1);
@@ -300,10 +291,8 @@ function analyzeOptStatus(
   for (const [status, times] of byCode) {
     const name = statusNames[status] || `status=${status}`;
     const sorted = [...times].sort((a, b) => a - b);
-    byTier[name] = {
-      count: times.length,
-      medianMs: sorted[Math.floor(sorted.length / 2)],
-    };
+    const medianMs = sorted[Math.floor(sorted.length / 2)];
+    byTier[name] = { count: times.length, medianMs };
   }
 
   return { byTier, deoptCount };

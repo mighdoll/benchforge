@@ -145,21 +145,18 @@ async function importBenchmarkWithSetup(
   message: RunMessage,
 ): Promise<BenchmarkImportResult> {
   const { modulePath, exportName, setupExportName, params } = message;
+  const modPath = modulePath!;
   const suffix = exportName ? ` (${exportName})` : "";
-  logTiming(`Importing from ${modulePath}${suffix}`);
-  const module = await import(modulePath!);
-  const fn = getModuleExport<BenchmarkFunction>(
-    module,
-    exportName,
-    modulePath!,
-  );
+  logTiming(`Importing from ${modPath}${suffix}`);
+  const module = await import(modPath);
+  const fn = getModuleExport<BenchmarkFunction>(module, exportName, modPath);
 
   if (setupExportName) {
     logTiming(`Calling setup: ${setupExportName}`);
     const setupFn = getModuleExport<BenchmarkFunction>(
       module,
       setupExportName,
-      modulePath!,
+      modPath,
     );
     return { fn, params: await setupFn(params) };
   }

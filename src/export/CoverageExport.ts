@@ -149,7 +149,6 @@ function closestByLine(
   line: number,
 ): LineCoverage | undefined {
   if (entries.length === 0) return undefined;
-  return entries.reduce((best, e) =>
-    Math.abs(e.startLine - line) < Math.abs(best.startLine - line) ? e : best,
-  );
+  const dist = (e: LineCoverage) => Math.abs(e.startLine - line);
+  return entries.reduce((best, e) => (dist(e) < dist(best) ? e : best));
 }

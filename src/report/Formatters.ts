@@ -102,11 +102,8 @@ export function formatDiffWithCI(value: unknown): string | null {
 /** Format percentage difference with CI for throughput metrics (higher is better) */
 export function formatDiffWithCIHigherIsBetter(value: unknown): string | null {
   if (!isDifferenceCI(value)) return null;
-  const flipped = flipCI(value);
-  return colorByDirection(
-    diffCIText(flipped.percent, flipped.ci),
-    flipped.direction,
-  );
+  const { percent, ci, direction } = flipCI(value);
+  return colorByDirection(diffCIText(percent, ci), direction);
 }
 
 /** @return truncated string with ellipsis if over maxLen */

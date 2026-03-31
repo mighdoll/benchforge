@@ -158,12 +158,9 @@ function generateMedians(samples: number[], resamples: number): number[] {
 }
 
 /** @return confidence interval [lower, upper] */
-function computeInterval(
-  medians: number[],
-  confidence: number,
-): [number, number] {
-  const alpha = (1 - confidence) / 2;
-  return [percentile(medians, alpha), percentile(medians, 1 - alpha)];
+function computeInterval(values: number[], conf: number): [number, number] {
+  const alpha = (1 - conf) / 2;
+  return [percentile(values, alpha), percentile(values, 1 - alpha)];
 }
 
 /** Bin values into histogram for compact visualization */

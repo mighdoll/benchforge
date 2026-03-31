@@ -99,12 +99,10 @@ async function runGroup(
 /** Warn if parameterized benchmarks lack setup */
 function validateBenchmarkParameters(group: BenchGroup): void {
   if (group.setup) return;
-
-  const allBenchmarks = group.baseline
+  const all = group.baseline
     ? [...group.benchmarks, group.baseline]
     : group.benchmarks;
-
-  for (const bench of allBenchmarks) {
+  for (const bench of all) {
     if (bench.fn.length > 0) {
       console.warn(
         `Benchmark "${bench.name}" in group "${group.name}" expects parameters but no setup() provided.`,
@@ -137,11 +135,9 @@ async function runMultipleBatches(
   runParams: RunParams,
   batches: number,
 ): Promise<ReportGroup> {
-  const timePerBatch = (runParams.options.maxTime || 5000) / batches;
-  const batchParams = {
-    ...runParams,
-    options: { ...runParams.options, maxTime: timePerBatch },
-  };
+  const maxTime = (runParams.options.maxTime || 5000) / batches;
+  const opts = { ...runParams.options, maxTime };
+  const batchParams = { ...runParams, options: opts };
   const baselineBatches: MeasuredResults[] = [];
   const benchmarkBatches = new Map<string, MeasuredResults[]>();
 
@@ -157,25 +153,28 @@ async function runMultipleBatches(
     );
   }
 
-  const meta = runParams.metadata;
   return mergeBatchResults(
     name,
     benchmarks,
     baseline,
     baselineBatches,
     benchmarkBatches,
-    meta,
+    runParams.metadata,
   );
 }
 
 /** Run single benchmark and create report */
 async function runSingleBenchmark(
   spec: BenchmarkSpec,
-  runParams: RunParams,
+  { runner, options, useWorker, params, metadata }: RunParams,
 ): Promise<BenchmarkReport> {
-  const { runner, options, useWorker, params, metadata } = runParams;
-  const benchmarkParams = { spec, runner, options, useWorker, params };
-  const [result] = await runBenchmark(benchmarkParams);
+  const [result] = await runBenchmark({
+    spec,
+    runner,
+    options,
+    useWorker,
+    params,
+  });
   return { name: spec.name, measuredResults: result, metadata };
 }
 
@@ -255,13 +254,13 @@ function mergeResults(results: MeasuredResults[]): MeasuredResults {
   const time = computeStats(allSamples);
 
   let offset = 0;
-  const allPausePoints = results.flatMap(r => {
-    const pts = (r.pausePoints ?? []).map(p => ({
+  const pauses = results.flatMap(r => {
+    const shifted = (r.pausePoints ?? []).map(p => ({
       sampleIndex: p.sampleIndex + offset,
       durationMs: p.durationMs,
     }));
     offset += r.samples.length;
-    return pts;
+    return shifted;
   });
 
   return {
@@ -270,6 +269,6 @@ function mergeResults(results: MeasuredResults[]): MeasuredResults {
     warmupSamples: allWarmup.length ? allWarmup : undefined,
     time,
     totalTime: results.reduce((sum, r) => sum + (r.totalTime || 0), 0),
-    pausePoints: allPausePoints.length ? allPausePoints : undefined,
+    pausePoints: pauses.length ? pauses : undefined,
   };
 }
