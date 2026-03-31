@@ -75,10 +75,11 @@ async function runAdaptiveBench<T>(
   adaptive: AdaptiveOptions,
   params?: T,
 ): Promise<MeasuredResults[]> {
-  const a = opts as AdaptiveOptions;
-  const min = a.minTime ?? adaptive.minTime ?? minTime;
-  const max = a.maxTime ?? adaptive.maxTime ?? maxTime;
-  const target = a.convergence ?? adaptive.convergence ?? targetConfidence;
+  const overrides = opts as AdaptiveOptions;
+  const min = overrides.minTime ?? adaptive.minTime ?? minTime;
+  const max = overrides.maxTime ?? adaptive.maxTime ?? maxTime;
+  const target =
+    overrides.convergence ?? adaptive.convergence ?? targetConfidence;
   const allSamples: number[] = [];
 
   const warmup = await collectInitial(runner, bench, opts, params, allSamples);
@@ -243,12 +244,12 @@ function appendSamples(result: MeasuredResults, samples: number[]): void {
 
 /** True if convergence target met, or minTime elapsed with fallback confidence. */
 function shouldStop(
-  c: ConvergenceResult,
+  convergence: ConvergenceResult,
   target: number,
   elapsed: number,
-  min: number,
+  minElapsed: number,
 ): boolean {
-  if (c.converged && c.confidence >= target) return true;
+  if (convergence.converged && convergence.confidence >= target) return true;
   const threshold = Math.max(target, fallbackThreshold);
-  return elapsed >= min && c.confidence >= threshold;
+  return elapsed >= minElapsed && convergence.confidence >= threshold;
 }

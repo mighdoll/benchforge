@@ -96,26 +96,25 @@ export function printHeapReports(
   groups: ReportGroup[],
   options: HeapReportOptions,
 ): void {
-  for (const group of groups) {
-    for (const report of groupReports(group)) {
-      const { heapProfile } = report.measuredResults;
-      if (!heapProfile) continue;
+  const reports = groups.flatMap(g => groupReports(g));
+  for (const report of reports) {
+    const { heapProfile } = report.measuredResults;
+    if (!heapProfile) continue;
 
-      console.log(dim(`\n─── Heap profile: ${report.name} ───`));
-      const resolved = resolveProfile(heapProfile);
-      const sites = flattenProfile(resolved);
-      const userSites = filterSites(sites, options.isUserCode);
-      const agg = aggregateSites(options.userOnly ? userSites : sites);
-      const extra = {
-        totalAll: resolved.totalBytes,
-        totalUserCode: userSites.reduce((sum, s) => sum + s.bytes, 0),
-        sampleCount: resolved.sortedSamples?.length,
-      };
-      console.log(formatHeapReport(agg, { ...options, ...extra }));
-      if (options.raw) {
-        console.log(dim(`\n─── Raw samples: ${report.name} ───`));
-        console.log(formatRawSamples(resolved));
-      }
+    console.log(dim(`\n─── Heap profile: ${report.name} ───`));
+    const resolved = resolveProfile(heapProfile);
+    const sites = flattenProfile(resolved);
+    const userSites = filterSites(sites, options.isUserCode);
+    const agg = aggregateSites(options.userOnly ? userSites : sites);
+    const extra = {
+      totalAll: resolved.totalBytes,
+      totalUserCode: userSites.reduce((sum, s) => sum + s.bytes, 0),
+      sampleCount: resolved.sortedSamples?.length,
+    };
+    console.log(formatHeapReport(agg, { ...options, ...extra }));
+    if (options.raw) {
+      console.log(dim(`\n─── Raw samples: ${report.name} ───`));
+      console.log(formatRawSamples(resolved));
     }
   }
 }

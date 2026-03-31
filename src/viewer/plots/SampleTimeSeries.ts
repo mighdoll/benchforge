@@ -307,25 +307,28 @@ function buildLegendItems(
       strokeDash: "4,4",
     });
   if (hasHeap) items.push({ color: "#9333ea", label: "heap", style: "rect" });
-  for (const tier of optTiers)
-    items.push({
+  items.push(
+    ...optTiers.map(tier => ({
       color: optTierColors[tier] || "#4682b4",
       label: tier,
-      style: "filled-dot",
-    });
+      style: "filled-dot" as const,
+    })),
+  );
   if (optTiers.length === 0) {
     const isBase = (s: string) => s.includes("(baseline)");
     const sorted = [...benchmarks].sort(
       (a, b) => Number(isBase(a)) - Number(isBase(b)),
     );
-    for (const bm of sorted) {
-      const base = isBase(bm);
-      items.push({
-        color: base ? "#ffa500" : "#4682b4",
-        label: bm,
-        style: base ? "hollow-dot" : "filled-dot",
-      });
-    }
+    items.push(
+      ...sorted.map(bm => {
+        const base = isBase(bm);
+        return {
+          color: base ? "#ffa500" : "#4682b4",
+          label: bm,
+          style: (base ? "hollow-dot" : "filled-dot") as LegendItem["style"],
+        };
+      }),
+    );
   }
   return items;
 }

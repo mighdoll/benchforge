@@ -88,11 +88,11 @@ export function closeSourceTab(tabId: string, config: ViewerConfig): void {
   tab.button.remove();
   tab.panel.remove();
   sourceTabs.delete(tabId);
-  if (getActiveTabId() === tabId) {
-    if (config.hasReport) activateTab("summary");
-    else if (config.hasProfile) activateTab("flamechart");
-    else if (config.hasTimeProfile) activateTab("time-flamechart");
-  }
+  if (getActiveTabId() !== tabId) return;
+
+  if (config.hasReport) activateTab("summary");
+  else if (config.hasProfile) activateTab("flamechart");
+  else if (config.hasTimeProfile) activateTab("time-flamechart");
 }
 
 function sourceTabId(file: string): string {
@@ -204,8 +204,7 @@ function renderGutters(
   const hasCounts = lineData.callCounts.size > 0;
   const hasAlloc = lineData.allocBytes.size > 0;
   const hasTime = lineData.selfTimeUs.size > 0;
-  const gutterCount = +hasCounts + +hasAlloc + +hasTime;
-  if (gutterCount === 0) return;
+  if (!hasCounts && !hasAlloc && !hasTime) return;
 
   const codeEl = panel.querySelector(".source-code") as HTMLElement;
   const maxAlloc = hasAlloc ? Math.max(...lineData.allocBytes.values()) : 0;

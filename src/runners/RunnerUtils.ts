@@ -6,7 +6,6 @@ import type { BenchRunner, RunnerOptions } from "./BenchRunner.ts";
 import { createRunner, type KnownRunner } from "./CreateRunner.ts";
 
 export const msToNs = 1e6;
-export const nsToMs = 1e-6;
 
 /** Get named or default export from module, throw if not a function */
 // biome-ignore lint/complexity/noBannedTypes: generic function constraint

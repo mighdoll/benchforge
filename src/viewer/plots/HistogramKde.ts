@@ -75,12 +75,11 @@ function buildBarData(allSamples: Sample[], benchmarkNames: string[]) {
     .thresholds(thresholds)
     .value(d => d.value)(allSamples);
 
-  const barData: Bar[] = [];
   const n = benchmarkNames.length;
   const unitsPerPx = (binMax - binMin) / plotWidth;
   const groupGapPx = 8;
 
-  for (const bin of bins) {
+  const barData: Bar[] = bins.flatMap(bin => {
     const counts = new Map<string, number>();
     for (const d of bin)
       counts.set(d.benchmark, (counts.get(d.benchmark) || 0) + 1);
@@ -90,12 +89,12 @@ function buildBarData(allSamples: Sample[], benchmarkNames: string[]) {
     const start = bin.x0! + groupGap / 2;
     const w = (full - groupGap) / n;
 
-    benchmarkNames.forEach((benchmark, i) => {
+    return benchmarkNames.map((benchmark, i) => {
       const x1 = start + i * w;
       const x2 = start + (i + 1) * w;
-      barData.push({ benchmark, count: counts.get(benchmark) || 0, x1, x2 });
+      return { benchmark, count: counts.get(benchmark) || 0, x1, x2 };
     });
-  }
+  });
 
   const maxCount = d3.max(barData, d => d.count)! || 1;
   const yMax = maxCount * 1.15;

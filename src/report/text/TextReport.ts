@@ -59,20 +59,21 @@ export function valuesForReports<S extends ReadonlyArray<ResultsMapper<any>>>(
 export function injectDiffColumns<T>(
   reportGroups: ReportColumnGroup<T>[],
 ): ColumnGroup<T>[] {
-  let ciAdded = false;
+  // Find the first comparable column to determine CI formatter
+  const allCols = reportGroups.flatMap(g => g.columns);
+  const firstComparable = allCols.find(c => c.comparable);
+  const ciFmt = firstComparable?.higherIsBetter
+    ? formatDiffWithCIHigherIsBetter
+    : formatDiffWithCI;
+  const ciCol = { title: "Δ% CI", key: "diffCI" as keyof T, formatter: ciFmt };
 
+  let ciAdded = false;
   return reportGroups.map(group => ({
     groupTitle: group.groupTitle,
     columns: group.columns.flatMap(col => {
       if (col.comparable && !ciAdded) {
         ciAdded = true;
-        const fmt = col.higherIsBetter
-          ? formatDiffWithCIHigherIsBetter
-          : formatDiffWithCI;
-        return [
-          col,
-          { title: "Δ% CI", key: "diffCI" as keyof T, formatter: fmt },
-        ];
+        return [col, ciCol];
       }
       return [col];
     }),
@@ -88,16 +89,17 @@ function resultGroupValues<S extends ReadonlyArray<ResultsMapper<any>>>(
   const baseSamples = baseline?.measuredResults.samples;
 
   const results = reports.map(report => {
-    const row = {
+    const samples = report.measuredResults.samples;
+    const diffCI =
+      baseSamples && samples
+        ? bootstrapDifferenceCI(baseSamples, samples)
+        : undefined;
+
+    return {
       name: truncate(report.name),
       ...extractReportValues(report, sections),
+      ...(diffCI && { diffCI }),
     } as ReportRowData<S>;
-
-    const samples = report.measuredResults.samples;
-    if (baseSamples && samples) {
-      (row as any).diffCI = bootstrapDifferenceCI(baseSamples, samples);
-    }
-    return row;
   });
 
   const baseRow = baseline && valuesForReports([baseline], sections)[0];

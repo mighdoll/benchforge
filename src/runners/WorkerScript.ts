@@ -283,17 +283,17 @@ process.on("message", async (message: RunMessage) => {
     const benchStart = getPerfNow();
     const { alloc, timeSample, callCounts } = message.options;
 
+    let result: ResultMessage;
     if (alloc || timeSample || callCounts) {
-      const result = await runWithProfiling(message, runner);
-      logTiming("Benchmark execution took", getElapsed(benchStart));
-      sendAndExit(result, 0);
+      result = await runWithProfiling(message, runner);
     } else {
       const { fn, params } = await resolveBenchmarkFn(message);
       const spec = { ...message.spec, fn };
       const results = await runner.runBench(spec, message.options, params);
-      logTiming("Benchmark execution took", getElapsed(benchStart));
-      sendAndExit({ type: "result", results }, 0);
+      result = { type: "result", results };
     }
+    logTiming("Benchmark execution took", getElapsed(benchStart));
+    sendAndExit(result, 0);
   } catch (error) {
     sendAndExit(createErrorMessage(error), 1);
   }

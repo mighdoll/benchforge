@@ -58,9 +58,8 @@ export function createDistributionPlot(
   const ciX = scales.x(ci[0]);
   const ciW = scales.x(ci[1]) - ciX;
   add(rect(ciX, margin.top, ciW, plot.h, { fill, opacity: "0.5" }));
-  opts.smooth
-    ? drawSmoothedDist(svg, histogram, scales, stroke)
-    : drawHistogramBars(svg, histogram, scales, layout, stroke);
+  if (opts.smooth) drawSmoothedDist(svg, histogram, scales, stroke);
+  else drawHistogramBars(svg, histogram, scales, layout, stroke);
   const zeroX = scales.x(0);
   const inRange = zeroX >= margin.left && zeroX <= layout.width - margin.right;
   if (inRange) {

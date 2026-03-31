@@ -56,8 +56,11 @@ export function flattenProfile(resolved: ResolvedProfile): HeapSite[] {
     const stack = node.stack.map(toCallFrame);
     const site: HeapSite = { ...frame, bytes: node.selfSize, stack };
     sites.push(site);
-    const bucket = nodeIdToSites.get(node.nodeId) ?? [];
-    if (!bucket.length) nodeIdToSites.set(node.nodeId, bucket);
+    let bucket = nodeIdToSites.get(node.nodeId);
+    if (!bucket) {
+      bucket = [];
+      nodeIdToSites.set(node.nodeId, bucket);
+    }
     bucket.push(site);
   }
 
@@ -112,8 +115,8 @@ export function aggregateSites(sites: HeapSite[]): HeapSite[] {
   for (const site of sites) {
     // When column is unknown, include fn name to avoid merging distinct sites
     const { url, line, col, fn } = site;
-    const suffix = col != null ? `${col}` : `?:${fn}`;
-    const key = `${url}:${line}:${suffix}`;
+    const colKey = col != null ? `${col}` : `?:${fn}`;
+    const key = `${url}:${line}:${colKey}`;
     const existing = byLocation.get(key);
     if (existing) {
       existing.bytes += site.bytes;
@@ -177,10 +180,10 @@ export function formatRawSamples(resolved: ResolvedProfile): string {
 
   const header = "ordinal\tsize\tfunction\tlocation";
   const rows = sortedSamples.map(s => {
-    const f = nodeMap.get(s.nodeId)?.frame;
-    const fn = f?.name || "(unknown)";
-    const url = f?.url || "";
-    const loc = url ? fmtLoc(url, f!.line, f!.col) : "(unknown)";
+    const frame = nodeMap.get(s.nodeId)?.frame;
+    const fn = frame?.name || "(unknown)";
+    const url = frame?.url || "";
+    const loc = url ? fmtLoc(url, frame!.line, frame!.col) : "(unknown)";
     return `${s.ordinal}\t${s.size}\t${fn}\t${loc}`;
   });
   return [header, ...rows].join("\n");
@@ -212,11 +215,12 @@ function formatVerboseSite(
   const dim = isUser(site) ? (s: string) => s : pc.dim;
   lines.push(dim(`${bytes}  ${site.fn}  ${loc}`));
 
-  for (const frame of callerFrames(site, stackDepth)) {
-    if (!frame.url || !isUser(frame)) continue;
-    const callerLoc = fmtLoc(frame.url, frame.line, frame.col);
-    lines.push(dim(`            <- ${frame.fn}  ${callerLoc}`));
-  }
+  callerFrames(site, stackDepth)
+    .filter(frame => frame.url && isUser(frame))
+    .forEach(frame => {
+      const callerLoc = fmtLoc(frame.url, frame.line, frame.col);
+      lines.push(dim(`            <- ${frame.fn}  ${callerLoc}`));
+    });
 }
 
 /** Compact single-line format: `49 MB  fn1 <- fn2 <- fn3` */

@@ -59,14 +59,11 @@ function buildTimeProfile(
   }
 
   // Build node lookup and parent map for stack resolution
-  const nodeMap = new Map<number, TimeProfileNode>();
+  const nodeMap = new Map<number, TimeProfileNode>(nodes.map(n => [n.id, n]));
   const parentMap = new Map<number, number>(); // childId -> parentId
   for (const node of nodes) {
-    nodeMap.set(node.id, node);
-    if (node.children) {
-      for (const childId of node.children) {
-        parentMap.set(childId, node.id);
-      }
+    for (const childId of node.children ?? []) {
+      parentMap.set(childId, node.id);
     }
   }
 

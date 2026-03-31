@@ -64,17 +64,12 @@ export async function runDefaultBench(
   configureArgs?: Configure<any>,
 ): Promise<void> {
   const args = parseBenchArgs(configureArgs);
-  if (args.url) {
-    await browserBenchExports(args);
-  } else if (suite) {
-    await benchExports(suite, args);
-  } else if (args.file) {
-    await fileBenchExports(args.file, args);
-  } else {
-    throw new Error(
-      "Provide a benchmark file, --url for browser mode, or pass a BenchSuite directly.",
-    );
-  }
+  if (args.url) return browserBenchExports(args);
+  if (suite) return benchExports(suite, args);
+  if (args.file) return fileBenchExports(args.file, args);
+  throw new Error(
+    "Provide a benchmark file, --url for browser mode, or pass a BenchSuite directly.",
+  );
 }
 
 /** Run benchmarks, display table, and optionally generate HTML report */
@@ -212,15 +207,15 @@ async function fileBenchExports(
   const mod = await import(fileUrl);
   const candidate = mod.default;
 
-  if (candidate && Array.isArray(candidate.matrices)) {
-    await matrixBenchExports(candidate as MatrixSuite, args);
-  } else if (candidate && Array.isArray(candidate.groups)) {
-    await benchExports(candidate as BenchSuite, args);
-  } else if (typeof candidate === "function") {
+  if (candidate && Array.isArray(candidate.matrices))
+    return matrixBenchExports(candidate as MatrixSuite, args);
+  if (candidate && Array.isArray(candidate.groups))
+    return benchExports(candidate as BenchSuite, args);
+  if (typeof candidate === "function") {
     const name = basename(filePath).replace(/\.[^.]+$/, "");
     const bench = { name, fn: candidate };
     const suite = { name, groups: [{ name, benchmarks: [bench] }] };
-    await benchExports(suite, args);
+    return benchExports(suite, args);
   }
 }
 
@@ -248,26 +243,27 @@ function browserResultGroups(
   name: string,
   result: BrowserProfileResult,
 ): ReportGroup[] {
+  const measured = toBrowserMeasured(name, result);
+  return [{ name, reports: [{ name, measuredResults: measured }] }];
+}
+
+/** Convert browser profile result to MeasuredResults */
+function toBrowserMeasured(
+  name: string,
+  result: BrowserProfileResult,
+): MeasuredResults {
   const { gcStats, heapProfile, timeProfile, coverage } = result;
   const base = { name, gcStats, heapProfile, timeProfile, coverage };
-  let measured: MeasuredResults;
 
   if (result.samples && result.samples.length > 0) {
     const { samples } = result;
     const totalTime = result.wallTimeMs ? result.wallTimeMs / 1000 : undefined;
-    measured = {
-      ...base,
-      samples,
-      time: computeStats(samples),
-      totalTime,
-    };
-  } else {
-    const w = result.wallTimeMs ?? 0;
-    const time = { min: w, max: w, avg: w, p50: w, p75: w, p99: w, p999: w };
-    measured = { ...base, samples: [w], time };
+    return { ...base, samples, time: computeStats(samples), totalTime };
   }
 
-  return [{ name, reports: [{ name, measuredResults: measured }] }];
+  const w = result.wallTimeMs ?? 0;
+  const time = { min: w, max: w, avg: w, p50: w, p75: w, p99: w, p999: w };
+  return { ...base, samples: [w], time };
 }
 
 /** Print browser benchmark tables and heap reports */
@@ -276,8 +272,7 @@ function printBrowserReport(
   results: ReportGroup[],
   args: DefaultCliArgs,
 ): void {
-  const hasSamples = result.samples && result.samples.length > 0;
-  const hasTime = hasSamples || result.wallTimeMs != null;
+  const hasTime = !!result.samples?.length || result.wallTimeMs != null;
   const sections: ResultsMapper<any>[] = [
     ...(hasTime ? [timeSection] : []),
     ...(result.gcStats ? [browserGcStatsSection] : []),

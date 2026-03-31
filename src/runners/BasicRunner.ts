@@ -170,9 +170,11 @@ async function collectSamples<T>(p: CollectParams<T>): Promise<CollectResult> {
   }
   const heapDelta = process.memoryUsage().heapUsed - heapBefore;
   const heapGrowth = Math.max(0, heapDelta) / 1024 / samples.length;
-  const trace = p.traceOpt;
-  const optStatus = trace ? analyzeOptStatus(samples, optStatuses) : undefined;
-  const optSamples = trace && optStatuses.length > 0 ? optStatuses : undefined;
+  const optStatus = p.traceOpt
+    ? analyzeOptStatus(samples, optStatuses)
+    : undefined;
+  const optSamples =
+    p.traceOpt && optStatuses.length > 0 ? optStatuses : undefined;
   return {
     samples,
     warmupSamples,
@@ -186,20 +188,23 @@ async function collectSamples<T>(p: CollectParams<T>): Promise<CollectResult> {
 }
 
 /** Assemble collected data into a MeasuredResults record. */
-function buildMeasuredResults(name: string, c: CollectResult): MeasuredResults {
-  const time = computeStats(c.samples);
-  const heap = c.heapGrowth;
+function buildMeasuredResults(
+  name: string,
+  collected: CollectResult,
+): MeasuredResults {
+  const time = computeStats(collected.samples);
+  const heap = collected.heapGrowth;
   return {
     name,
-    samples: c.samples,
-    warmupSamples: c.warmupSamples,
-    heapSamples: c.heapSamples,
-    timestamps: c.timestamps,
+    samples: collected.samples,
+    warmupSamples: collected.warmupSamples,
+    heapSamples: collected.heapSamples,
+    timestamps: collected.timestamps,
     time,
     heapSize: { avg: heap, min: heap, max: heap },
-    optStatus: c.optStatus,
-    optSamples: c.optSamples,
-    pausePoints: c.pausePoints,
+    optStatus: collected.optStatus,
+    optSamples: collected.optSamples,
+    pausePoints: collected.pausePoints,
   };
 }
 
@@ -229,7 +234,7 @@ async function runSampleLoop<T>(
   const trackHeap = true;
   const getOptStatus = p.traceOpt ? createOptStatusGetter() : undefined;
   const estimated = maxIterations || Math.ceil(maxTime / 0.1);
-  const a = createSampleArrays(estimated, trackHeap, !!getOptStatus);
+  const arrays = createSampleArrays(estimated, trackHeap, !!getOptStatus);
 
   let count = 0;
   let elapsed = 0;
@@ -243,14 +248,18 @@ async function runSampleLoop<T>(
     const start = performance.now();
     executeBenchmark(p.benchmark, p.params);
     const end = performance.now();
-    a.samples[count] = end - start;
-    a.timestamps[count] = Number(process.hrtime.bigint() / 1000n);
-    if (trackHeap) a.heapSamples[count] = getHeapStatistics().used_heap_size;
-    if (getOptStatus) a.optStatuses[count] = getOptStatus(p.benchmark.fn);
+    arrays.samples[count] = end - start;
+    arrays.timestamps[count] = Number(process.hrtime.bigint() / 1000n);
+    if (trackHeap)
+      arrays.heapSamples[count] = getHeapStatistics().used_heap_size;
+    if (getOptStatus) arrays.optStatuses[count] = getOptStatus(p.benchmark.fn);
     count++;
 
     if (shouldPause(count, pauseFirst, pauseInterval)) {
-      a.pausePoints.push({ sampleIndex: count - 1, durationMs: pauseDuration });
+      arrays.pausePoints.push({
+        sampleIndex: count - 1,
+        durationMs: pauseDuration,
+      });
       const pauseStart = performance.now();
       await new Promise(r => setTimeout(r, pauseDuration));
       totalPauseTime += performance.now() - pauseStart;
@@ -258,14 +267,14 @@ async function runSampleLoop<T>(
     elapsed = performance.now() - loopStart - totalPauseTime;
   }
 
-  trimArrays(a, count, trackHeap, !!getOptStatus);
-  const heapSamples = trackHeap ? a.heapSamples : undefined;
+  trimArrays(arrays, count, trackHeap, !!getOptStatus);
+  const heapSamples = trackHeap ? arrays.heapSamples : undefined;
   return {
-    samples: a.samples,
+    samples: arrays.samples,
     heapSamples,
-    timestamps: a.timestamps,
-    optStatuses: a.optStatuses,
-    pausePoints: a.pausePoints,
+    timestamps: arrays.timestamps,
+    optStatuses: arrays.optStatuses,
+    pausePoints: arrays.pausePoints,
   };
 }
 
@@ -276,19 +285,19 @@ function analyzeOptStatus(
 ): OptStatusInfo | undefined {
   if (statuses.length === 0 || statuses[0] === undefined) return undefined;
 
-  const byCode = new Map<number, number[]>();
+  const samplesByStatus = new Map<number, number[]>();
   let deoptCount = 0;
 
   for (let i = 0; i < samples.length; i++) {
     const status = statuses[i];
     if (status === undefined) continue;
     if (status & 8) deoptCount++; // Check deopt flag (bit 3)
-    if (!byCode.has(status)) byCode.set(status, []);
-    byCode.get(status)!.push(samples[i]);
+    if (!samplesByStatus.has(status)) samplesByStatus.set(status, []);
+    samplesByStatus.get(status)!.push(samples[i]);
   }
 
   const byTier: Record<string, { count: number; medianMs: number }> = {};
-  for (const [status, times] of byCode) {
+  for (const [status, times] of samplesByStatus) {
     const name = statusNames[status] || `status=${status}`;
     const sorted = [...times].sort((a, b) => a - b);
     const medianMs = sorted[Math.floor(sorted.length / 2)];
@@ -324,12 +333,11 @@ function createSampleArrays(
   trackHeap: boolean,
   trackOpt: boolean,
 ): SampleArrays {
-  const prealloc = (enabled: boolean) => (enabled ? new Array<number>(n) : []);
   return {
     samples: new Array<number>(n),
     timestamps: new Array<number>(n),
-    heapSamples: prealloc(trackHeap),
-    optStatuses: prealloc(trackOpt),
+    heapSamples: trackHeap ? new Array<number>(n) : [],
+    optStatuses: trackOpt ? new Array<number>(n) : [],
     pausePoints: [],
   };
 }

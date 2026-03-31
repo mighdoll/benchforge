@@ -259,7 +259,7 @@ async function handleArchiveRequest(
     const sources = allFrames.length
       ? await collectSources(allFrames, sourceCache)
       : Object.fromEntries(sourceCache);
-    const ts = new Date().toISOString().replace(/[:.]/g, "-");
+    const timestamp = new Date().toISOString().replace(/[:.]/g, "-");
     const version = process.env.npm_package_version || "unknown";
     const archive = {
       schema: 1,
@@ -267,12 +267,12 @@ async function handleArchiveRequest(
       timeProfile,
       report,
       sources,
-      metadata: { timestamp: ts, benchforgeVersion: version },
+      metadata: { timestamp, benchforgeVersion: version },
     };
     const body = JSON.stringify(archive);
     const filename = profile
-      ? archiveFileName(profile, ts)
-      : `benchforge-${ts}.benchforge`;
+      ? archiveFileName(profile, timestamp)
+      : `benchforge-${timestamp}.benchforge`;
     res.setHeader("Content-Type", "application/json");
     res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
     res.end(body);

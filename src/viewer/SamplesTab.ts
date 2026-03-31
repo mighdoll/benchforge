@@ -1,5 +1,5 @@
 import { escapeHtml } from "./Helpers.ts";
-import type { ReportData } from "./ReportData.ts";
+import type { BenchmarkGroup, ReportData } from "./ReportData.ts";
 
 /** Build plot scaffolding and render time-series / histogram charts into the samples panel. */
 export async function loadSamples(
@@ -24,10 +24,7 @@ export function hasSufficientSamples(data: ReportData): boolean {
 }
 
 /** Build the HTML scaffold for a group's time-series and histogram plots. */
-function buildSamplesGroupHtml(
-  group: ReportData["groups"][0],
-  i: number,
-): string {
+function buildSamplesGroupHtml(group: BenchmarkGroup, i: number): string {
   if (!group.benchmarks?.length) return "";
 
   const hasSamples =

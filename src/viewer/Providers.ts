@@ -119,17 +119,16 @@ export class ServerProvider implements DataProvider {
   }
 
   profileUrl(type: "alloc" | "time"): string | null {
-    const { hasProfile, hasTimeProfile } = this.config;
-    if (type === "alloc") return hasProfile ? "/api/profile" : null;
-    return hasTimeProfile ? "/api/profile/time" : null;
+    if (type === "alloc") return this.config.hasProfile ? "/api/profile" : null;
+    return this.config.hasTimeProfile ? "/api/profile/time" : null;
   }
 
   async createArchive(): Promise<{ blob: Blob; filename: string }> {
     const resp = await fetch("/api/archive", { method: "POST" });
     if (!resp.ok) throw new Error("Archive failed");
-    const disp = resp.headers.get("Content-Disposition") || "";
-    const match = disp.match(/filename="?(.+?)"?$/);
-    const filename = match?.[1] || "benchforge-archive.benchforge";
+    const disposition = resp.headers.get("Content-Disposition") || "";
+    const nameMatch = disposition.match(/filename="?(.+?)"?$/);
+    const filename = nameMatch?.[1] || "benchforge-archive.benchforge";
     return { blob: await resp.blob(), filename };
   }
 }
@@ -192,8 +191,8 @@ export class ArchiveProvider implements DataProvider {
   async createArchive(): Promise<{ blob: Blob; filename: string }> {
     const json = JSON.stringify(this.archive);
     const blob = new Blob([json], { type: "application/json" });
-    const fallback = new Date().toISOString().replace(/[:.]/g, "-");
-    const ts = this.archive.metadata?.timestamp || fallback;
-    return { blob, filename: `benchforge-${ts}.benchforge` };
+    const fallbackDate = new Date().toISOString().replace(/[:.]/g, "-");
+    const timestamp = this.archive.metadata?.timestamp || fallbackDate;
+    return { blob, filename: `benchforge-${timestamp}.benchforge` };
   }
 }

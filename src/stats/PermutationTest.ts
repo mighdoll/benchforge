@@ -37,7 +37,7 @@ export interface ComparisonResult {
 const significanceThreshold = 0.05;
 const strongSignificance = 0.001;
 const goodSignificance = 0.01;
-const defaultBootstrapSamples = 10000;
+const bootstrapSamples = 10000;
 
 /** @return statistical comparison between baseline and current samples */
 export function compareWithBaseline(
@@ -74,12 +74,12 @@ function bootstrapDifferenceTest(
   const n1 = sample1.length;
 
   let moreExtreme = 0;
-  for (let i = 0; i < defaultBootstrapSamples; i++) {
+  for (let i = 0; i < bootstrapSamples; i++) {
     const { resample1, resample2 } = shuffleAndSplit(combined, n1);
     const diff = statistic(resample2) - statistic(resample1);
     if (Math.abs(diff) >= Math.abs(observedDiff)) moreExtreme++;
   }
-  return moreExtreme / defaultBootstrapSamples;
+  return moreExtreme / bootstrapSamples;
 }
 
 /** @return change statistics for a current vs baseline comparison */

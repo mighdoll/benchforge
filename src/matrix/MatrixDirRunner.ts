@@ -1,4 +1,5 @@
 import type { RunnerOptions } from "../runners/BenchRunner.ts";
+import type { MeasuredResults } from "../runners/MeasuredResults.ts";
 import { runMatrixVariant } from "../runners/RunnerOrchestrator.ts";
 import type {
   BenchMatrix,
@@ -113,9 +114,7 @@ async function runBaselineIfExists<T>(
   caseId: string,
   caseData: unknown,
   ctx: DirMatrixContext<T>,
-): Promise<
-  import("../runners/MeasuredResults.ts").MeasuredResults | undefined
-> {
+): Promise<MeasuredResults | undefined> {
   const { matrix, baselineIds, runnerOpts } = ctx;
   if (!matrix.baselineDir || !baselineIds.includes(variantId)) return undefined;
 

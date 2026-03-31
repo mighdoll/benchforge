@@ -10,9 +10,3 @@ export function formatConvergence(v: unknown): string {
   const pct = `${Math.round(v)}%`;
   return v < lowConfidence ? red(pct) : pct;
 }
-
-/** @return coefficient of variation as ±percentage */
-export function formatCV(v: unknown): string {
-  if (typeof v !== "number") return "";
-  return `±${(v * 100).toFixed(1)}%`;
-}

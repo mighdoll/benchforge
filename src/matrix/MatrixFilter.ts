@@ -75,25 +75,19 @@ async function getFilteredVariants<T>(
 ): Promise<string[] | undefined> {
   if (!variantPattern) return undefined;
 
-  if (matrix.variants) {
-    const ids = Object.keys(matrix.variants).filter(id =>
-      matchPattern(id, variantPattern),
-    );
-    if (ids.length === 0) {
-      throw new Error(`No variants match filter: "${variantPattern}"`);
-    }
-    return ids;
-  }
+  const allIds = await resolveVariantIds(matrix);
 
-  if (matrix.variantDir) {
-    const allIds = await discoverVariants(matrix.variantDir);
-    const filtered = allIds.filter(id => matchPattern(id, variantPattern));
-    if (filtered.length === 0) {
-      throw new Error(`No variants match filter: "${variantPattern}"`);
-    }
-    return filtered;
+  const filtered = allIds.filter(id => matchPattern(id, variantPattern));
+  if (filtered.length === 0) {
+    throw new Error(`No variants match filter: "${variantPattern}"`);
   }
+  return filtered;
+}
 
+/** Resolve all variant IDs from inline variants or variantDir */
+async function resolveVariantIds<T>(matrix: BenchMatrix<T>): Promise<string[]> {
+  if (matrix.variants) return Object.keys(matrix.variants);
+  if (matrix.variantDir) return discoverVariants(matrix.variantDir);
   throw new Error("BenchMatrix requires 'variants' or 'variantDir'");
 }
 

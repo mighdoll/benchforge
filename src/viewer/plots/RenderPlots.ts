@@ -235,13 +235,15 @@ function flattenBenchmark(b: PreparedBenchmark, out: FlattenedData): void {
       duration: gc.duration,
     });
   });
-  b.pausePoints?.forEach(p => {
-    out.allPausePoints.push({
-      benchmark: name,
-      sampleIndex: p.sampleIndex,
-      durationMs: p.durationMs,
-    });
-  });
+  if (b.pausePoints) {
+    out.allPausePoints.push(
+      ...b.pausePoints.map(p => ({
+        benchmark: name,
+        sampleIndex: p.sampleIndex,
+        durationMs: p.durationMs,
+      })),
+    );
+  }
 }
 
 /** Running total array, used to map GC event offsets to sample indices */

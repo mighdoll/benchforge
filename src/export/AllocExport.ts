@@ -103,15 +103,11 @@ export async function collectSources(
 
   const sources: Record<string, string> = {};
   for (const url of urls) {
-    if (cache?.has(url)) {
-      sources[url] = cache.get(url)!;
-      continue;
-    }
-    const text = await fetchSource(url);
-    if (text !== undefined) {
-      sources[url] = text;
-      cache?.set(url, text);
-    }
+    const cached = cache?.get(url);
+    const text = cached ?? (await fetchSource(url));
+    if (text === undefined) continue;
+    sources[url] = text;
+    if (!cached) cache?.set(url, text);
   }
 
   return sources;
@@ -122,8 +118,8 @@ export async function collectSources(
 export async function archiveBenchmark(
   options: ArchiveOptions,
 ): Promise<string | undefined> {
-  const { groups, reportData, timeProfileData, coverageData } = options;
-  const { outputPath } = options;
+  const { groups, reportData, timeProfileData, coverageData, outputPath } =
+    options;
   const file = buildSpeedscopeFile(groups);
   const timeProfile = timeProfileData ? JSON.parse(timeProfileData) : null;
   if (!file && !timeProfile && !reportData) {

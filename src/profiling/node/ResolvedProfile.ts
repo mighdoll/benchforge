@@ -73,7 +73,7 @@ export function resolveProfile(profile: HeapProfile): ResolvedProfile {
     nodes.push(resolved);
     nodeMap.set(node.id, resolved);
     totalBytes += node.selfSize;
-    for (const child of node.children || []) walk(child, stack);
+    for (const child of node.children ?? []) walk(child, stack);
   }
 
   walk(profile.head, []);

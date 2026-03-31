@@ -1,8 +1,8 @@
 /** Escape a string for safe insertion into HTML. */
 export function escapeHtml(s: string): string {
-  const d = document.createElement("div");
-  d.textContent = s;
-  return d.innerHTML;
+  const el = document.createElement("div");
+  el.textContent = s;
+  return el.innerHTML;
 }
 
 /** Infer a Shiki language id from a file extension. */

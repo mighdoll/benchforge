@@ -27,7 +27,7 @@ type BootstrapOptions = {
   resamples?: number;
   confidence?: number;
 };
-const confidence = 0.95;
+const defaultConfidence = 0.95;
 const outlierMultiplier = 1.5; // Tukey's fence multiplier
 const bootstrapSamples = 10000;
 
@@ -78,9 +78,11 @@ export function bootstrapMedian(
   samples: number[],
   options: BootstrapOptions = {},
 ): BootstrapResult {
-  const { resamples = bootstrapSamples, confidence: conf = confidence } =
+  const { resamples = bootstrapSamples, confidence: conf = defaultConfidence } =
     options;
-  const medians = generateMedians(samples, resamples);
+  const medians = Array.from({ length: resamples }, () =>
+    percentile(createResample(samples), 0.5),
+  );
   const ci = computeInterval(medians, conf);
 
   return {
@@ -125,7 +127,7 @@ export function bootstrapDifferenceCI(
   current: number[],
   options: BootstrapOptions = {},
 ): DifferenceCI {
-  const { resamples = bootstrapSamples, confidence: conf = confidence } =
+  const { resamples = bootstrapSamples, confidence: conf = defaultConfidence } =
     options;
 
   const baselineMedian = percentile(baseline, 0.5);
@@ -143,18 +145,11 @@ export function bootstrapDifferenceCI(
   }
 
   const ci = computeInterval(diffs, conf);
-  const excludesZero = ci[0] > 0 || ci[1] < 0;
+  const ciExcludesZero = ci[0] > 0 || ci[1] < 0;
   let direction: CIDirection = "uncertain";
-  if (excludesZero) direction = observedPercent < 0 ? "faster" : "slower";
+  if (ciExcludesZero) direction = observedPercent < 0 ? "faster" : "slower";
   const histogram = binValues(diffs);
   return { percent: observedPercent, ci, direction, histogram };
-}
-
-/** @return medians from bootstrap resamples */
-function generateMedians(samples: number[], resamples: number): number[] {
-  return Array.from({ length: resamples }, () =>
-    percentile(createResample(samples), 0.5),
-  );
 }
 
 /** @return confidence interval [lower, upper] */

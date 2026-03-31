@@ -29,17 +29,17 @@ export function parseGcLine(line: string): GcEvent | undefined {
   const fields = parseNvpFields(line);
   if (!fields.gc) return undefined;
 
-  const int = (k: string) => Number.parseInt(fields[k] || "0", 10);
+  const intField = (k: string) => Number.parseInt(fields[k] || "0", 10);
   const type = parseGcType(fields.gc);
   const pauseMs = Number.parseFloat(fields.pause || "0");
   if (Number.isNaN(pauseMs)) return undefined;
 
-  const allocated = int("allocated");
-  const promoted = int("promoted");
+  const allocated = intField("allocated");
+  const promoted = intField("promoted");
   // V8 uses "new_space_survived" not "survived"
-  const survived = int("new_space_survived") || int("survived");
-  const start = int("start_object_size");
-  const end = int("end_object_size");
+  const survived = intField("new_space_survived") || intField("survived");
+  const start = intField("start_object_size");
+  const end = intField("end_object_size");
   const collected = start > end ? start - end : 0;
 
   return { type, pauseMs, allocated, collected, promoted, survived };

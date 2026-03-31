@@ -47,13 +47,13 @@ function prepareJsonData(
   };
 }
 
-/** Clean CLI args for JSON export (remove undefined values) */
+/** Clean CLI args for JSON export (remove undefined values, camelCase keys) */
 function cleanCliArgs(args: DefaultCliArgs): Record<string, any> {
-  const camel = (k: string) =>
+  const toCamelCase = (k: string) =>
     k.replace(/-([a-z])/g, (_, l) => l.toUpperCase());
   const entries = Object.entries(args)
     .filter(([, v]) => v !== undefined && v !== null)
-    .map(([k, v]) => [camel(k), v]);
+    .map(([k, v]) => [toCamelCase(k), v]);
   return Object.fromEntries(entries);
 }
 
@@ -68,15 +68,15 @@ function convertGroup(group: ReportGroup): BenchmarkGroup {
 
 /** Extract measured stats and optional metrics into JSON result shape */
 function convertReport(report: any): BenchmarkResult {
-  const { name, measuredResults: m } = report;
-  const { time, heapSize, gcTime } = m;
+  const { name, measuredResults } = report;
+  const { time, heapSize, gcTime } = measuredResults;
   const minMaxMean = (s: any) =>
     s ? { min: s.min, max: s.max, mean: s.avg } : undefined;
 
   return {
     name,
     status: "completed",
-    samples: m.samples || [],
+    samples: measuredResults.samples || [],
     time: {
       ...minMaxMean(time)!,
       p50: time.p50,
@@ -87,8 +87,8 @@ function convertReport(report: any): BenchmarkResult {
     heapSize: minMaxMean(heapSize),
     gcTime: minMaxMean(gcTime),
     execution: {
-      iterations: m.samples?.length || 0,
-      totalTime: m.totalTime || 0,
+      iterations: measuredResults.samples?.length || 0,
+      totalTime: measuredResults.totalTime || 0,
       warmupRuns: undefined, // Not available in current data structure
     },
   };

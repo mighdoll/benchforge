@@ -42,8 +42,14 @@ export interface MatrixExportOptions {
 
 /** Export reports (JSON, Perfetto, archive, viewer) based on CLI args */
 export async function exportReports(options: ExportOptions): Promise<void> {
-  const { results, args, sections, suiteName } = options;
-  const { currentVersion, baselineVersion } = options;
+  const {
+    results,
+    args,
+    sections,
+    suiteName,
+    currentVersion,
+    baselineVersion,
+  } = options;
 
   const needsReportData = args.view || args.archive != null;
   const htmlOptions = {

@@ -54,14 +54,12 @@ function aggregateSelf(
 
   const { frames } = profile.shared;
 
-  // Build set of frame indices that belong to this file
-  const fileFrames = new Map<number, number>(); // frameIndex -> line
-  for (let i = 0; i < frames.length; i++) {
-    const f = frames[i];
-    if (f.line && f.file && fileMatches(f.file, file)) {
-      fileFrames.set(i, f.line);
-    }
-  }
+  // Build map of frame indices that belong to this file: frameIndex -> line
+  const fileFrames = new Map<number, number>();
+  frames.forEach((frame, i) => {
+    if (frame.line && frame.file && fileMatches(frame.file, file))
+      fileFrames.set(i, frame.line);
+  });
   if (fileFrames.size === 0) return result;
 
   for (const p of profile.profiles) {
@@ -113,8 +111,6 @@ function fileMatches(frameFile: string, target: string): boolean {
 
 /** Find coverage entries by URL matching when exact key lookup fails. */
 function findCoverageEntries(file: string, coverage: ViewerCoverageData) {
-  for (const url of Object.keys(coverage)) {
-    if (fileMatches(url, file)) return coverage[url];
-  }
-  return undefined;
+  const matchingUrl = Object.keys(coverage).find(url => fileMatches(url, file));
+  return matchingUrl ? coverage[matchingUrl] : undefined;
 }

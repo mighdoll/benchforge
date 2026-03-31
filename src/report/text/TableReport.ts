@@ -149,16 +149,18 @@ function addComparisons<T extends Record<string, any>>(
   main: T,
   baseline: T,
 ): T {
-  const diffCols = groups.flatMap(g => g.columns).filter(col => col.diffKey);
-  const result = { ...main };
+  const diffCols = groups
+    .flatMap(g => g.columns)
+    .filter((col): col is DiffColumn<T> => col.diffKey !== undefined);
 
-  for (const col of diffCols) {
-    const dcol = col as DiffColumn<T>;
-    const fmt = dcol.diffFormatter ?? diffPercent;
-    (result as any)[col.key] = fmt(main[dcol.diffKey], baseline[dcol.diffKey]);
-  }
+  const diffs = Object.fromEntries(
+    diffCols.map(col => {
+      const fmt = col.diffFormatter ?? diffPercent;
+      return [col.key, fmt(main[col.diffKey], baseline[col.diffKey])];
+    }),
+  );
 
-  return result;
+  return { ...main, ...diffs };
 }
 
 /** @return bolded column title strings */
@@ -183,14 +185,15 @@ function createGroupHeaders<T>(
 
 /** @return spanning cell configs for group title headers */
 function createSectionSpans<T>(groups: ColumnGroup<T>[]): SpanningCellConfig[] {
-  let col = 0;
   const alignment: Alignment = "center";
-  return groups.map(g => {
+  const spans: SpanningCellConfig[] = [];
+  let col = 0;
+  for (const g of groups) {
     const colSpan = g.columns.length;
-    const span = { row: 0, col, colSpan, alignment };
+    spans.push({ row: 0, col, colSpan, alignment });
     col += colSpan;
-    return span;
-  });
+  }
+  return spans;
 }
 
 /** Calculate column widths based on content, including group titles */
@@ -256,7 +259,11 @@ function calcBorders<T>(groups: ColumnGroup<T>[]): {
 } {
   if (groups.length === 0) return { sectionBorders: [], headerBottom: 1 };
 
+  const sectionBorders: number[] = [];
   let border = 0;
-  const sectionBorders = groups.map(g => (border += g.columns.length));
+  for (const g of groups) {
+    border += g.columns.length;
+    sectionBorders.push(border);
+  }
   return { sectionBorders, headerBottom: 3 };
 }

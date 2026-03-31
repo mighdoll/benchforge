@@ -57,20 +57,19 @@ function buildTraceEvents(
     name,
     args,
   });
-  const events: TraceEvent[] = [
+  const metadata: TraceEvent[] = [
     meta("process_name", { name: "wesl-bench" }),
     meta("thread_name", { name: "MainThread" }),
     meta("bench_settings", cleanArgs(cliArgs)),
   ];
 
-  for (const group of groups) {
-    for (const report of group.reports) {
-      const results = report.measuredResults as MeasuredResults;
-      events.push(...buildBenchmarkEvents(results));
-    }
-  }
+  const benchEvents = groups.flatMap(group =>
+    group.reports.flatMap(report =>
+      buildBenchmarkEvents(report.measuredResults as MeasuredResults),
+    ),
+  );
 
-  return events;
+  return [...metadata, ...benchEvents];
 }
 
 /** Merge V8 trace events from a previous run, aligning timestamps */
