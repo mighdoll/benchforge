@@ -30,12 +30,12 @@ Output includes full statistics (mean, p50, p99) from per-iteration
 `performance.now()` timing:
 
 ```
-╔════════════╤══════════════════╤═══════╤══════╗
-║            │       time       │       │      ║
-║ name       │ mean  p50   p99  │ conv% │ runs ║
-╟────────────┼──────────────────┼───────┼──────╢
-║ index.html │ 2.49  2.50  2.90 │ —     │ 201  ║
-╚════════════╧══════════════════╧═══════╧══════╝
+╔════════════╤══════════════════╤══════╗
+║            │       time       │      ║
+║ name       │ mean  p50   p99  │ runs ║
+╟────────────┼──────────────────┼──────╢
+║ index.html │ 2.49  2.50  2.90 │ 201  ║
+╚════════════╧══════════════════╧══════╝
 ```
 
 Heap sampling and GC tracing wrap the entire iteration run (not
@@ -154,8 +154,8 @@ Available metrics:
 - **full** - old-gen mark-compact count
 - **pause** - total GC pause time (ms)
 
-Note: Node's `--gc-stats` additionally reports alloc/iter, promoted, and survived
-bytes (via `--trace-gc-nvp`), which aren't available from CDP tracing.
+Note: Node's `--gc-stats` additionally reports alloc/iter and promo%
+(via `--trace-gc-nvp`), which aren't available from CDP tracing.
 
 ## Examples
 

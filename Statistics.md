@@ -1,15 +1,17 @@
-# Statistical Methods in Bencher
+# Statistical Methods in Benchforge
 
 ## Overview
 
-Bencher uses robust statistics designed for JavaScript performance data, which exhibits:
+Benchforge uses robust statistics designed for JavaScript performance data, which exhibits:
 - Right-skewed distributions (occasional slow iterations from GC/OS interrupts)
 - Non-stationarity (JIT warmup, memory pressure changes)
 - Multimodality (normal vs GC-affected iterations)
 
-## Core Statistics (`StatisticalUtils.ts`)
+## Active Features
 
-### Percentiles
+These are shown in default output or conditionally with flags.
+
+### Percentiles (`StatisticalUtils.ts`)
 Nearest-rank method for p25, p50 (median), p75, p95, p99, p999:
 ```typescript
 function percentile(values: number[], p: number): number {
@@ -18,21 +20,10 @@ function percentile(values: number[], p: number): number {
   return sorted[Math.max(0, index)];
 }
 ```
-
-### Robust Variability Measures
-- **MAD** (Median Absolute Deviation): Robust alternative to standard deviation
-- **CV** (Coefficient of Variation): σ/μ for relative variability
-- **Standard Deviation**: Uses Bessel's correction (n-1 denominator)
-
-### Outlier Detection
-Tukey's IQR method with 1.5× multiplier:
-- Lower bound: Q1 - 1.5 × IQR
-- Upper bound: Q3 + 1.5 × IQR
-
-## Baseline Comparison
+Terminal reports show p50 and p99. The viewer and JSON export include p50, p75, p99, p999.
 
 ### Bootstrap Difference CI (`bootstrapDifferenceCI`)
-Used in both terminal and HTML reports for comparing against baseline.
+Shown in terminal and HTML reports when a baseline is present.
 
 **Algorithm:**
 1. For each of 10,000 iterations:
@@ -57,7 +48,20 @@ The CI approach is more informative for benchmarks:
 Note: `PermutationTest.ts` contains an unused permutation test implementation
 that computes p-values instead of CIs, kept for potential future use.
 
-## Adaptive Sampling (`AdaptiveWrapper.ts`)
+## Internal-Only Statistics
+
+These are computed but not displayed to users. They exist for internal use
+by the adaptive sampling algorithm or as building blocks for other stats.
+
+- **MAD** (Median Absolute Deviation): Robust alternative to standard deviation
+- **CV** (Coefficient of Variation): σ/μ for relative variability
+- **Standard Deviation**: Uses Bessel's correction (n-1 denominator)
+- **Outlier Detection**: Tukey's IQR method (Q1 - 1.5×IQR, Q3 + 1.5×IQR)
+- **Outlier Impact**: Proportion of excess time in outliers (`excess_time / total_time`), used by adaptive convergence detection
+
+## Experimental: Adaptive Sampling (`AdaptiveWrapper.ts`)
+
+Gated behind the `--adaptive` flag. The algorithm is still being tuned.
 
 ### Convergence Detection
 Compares two sliding windows of samples to detect stability.
@@ -79,16 +83,6 @@ Compares two sliding windows of samples to detect stability.
 - Both drifts < 5% → converged (100% confidence)
 - Otherwise → confidence based on how close to threshold
 
-### Outlier Impact
-Measures time cost of outliers, not just count:
-```typescript
-// Threshold: median + 1.5 × (p75 - median)
-// Impact ratio: excess_time / total_time
-```
-
-This is more meaningful than counting outliers because one 10× outlier
-matters more than ten 1.1× outliers.
-
 ### Timing Parameters
 - `minTime`: 1000ms (minimum run time before early termination)
 - `maxTime`: 10000ms (hard limit)
@@ -103,4 +97,4 @@ matters more than ten 1.1× outliers.
 | `AdaptiveWrapper.ts` | Adaptive sampling with convergence detection |
 | `PermutationTest.ts` | Unused permutation test (p-values) |
 | `BenchmarkReport.ts` | Terminal table with Δ% CI column |
-| `HtmlDataPrep.ts` | Prepares data for HTML reports (`src/html/`) |
+| `HtmlReport.ts` | Prepares data for HTML reports |

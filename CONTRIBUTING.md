@@ -14,14 +14,13 @@ Requires Node 22.6+. During development, `bin/benchforge` runs TypeScript direct
 
 ```
 src/
-  core/        benchmark definitions, result types
-  runners/     timing loop, adaptive sampling, worker isolation
-  profiling/   heap/CPU sampling (Node inspector), browser (Playwright + CDP)
+  runners/     benchmark types, timing loop, adaptive sampling, worker isolation
+  profiling/   heap/CPU/coverage sampling (Node inspector), browser (Playwright + CDP)
   matrix/      case x variant matrix benchmarks
   stats/       bootstrap CI, permutation tests, percentiles
   report/      terminal tables, formatters, HTML data prep
   export/      JSON, Speedscope, Perfetto, .benchforge archive
-  cli/         argument parsing, orchestration, filtering
+  cli/         argument parsing, orchestration, filtering, viewer server
   viewer/      Vite SPA — tabs, plots, source viewer (separate build)
     plots/     client-side charts (excluded from tsconfig, uses DOM types)
 examples/      runnable benchmarks for Node and browser modes
@@ -75,12 +74,13 @@ The `.benchforge` archive is a JSON file that the viewer can open standalone. An
   "report": { "groups": [...], "metadata": {...} },
   "profile": null,
   "timeProfile": null,
+  "coverage": null,
   "sources": {},
   "metadata": { "timestamp": "...", "benchforgeVersion": "..." }
 }
 ```
 
-The `report` field follows the `ReportData` shape (`src/viewer/ReportData.ts`). Allocation and time profiles use the Speedscope format. See `src/viewer/ViewerServer.ts` for how archives are assembled server-side.
+The `report` field follows the `ReportData` shape (`src/viewer/ReportData.ts`). Allocation and time profiles use the Speedscope format. See `src/cli/ViewerServer.ts` for how archives are assembled server-side.
 
 Open an archive with: `benchforge view file.benchforge`
 

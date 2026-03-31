@@ -178,8 +178,7 @@ Results are displayed in a formatted table:
 
 The HTML report displays:
 - Histogram + KDE: Bar chart showing the distribution
-- Time Series: Sample values over iterations
-- Allocation Series: Per-sample heap allocation (requires `--alloc`)
+- Time Series: Sample values over iterations, with heap allocation overlay when `--alloc` is enabled
 
 ```bash
 # Open viewer in browser (report + allocation tabs)
