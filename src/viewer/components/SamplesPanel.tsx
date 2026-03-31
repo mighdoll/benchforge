@@ -6,6 +6,7 @@ import {
 } from "../plots/RenderPlots.ts";
 import { reportData, samplesLoaded } from "../State.ts";
 
+/** True when at least one benchmark group has multiple samples (enough to plot). */
 export function hasSufficientSamples(data: ReportData): boolean {
   return data.groups.some(groupHasSamples);
 }
@@ -17,6 +18,7 @@ function groupHasSamples(group: BenchmarkGroup): boolean {
   );
 }
 
+/** Time-series and histogram plots for each benchmark group. Lazy-loaded on first tab activation. */
 export function SamplesPanel() {
   const data = reportData.value;
   if (!samplesLoaded.value || !data) return null;
@@ -72,6 +74,7 @@ function SamplesGroup({ group, index }: GroupPlotProps) {
   );
 }
 
+/** Lazy-imports and renders a time-series chart for one benchmark group. */
 function TimeSeriesPlot({ group, index }: GroupPlotProps) {
   const ref = useRef<HTMLDivElement>(null);
   useEffect(() => {
@@ -93,6 +96,7 @@ function TimeSeriesPlot({ group, index }: GroupPlotProps) {
   );
 }
 
+/** Lazy-imports and renders a histogram with KDE for one benchmark group. */
 function HistogramPlot({ group, index }: GroupPlotProps) {
   const ref = useRef<HTMLDivElement>(null);
   useEffect(() => {

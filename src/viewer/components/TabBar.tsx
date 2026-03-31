@@ -10,6 +10,7 @@ import {
 import { hasSufficientSamples } from "./SamplesPanel.tsx";
 import { ThemeToggle } from "./ThemeToggle.tsx";
 
+/** Top navigation bar with fixed tabs, dynamic source tabs, theme toggle, and archive download. */
 export function TabBar() {
   const dataProvider = provider.value!;
   const { config } = dataProvider;
@@ -108,6 +109,7 @@ function SourceTabBtn({ tabId, file, line }: { tabId: string; file: string; line
   );
 }
 
+/** Remove a source tab and fall back to the best available fixed tab. */
 function closeSourceTab(tabId: string): void {
   sourceTabs.value = sourceTabs.value.filter(t => t.id !== tabId);
   if (activeTabId.value !== tabId) return;
@@ -118,6 +120,7 @@ function closeSourceTab(tabId: string): void {
   else if (config.hasTimeProfile) activeTabId.value = "time-flamechart";
 }
 
+/** Download button that bundles all report data into a `.benchforge` archive. */
 function ArchiveButton({ provider: dataProvider }: { provider: DataProvider }) {
   const [archiving, setArchiving] = useState(false);
 

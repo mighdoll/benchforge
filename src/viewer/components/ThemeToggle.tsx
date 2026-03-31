@@ -21,6 +21,7 @@ const Moon = () => (
   </svg>
 );
 
+/** Light/dark mode buttons. Clicking the active mode reverts to system default. */
 export function ThemeToggle(): preact.JSX.Element {
   const pref = themePreference.value;
 

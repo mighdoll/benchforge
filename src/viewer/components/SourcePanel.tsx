@@ -27,6 +27,7 @@ import {
 
 let highlighterPromise: Promise<HighlighterCore> | undefined;
 
+/** Lazily create a shared Shiki highlighter with light/dark themes. */
 function getHighlighter(): Promise<HighlighterCore> {
   highlighterPromise ??= createHighlighterCore({
     themes: [themeLight, themeDark],
@@ -36,6 +37,7 @@ function getHighlighter(): Promise<HighlighterCore> {
   return highlighterPromise;
 }
 
+/** Open or focus a source tab, scrolling to the given line and column. */
 export function openSourceTab(file: string, line: number, col: number): void {
   const id = "src:" + file;
   const existing = sourceTabs.value.find(t => t.id === id);
@@ -196,12 +198,14 @@ function SourceHeader({
   );
 }
 
+/** Build a gutter span with optional heat-map styling (CSS custom property). */
 function gutter(kind: string, text: string, heat?: number): string {
   const style = heat ? ` style="--heat:${heat.toFixed(3)}"` : "";
   const cls = heat ? ` heat` : "";
   return `<span class="gutter gutter-${kind}${cls}"${style}>${text}</span>`;
 }
 
+/** Inject call-count, alloc, and time gutters into highlighted source lines. */
 function renderGutters(
   panel: HTMLElement,
   file: string,

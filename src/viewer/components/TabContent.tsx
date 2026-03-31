@@ -40,6 +40,7 @@ export function TabContent() {
   );
 }
 
+/** Build a Speedscope iframe hash-URL with optional editor URI. */
 function iframeSrc(url: string | null, config: ViewerConfig): string {
   if (!url) return "";
   const parts = ["profileURL=" + encodeURIComponent(url)];

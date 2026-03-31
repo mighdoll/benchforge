@@ -15,6 +15,7 @@ import {
 import { DropZone } from "./DropZone.tsx";
 import { Shell } from "./Shell.tsx";
 
+/** Reset viewer state and activate the appropriate default tab for the provider. */
 export function initViewer(p: DataProvider): void {
   provider.value = p;
   reportData.value = null;
@@ -39,6 +40,7 @@ export function App() {
   return null;
 }
 
+/** Try archive URL param, preloaded data, then dev server -- first match wins. */
 async function resolve(): Promise<void> {
   const params = new URLSearchParams(window.location.search);
   const archiveUrl = params.get("url");

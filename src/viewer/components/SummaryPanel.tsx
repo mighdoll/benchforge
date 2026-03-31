@@ -184,6 +184,7 @@ function StatsCard({
   );
 }
 
+/** Render section stats, hiding GC rows when GC tracking is disabled. */
 function renderSectionStats(stats: SectionStat[], gcEnabled: boolean) {
   const filtered = gcEnabled
     ? stats
@@ -199,6 +200,7 @@ function renderSectionStats(stats: SectionStat[], gcEnabled: boolean) {
   ));
 }
 
+/** Show basic percentile stats when section stats are unavailable. */
 function renderFallbackStats(stats: BenchmarkStats) {
   const items: [string, number][] = [
     ["Min", stats.min],
@@ -216,6 +218,7 @@ function renderFallbackStats(stats: BenchmarkStats) {
   ));
 }
 
+/** Reconstruct the CLI invocation string, omitting default and internal args. */
 function formatCliArgs(args?: Record<string, unknown>): string {
   if (!args) return "benchforge";
   const flags = Object.entries(args)

@@ -2,11 +2,13 @@ import { useRef, useState } from "preact/hooks";
 import { type ArchiveData, ArchiveProvider } from "../Providers.ts";
 import { initViewer } from "./App.tsx";
 
+/** Landing page for loading `.benchforge` archive files via drag-drop or file picker. */
 export function DropZone() {
   const [dragOver, setDragOver] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
+  /** Parse an archive JSON file and initialize the viewer with its data. */
   async function loadFile(file: File): Promise<void> {
     try {
       const text = await file.text();
