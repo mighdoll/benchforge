@@ -67,3 +67,47 @@ test("bench function mode with call counts", { timeout: 30000 }, async () => {
   );
   expect(buildArray!.ranges[0].count).toBe(result.samples!.length);
 });
+
+test("page-load mode with navTiming", { timeout: 30000 }, async () => {
+  const url = `file://${examplesDir}/browser-page-load/index.html`;
+  const result = await profileBrowser({ url, pageLoad: true, alloc: true });
+
+  expect(result.navTiming).toBeDefined();
+  expect(result.navTiming!.domContentLoaded).toBeGreaterThan(0);
+  expect(result.navTiming!.loadEvent).toBeGreaterThan(0);
+  expect(result.wallTimeMs).toBe(result.navTiming!.loadEvent);
+  expect(result.heapProfile).toBeDefined();
+  expect(result.heapProfile!.head).toBeDefined();
+  // page-load mode doesn't produce iteration samples
+  expect(result.samples).toBeUndefined();
+});
+
+test("page-load mode with call counts", { timeout: 30000 }, async () => {
+  const url = `file://${examplesDir}/browser-page-load/index.html`;
+  const result = await profileBrowser({
+    url,
+    pageLoad: true,
+    callCounts: true,
+  });
+
+  expect(result.navTiming).toBeDefined();
+  expect(result.coverage).toBeDefined();
+  expect(result.coverage!.scripts.length).toBeGreaterThan(0);
+
+  const pageScript = result.coverage!.scripts.find(s =>
+    s.url.includes("browser-page-load"),
+  );
+  expect(pageScript).toBeDefined();
+  const fnNames = pageScript!.functions.map(f => f.functionName);
+  expect(fnNames).toContain("buildItems");
+  expect(fnNames).toContain("renderItems");
+});
+
+test("page-load mode with gc stats", { timeout: 30000 }, async () => {
+  const url = `file://${examplesDir}/browser-page-load/index.html`;
+  const result = await profileBrowser({ url, pageLoad: true, gcStats: true });
+
+  expect(result.navTiming).toBeDefined();
+  expect(result.gcStats).toBeDefined();
+  expect(result.gcStats!.scavenges).toBeGreaterThanOrEqual(0);
+});

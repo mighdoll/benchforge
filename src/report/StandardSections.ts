@@ -237,6 +237,36 @@ export function formatTierSummary(
     .join(join);
 }
 
+/** Extracted page-load timing metrics */
+export interface PageLoadStats {
+  dcl?: number;
+  load?: number;
+  lcp?: number;
+}
+
+/** Section: page-load navigation timing (DCL, Load Event, LCP) */
+export const pageLoadSection: ResultsMapper<PageLoadStats> = {
+  extract: (results: MeasuredResults) => {
+    const nav = results.navTiming;
+    if (!nav) return {};
+    return {
+      dcl: nav.domContentLoaded || undefined,
+      load: nav.loadEvent || undefined,
+      lcp: nav.lcp,
+    };
+  },
+  columns: (): ReportColumnGroup<PageLoadStats>[] => [
+    {
+      groupTitle: "page load",
+      columns: [
+        { key: "dcl", title: "DCL", formatter: timeMs },
+        { key: "load", title: "load", formatter: timeMs },
+        { key: "lcp", title: "LCP", formatter: timeMs },
+      ],
+    },
+  ],
+};
+
 /** Build default report sections (GC stats if enabled, plus run count) from CLI flags */
 export function buildGenericSections(args: {
   "gc-stats"?: boolean;

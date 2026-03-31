@@ -48,6 +48,8 @@ const cliOptions = {
   "trace-opt":      { type: "boolean", default: false, describe: "trace V8 optimization tiers (requires --allow-natives-syntax)" },
   "skip-settle":    { type: "boolean", default: false, describe: "skip post-warmup settle time (see V8 optimization cold start)" },
   url:              { type: "string",  requiresArg: true, describe: "page URL for browser profiling (enables browser mode)" },
+  "page-load":      { type: "boolean", default: false, describe: "passive page-load profiling (no __bench/__start needed)" },
+  "wait-for":       { type: "string",  requiresArg: true, describe: "page-load completion: CSS selector, JS expression, 'load', or 'domcontentloaded'" },
   headless:         { type: "boolean", default: true, describe: "run browser in headless mode" },
   timeout:          { type: "number",  default: 60, describe: "browser page timeout in seconds" },
   "chrome-args":    { type: "string",  array: true, requiresArg: true, describe: "extra Chromium flags" },
@@ -88,7 +90,14 @@ const optionGroups = {
     "archive",
     "editor",
   ],
-  "Browser:": ["url", "headless", "timeout", "chrome-args"],
+  "Browser:": [
+    "url",
+    "page-load",
+    "wait-for",
+    "headless",
+    "timeout",
+    "chrome-args",
+  ],
   "Advanced:": ["inspect", "trace-opt", "skip-settle"],
 } as const;
 

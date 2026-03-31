@@ -3,7 +3,8 @@
 Benchmark and profile browser code using Playwright and Chrome DevTools Protocol.
 
 `benchforge --url <page>` opens a Chromium instance, loads your page, and
-auto-detects which mode to use based on what the page exports.
+auto-detects bench function vs lap mode based on what the page exports.
+Use `--page-load` for profiling of unmodified pages.
 
 ## Bench Function Mode (`window.__bench`)
 
@@ -100,6 +101,59 @@ benchforge --url http://localhost:5173 --alloc --gc-stats
 
 0 laps = single wall-clock measurement. N laps = full per-iteration statistics.
 
+## Page-Load Mode (`--page-load`)
+
+Profile any page without modifying it. No `__bench` or `__start/__done`
+needed -- benchforge instruments before navigation, waits for completion,
+and collects profiles:
+
+```bash
+benchforge --url http://localhost:5173 --page-load --alloc --call-counts
+benchforge --url http://localhost:5173 --page-load --alloc --gc-stats --view
+```
+
+Output includes navigation timing from the page's Performance API:
+
+```
+╔════════════╤═══════════════════════╗
+║            │      page load        ║
+║ name       │  DCL    load    LCP   ║
+╟────────────┼───────────────────────╢
+║ index.html │ 42.3   85.7   120.4  ║
+╚════════════╧═══════════════════════╝
+```
+
+### Completion Signal
+
+By default, benchforge waits for `networkidle` (500ms with no in-flight
+requests). This is usually fine. Use `--wait-for` when your SPA does
+async work after initial load (data fetching, deferred rendering) and
+you want profiles to capture the full render cycle:
+
+| Value | Behavior |
+|-------|----------|
+| `"load"` | Navigation load event only |
+| `"domcontentloaded"` | DOMContentLoaded event only |
+| CSS selector (`#app`, `.loaded`, `[data-ready]`) | `page.waitForSelector()` after networkidle |
+| JS expression (`window.appReady === true`) | `page.waitForFunction()` after networkidle |
+
+```bash
+# Wait for a specific element
+benchforge --url http://localhost:5173 --page-load --wait-for "#app.loaded" --alloc
+
+# Wait for a JS condition
+benchforge --url http://localhost:5173 --page-load --wait-for "window.appReady" --alloc
+
+# Just the load event, no idle wait
+benchforge --url http://localhost:5173 --page-load --wait-for load --alloc
+```
+
+Using `--wait-for` implies `--page-load`, so you can omit the flag:
+
+```bash
+benchforge --url http://localhost:5173 --wait-for "#root" --alloc
+```
+
 ## How It Works
 
 ```
@@ -125,6 +179,13 @@ Page                              CLI (Playwright + CDP)
   __done()       ------------>   stop heap sampling, resolve promise
                                   stop GC tracing, parse events
 
+[page-load mode]
+                                  start instruments (--alloc, --call-counts, etc.)
+                                  navigate to URL
+                                  wait for networkidle (or --wait-for)
+                                  read navigation timing from page
+                                  stop instruments, collect profiles
+
                                   compute stats, print report
 ```
 
@@ -135,6 +196,8 @@ Browser-specific options:
 | Option | Default | Description |
 |--------|---------|-------------|
 | `--url <url>` | | Page URL (enables browser mode) |
+| `--page-load` | false | Passive page-load profiling (no `__bench`/`__start` needed) |
+| `--wait-for <value>` | | Completion signal: CSS selector, JS expression, `load`, or `domcontentloaded` |
 | `--headless` | true | Run headless (`--no-headless` to show browser) |
 | `--chrome-args=<flag>` | | Extra Chromium flags (repeatable, use `=` for values starting with `--`) |
 | `--timeout <seconds>` | 60 | Max wait time |
@@ -159,8 +222,9 @@ Note: Node's `--gc-stats` additionally reports alloc/iter and promo%
 
 ## Examples
 
-See `examples/browser-bench/` (bench function mode) and
-`examples/browser-heap/` (lap mode).
+See `examples/browser-bench/` (bench function mode),
+`examples/browser-heap/` (lap mode), and
+`examples/browser-page-load/` (page-load mode).
 
 ```bash
 # bench function mode - timing statistics
@@ -168,6 +232,9 @@ benchforge --url file://$(pwd)/examples/browser-bench/index.html --duration 1
 
 # lap mode - allocation profiling
 benchforge --url file://$(pwd)/examples/browser-heap/index.html --alloc --gc-stats
+
+# page-load mode - passive profiling
+benchforge --url file://$(pwd)/examples/browser-page-load/index.html --page-load --alloc --call-counts --gc-stats
 
 # allocation profiling with inlining disabled (see true allocation sites)
 benchforge --url file://$(pwd)/examples/browser-heap/index.html --alloc \

@@ -19,6 +19,7 @@
     "example:counts": "bin/benchforge examples/simple-cli.ts --alloc --time-sample --call-counts --view --skip-settle --iterations 5",
     "example:heap": "node benchforge-browser/bin.mjs file://$PWD/examples/browser-heap/index.html --gc-stats --view",
     "example:lap": "bin/benchforge --url file://$PWD/examples/browser-lap/index.html --gc-stats --alloc --view",
+    "example:page-load": "bin/benchforge --url file://$PWD/examples/browser-page-load/index.html --page-load --alloc --time-sample --call-counts --gc-stats --view",
     "fix": "biome check --fix --unsafe --error-on-warnings",
     "lint": "biome check --error-on-warnings",
     "prepublishOnly": "run-s lint build",

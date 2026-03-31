@@ -7,6 +7,7 @@ import type { TimeProfile } from "../node/TimeSampler.ts";
 import { runBenchLoop } from "./BenchLoop.ts";
 import { collectTracing, startGcTracing } from "./BrowserCDP.ts";
 import { setupLapMode } from "./LapMode.ts";
+import { runPageLoad } from "./PageLoadMode.ts";
 
 /** Options for a browser benchmark run (profiling, GC, iteration limits). */
 export interface BrowserProfileParams {
@@ -22,6 +23,15 @@ export interface BrowserProfileParams {
   timeout?: number; // seconds
   maxTime?: number; // ms, bench function iteration time limit
   maxIterations?: number; // exact iteration count (bench function mode)
+  pageLoad?: boolean; // passive page-load profiling mode
+  waitFor?: string; // completion signal: selector, JS expression, "load", "domcontentloaded"
+}
+
+/** Navigation timing metrics from the page's Performance API. */
+export interface NavTiming {
+  domContentLoaded: number; // ms
+  loadEvent: number; // ms
+  lcp?: number; // ms
 }
 
 /** Collected profiles, timing samples, and GC stats from a browser benchmark. */
@@ -34,6 +44,8 @@ export interface BrowserProfileResult {
   wallTimeMs?: number;
   /** Per-iteration timing samples (ms) from bench function or lap mode */
   samples?: number[];
+  /** Navigation timing from page-load mode */
+  navTiming?: NavTiming;
 }
 
 /**
@@ -61,6 +73,14 @@ export async function profileBrowser(
     page.on("pageerror", err => pageErrors.push(err.message));
 
     const traceEvents = collectGc ? await startGcTracing(cdp) : [];
+
+    if (params.pageLoad) {
+      let result = await runPageLoad(page, cdp, params, samplingInterval);
+      if (collectGc)
+        result = { ...result, gcStats: await collectTracing(cdp, traceEvents) };
+      return result;
+    }
+
     const lapArgs = {
       page,
       cdp,

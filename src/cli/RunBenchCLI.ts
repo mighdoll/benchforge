@@ -17,6 +17,7 @@ import type { ReportGroup, ResultsMapper } from "../report/BenchmarkReport.ts";
 import colors from "../report/Colors.ts";
 import {
   browserGcStatsSection,
+  pageLoadSection,
   runsSection,
   timeSection,
 } from "../report/StandardSections.ts";
@@ -91,6 +92,7 @@ export async function browserBenchExports(args: DefaultCliArgs): Promise<void> {
 
   const url = args.url!;
   const { iterations, duration } = args;
+  const pageLoad = args["page-load"] || !!args["wait-for"];
   const result = await profileBrowser({
     url,
     alloc: needsAlloc(args),
@@ -110,6 +112,8 @@ export async function browserBenchExports(args: DefaultCliArgs): Promise<void> {
     callCounts: args["call-counts"],
     maxTime: iterations ? Number.MAX_SAFE_INTEGER : duration * 1000,
     maxIterations: iterations,
+    pageLoad,
+    waitFor: args["wait-for"],
   });
 
   const name = new URL(url).pathname.split("/").pop() || "browser";
@@ -265,9 +269,10 @@ function printBrowserReport(
 ): void {
   const hasTime = !!result.samples?.length || result.wallTimeMs != null;
   const sections: ResultsMapper<any>[] = [
-    ...(hasTime ? [timeSection] : []),
+    ...(result.navTiming ? [pageLoadSection] : []),
+    ...(hasTime && !result.navTiming ? [timeSection] : []),
     ...(result.gcStats ? [browserGcStatsSection] : []),
-    ...(hasTime ? [runsSection] : []),
+    ...(hasTime && !result.navTiming ? [runsSection] : []),
   ];
   if (sections.length > 0) console.log(reportResults(results, sections));
   if (result.heapProfile) {
@@ -283,8 +288,8 @@ function toBrowserMeasured(
   name: string,
   result: BrowserProfileResult,
 ): MeasuredResults {
-  const { gcStats, heapProfile, timeProfile, coverage } = result;
-  const base = { name, gcStats, heapProfile, timeProfile, coverage };
+  const { gcStats, heapProfile, timeProfile, coverage, navTiming } = result;
+  const base = { name, gcStats, heapProfile, timeProfile, coverage, navTiming };
 
   if (result.samples && result.samples.length > 0) {
     const { samples } = result;

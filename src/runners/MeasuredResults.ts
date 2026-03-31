@@ -1,3 +1,4 @@
+import type { NavTiming } from "../profiling/browser/BrowserProfiler.ts";
 import type { CoverageData } from "../profiling/node/CoverageTypes.ts";
 import type { HeapProfile } from "../profiling/node/HeapSampler.ts";
 import type { TimeProfile } from "../profiling/node/TimeSampler.ts";
@@ -94,6 +95,9 @@ export interface MeasuredResults {
 
   /** Per-function execution counts (requires --call-counts) */
   coverage?: CoverageData;
+
+  /** Navigation timing from page-load mode */
+  navTiming?: NavTiming;
 }
 
 /** A pause point during sample collection for V8 optimization */
