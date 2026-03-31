@@ -47,13 +47,11 @@ function aggregateSelf(
     for (let i = 0; i < p.samples.length; i++) {
       const stack = p.samples[i];
       const weight = p.weights[i];
-      // Walk stack bottom-up (deepest frame last) to find self frame
-      for (let j = stack.length - 1; j >= 0; j--) {
-        const line = fileFrames.get(stack[j]);
-        if (line !== undefined) {
-          result.set(line, (result.get(line) || 0) + weight);
-          break;
-        }
+      // True self: only attribute weight when the leaf frame is in this file
+      const leaf = stack[stack.length - 1];
+      const line = fileFrames.get(leaf);
+      if (line !== undefined) {
+        result.set(line, (result.get(line) || 0) + weight);
       }
     }
   }
