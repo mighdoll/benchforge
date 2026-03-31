@@ -54,6 +54,7 @@ export default defineConfig({
   build: {
     outDir: "../../dist/viewer",
     emptyOutDir: true,
+    chunkSizeWarningLimit: 700,
   },
   server: { port: 5173 },
   plugins: [serveSpeedscope(), copySpeedscope()],
