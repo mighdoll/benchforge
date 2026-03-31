@@ -14,6 +14,9 @@ importers:
 
   .:
     dependencies:
+      '@preact/signals':
+        specifier: ^2.9.0
+        version: 2.9.0(preact@10.29.0)
       esbuild:
         specifier: ^0.27.4
         version: 0.27.4
@@ -23,6 +26,9 @@ importers:
       picocolors:
         specifier: ^1.1.1
         version: 1.1.1
+      preact:
+        specifier: ^10.29.0
+        version: 10.29.0
       sirv:
         specifier: ^3.0.2
         version: 3.0.2
@@ -351,6 +357,14 @@ packages:
 
   '@polka/url@1.0.0-next.29':
     resolution: {integrity: sha512-wwQAWhWSuHaag8c4q/KN/vCoeOJYshAIvMQwD4GpSb3OiZklFfvAgmj0VCBBImRpuF/aFgIRzllXlVX93Jevww==}
+
+  '@preact/signals-core@1.14.0':
+    resolution: {integrity: sha512-AowtCcCU/33lFlh1zRFf/u+12rfrhtNakj7UpaGEsmMwUKpKWMVvcktOGcwBBNiB4lWrZWc01LhiyyzVklJyaQ==}
+
+  '@preact/signals@2.9.0':
+    resolution: {integrity: sha512-hYrY0KyUqkDgOl1qba/JGn6y81pXnurn21PMaxfcMwdncdZ3M/oVdmpTvEnsGjh48dIwDVc7bjWHqIsngSjYug==}
+    peerDependencies:
+      preact: '>= 10.25.0 || >=11.0.0-0'
 
   '@quansync/fs@1.0.0':
     resolution: {integrity: sha512-4TJ3DFtlf1L5LDMaM6CanJ/0lckGNtJcMjQ1NAV6zDmA0tEHKZtxNKin8EgPaVX1YzljbxckyT2tJrpQKAtngQ==}
@@ -1553,6 +1567,9 @@ packages:
     resolution: {integrity: sha512-dM0jVuXJPsDN6DvRpea484tCUaMiXWjuCn++HGTqUWzGDjv5tZkEZldAJ/UMlqRYGFrD/etByo4/xOuC/snX2A==}
     engines: {node: '>=20'}
 
+  preact@10.29.0:
+    resolution: {integrity: sha512-wSAGyk2bYR1c7t3SZ3jHcM6xy0lcBcDel6lODcs9ME6Th++Dx2KU+6D3HD8wMMKGA8Wpw7OMd3/4RGzYRpzwRg==}
+
   property-information@7.1.0:
     resolution: {integrity: sha512-TwEZ+X+yCJmYfL7TPUOcvBZ4QfoT5YenQiJuX//0th53DE6w0xxLEtfK3iyryQFddXuvkIk51EEgrJQ0WJkOmQ==}
 
@@ -2216,6 +2233,13 @@ snapshots:
   '@oxc-project/types@0.122.0': {}
 
   '@polka/url@1.0.0-next.29': {}
+
+  '@preact/signals-core@1.14.0': {}
+
+  '@preact/signals@2.9.0(preact@10.29.0)':
+    dependencies:
+      '@preact/signals-core': 1.14.0
+      preact: 10.29.0
 
   '@quansync/fs@1.0.0':
     dependencies:
@@ -3490,6 +3514,8 @@ snapshots:
       source-map-js: 1.2.1
 
   powershell-utils@0.1.0: {}
+
+  preact@10.29.0: {}
 
   property-information@7.1.0: {}
 

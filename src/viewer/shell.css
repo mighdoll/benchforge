@@ -36,6 +36,7 @@ html, body {
 }
 
 body { display: flex; flex-direction: column; }
+#app { display: contents; }
 
 .tab-bar {
   display: flex;

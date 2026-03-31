@@ -51,6 +51,10 @@ function copySpeedscope(): Plugin {
 
 export default defineConfig({
   root: "src/viewer",
+  esbuild: {
+    jsx: "automatic",
+    jsxImportSource: "preact",
+  },
   build: {
     outDir: "../../dist/viewer",
     emptyOutDir: true,

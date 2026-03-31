@@ -10,22 +10,8 @@
 </head>
 <body>
 
-<div class="tab-bar">
-  <button class="tab" data-tab="summary" id="tab-summary" disabled>Summary</button>
-  <button class="tab" data-tab="samples" id="tab-samples" disabled>Samples</button>
-  <button class="tab" data-tab="flamechart" id="tab-flamechart" disabled>Allocation</button>
-  <button class="tab" data-tab="time-flamechart" id="tab-time-flamechart" disabled>Timing</button>
-  <div class="tab-spacer"></div>
-  <button class="tab archive-btn" data-action="archive">Archive &#8595;</button>
-</div>
+<div id="app"></div>
 
-<div class="tab-content">
-  <div id="summary-panel" class="report-panel"></div>
-  <div id="samples-panel" class="report-panel"></div>
-  <iframe id="speedscope-iframe"></iframe>
-  <iframe id="time-speedscope-iframe"></iframe>
-</div>
-
-<script type="module" src="./shell.ts"></script>
+<script type="module" src="./main.tsx"></script>
 </body>
 </html>

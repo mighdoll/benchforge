@@ -27,15 +27,11 @@
     "**/dist",
     "src/test/fixtures",
     "src/viewer/plots",
-    "src/viewer/shell.ts",
-    "src/viewer/Archive.ts",
-    "src/viewer/DropZone.ts",
+    "src/viewer/main.tsx",
+    "src/viewer/state.ts",
     "src/viewer/Helpers.ts",
     "src/viewer/Providers.ts",
-    "src/viewer/ReportTab.ts",
-    "src/viewer/SamplesTab.ts",
-    "src/viewer/SourceTabs.ts",
-    "src/viewer/TabSwitcher.ts",
+    "src/viewer/components",
     "*.config.ts"
   ]
 }

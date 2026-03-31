@@ -1,21 +1,17 @@
 import type { BenchmarkEntry, ReportData } from "../ReportData.ts";
-import { createCIPlot } from "./CIPlot.ts";
-import { createHistogramKde } from "./HistogramKde.ts";
-import {
-  type FlatGcEvent,
-  type FlatPausePoint,
-  formatPct,
-  type HeapPoint,
-  type Sample,
-  type TimeSeriesPoint,
+import type {
+  FlatGcEvent,
+  FlatPausePoint,
+  HeapPoint,
+  Sample,
+  TimeSeriesPoint,
 } from "./PlotTypes.ts";
-import { createSampleTimeSeries } from "./SampleTimeSeries.ts";
 
-interface PreparedBenchmark extends BenchmarkEntry {
+export interface PreparedBenchmark extends BenchmarkEntry {
   isBaseline: boolean;
 }
 
-interface FlattenedData {
+export interface FlattenedData {
   allSamples: Sample[];
   timeSeries: TimeSeriesPoint[];
   heapSeries: HeapPoint[];
@@ -23,79 +19,8 @@ interface FlattenedData {
   allPausePoints: FlatPausePoint[];
 }
 
-/** Render stats and CI plots for the summary tab */
-export function renderSummaryStats(data: ReportData): void {
-  const gcEnabled = data.metadata.gcTrackingEnabled ?? false;
-  data.groups.forEach((group, groupIndex) => {
-    try {
-      renderGroupStats(group, groupIndex, gcEnabled);
-    } catch (error) {
-      console.error("Error rendering stats for group", groupIndex, error);
-    }
-  });
-}
-
-/** Render time series and histogram plots for the samples tab */
-export function renderSamplePlots(data: ReportData): void {
-  data.groups.forEach((group, groupIndex) => {
-    try {
-      renderGroupPlots(group, groupIndex);
-    } catch (error) {
-      console.error("Error rendering plots for group", groupIndex, error);
-    }
-  });
-}
-
-/** Render CI plot and stats cards for a single benchmark group */
-function renderGroupStats(
-  group: ReportData["groups"][0],
-  groupIndex: number,
-  gcEnabled: boolean,
-): void {
-  const benchmarks = prepareBenchmarks(group);
-  if (benchmarks.length === 0) return;
-
-  const currentBenchmark = benchmarks.find(b => !b.isBaseline);
-  if (currentBenchmark?.comparisonCI?.histogram) {
-    renderToContainer(`#ci-plot-${groupIndex}`, true, () =>
-      createCIPlot(currentBenchmark.comparisonCI!),
-    );
-  }
-
-  const statsContainer = document.querySelector(`#stats-${groupIndex}`);
-  if (statsContainer)
-    statsContainer.innerHTML = benchmarks
-      .map(b => generateStatsHtml(b, gcEnabled))
-      .join("");
-}
-
-/** Render histogram and time series plots for a single benchmark group */
-function renderGroupPlots(
-  group: ReportData["groups"][0],
-  groupIndex: number,
-): void {
-  const benchmarks = prepareBenchmarks(group);
-  if (benchmarks.length === 0 || !benchmarks[0].samples?.length) return;
-
-  const f = flattenSamples(benchmarks);
-  const names = benchmarks.map(b => b.name);
-
-  renderToContainer(`#histogram-${groupIndex}`, f.allSamples.length > 0, () =>
-    createHistogramKde(f.allSamples, names),
-  );
-  const tsId = `#sample-timeseries-${groupIndex}`;
-  renderToContainer(tsId, f.timeSeries.length > 0, () =>
-    createSampleTimeSeries(
-      f.timeSeries,
-      f.allGcEvents,
-      f.allPausePoints,
-      f.heapSeries,
-    ),
-  );
-}
-
 /** Combine baseline and benchmarks into a single list with display names */
-function prepareBenchmarks(
+export function prepareBenchmarks(
   group: ReportData["groups"][0],
 ): PreparedBenchmark[] {
   const base = group.baseline;
@@ -109,35 +34,8 @@ function prepareBenchmarks(
   return [...baseline, ...current];
 }
 
-/** Clear a container element and append a freshly created plot */
-function renderToContainer(
-  selector: string,
-  condition: boolean,
-  create: () => SVGSVGElement | HTMLElement,
-): void {
-  const container = document.querySelector(selector);
-  if (!container || !condition) return;
-  container.innerHTML = "";
-  container.appendChild(create());
-}
-
-/** Build HTML for a benchmark's stats card (CI comparison + metric grid) */
-function generateStatsHtml(b: PreparedBenchmark, gcEnabled: boolean): string {
-  const ciHtml = generateCIHtml(b.comparisonCI);
-  const statsHtml = b.sectionStats?.length
-    ? sectionStatsHtml(b.sectionStats, gcEnabled)
-    : fallbackStatsHtml(b.stats);
-
-  return `
-    <div class="summary-stats">
-      <h3 style="margin-bottom: 10px; color: #333;">${b.name}</h3>
-      <div class="stats-grid">${ciHtml}${statsHtml}</div>
-    </div>
-  `;
-}
-
 /** Collect all sample data across benchmarks into flat arrays for plotting */
-function flattenSamples(benchmarks: PreparedBenchmark[]): FlattenedData {
+export function flattenSamples(benchmarks: PreparedBenchmark[]): FlattenedData {
   const out: FlattenedData = {
     allSamples: [],
     timeSeries: [],
@@ -149,58 +47,6 @@ function flattenSamples(benchmarks: PreparedBenchmark[]): FlattenedData {
     if (b.samples?.length) flattenBenchmark(b, out);
   }
   return out;
-}
-
-/** Format the "vs Baseline" confidence interval as a stat card item */
-function generateCIHtml(ci: BenchmarkEntry["comparisonCI"]): string {
-  if (!ci) return "";
-  const pct = `${formatPct(ci.percent)} [${formatPct(ci.ci[0])}, ${formatPct(ci.ci[1])}]`;
-  return `
-    <div class="stat-item">
-      <div class="stat-label">vs Baseline</div>
-      <div class="stat-value ci-${ci.direction}">${pct}</div>
-    </div>
-  `;
-}
-
-/** Render section-based stats, filtering out GC section when tracking is disabled */
-function sectionStatsHtml(
-  sectionStats: NonNullable<PreparedBenchmark["sectionStats"]>,
-  gcEnabled: boolean,
-): string {
-  const stats = gcEnabled
-    ? sectionStats
-    : sectionStats.filter(s => s.groupTitle !== "gc");
-  return stats
-    .map(
-      stat => `
-      <div class="stat-item">
-        <div class="stat-label">${stat.groupTitle ? stat.groupTitle + " " : ""}${stat.label}</div>
-        <div class="stat-value">${stat.value}</div>
-      </div>`,
-    )
-    .join("");
-}
-
-/** Render basic percentile stats when section-based stats are unavailable */
-function fallbackStatsHtml(stats: PreparedBenchmark["stats"]): string {
-  const items: [string, number][] = [
-    ["Min", stats.min],
-    ["Median", stats.p50],
-    ["Mean", stats.avg],
-    ["Max", stats.max],
-    ["P75", stats.p75],
-    ["P99", stats.p99],
-  ];
-  return items
-    .map(
-      ([label, value]) => `
-      <div class="stat-item">
-        <div class="stat-label">${label}</div>
-        <div class="stat-value">${value.toFixed(3)}ms</div>
-      </div>`,
-    )
-    .join("");
 }
 
 /** Extract time series, heap, GC, and pause data from one benchmark */
