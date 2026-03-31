@@ -20,16 +20,6 @@ export interface ResolvedFrame {
   col?: number;
 }
 
-/** Convert a V8 0-indexed CallFrame to a display-ready 1-indexed ResolvedFrame */
-export function resolveCallFrame(cf: CallFrame): ResolvedFrame {
-  return {
-    name: cf.functionName || "(anonymous)",
-    url: cf.url || "",
-    line: cf.lineNumber + 1,
-    col: cf.columnNumber != null ? cf.columnNumber + 1 : undefined,
-  };
-}
-
 /** A profile node with its resolved call stack from root to this node */
 export interface ResolvedNode {
   /** The call frame at this node */
@@ -61,6 +51,16 @@ export interface ResolvedProfile {
 
   /** Total bytes across all nodes (sum of selfSize) */
   totalBytes: number;
+}
+
+/** Convert a V8 0-indexed CallFrame to a display-ready 1-indexed ResolvedFrame */
+export function resolveCallFrame(cf: CallFrame): ResolvedFrame {
+  return {
+    name: cf.functionName || "(anonymous)",
+    url: cf.url || "",
+    line: cf.lineNumber + 1,
+    col: cf.columnNumber != null ? cf.columnNumber + 1 : undefined,
+  };
 }
 
 /** Walk a HeapProfile tree once, producing a fully resolved intermediate form */

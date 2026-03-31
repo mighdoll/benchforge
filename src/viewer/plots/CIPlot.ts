@@ -4,8 +4,6 @@ import type {
 } from "../../stats/StatisticalUtils.ts";
 import { formatPct } from "./PlotTypes.ts";
 
-const svgNS = "http://www.w3.org/2000/svg";
-
 export interface DistributionPlotOptions {
   width?: number;
   height?: number;
@@ -22,6 +20,8 @@ type Layout = {
   plot: { w: number; h: number };
 };
 const defaultMargin = { top: 22, right: 12, bottom: 22, left: 12 };
+
+const svgNS = "http://www.w3.org/2000/svg";
 
 const defaultOpts: Required<DistributionPlotOptions> = {
   width: 260,

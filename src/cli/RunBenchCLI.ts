@@ -247,24 +247,6 @@ function browserResultGroups(
   return [{ name, reports: [{ name, measuredResults: measured }] }];
 }
 
-/** Convert browser profile result to MeasuredResults */
-function toBrowserMeasured(
-  name: string,
-  result: BrowserProfileResult,
-): MeasuredResults {
-  const { gcStats, heapProfile, timeProfile, coverage } = result;
-  const base = { name, gcStats, heapProfile, timeProfile, coverage };
-
-  if (result.samples && result.samples.length > 0) {
-    const { samples } = result;
-    const totalTime = result.wallTimeMs ? result.wallTimeMs / 1000 : undefined;
-    return { ...base, samples, time: computeStats(samples), totalTime };
-  }
-
-  const w = result.wallTimeMs ?? 0;
-  return { ...base, samples: [w], time: computeStats([w]) };
-}
-
 /** Print browser benchmark tables and heap reports */
 function printBrowserReport(
   result: BrowserProfileResult,
@@ -284,4 +266,22 @@ function printBrowserReport(
       isUserCode: isBrowserUserCode,
     });
   }
+}
+
+/** Convert browser profile result to MeasuredResults */
+function toBrowserMeasured(
+  name: string,
+  result: BrowserProfileResult,
+): MeasuredResults {
+  const { gcStats, heapProfile, timeProfile, coverage } = result;
+  const base = { name, gcStats, heapProfile, timeProfile, coverage };
+
+  if (result.samples && result.samples.length > 0) {
+    const { samples } = result;
+    const totalTime = result.wallTimeMs ? result.wallTimeMs / 1000 : undefined;
+    return { ...base, samples, time: computeStats(samples), totalTime };
+  }
+
+  const w = result.wallTimeMs ?? 0;
+  return { ...base, samples: [w], time: computeStats([w]) };
 }

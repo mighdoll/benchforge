@@ -50,35 +50,6 @@ const optTierColors: Record<string, string> = {
   interpreted: "#dc3545",
 };
 
-/** Build the marks array for the time series plot */
-function buildMarks(
-  ctx: PlotContext,
-  heapData: ReturnType<typeof prepareHeapData>,
-  gcEvents: FlatGcEvent[],
-  pausePoints: FlatPausePoint[],
-  legendItems: LegendItem[],
-): Plot.Markish[] {
-  const warmupRule = ctx.hasWarmup
-    ? [
-        Plot.ruleX([0], {
-          stroke: "#999",
-          strokeWidth: 1,
-          strokeDasharray: "4,4",
-        }),
-      ]
-    : [];
-  const bounds = { xMin: ctx.xMin, xMax: ctx.xMax, yMax: ctx.yMax };
-  return [
-    ...heapMarks(heapData, ctx.yMin),
-    ...warmupRule,
-    gcMark(gcEvents, ctx.yMin, ctx.convertValue),
-    ...pauseMarks(pausePoints, ctx.yMin, ctx.yMax),
-    ...sampleDotMarks(ctx),
-    Plot.ruleY([ctx.yMin], { stroke: "black", strokeWidth: 1 }),
-    ...buildLegend(bounds, legendItems),
-  ];
-}
-
 /** Create sample time series showing each sample in order */
 export function createSampleTimeSeries(
   timeSeries: TimeSeriesPoint[],
@@ -172,6 +143,141 @@ function prepareHeapData(heapSeries: HeapPoint[], yMin: number, yMax: number) {
     y: yMin + (d.value - heapMin) * scale,
     heapMB: d.value / 1024 / 1024,
   }));
+}
+
+/** Assemble legend entries based on which data series are present */
+function buildLegendItems(
+  hasWarmup: boolean,
+  gcCount: number,
+  pauseCount: number,
+  hasHeap: boolean,
+  optTiers: string[],
+  benchmarks: string[],
+): LegendItem[] {
+  const items: LegendItem[] = [];
+  if (hasWarmup)
+    items.push({ color: "#dc3545", label: "warmup", style: "hollow-dot" });
+  if (gcCount > 0)
+    items.push({
+      color: "#22c55e",
+      label: `gc (${gcCount})`,
+      style: "vertical-line",
+    });
+  if (pauseCount > 0)
+    items.push({
+      color: "#888",
+      label: `pause (${pauseCount})`,
+      style: "vertical-line",
+      strokeDash: "4,4",
+    });
+  if (hasHeap) items.push({ color: "#9333ea", label: "heap", style: "rect" });
+  items.push(
+    ...optTiers.map(tier => ({
+      color: optTierColors[tier] || "#4682b4",
+      label: tier,
+      style: "filled-dot" as const,
+    })),
+  );
+  if (optTiers.length === 0) {
+    const isBase = (s: string) => s.includes("(baseline)");
+    const sorted = [...benchmarks].sort(
+      (a, b) => Number(isBase(a)) - Number(isBase(b)),
+    );
+    items.push(
+      ...sorted.map(bm => {
+        const base = isBase(bm);
+        return {
+          color: base ? "#ffa500" : "#4682b4",
+          label: bm,
+          style: (base ? "hollow-dot" : "filled-dot") as LegendItem["style"],
+        };
+      }),
+    );
+  }
+  return items;
+}
+
+/** Build the marks array for the time series plot */
+function buildMarks(
+  ctx: PlotContext,
+  heapData: ReturnType<typeof prepareHeapData>,
+  gcEvents: FlatGcEvent[],
+  pausePoints: FlatPausePoint[],
+  legendItems: LegendItem[],
+): Plot.Markish[] {
+  const warmupRule = ctx.hasWarmup
+    ? [
+        Plot.ruleX([0], {
+          stroke: "#999",
+          strokeWidth: 1,
+          strokeDasharray: "4,4",
+        }),
+      ]
+    : [];
+  const bounds = { xMin: ctx.xMin, xMax: ctx.xMax, yMax: ctx.yMax };
+  return [
+    ...heapMarks(heapData, ctx.yMin),
+    ...warmupRule,
+    gcMark(gcEvents, ctx.yMin, ctx.convertValue),
+    ...pauseMarks(pausePoints, ctx.yMin, ctx.yMax),
+    ...sampleDotMarks(ctx),
+    Plot.ruleY([ctx.yMin], { stroke: "black", strokeWidth: 1 }),
+    ...buildLegend(bounds, legendItems),
+  ];
+}
+
+/** Convert raw time series points to sample data with baseline/optimization metadata */
+function buildSampleData(
+  timeSeries: TimeSeriesPoint[],
+): Omit<SampleData, "displayValue">[] {
+  return timeSeries.map(d => ({
+    benchmark: d.benchmark,
+    sample: d.iteration,
+    value: d.value,
+    isBaseline: d.benchmark.includes("(baseline)"),
+    isWarmup: d.isWarmup || false,
+    optTier:
+      d.optStatus !== undefined
+        ? optStatusNames[d.optStatus] || "unknown"
+        : null,
+  }));
+}
+
+/** Pick display unit (ns/us/ms) based on average value magnitude */
+function getTimeUnit(values: number[]) {
+  const avg = d3.mean(values)!;
+  const fmt0 = (d: number) => d3.format(",.0f")(d);
+  const fmt1 = (d: number) => d3.format(",.1f")(d);
+  if (avg < 0.001)
+    return {
+      unitSuffix: "ns",
+      convertValue: (ms: number) => ms * 1e6,
+      formatValue: fmt0,
+    };
+  if (avg < 1)
+    return {
+      unitSuffix: "μs",
+      convertValue: (ms: number) => ms * 1e3,
+      formatValue: fmt1,
+    };
+  return {
+    unitSuffix: "ms",
+    convertValue: (ms: number) => ms,
+    formatValue: fmt1,
+  };
+}
+
+/** Compute Y axis range with padding, snapping yMin to a round number */
+function computeYRange(values: number[]) {
+  const dataMin = d3.min(values)!;
+  const dataMax = d3.max(values)!;
+  const dataRange = dataMax - dataMin;
+  const padding = dataRange * 0.15;
+  let yMin = dataMin - padding;
+  const magnitude = 10 ** Math.floor(Math.log10(Math.abs(yMin)));
+  yMin = Math.floor(yMin / magnitude) * magnitude;
+  if (dataMin > 0 && yMin < 0) yMin = 0;
+  return { yMin, yMax: dataMax + dataRange * 0.05 };
 }
 
 /** Create area + tooltip marks for the heap usage overlay */
@@ -295,110 +401,4 @@ function sampleDotMarks(ctx: PlotContext): any[] {
       },
     ),
   ];
-}
-
-/** Assemble legend entries based on which data series are present */
-function buildLegendItems(
-  hasWarmup: boolean,
-  gcCount: number,
-  pauseCount: number,
-  hasHeap: boolean,
-  optTiers: string[],
-  benchmarks: string[],
-): LegendItem[] {
-  const items: LegendItem[] = [];
-  if (hasWarmup)
-    items.push({ color: "#dc3545", label: "warmup", style: "hollow-dot" });
-  if (gcCount > 0)
-    items.push({
-      color: "#22c55e",
-      label: `gc (${gcCount})`,
-      style: "vertical-line",
-    });
-  if (pauseCount > 0)
-    items.push({
-      color: "#888",
-      label: `pause (${pauseCount})`,
-      style: "vertical-line",
-      strokeDash: "4,4",
-    });
-  if (hasHeap) items.push({ color: "#9333ea", label: "heap", style: "rect" });
-  items.push(
-    ...optTiers.map(tier => ({
-      color: optTierColors[tier] || "#4682b4",
-      label: tier,
-      style: "filled-dot" as const,
-    })),
-  );
-  if (optTiers.length === 0) {
-    const isBase = (s: string) => s.includes("(baseline)");
-    const sorted = [...benchmarks].sort(
-      (a, b) => Number(isBase(a)) - Number(isBase(b)),
-    );
-    items.push(
-      ...sorted.map(bm => {
-        const base = isBase(bm);
-        return {
-          color: base ? "#ffa500" : "#4682b4",
-          label: bm,
-          style: (base ? "hollow-dot" : "filled-dot") as LegendItem["style"],
-        };
-      }),
-    );
-  }
-  return items;
-}
-
-/** Convert raw time series points to sample data with baseline/optimization metadata */
-function buildSampleData(
-  timeSeries: TimeSeriesPoint[],
-): Omit<SampleData, "displayValue">[] {
-  return timeSeries.map(d => ({
-    benchmark: d.benchmark,
-    sample: d.iteration,
-    value: d.value,
-    isBaseline: d.benchmark.includes("(baseline)"),
-    isWarmup: d.isWarmup || false,
-    optTier:
-      d.optStatus !== undefined
-        ? optStatusNames[d.optStatus] || "unknown"
-        : null,
-  }));
-}
-
-/** Pick display unit (ns/us/ms) based on average value magnitude */
-function getTimeUnit(values: number[]) {
-  const avg = d3.mean(values)!;
-  const fmt0 = (d: number) => d3.format(",.0f")(d);
-  const fmt1 = (d: number) => d3.format(",.1f")(d);
-  if (avg < 0.001)
-    return {
-      unitSuffix: "ns",
-      convertValue: (ms: number) => ms * 1e6,
-      formatValue: fmt0,
-    };
-  if (avg < 1)
-    return {
-      unitSuffix: "μs",
-      convertValue: (ms: number) => ms * 1e3,
-      formatValue: fmt1,
-    };
-  return {
-    unitSuffix: "ms",
-    convertValue: (ms: number) => ms,
-    formatValue: fmt1,
-  };
-}
-
-/** Compute Y axis range with padding, snapping yMin to a round number */
-function computeYRange(values: number[]) {
-  const dataMin = d3.min(values)!;
-  const dataMax = d3.max(values)!;
-  const dataRange = dataMax - dataMin;
-  const padding = dataRange * 0.15;
-  let yMin = dataMin - padding;
-  const magnitude = 10 ** Math.floor(Math.log10(Math.abs(yMin)));
-  yMin = Math.floor(yMin / magnitude) * magnitude;
-  if (dataMin > 0 && yMin < 0) yMin = 0;
-  return { yMin, yMax: dataMax + dataRange * 0.05 };
 }

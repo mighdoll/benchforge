@@ -84,14 +84,14 @@ async function getFilteredVariants<T>(
   return filtered;
 }
 
+/** Match id against pattern (case-insensitive substring) */
+function matchPattern(id: string, pattern: string): boolean {
+  return id.toLowerCase().includes(pattern.toLowerCase());
+}
+
 /** Resolve all variant IDs from inline variants or variantDir */
 async function resolveVariantIds<T>(matrix: BenchMatrix<T>): Promise<string[]> {
   if (matrix.variants) return Object.keys(matrix.variants);
   if (matrix.variantDir) return discoverVariants(matrix.variantDir);
   throw new Error("BenchMatrix requires 'variants' or 'variantDir'");
-}
-
-/** Match id against pattern (case-insensitive substring) */
-function matchPattern(id: string, pattern: string): boolean {
-  return id.toLowerCase().includes(pattern.toLowerCase());
 }

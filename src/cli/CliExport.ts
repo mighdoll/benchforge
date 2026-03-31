@@ -40,6 +40,10 @@ export interface MatrixExportOptions {
   baselineVersion?: GitVersion;
 }
 
+type FrameContainer = {
+  shared: { frames: { name: string; file?: string; line?: number }[] };
+};
+
 /** Export reports (JSON, Perfetto, archive, viewer) based on CLI args */
 export async function exportReports(options: ExportOptions): Promise<void> {
   const {
@@ -143,10 +147,6 @@ async function annotateCoverage(
 
   return JSON.stringify(Object.fromEntries(result.map));
 }
-
-type FrameContainer = {
-  shared: { frames: { name: string; file?: string; line?: number }[] };
-};
 
 /** Start viewer server with profile data and block until Ctrl+C */
 async function openViewer(
