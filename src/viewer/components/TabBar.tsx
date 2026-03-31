@@ -2,6 +2,7 @@ import { useState } from "preact/hooks";
 import type { DataProvider } from "../Providers.ts";
 import {
   activeTabId,
+  defaultTabId,
   provider,
   reportData,
   samplesLoaded,
@@ -112,12 +113,7 @@ function SourceTabBtn({ tabId, file, line }: { tabId: string; file: string; line
 /** Remove a source tab and fall back to the best available fixed tab. */
 function closeSourceTab(tabId: string): void {
   sourceTabs.value = sourceTabs.value.filter(t => t.id !== tabId);
-  if (activeTabId.value !== tabId) return;
-
-  const config = provider.value!.config;
-  if (config.hasReport) activeTabId.value = "summary";
-  else if (config.hasProfile) activeTabId.value = "flamechart";
-  else if (config.hasTimeProfile) activeTabId.value = "time-flamechart";
+  if (activeTabId.value === tabId) activeTabId.value = defaultTabId();
 }
 
 /** Download button that bundles all report data into a `.benchforge` archive. */

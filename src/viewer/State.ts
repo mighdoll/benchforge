@@ -25,3 +25,12 @@ function readThemeCookie(): ThemePreference {
 }
 
 export const themePreference = signal<ThemePreference>(readThemeCookie());
+
+/** Pick the best default tab based on available data. */
+export function defaultTabId(): string {
+  const config = provider.value?.config;
+  if (config?.hasReport) return "summary";
+  if (config?.hasProfile) return "flamechart";
+  if (config?.hasTimeProfile) return "time-flamechart";
+  return "summary";
+}

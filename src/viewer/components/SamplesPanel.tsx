@@ -1,7 +1,9 @@
 import { useEffect, useRef } from "preact/hooks";
 import type { BenchmarkGroup, ReportData } from "../ReportData.ts";
 import {
+  type FlattenedData,
   flattenSamples,
+  type PreparedBenchmark,
   prepareBenchmarks,
 } from "../plots/RenderPlots.ts";
 import { reportData, samplesLoaded } from "../State.ts";
@@ -32,9 +34,7 @@ export function SamplesPanel() {
   );
 }
 
-interface GroupPlotProps { group: BenchmarkGroup; index: number }
-
-function SamplesGroup({ group, index }: GroupPlotProps) {
+function SamplesGroup({ group, index }: { group: BenchmarkGroup; index: number }) {
   if (!group.benchmarks?.length) return null;
 
   if (!groupHasSamples(group))
@@ -49,6 +49,9 @@ function SamplesGroup({ group, index }: GroupPlotProps) {
       </div>
     );
 
+  const benchmarks = prepareBenchmarks(group);
+  const flat = flattenSamples(benchmarks);
+
   return (
     <div>
       <div class="group-header">
@@ -60,35 +63,38 @@ function SamplesGroup({ group, index }: GroupPlotProps) {
           <div class="plot-description">
             Execution time for each sample in collection order
           </div>
-          <TimeSeriesPlot group={group} index={index} />
+          <TimeSeriesPlot benchmarks={benchmarks} flat={flat} index={index} />
         </div>
         <div class="plot-container">
           <div class="plot-title">Time Distribution</div>
           <div class="plot-description">
             Frequency distribution of execution times
           </div>
-          <HistogramPlot group={group} index={index} />
+          <HistogramPlot benchmarks={benchmarks} flat={flat} index={index} />
         </div>
       </div>
     </div>
   );
 }
 
+interface PlotProps {
+  benchmarks: PreparedBenchmark[];
+  flat: FlattenedData;
+  index: number;
+}
+
 /** Lazy-imports and renders a time-series chart for one benchmark group. */
-function TimeSeriesPlot({ group, index }: GroupPlotProps) {
+function TimeSeriesPlot({ flat, index }: PlotProps) {
   const ref = useRef<HTMLDivElement>(null);
   useEffect(() => {
-    const benchmarks = prepareBenchmarks(group);
-    const flat = flattenSamples(benchmarks);
     if (flat.timeSeries.length === 0) return;
     import("../plots/SampleTimeSeries.ts").then(({ createSampleTimeSeries }) => {
       if (!ref.current) return;
       ref.current.innerHTML = "";
       const { timeSeries, allGcEvents, allPausePoints, heapSeries } = flat;
-      const el = createSampleTimeSeries(timeSeries, allGcEvents, allPausePoints, heapSeries);
-      ref.current.appendChild(el);
+      ref.current.appendChild(createSampleTimeSeries(timeSeries, allGcEvents, allPausePoints, heapSeries));
     });
-  }, [group]);
+  }, [flat]);
   return (
     <div id={`sample-timeseries-${index}`} class="plot-area" ref={ref}>
       <div class="loading">Loading time series...</div>
@@ -97,19 +103,17 @@ function TimeSeriesPlot({ group, index }: GroupPlotProps) {
 }
 
 /** Lazy-imports and renders a histogram with KDE for one benchmark group. */
-function HistogramPlot({ group, index }: GroupPlotProps) {
+function HistogramPlot({ benchmarks, flat, index }: PlotProps) {
   const ref = useRef<HTMLDivElement>(null);
   useEffect(() => {
-    const benchmarks = prepareBenchmarks(group);
-    const flat = flattenSamples(benchmarks);
-    const names = benchmarks.map(b => b.name);
     if (flat.allSamples.length === 0) return;
+    const names = benchmarks.map(b => b.name);
     import("../plots/HistogramKde.ts").then(({ createHistogramKde }) => {
       if (!ref.current) return;
       ref.current.innerHTML = "";
       ref.current.appendChild(createHistogramKde(flat.allSamples, names));
     });
-  }, [group]);
+  }, [flat, benchmarks]);
   return (
     <div id={`histogram-${index}`} class="plot-area" ref={ref}>
       <div class="loading">Loading histogram...</div>

@@ -7,6 +7,7 @@ import {
 } from "../Providers.ts";
 import {
   activeTabId,
+  defaultTabId,
   provider,
   reportData,
   samplesLoaded,
@@ -21,11 +22,7 @@ export function initViewer(p: DataProvider): void {
   reportData.value = null;
   samplesLoaded.value = false;
   sourceTabs.value = [];
-
-  const { config } = p;
-  if (config.hasReport) activeTabId.value = "summary";
-  else if (config.hasProfile) activeTabId.value = "flamechart";
-  else if (config.hasTimeProfile) activeTabId.value = "time-flamechart";
+  activeTabId.value = defaultTabId();
 }
 
 export function App() {
