@@ -78,7 +78,7 @@ export function SourcePanel({ tab }: { tab: SourceTabState }): preact.JSX.Elemen
         const highlighter = await getHighlighter();
         if (stale) return;
         const themes = { light: "github-light", dark: "github-dark" };
-        setHtml(highlighter.codeToHtml(code, { lang: guessLang(tab.file), themes }));
+        setHtml(highlighter.codeToHtml(code, { lang: guessLang(tab.file), themes, defaultColor: false }));
       } catch {
         if (!stale) setError(tab.file);
       }

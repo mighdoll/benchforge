@@ -287,19 +287,16 @@ body { display: flex; flex-direction: column; }
 :root[data-theme="dark"] .source-code .line .gutter-time  { color: #60a5fa; }
 
 /* Shiki dual-theme wiring */
-.shiki, .shiki span { color: var(--shiki-light); background-color: var(--shiki-light-bg); }
+.shiki { color: var(--shiki-light); background-color: var(--shiki-light-bg); }
+.shiki span { color: var(--shiki-light); }
 
 @media (prefers-color-scheme: dark) {
-  :root:not([data-theme="light"]) .shiki,
-  :root:not([data-theme="light"]) .shiki span {
-    color: var(--shiki-dark); background-color: var(--shiki-dark-bg);
-  }
+  :root:not([data-theme="light"]) .shiki { color: var(--shiki-dark); background-color: var(--shiki-dark-bg); }
+  :root:not([data-theme="light"]) .shiki span { color: var(--shiki-dark); }
 }
 
-:root[data-theme="dark"] .shiki,
-:root[data-theme="dark"] .shiki span {
-  color: var(--shiki-dark); background-color: var(--shiki-dark-bg);
-}
+:root[data-theme="dark"] .shiki { color: var(--shiki-dark); background-color: var(--shiki-dark-bg); }
+:root[data-theme="dark"] .shiki span { color: var(--shiki-dark); }
 
 .source-placeholder {
   color: var(--tab-color);
