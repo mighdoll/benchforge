@@ -1,5 +1,6 @@
 import { archiveProfile } from "./Archive.ts";
 import { loadArchiveFromUrl, showDropZone } from "./DropZone.ts";
+import { tabBar } from "./Helpers.ts";
 import type { ArchiveData, DataProvider, ViewerConfig } from "./Providers.ts";
 import { ArchiveProvider, ServerProvider } from "./Providers.ts";
 import type { ReportData } from "./ReportData.ts";
@@ -9,7 +10,6 @@ import { closeSourceTab, openSourceTab } from "./SourceTabs.ts";
 import { activateTab } from "./TabSwitcher.ts";
 
 const $ = document.getElementById.bind(document);
-const tabBar = document.querySelector(".tab-bar") as HTMLDivElement;
 const summaryPanel = $("summary-panel") as HTMLDivElement;
 const samplesPanel = $("samples-panel") as HTMLDivElement;
 const iframe = $("speedscope-iframe") as HTMLIFrameElement;

@@ -1,10 +1,11 @@
 import { bootstrapDifferenceCI } from "../../stats/StatisticalUtils.ts";
-import type {
-  BenchmarkReport,
-  ReportColumnGroup,
-  ReportGroup,
-  ResultsMapper,
-  UnknownRecord,
+import {
+  type BenchmarkReport,
+  isHigherIsBetter,
+  type ReportColumnGroup,
+  type ReportGroup,
+  type ResultsMapper,
+  type UnknownRecord,
 } from "../BenchmarkReport.ts";
 import {
   formatDiffWithCI,
@@ -59,10 +60,7 @@ export function valuesForReports<S extends ReadonlyArray<ResultsMapper<any>>>(
 export function injectDiffColumns<T>(
   reportGroups: ReportColumnGroup<T>[],
 ): ColumnGroup<T>[] {
-  // Find the first comparable column to determine CI formatter
-  const allCols = reportGroups.flatMap(g => g.columns);
-  const firstComparable = allCols.find(c => c.comparable);
-  const ciFmt = firstComparable?.higherIsBetter
+  const ciFmt = isHigherIsBetter(reportGroups)
     ? formatDiffWithCIHigherIsBetter
     : formatDiffWithCI;
   const ciCol = { title: "Δ% CI", key: "diffCI" as keyof T, formatter: ciFmt };

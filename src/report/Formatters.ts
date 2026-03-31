@@ -7,6 +7,15 @@ import colors from "./Colors.ts";
 
 const { red, green } = colors;
 
+/** Format duration in milliseconds with appropriate units (ns, μs, ms, s) */
+export function duration(ms: unknown): string | null {
+  if (typeof ms !== "number") return null;
+  if (ms < 0.001) return `${(ms * 1000000).toFixed(0)}ns`;
+  if (ms < 1) return `${(ms * 1000).toFixed(1)}μs`;
+  if (ms < 1000) return `${ms.toFixed(2)}ms`;
+  return `${(ms / 1000).toFixed(2)}s`;
+}
+
 /** Format time in milliseconds, showing very small values with units */
 export function timeMs(ms: unknown): string | null {
   if (typeof ms !== "number") return null;

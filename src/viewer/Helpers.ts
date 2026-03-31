@@ -5,6 +5,14 @@ export function escapeHtml(s: string): string {
   return el.innerHTML;
 }
 
+/** Cached reference to the `.tab-bar` element. */
+export const tabBar = document.querySelector(".tab-bar") as HTMLDivElement;
+
+/** Cached reference to the `.tab-content` element. */
+export const tabContent = document.querySelector(
+  ".tab-content",
+) as HTMLDivElement;
+
 /** Infer a Shiki language id from a file extension. */
 export function guessLang(file: string): string {
   if (file.endsWith(".ts") || file.endsWith(".tsx")) return "typescript";

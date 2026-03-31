@@ -1,7 +1,7 @@
 import { spawn } from "node:child_process";
 import { readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { resolve } from "node:path";
-import type { DefaultCliArgs } from "../cli/CliArgs.ts";
+import { cleanCliArgs, type DefaultCliArgs } from "../cli/CliArgs.ts";
 import type { ReportGroup } from "../report/BenchmarkReport.ts";
 import type { MeasuredResults } from "../runners/MeasuredResults.ts";
 
@@ -59,7 +59,7 @@ function buildTraceEvents(
   const metadata: TraceEvent[] = [
     meta("process_name", { name: "wesl-bench" }),
     meta("thread_name", { name: "MainThread" }),
-    meta("bench_settings", cleanArgs(cliArgs)),
+    meta("bench_settings", cleanCliArgs(cliArgs)),
   ];
 
   const benchEvents = groups.flatMap(group =>
@@ -122,14 +122,6 @@ function scheduleDeferredMerge(outputPath: string): void {
     });
     child.unref();
   });
-}
-
-/** Clean CLI args for metadata */
-function cleanArgs(args: DefaultCliArgs): Record<string, unknown> {
-  const skip = new Set(["_", "$0"]);
-  return Object.fromEntries(
-    Object.entries(args).filter(([k, v]) => v !== undefined && !skip.has(k)),
-  );
 }
 
 /** Build events for a single benchmark run */

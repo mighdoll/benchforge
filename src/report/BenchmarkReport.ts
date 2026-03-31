@@ -43,3 +43,20 @@ export type UnknownRecord = Record<string, unknown>;
 export function groupReports(group: ReportGroup): BenchmarkReport[] {
   return group.baseline ? [...group.reports, group.baseline] : group.reports;
 }
+
+/** @return true if the first comparable column in sections has higherIsBetter set */
+export function isHigherIsBetter(
+  sections: ResultsMapper[] | ReportColumnGroup<any>[],
+): boolean {
+  const groups = isMappers(sections)
+    ? sections.flatMap(s => s.columns())
+    : sections;
+  const col = groups.flatMap(g => g.columns).find(c => c.comparable);
+  return col?.higherIsBetter ?? false;
+}
+
+function isMappers(
+  v: ResultsMapper[] | ReportColumnGroup<any>[],
+): v is ResultsMapper[] {
+  return v.length > 0 && "extract" in v[0];
+}

@@ -262,8 +262,7 @@ function toBrowserMeasured(
   }
 
   const w = result.wallTimeMs ?? 0;
-  const time = { min: w, max: w, avg: w, p50: w, p75: w, p99: w, p999: w };
-  return { ...base, samples: [w], time };
+  return { ...base, samples: [w], time: computeStats([w]) };
 }
 
 /** Print browser benchmark tables and heap reports */

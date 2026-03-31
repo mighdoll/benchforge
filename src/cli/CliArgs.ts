@@ -135,6 +135,19 @@ export function parseCliArgs<T = DefaultCliArgs>(
   return yargsInstance.parseSync() as T;
 }
 
+/** Strip yargs internals and undefined values from CLI args for serialization.
+ *  Converts kebab-case keys to camelCase. */
+export function cleanCliArgs(args: DefaultCliArgs): Record<string, unknown> {
+  const skip = new Set(["_", "$0"]);
+  const toCamelCase = (k: string) =>
+    k.replace(/-([a-z])/g, (_, l: string) => l.toUpperCase());
+  return Object.fromEntries(
+    Object.entries(args)
+      .filter(([k, v]) => v !== undefined && v !== null && !skip.has(k))
+      .map(([k, v]) => [toCamelCase(k), v]),
+  );
+}
+
 /** Assign options to their labeled groups in yargs help output */
 function applyGroups(y: Argv): Argv {
   return Object.entries(optionGroups).reduce(

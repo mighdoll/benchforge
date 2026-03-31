@@ -1,3 +1,4 @@
+import { resolveCallFrame } from "../profiling/node/ResolvedProfile.ts";
 import type {
   TimeProfile,
   TimeProfileNode,
@@ -114,14 +115,13 @@ function resolveStack(
   for (let i = path.length - 1; i >= 0; i--) {
     const node = nodeMap.get(path[i]);
     if (!node) continue;
-    const { functionName, url, lineNumber, columnNumber } = node.callFrame;
+    const { functionName, url, lineNumber } = node.callFrame;
     // Skip the synthetic (root) node
     if (!functionName && !url && lineNumber <= 0) continue;
-    // V8 lines/cols are 0-indexed; speedscope expects 1-indexed
-    const name = functionName || "(anonymous)";
-    const line = lineNumber + 1;
-    const col = columnNumber != null ? columnNumber + 1 : undefined;
-    stack.push(internFrame(name, url, line, col, sharedFrames, frameIndex));
+    const f = resolveCallFrame(node.callFrame);
+    stack.push(
+      internFrame(f.name, f.url, f.line, f.col, sharedFrames, frameIndex),
+    );
   }
 
   cache.set(nodeId, stack);

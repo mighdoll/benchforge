@@ -1,5 +1,5 @@
 import { writeFile } from "node:fs/promises";
-import type { DefaultCliArgs } from "../cli/CliArgs.ts";
+import { cleanCliArgs, type DefaultCliArgs } from "../cli/CliArgs.ts";
 import type { ReportGroup } from "../report/BenchmarkReport.ts";
 import type {
   BenchmarkGroup,
@@ -45,16 +45,6 @@ function prepareJsonData(
       },
     ],
   };
-}
-
-/** Clean CLI args for JSON export (remove undefined values, camelCase keys) */
-function cleanCliArgs(args: DefaultCliArgs): Record<string, any> {
-  const toCamelCase = (k: string) =>
-    k.replace(/-([a-z])/g, (_, l) => l.toUpperCase());
-  const entries = Object.entries(args)
-    .filter(([, v]) => v !== undefined && v !== null)
-    .map(([k, v]) => [toCamelCase(k), v]);
-  return Object.fromEntries(entries);
 }
 
 /** Convert a report group, mapping each report to the JSON result format */

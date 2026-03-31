@@ -1,12 +1,9 @@
-import { escapeHtml } from "./Helpers.ts";
+import { escapeHtml, tabBar, tabContent } from "./Helpers.ts";
 import {
   type ArchiveData,
   ArchiveProvider,
   type DataProvider,
 } from "./Providers.ts";
-
-const tabBar = document.querySelector(".tab-bar") as HTMLDivElement;
-const tabContent = document.querySelector(".tab-content") as HTMLDivElement;
 
 /** Display the drag-drop landing page for the hosted viewer (no server). */
 export function showDropZone(onInit: (provider: DataProvider) => void): void {

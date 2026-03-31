@@ -5,7 +5,11 @@ import type {
   ReportData,
   SectionStat,
 } from "../viewer/ReportData.ts";
-import type { ReportGroup, ResultsMapper } from "./BenchmarkReport.ts";
+import {
+  isHigherIsBetter,
+  type ReportGroup,
+  type ResultsMapper,
+} from "./BenchmarkReport.ts";
 import type { GitVersion } from "./GitUtils.ts";
 
 /** Options for prepareHtmlData: report sections, git versions, and CLI args */
@@ -28,7 +32,7 @@ export function prepareHtmlData(
   options: PrepareHtmlOptions,
 ): ReportData {
   const { cliArgs, sections, currentVersion, baselineVersion } = options;
-  const higherIsBetter = findHigherIsBetter(sections);
+  const higherIsBetter = sections ? isHigherIsBetter(sections) : false;
   return {
     groups: groups.map(group =>
       prepareGroupData(group, sections, higherIsBetter),
@@ -42,12 +46,6 @@ export function prepareHtmlData(
       baselineVersion,
     },
   };
-}
-
-/** Find higherIsBetter from first comparable column in sections */
-function findHigherIsBetter(sections?: ResultsMapper[]): boolean {
-  const cols = sections?.flatMap(s => s.columns().flatMap(g => g.columns));
-  return cols?.find(c => c.comparable)?.higherIsBetter ?? false;
 }
 
 /** @return group data with bootstrap CI comparisons against baseline */

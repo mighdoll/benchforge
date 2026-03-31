@@ -2,6 +2,7 @@ import {
   type AdaptiveOptions,
   createAdaptiveWrapper,
 } from "./AdaptiveWrapper.ts";
+import type { BenchmarkFunction } from "./BenchmarkSpec.ts";
 import type { BenchRunner, RunnerOptions } from "./BenchRunner.ts";
 import { createRunner, type KnownRunner } from "./CreateRunner.ts";
 
@@ -21,6 +22,28 @@ export function getModuleExport<T extends Function = Function>(
     throw new Error(`Export '${name}' from ${modulePath} is not a function`);
   }
   return fn as T;
+}
+
+/** Import a benchmark function from a module, optionally running a setup export */
+export async function importBenchFn(
+  modulePath: string,
+  exportName: string | undefined,
+  setupExportName: string | undefined,
+  params: unknown,
+): Promise<{ fn: BenchmarkFunction; params: unknown }> {
+  const module = await import(modulePath);
+  const fn = getModuleExport<BenchmarkFunction>(module, exportName, modulePath);
+
+  if (setupExportName) {
+    const setupFn = getModuleExport<BenchmarkFunction>(
+      module,
+      setupExportName,
+      modulePath,
+    );
+    return { fn, params: await setupFn(params) };
+  }
+
+  return { fn, params };
 }
 
 /** Create runner, wrapping with adaptive sampling if options.adaptive is set */

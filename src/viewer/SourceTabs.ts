@@ -6,7 +6,13 @@ import langTs from "shiki/dist/langs/typescript.mjs";
 import themeDark from "shiki/dist/themes/github-dark.mjs";
 import themeLight from "shiki/dist/themes/github-light.mjs";
 import { createJavaScriptRegexEngine } from "shiki/engine/javascript";
-import { escapeHtml, filePathFromUrl, guessLang } from "./Helpers.ts";
+import {
+  escapeHtml,
+  filePathFromUrl,
+  guessLang,
+  tabBar,
+  tabContent,
+} from "./Helpers.ts";
 import {
   computeLineData,
   formatGutterBytes,
@@ -31,8 +37,6 @@ interface SourceTabData {
   panel: HTMLDivElement;
 }
 
-const tabBar = document.querySelector(".tab-bar") as HTMLDivElement;
-const tabContent = document.querySelector(".tab-content") as HTMLDivElement;
 const sourceTabs = new Map<string, SourceTabData>();
 
 let highlighterPromise: Promise<HighlighterCore> | undefined;

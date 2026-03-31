@@ -9,7 +9,7 @@ import type { RunnerOptions } from "./BenchRunner.ts";
 import type { KnownRunner } from "./CreateRunner.ts";
 import { aggregateGcStats, type GcEvent, parseGcLine } from "./GcStats.ts";
 import type { MeasuredResults } from "./MeasuredResults.ts";
-import { createBenchRunner, getModuleExport } from "./RunnerUtils.ts";
+import { createBenchRunner, importBenchFn } from "./RunnerUtils.ts";
 import { debugWorkerTiming, getElapsed, getPerfNow } from "./TimingUtils.ts";
 import type {
   ErrorMessage,
@@ -85,26 +85,16 @@ async function resolveModuleSpec<T>(
   spec: BenchmarkSpec<T>,
   params: T | undefined,
 ): Promise<{ spec: BenchmarkSpec<T>; params: T | undefined }> {
-  const modPath = spec.modulePath!;
-  const module = await import(modPath);
-  const fn = getModuleExport<BenchmarkFunction<T>>(
-    module,
+  const result = await importBenchFn(
+    spec.modulePath!,
     spec.exportName,
-    modPath,
+    spec.setupExportName,
+    params,
   );
-
-  let resolvedParams = params;
-  if (spec.setupExportName) {
-    type SetupFn = (p: T | undefined) => T | Promise<T>;
-    const setupFn = getModuleExport<SetupFn>(
-      module,
-      spec.setupExportName,
-      modPath,
-    );
-    resolvedParams = await setupFn(params);
-  }
-
-  return { spec: { ...spec, fn }, params: resolvedParams };
+  return {
+    spec: { ...spec, fn: result.fn as BenchmarkFunction<T> },
+    params: result.params as T | undefined,
+  };
 }
 
 /** Create message for worker execution */

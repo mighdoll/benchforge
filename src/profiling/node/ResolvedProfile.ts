@@ -1,4 +1,9 @@
-import type { HeapProfile, HeapSample, ProfileNode } from "./HeapSampler.ts";
+import type {
+  CallFrame,
+  HeapProfile,
+  HeapSample,
+  ProfileNode,
+} from "./HeapSampler.ts";
 
 /** A call frame with display-ready 1-indexed source positions */
 export interface ResolvedFrame {
@@ -13,6 +18,16 @@ export interface ResolvedFrame {
 
   /** 1-indexed column number (undefined when unknown) */
   col?: number;
+}
+
+/** Convert a V8 0-indexed CallFrame to a display-ready 1-indexed ResolvedFrame */
+export function resolveCallFrame(cf: CallFrame): ResolvedFrame {
+  return {
+    name: cf.functionName || "(anonymous)",
+    url: cf.url || "",
+    line: cf.lineNumber + 1,
+    col: cf.columnNumber != null ? cf.columnNumber + 1 : undefined,
+  };
 }
 
 /** A profile node with its resolved call stack from root to this node */
@@ -55,14 +70,7 @@ export function resolveProfile(profile: HeapProfile): ResolvedProfile {
   let totalBytes = 0;
 
   function walk(node: ProfileNode, parentStack: ResolvedFrame[]): void {
-    const { functionName, url, lineNumber, columnNumber } = node.callFrame;
-    const col = columnNumber != null ? columnNumber + 1 : undefined;
-    const frame: ResolvedFrame = {
-      name: functionName || "(anonymous)",
-      url: url || "",
-      line: lineNumber + 1,
-      col,
-    };
+    const frame = resolveCallFrame(node.callFrame);
     const stack = [...parentStack, frame];
     const resolved: ResolvedNode = {
       frame,

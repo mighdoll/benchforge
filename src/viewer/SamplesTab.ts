@@ -16,10 +16,14 @@ export async function loadSamples(
 
 /** True if any benchmark in the report collected more than one sample. */
 export function hasSufficientSamples(data: ReportData): boolean {
-  return data.groups.some(
-    g =>
-      g.benchmarks.some(b => b.samples.length > 1) ||
-      (g.baseline !== undefined && g.baseline.samples.length > 1),
+  return data.groups.some(groupHasSamples);
+}
+
+/** True if any benchmark or baseline in the group has more than one sample. */
+function groupHasSamples(group: BenchmarkGroup): boolean {
+  return (
+    group.benchmarks.some(b => b.samples.length > 1) ||
+    (group.baseline !== undefined && group.baseline.samples.length > 1)
   );
 }
 
@@ -27,9 +31,7 @@ export function hasSufficientSamples(data: ReportData): boolean {
 function buildSamplesGroupHtml(group: BenchmarkGroup, i: number): string {
   if (!group.benchmarks?.length) return "";
 
-  const hasSamples =
-    group.benchmarks.some(b => b.samples?.length > 1) ||
-    (group.baseline && group.baseline.samples.length > 1);
+  const hasSamples = groupHasSamples(group);
 
   if (!hasSamples) {
     return `<div>

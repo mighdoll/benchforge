@@ -7,7 +7,7 @@ import type { BenchmarkFunction, BenchmarkSpec } from "./BenchmarkSpec.ts";
 import type { BenchRunner, RunnerOptions } from "./BenchRunner.ts";
 import type { KnownRunner } from "./CreateRunner.ts";
 import type { MeasuredResults } from "./MeasuredResults.ts";
-import { createBenchRunner, getModuleExport } from "./RunnerUtils.ts";
+import { createBenchRunner, importBenchFn } from "./RunnerUtils.ts";
 import { debugWorkerTiming, getElapsed, getPerfNow } from "./TimingUtils.ts";
 
 /** Message sent to worker process to start a benchmark run. */
@@ -145,23 +145,10 @@ async function importBenchmarkWithSetup(
   message: RunMessage,
 ): Promise<BenchmarkImportResult> {
   const { modulePath, exportName, setupExportName, params } = message;
-  const modPath = modulePath!;
   const suffix = exportName ? ` (${exportName})` : "";
-  logTiming(`Importing from ${modPath}${suffix}`);
-  const module = await import(modPath);
-  const fn = getModuleExport<BenchmarkFunction>(module, exportName, modPath);
-
-  if (setupExportName) {
-    logTiming(`Calling setup: ${setupExportName}`);
-    const setupFn = getModuleExport<BenchmarkFunction>(
-      module,
-      setupExportName,
-      modPath,
-    );
-    return { fn, params: await setupFn(params) };
-  }
-
-  return { fn, params };
+  logTiming(`Importing from ${modulePath}${suffix}`);
+  if (setupExportName) logTiming(`Calling setup: ${setupExportName}`);
+  return importBenchFn(modulePath!, exportName, setupExportName, params);
 }
 
 /** Reconstruct function from string code */
