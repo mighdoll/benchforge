@@ -59,7 +59,7 @@ export function openSourceTab(
   activeTabId.value = id;
 }
 
-export function SourcePanel({ tab }: { tab: SourceTabState }) {
+export function SourcePanel({ tab }: { tab: SourceTabState }): preact.JSX.Element {
   const p = provider.value!;
   const [html, setHtml] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
