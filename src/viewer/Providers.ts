@@ -70,12 +70,15 @@ export class ServerProvider implements DataProvider {
     Promise<ViewerSpeedscopeFile | null>
   >();
 
-  constructor(readonly config: ViewerConfig) {}
+  readonly config: ViewerConfig;
+  constructor(config: ViewerConfig) {
+    this.config = config;
+  }
 
   /** Fetch the server config and return a ready-to-use provider. */
   static async create(): Promise<ServerProvider> {
     const resp = await fetch("/api/config");
-    return new ServerProvider(await resp.json());
+    return new ServerProvider((await resp.json()) as ViewerConfig);
   }
 
   async fetchReportData(): Promise<unknown> {

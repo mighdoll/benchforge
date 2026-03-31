@@ -12,6 +12,7 @@ import {
   formatGutterBytes,
   formatGutterCount,
   formatGutterTime,
+  type LineGutterData,
 } from "./LineData.ts";
 import type {
   DataProvider,
@@ -205,16 +206,25 @@ function renderGutters(
 
     el.insertAdjacentHTML("afterbegin", gutterHtml);
 
-    // Heat-map background: use the hottest column's ratio
-    const allocRatio =
-      maxAlloc > 0 ? (lineData.allocBytes.get(lineNum) || 0) / maxAlloc : 0;
-    const timeRatio =
-      maxTime > 0 ? (lineData.selfTimeUs.get(lineNum) || 0) / maxTime : 0;
-    const heat = Math.max(allocRatio, timeRatio);
-    if (heat > 0.01) {
-      el.style.setProperty("--heat", heat.toFixed(3));
-      el.classList.add("heat");
-    }
+    applyHeatMap(el, lineNum, lineData, maxAlloc, maxTime);
+  }
+}
+
+function applyHeatMap(
+  el: HTMLElement,
+  lineNum: number,
+  lineData: LineGutterData,
+  maxAlloc: number,
+  maxTime: number,
+): void {
+  const allocRatio =
+    maxAlloc > 0 ? (lineData.allocBytes.get(lineNum) || 0) / maxAlloc : 0;
+  const timeRatio =
+    maxTime > 0 ? (lineData.selfTimeUs.get(lineNum) || 0) / maxTime : 0;
+  const heat = Math.max(allocRatio, timeRatio);
+  if (heat > 0.01) {
+    el.style.setProperty("--heat", heat.toFixed(3));
+    el.classList.add("heat");
   }
 }
 
