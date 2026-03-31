@@ -19,6 +19,16 @@ export async function runPageLoad(
   const opts = instrumentOpts(params, samplingInterval);
   await startInstruments(cdp, opts);
 
+  // Observe LCP via PerformanceObserver (avoids deprecated getEntriesByType warning)
+  await page.addInitScript(() => {
+    const g = globalThis as any;
+    g.__lcpTime = undefined;
+    new PerformanceObserver(list => {
+      const entries = list.getEntries();
+      if (entries.length) g.__lcpTime = entries.at(-1)!.startTime;
+    }).observe({ type: "largest-contentful-paint" as any, buffered: true });
+  });
+
   const { url, waitFor } = params;
 
   // Navigate with appropriate wait strategy
@@ -41,11 +51,10 @@ export async function runPageLoad(
   const navTiming = await page.evaluate(() => {
     const perf = performance as any;
     const nav = perf.getEntriesByType("navigation")[0];
-    const lcp = perf.getEntriesByType("largest-contentful-paint");
     return {
       domContentLoaded: (nav?.domContentLoadedEventEnd as number) ?? 0,
       loadEvent: (nav?.loadEventEnd as number) ?? 0,
-      lcp: lcp.at(-1)?.startTime,
+      lcp: (globalThis as any).__lcpTime as number | undefined,
     };
   });
 
