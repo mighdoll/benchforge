@@ -4,8 +4,8 @@ import type { HeapProfile, HeapSampleOptions } from "../node/HeapSampler.ts";
 import type { TimeProfile } from "../node/TimeSampler.ts";
 import { runBenchLoop } from "./BenchLoop.ts";
 import { collectTracing, startGcTracing } from "./BrowserCDP.ts";
-import { connectCdp } from "./CdpClient.ts";
-import { createCdpPage } from "./CdpPage.ts";
+import { type CdpClient, connectCdp } from "./CdpClient.ts";
+import { type CdpPage, createCdpPage } from "./CdpPage.ts";
 import { createTab, launchChrome } from "./ChromeLauncher.ts";
 import { setupLapMode } from "./LapMode.ts";
 import { runPageLoad } from "./PageLoadMode.ts";
@@ -60,10 +60,7 @@ export interface BrowserProfileResult {
 export async function profileBrowser(
   params: BrowserProfileParams,
 ): Promise<BrowserProfileResult> {
-  const { url, headless = false, chromePath, chromeProfile } = params;
-  const { chromeArgs, timeout = 60 } = params;
-  const collectGc = params.gcStats;
-  const samplingInterval = params.allocOptions?.samplingInterval ?? 32768;
+  const { headless = false, chromePath, chromeProfile, chromeArgs } = params;
 
   const chrome = await launchChrome({
     headless,
@@ -74,50 +71,56 @@ export async function profileBrowser(
   try {
     const pageWsUrl = await createTab(chrome.port);
     const cdp = await connectCdp(pageWsUrl);
-    const page = await createCdpPage(cdp, { timeout: timeout * 1000 });
-
-    const pageErrors: string[] = [];
-    page.onPageError(msg => pageErrors.push(msg));
-
-    const traceEvents = collectGc ? await startGcTracing(cdp) : [];
-
-    if (params.pageLoad) {
-      let result = await runPageLoad(page, cdp, params, samplingInterval);
-      if (collectGc)
-        result = { ...result, gcStats: await collectTracing(cdp, traceEvents) };
-      return result;
-    }
-
-    const lapArgs = {
-      page,
-      cdp,
-      params,
-      samplingInterval,
-      timeout,
-      pageErrors,
-    };
-    const lapMode = await setupLapMode(lapArgs);
-
-    await page.navigate(url, { waitUntil: "load" });
-    const hasBench = await page.evaluate(
-      () => typeof (globalThis as any).__bench === "function",
-    );
-
-    let result: BrowserProfileResult;
-    if (hasBench) {
-      lapMode.cancel();
-      lapMode.promise.catch(() => {}); // suppress unused rejection
-      result = await runBenchLoop(page, cdp, params, samplingInterval);
-    } else {
-      result = await lapMode.promise;
-      lapMode.cancel();
-    }
-
-    if (collectGc) {
-      result = { ...result, gcStats: await collectTracing(cdp, traceEvents) };
-    }
-    return result;
+    const timeout = (params.timeout ?? 60) * 1000;
+    const page = await createCdpPage(cdp, { timeout });
+    return await runProfile(page, cdp, params);
   } finally {
     await chrome.close();
   }
+}
+
+/** Run profiling on an open CDP page, auto-detecting mode. */
+async function runProfile(
+  page: CdpPage,
+  cdp: CdpClient,
+  params: BrowserProfileParams,
+): Promise<BrowserProfileResult> {
+  const { url } = params;
+  const collectGc = params.gcStats;
+  const samplingInterval = params.allocOptions?.samplingInterval ?? 32768;
+
+  const pageErrors: string[] = [];
+  page.onPageError(msg => pageErrors.push(msg));
+
+  const traceEvents = collectGc ? await startGcTracing(cdp) : [];
+
+  if (params.pageLoad) {
+    let result = await runPageLoad(page, cdp, params, samplingInterval);
+    if (collectGc)
+      result = { ...result, gcStats: await collectTracing(cdp, traceEvents) };
+    return result;
+  }
+
+  const timeout = params.timeout ?? 60;
+  const lapArgs = { page, cdp, params, samplingInterval, timeout, pageErrors };
+  const lapMode = await setupLapMode(lapArgs);
+
+  await page.navigate(url, { waitUntil: "load" });
+  const hasBench = await page.evaluate(
+    () => typeof (globalThis as any).__bench === "function",
+  );
+
+  let result: BrowserProfileResult;
+  if (hasBench) {
+    lapMode.cancel();
+    lapMode.promise.catch(() => {}); // suppress unused rejection
+    result = await runBenchLoop(page, cdp, params, samplingInterval);
+  } else {
+    result = await lapMode.promise;
+    lapMode.cancel();
+  }
+
+  if (collectGc)
+    result = { ...result, gcStats: await collectTracing(cdp, traceEvents) };
+  return result;
 }
