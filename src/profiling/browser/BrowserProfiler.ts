@@ -84,7 +84,6 @@ async function runProfile(
   cdp: CdpClient,
   params: BrowserProfileParams,
 ): Promise<BrowserProfileResult> {
-  const { url } = params;
   const wantGc = params.gcStats;
   const samplingInterval = params.allocOptions?.samplingInterval ?? 32768;
 
@@ -93,13 +92,32 @@ async function runProfile(
 
   const traceEvents = wantGc ? await startGcTracing(cdp) : [];
 
+  let result: BrowserProfileResult;
   if (params.pageLoad) {
-    let result = await runPageLoad(page, cdp, params, samplingInterval);
-    if (wantGc)
-      result = { ...result, gcStats: await collectTracing(cdp, traceEvents) };
-    return result;
+    result = await runPageLoad(page, cdp, params, samplingInterval);
+  } else {
+    result = await runBenchOrLap(
+      page,
+      cdp,
+      params,
+      samplingInterval,
+      pageErrors,
+    );
   }
 
+  if (wantGc)
+    result = { ...result, gcStats: await collectTracing(cdp, traceEvents) };
+  return result;
+}
+
+/** Auto-detect bench function vs lap mode after page load. */
+async function runBenchOrLap(
+  page: CdpPage,
+  cdp: CdpClient,
+  params: BrowserProfileParams,
+  samplingInterval: number,
+  pageErrors: string[],
+): Promise<BrowserProfileResult> {
   const timeout = params.timeout ?? 60;
   const lapMode = await setupLapMode({
     page,
@@ -110,22 +128,17 @@ async function runProfile(
     pageErrors,
   });
 
-  await page.navigate(url, { waitUntil: "load" });
+  await page.navigate(params.url, { waitUntil: "load" });
   const hasBench = await page.evaluate(
     () => typeof (globalThis as any).__bench === "function",
   );
 
-  let result: BrowserProfileResult;
   if (hasBench) {
     lapMode.cancel();
     lapMode.promise.catch(() => {}); // suppress unused rejection
-    result = await runBenchLoop(page, cdp, params, samplingInterval);
-  } else {
-    result = await lapMode.promise;
-    lapMode.cancel();
+    return runBenchLoop(page, cdp, params, samplingInterval);
   }
-
-  if (wantGc)
-    result = { ...result, gcStats: await collectTracing(cdp, traceEvents) };
+  const result = await lapMode.promise;
+  lapMode.cancel();
   return result;
 }
