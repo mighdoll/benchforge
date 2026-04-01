@@ -159,10 +159,7 @@ export async function matrixBenchExports(
   await finishReports(groups, args, suite.name, exportOptions);
 }
 
-/** Run matrix suite with CLI arguments.
- *
- *  Default runs defaultCases/defaultVariants. --filter narrows defaults,
- *  --all --filter narrows all, --all runs everything. */
+/** Run matrix suite with CLI arguments. --filter narrows defaults, --all --filter narrows all. */
 export async function runMatrixSuite(
   suite: MatrixSuite,
   args: DefaultCliArgs,

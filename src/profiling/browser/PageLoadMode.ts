@@ -32,12 +32,10 @@ export async function runPageLoad(
 
   const { url, waitFor } = params;
 
-  // Navigate with appropriate wait strategy
   const isBuiltinWait = waitFor === "load" || waitFor === "domcontentloaded";
   const waitUntil = isBuiltinWait ? waitFor : "networkidle";
   await page.navigate(url, { waitUntil });
 
-  // Custom wait: CSS selector or JS expression
   if (waitFor && !isBuiltinWait) {
     if (/^[#.[]/.test(waitFor)) {
       await page.waitForSelector(waitFor);

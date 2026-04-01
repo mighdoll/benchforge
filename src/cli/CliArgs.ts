@@ -161,7 +161,7 @@ export function cleanCliArgs(args: DefaultCliArgs): Record<string, unknown> {
   );
 }
 
-/** Assign options to their labeled groups in yargs help output */
+/** Assign options to their labeled groups in yargs help output. */
 function applyGroups(y: Argv): Argv {
   return Object.entries(optionGroups).reduce(
     (acc, [label, keys]) => acc.group(keys as unknown as string[], label),
