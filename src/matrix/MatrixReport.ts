@@ -20,7 +20,8 @@ import {
   bootstrapDifferenceCI,
   type DifferenceCI,
 } from "../stats/StatisticalUtils.ts";
-import type { CaseResult, MatrixResults } from "./BenchMatrix.ts";
+import type { MeasuredResults } from "../runners/MeasuredResults.ts";
+import type { CaseResult, MatrixResults, VariantResult } from "./BenchMatrix.ts";
 
 /** User-defined column that extracts and formats a metric from case results */
 export interface ExtraColumn {
@@ -151,20 +152,33 @@ function buildSectionTable(
   const variantTitle = options.variantTitle ?? "name";
 
   type Row = Record<string, unknown> & { name: string };
-  const rows: Row[] = results.variants.flatMap(variant => {
-    const cr = variant.cases.find(c => c.caseId === caseId);
-    if (!cr) return [];
+  const caseResults = collectCaseResults(results, caseId);
+  const shared = hasSharedBaseline(caseResults);
 
+  const rows: Row[] = caseResults.flatMap(({ variant, cr }) => {
     const row: Row = {
       name: truncate(variant.id, 25),
       ...extractSectionValues(cr.measured, sections, cr.metadata),
     };
     if (cr.baseline) {
-      const { samples } = cr.measured;
-      row.diffCI = bootstrapDifferenceCI(cr.baseline.samples, samples);
+      row.diffCI = bootstrapDifferenceCI(cr.baseline.samples, cr.measured.samples);
     }
-    return [row];
+    const out: Row[] = [row];
+    if (cr.baseline && !shared) {
+      out.push({
+        name: " \u21B3 baseline",
+        ...extractSectionValues(cr.baseline, sections, cr.metadata),
+      });
+    }
+    return out;
   });
+
+  if (shared) {
+    rows.push({
+      name: "=> baseline",
+      ...extractSectionValues(shared, sections),
+    });
+  }
 
   const hasBaseline = rows.some(r => r.diffCI);
   const cols = sectionColumnGroups<Row>(sections, hasBaseline, variantTitle);
@@ -172,16 +186,31 @@ function buildSectionTable(
   return `${caseTitle}\n${table}`;
 }
 
-/** Build rows for all variants for a given case */
+/** Build rows for all variants for a given case, with baseline rows when present */
 function buildCaseRows(
   results: MatrixResults,
   caseId: string,
   extraColumns?: ExtraColumn[],
 ): MatrixReportRow[] {
-  return results.variants.flatMap(variant => {
-    const caseResult = variant.cases.find(c => c.caseId === caseId);
-    return caseResult ? [buildRow(variant.id, caseResult, extraColumns)] : [];
+  const caseResults = collectCaseResults(results, caseId);
+  const shared = hasSharedBaseline(caseResults);
+
+  const rows = caseResults.flatMap(({ variant, cr }) => {
+    const out: MatrixReportRow[] = [buildRow(variant.id, cr, extraColumns)];
+    if (cr.baseline && !shared) {
+      out.push(buildRow(" \u21B3 baseline", {
+        ...cr, measured: cr.baseline, baseline: undefined,
+      }, extraColumns));
+    }
+    return out;
   });
+
+  if (shared) {
+    rows.push(buildRow("=> baseline", {
+      caseId, measured: shared,
+    }, extraColumns));
+  }
+  return rows;
 }
 
 /** Build default column groups (name, time, extras) */
@@ -211,7 +240,7 @@ function buildColumns(
 
 /** Build a table row from a variant's case result */
 function buildRow(
-  variantId: string,
+  name: string,
   caseResult: CaseResult,
   extraColumns?: ExtraColumn[],
 ): MatrixReportRow {
@@ -220,7 +249,7 @@ function buildRow(
   const time = measured.time?.avg ?? average(samples);
 
   const row: MatrixReportRow = {
-    name: truncate(variantId, 25),
+    name: truncate(name, 25),
     time,
     samples: samples.length,
   };
@@ -253,4 +282,21 @@ function extraColumnGroups(
       formatter: col.formatter ?? String,
     })),
   }));
+}
+
+interface VariantCase { variant: VariantResult; cr: CaseResult }
+
+/** Collect (variant, caseResult) pairs for a given caseId */
+function collectCaseResults(results: MatrixResults, caseId: string): VariantCase[] {
+  return results.variants.flatMap(variant => {
+    const cr = variant.cases.find(c => c.caseId === caseId);
+    return cr ? [{ variant, cr }] : [];
+  });
+}
+
+/** If all baselines are the same reference (baselineVariant mode), return it */
+function hasSharedBaseline(caseResults: VariantCase[]): MeasuredResults | undefined {
+  const baselines = caseResults.map(({ cr }) => cr.baseline).filter(Boolean);
+  if (baselines.length < 2) return undefined;
+  return baselines.every(b => b === baselines[0]) ? baselines[0] : undefined;
 }

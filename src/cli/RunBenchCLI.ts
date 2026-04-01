@@ -9,6 +9,7 @@ import {
   filterMatrix,
   type MatrixFilter,
   parseMatrixFilter,
+  resolveVariantIds,
 } from "../matrix/MatrixFilter.ts";
 import type { MatrixReportOptions } from "../matrix/MatrixReport.ts";
 import type { BrowserProfileResult } from "../profiling/browser/BrowserProfiler.ts";
@@ -67,6 +68,7 @@ export async function runDefaultBench(
 ): Promise<void> {
   const args = parseBenchArgs(configureArgs);
   if (args.url) return browserBenchExports(args);
+  if (args.list && suite) return listSuite(suite);
   if (suite) return benchExports(suite, args);
   if (args.file) return fileBenchExports(args.file, args);
   throw new Error(
@@ -164,6 +166,10 @@ export async function runMatrixSuite(
   suite: MatrixSuite,
   args: DefaultCliArgs,
 ): Promise<MatrixResults[]> {
+  if (args.list) {
+    await listMatrixSuite(suite);
+    return [];
+  }
   validateArgs(args);
   const filter = args.filter ? parseMatrixFilter(args.filter) : undefined;
   const options = cliToMatrixOptions(args);
@@ -178,7 +184,8 @@ export async function runMatrixSuite(
   return results;
 }
 
-/** Apply default-case narrowing and user filter to a matrix. */
+/** Apply default-case narrowing and user filter to a matrix.
+ *  --filter bypasses defaults (implies --all for the filtered dimension). */
 async function applyMatrixFilters(
   matrix: FilteredMatrix<any>,
   runAll: boolean,
@@ -189,13 +196,39 @@ async function applyMatrixFilters(
     : undefined;
 
   let filtered: FilteredMatrix<any> = matrix;
-  if (!runAll && mod) {
+  if (!runAll && !filter && mod) {
     const { defaultCases: filteredCases, defaultVariants: filteredVariants } =
       mod;
     filtered = { ...matrix, filteredCases, filteredVariants };
   }
   if (filter) filtered = await filterMatrix(filtered, filter);
   return filtered;
+}
+
+/** Print available benchmarks in a suite */
+function listSuite(suite: BenchSuite): void {
+  for (const group of suite.groups) {
+    console.log(group.name);
+    for (const bench of group.benchmarks) console.log(`  ${bench.name}`);
+    if (group.baseline) console.log(`  ${group.baseline.name} (baseline)`);
+  }
+}
+
+/** Print available cases and variants for each matrix in a suite */
+async function listMatrixSuite(suite: MatrixSuite): Promise<void> {
+  for (const matrix of suite.matrices) {
+    console.log(matrix.name);
+    const caseIds = matrix.casesModule
+      ? (await loadCasesModule(matrix.casesModule)).cases
+      : matrix.cases;
+    if (caseIds) {
+      console.log("  cases:");
+      for (const id of caseIds) console.log(`    ${id}`);
+    }
+    const variantIds = await resolveVariantIds(matrix);
+    console.log("  variants:");
+    for (const id of variantIds) console.log(`    ${id}`);
+  }
 }
 
 /** Import a file and run it as a benchmark based on what it exports. */
@@ -207,10 +240,14 @@ async function fileBenchExports(
   const mod = await import(fileUrl);
   const candidate = mod.default;
 
-  if (candidate && Array.isArray(candidate.matrices))
+  if (candidate && Array.isArray(candidate.matrices)) {
+    if (args.list) return listMatrixSuite(candidate as MatrixSuite);
     return matrixBenchExports(candidate as MatrixSuite, args);
-  if (candidate && Array.isArray(candidate.groups))
+  }
+  if (candidate && Array.isArray(candidate.groups)) {
+    if (args.list) return listSuite(candidate as BenchSuite);
     return benchExports(candidate as BenchSuite, args);
+  }
   if (typeof candidate === "function") {
     const name = basename(filePath).replace(/\.[^.]+$/, "");
     const bench = { name, fn: candidate };
