@@ -3,20 +3,13 @@ import {
   startInstruments,
   stopInstruments,
 } from "./BrowserCDP.ts";
-import type {
-  BrowserProfileParams,
-  BrowserProfileResult,
-} from "./BrowserProfiler.ts";
-import type { CdpClient } from "./CdpClient.ts";
-import type { CdpPage } from "./CdpPage.ts";
+import type { BrowserProfileResult, ProfileCtx } from "./BrowserProfiler.ts";
 
 /** Run passive page-load profiling: instrument ==> navigate ==> wait ==> collect. */
 export async function runPageLoad(
-  page: CdpPage,
-  cdp: CdpClient,
-  params: BrowserProfileParams,
-  samplingInterval: number,
+  ctx: ProfileCtx,
 ): Promise<BrowserProfileResult> {
+  const { page, cdp, params, samplingInterval } = ctx;
   const opts = instrumentOpts(params, samplingInterval);
   await startInstruments(cdp, opts);
 

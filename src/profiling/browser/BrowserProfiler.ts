@@ -92,41 +92,31 @@ async function runProfile(
 
   const traceEvents = wantGc ? await startGcTracing(cdp) : [];
 
-  let result: BrowserProfileResult;
-  if (params.pageLoad) {
-    result = await runPageLoad(page, cdp, params, samplingInterval);
-  } else {
-    result = await runBenchOrLap(
-      page,
-      cdp,
-      params,
-      samplingInterval,
-      pageErrors,
-    );
-  }
+  const ctx = { page, cdp, params, samplingInterval };
+  const result = params.pageLoad
+    ? await runPageLoad(ctx)
+    : await runBenchOrLap(ctx, pageErrors);
 
   if (wantGc)
-    result = { ...result, gcStats: await collectTracing(cdp, traceEvents) };
+    return { ...result, gcStats: await collectTracing(cdp, traceEvents) };
   return result;
+}
+
+export interface ProfileCtx {
+  page: CdpPage;
+  cdp: CdpClient;
+  params: BrowserProfileParams;
+  samplingInterval: number;
 }
 
 /** Auto-detect bench function vs lap mode after page load. */
 async function runBenchOrLap(
-  page: CdpPage,
-  cdp: CdpClient,
-  params: BrowserProfileParams,
-  samplingInterval: number,
+  ctx: ProfileCtx,
   pageErrors: string[],
 ): Promise<BrowserProfileResult> {
+  const { page, params } = ctx;
   const timeout = params.timeout ?? 60;
-  const lapMode = await setupLapMode({
-    page,
-    cdp,
-    params,
-    samplingInterval,
-    timeout,
-    pageErrors,
-  });
+  const lapMode = await setupLapMode({ ...ctx, timeout, pageErrors });
 
   await page.navigate(params.url, { waitUntil: "load" });
   const hasBench = await page.evaluate(
@@ -136,7 +126,7 @@ async function runBenchOrLap(
   if (hasBench) {
     lapMode.cancel();
     lapMode.promise.catch(() => {}); // suppress unused rejection
-    return runBenchLoop(page, cdp, params, samplingInterval);
+    return runBenchLoop(ctx);
   }
   const result = await lapMode.promise;
   lapMode.cancel();

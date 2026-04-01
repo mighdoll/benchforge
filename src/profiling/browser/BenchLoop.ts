@@ -3,20 +3,13 @@ import {
   startInstruments,
   stopInstruments,
 } from "./BrowserCDP.ts";
-import type {
-  BrowserProfileParams,
-  BrowserProfileResult,
-} from "./BrowserProfiler.ts";
-import type { CdpClient } from "./CdpClient.ts";
-import type { CdpPage } from "./CdpPage.ts";
+import type { BrowserProfileResult, ProfileCtx } from "./BrowserProfiler.ts";
 
 /** Bench function mode: run window.__bench in a timed iteration loop. */
 export async function runBenchLoop(
-  page: CdpPage,
-  cdp: CdpClient,
-  params: BrowserProfileParams,
-  samplingInterval: number,
+  ctx: ProfileCtx,
 ): Promise<BrowserProfileResult> {
+  const { page, cdp, params, samplingInterval } = ctx;
   const maxTime = params.maxTime ?? 642;
   const maxIter = params.maxIterations ?? Number.MAX_SAFE_INTEGER;
   const opts = instrumentOpts(params, samplingInterval);
