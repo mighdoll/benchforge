@@ -55,8 +55,9 @@ export async function launchChrome(opts: {
 
 /** Create a new browser tab and return its CDP WebSocket URL. */
 export async function createTab(port: number): Promise<string> {
-  const url = `http://127.0.0.1:${port}/json/new`;
-  const resp = await fetch(url, { method: "PUT" });
+  const resp = await fetch(`http://127.0.0.1:${port}/json/new`, {
+    method: "PUT",
+  });
   const text = await resp.text();
   let data: { webSocketDebuggerUrl: string };
   try {
@@ -97,12 +98,12 @@ function findChrome(): string {
 function pipeChromeOutput(proc: ChildProcess): void {
   const forward = (stream: NodeJS.ReadableStream | null) =>
     stream?.on("data", (chunk: Buffer) => {
-      for (const line of chunk
+      const lines = chunk
         .toString()
         .split("\n")
         .map(l => l.trim())
-        .filter(Boolean))
-        process.stderr.write(`[chrome] ${line}\n`);
+        .filter(Boolean);
+      for (const line of lines) process.stderr.write(`[chrome] ${line}\n`);
     });
   forward(proc.stdout);
   forward(proc.stderr);
@@ -111,10 +112,9 @@ function pipeChromeOutput(proc: ChildProcess): void {
 /** Parse the DevTools WebSocket URL from Chrome's stderr. */
 function parseWsUrl(proc: ChildProcess): Promise<string> {
   return new Promise((resolve, reject) => {
+    const wsPattern = /DevTools listening on (ws:\/\/\S+)/;
     const onData = (chunk: Buffer) => {
-      const match = chunk
-        .toString()
-        .match(/DevTools listening on (ws:\/\/\S+)/);
+      const match = chunk.toString().match(wsPattern);
       if (match) {
         proc.stderr?.off("data", onData);
         resolve(match[1]);

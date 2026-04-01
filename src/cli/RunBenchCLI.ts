@@ -93,28 +93,31 @@ export async function browserBenchExports(args: DefaultCliArgs): Promise<void> {
   const url = args.url!;
   const { iterations, duration } = args;
   const pageLoad = args["page-load"] || !!args["wait-for"];
+  const allocOptions = {
+    samplingInterval: args["alloc-interval"],
+    stackDepth: args["alloc-depth"],
+  };
+  const chromeArgs = args["chrome-args"]
+    ?.flatMap(a => a.split(/\s+/))
+    .map(stripQuotes)
+    .filter(Boolean);
+  const maxTime = iterations ? Number.MAX_SAFE_INTEGER : duration * 1000;
   const result = await profileBrowser({
     url,
+    pageLoad,
+    maxTime,
+    chromeArgs,
+    allocOptions,
     alloc: needsAlloc(args),
-    allocOptions: {
-      samplingInterval: args["alloc-interval"],
-      stackDepth: args["alloc-depth"],
-    },
     timeSample: needsTimeSample(args),
     timeInterval: args["time-interval"],
     headless: args.headless,
     chromePath: args.chrome,
     chromeProfile: args["chrome-profile"],
-    chromeArgs: args["chrome-args"]
-      ?.flatMap(a => a.split(/\s+/))
-      .map(stripQuotes)
-      .filter(Boolean),
     timeout: args.timeout,
     gcStats: args["gc-stats"],
     callCounts: args["call-counts"],
-    maxTime: iterations ? Number.MAX_SAFE_INTEGER : duration * 1000,
     maxIterations: iterations,
-    pageLoad,
     waitFor: args["wait-for"],
   });
 
@@ -126,11 +129,9 @@ export async function browserBenchExports(args: DefaultCliArgs): Promise<void> {
 
 /** Dynamically import the browser profiler (lazy-loaded for non-browser benchmarks). */
 async function loadBrowserProfiler() {
+  const path = "../profiling/browser/BrowserProfiler.ts";
   type BrowserMod = typeof import("../profiling/browser/BrowserProfiler.ts");
-  const mod: BrowserMod = await import(
-    "../profiling/browser/BrowserProfiler.ts"
-  );
-  return mod.profileBrowser;
+  return ((await import(path)) as BrowserMod).profileBrowser;
 }
 
 /** Run matrix suite with full CLI handling (parse, run, report, export). */
@@ -154,8 +155,8 @@ export async function matrixBenchExports(
   const report = defaultMatrixReport(results, reportOptions, args);
   console.log(report);
 
-  const reportGroups = matrixToReportGroups(results);
-  await finishReports(reportGroups, args, suite.name, exportOptions);
+  const groups = matrixToReportGroups(results);
+  await finishReports(groups, args, suite.name, exportOptions);
 }
 
 /** Run matrix suite with CLI arguments.
@@ -186,21 +187,17 @@ async function applyMatrixFilters(
   runAll: boolean,
   filter?: MatrixFilter,
 ): Promise<FilteredMatrix<any>> {
-  const casesModule = matrix.casesModule
+  const mod = matrix.casesModule
     ? await loadCasesModule(matrix.casesModule)
     : undefined;
 
   let filtered: FilteredMatrix<any> = matrix;
-  if (!runAll && casesModule) {
-    filtered = {
-      ...matrix,
-      filteredCases: casesModule.defaultCases,
-      filteredVariants: casesModule.defaultVariants,
-    };
+  if (!runAll && mod) {
+    const { defaultCases: filteredCases, defaultVariants: filteredVariants } =
+      mod;
+    filtered = { ...matrix, filteredCases, filteredVariants };
   }
-  if (filter) {
-    filtered = await filterMatrix(filtered, filter);
-  }
+  if (filter) filtered = await filterMatrix(filtered, filter);
   return filtered;
 }
 
@@ -260,18 +257,20 @@ function printBrowserReport(
   args: DefaultCliArgs,
 ): void {
   const hasTime = !!result.samples?.length || result.wallTimeMs != null;
+  const showTime = hasTime && !result.navTiming;
   const sections: ResultsMapper<any>[] = [
     ...(result.navTiming ? [pageLoadSection] : []),
-    ...(hasTime && !result.navTiming ? [timeSection] : []),
+    ...(showTime ? [timeSection] : []),
     ...(result.gcStats ? [browserGcStatsSection] : []),
-    ...(hasTime && !result.navTiming ? [runsSection] : []),
+    ...(showTime ? [runsSection] : []),
   ];
   if (sections.length > 0) console.log(reportResults(results, sections));
   if (result.heapProfile) {
-    printHeapReports(results, {
+    const opts = {
       ...cliHeapReportOptions(args),
       isUserCode: isBrowserUserCode,
-    });
+    };
+    printHeapReports(results, opts);
   }
 }
 
@@ -283,8 +282,8 @@ function toBrowserMeasured(
   const { gcStats, heapProfile, timeProfile, coverage, navTiming } = result;
   const base = { name, gcStats, heapProfile, timeProfile, coverage, navTiming };
 
-  if (result.samples && result.samples.length > 0) {
-    const { samples } = result;
+  const { samples } = result;
+  if (samples && samples.length > 0) {
     const totalTime = result.wallTimeMs ? result.wallTimeMs / 1000 : undefined;
     return { ...base, samples, time: computeStats(samples), totalTime };
   }

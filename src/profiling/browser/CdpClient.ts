@@ -43,11 +43,8 @@ export async function connectCdp(wsUrl: string): Promise<CdpClient> {
       });
     },
     on(event, handler) {
-      let set = listeners.get(event);
-      if (!set) {
-        set = new Set();
-        listeners.set(event, set);
-      }
+      const set = listeners.get(event) ?? new Set();
+      listeners.set(event, set);
       set.add(handler);
     },
     once(event, handler) {

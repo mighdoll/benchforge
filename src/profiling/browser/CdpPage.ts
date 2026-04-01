@@ -42,18 +42,14 @@ export async function createCdpPage(
         source: `(${fn.toString()})()`,
       });
     },
-    waitForSelector: sel =>
-      pollEval(
-        cdp,
-        `!!document.querySelector(${JSON.stringify(sel)})`,
-        timeout,
-      ),
+    waitForSelector(sel) {
+      const expr = `!!document.querySelector(${JSON.stringify(sel)})`;
+      return pollEval(cdp, expr, timeout);
+    },
     waitForFunction: expr => pollEval(cdp, expr, timeout),
     onPageError(handler) {
-      cdp.on("Runtime.exceptionThrown", ({ exceptionDetails }) => {
-        handler(
-          exceptionDetails.exception?.description || exceptionDetails.text,
-        );
+      cdp.on("Runtime.exceptionThrown", ({ exceptionDetails: d }) => {
+        handler(d.exception?.description || d.text);
       });
     },
   };
@@ -100,15 +96,13 @@ async function cdpEvaluate(
   fn: (...args: any[]) => any,
   arg?: unknown,
 ): Promise<any> {
-  const call =
-    arg !== undefined
-      ? `(${fn.toString()})(${JSON.stringify(arg)})`
-      : `(${fn.toString()})()`;
-  const { result, exceptionDetails } = await cdp.send("Runtime.evaluate", {
-    expression: call,
-    awaitPromise: true,
-    returnByValue: true,
-  });
+  const argStr = arg !== undefined ? JSON.stringify(arg) : "";
+  const expression = `(${fn.toString()})(${argStr})`;
+  const evalOpts = { expression, awaitPromise: true, returnByValue: true };
+  const { result, exceptionDetails } = await cdp.send(
+    "Runtime.evaluate",
+    evalOpts,
+  );
   if (exceptionDetails) {
     const msg =
       exceptionDetails.exception?.description || exceptionDetails.text;
@@ -140,18 +134,18 @@ async function cdpExpose(
   await cdp.send("Page.addScriptToEvaluateOnNewDocument", { source: wrapper });
   await cdp.send("Runtime.evaluate", { expression: wrapper });
 
+  const pageEval = (expr: string) =>
+    cdp.send("Runtime.evaluate", { expression: expr });
   cdp.on("Runtime.bindingCalled", async params => {
     if (params.name !== binding) return;
     const { seq, args } = JSON.parse(params.payload);
+    const cb = `globalThis.__cdpCbs[${seq}]`;
     try {
       const val = await fn(...args);
-      await cdp.send("Runtime.evaluate", {
-        expression: `globalThis.__cdpCbs[${seq}]?.resolve(${JSON.stringify(val ?? null)})`,
-      });
+      await pageEval(`${cb}?.resolve(${JSON.stringify(val ?? null)})`);
     } catch (err: any) {
-      await cdp.send("Runtime.evaluate", {
-        expression: `globalThis.__cdpCbs[${seq}]?.reject(new Error(${JSON.stringify(String(err.message))}))`,
-      });
+      const msg = JSON.stringify(String(err.message));
+      await pageEval(`${cb}?.reject(new Error(${msg}))`);
     }
   });
 }
@@ -163,11 +157,9 @@ async function pollEval(
   timeout: number,
 ): Promise<void> {
   const deadline = Date.now() + timeout;
+  const evalOpts = { expression, returnByValue: true };
   while (Date.now() < deadline) {
-    const { result } = await cdp.send("Runtime.evaluate", {
-      expression,
-      returnByValue: true,
-    });
+    const { result } = await cdp.send("Runtime.evaluate", evalOpts);
     if (result.value) return;
     await new Promise(r => setTimeout(r, 100));
   }

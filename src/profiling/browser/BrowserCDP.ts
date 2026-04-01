@@ -24,10 +24,11 @@ export function instrumentOpts(
   },
   samplingInterval: number,
 ): InstrumentOpts {
+  const { alloc = false, timeSample = false, callCounts = false } = params;
   return {
-    alloc: params.alloc ?? false,
-    timeSample: params.timeSample ?? false,
-    callCounts: params.callCounts ?? false,
+    alloc,
+    timeSample,
+    callCounts,
     samplingInterval,
     timeInterval: params.timeInterval,
   };
@@ -107,10 +108,10 @@ export async function stopInstruments(
   timeProfile?: TimeProfile;
   coverage?: CoverageData;
 }> {
-  const heapProfile = opts.alloc
-    ? ((await cdp.send("HeapProfiler.stopSampling"))
-        .profile as unknown as HeapProfile)
+  const heap = opts.alloc
+    ? await cdp.send("HeapProfiler.stopSampling")
     : undefined;
+  const heapProfile = heap?.profile as HeapProfile | undefined;
   const timeProfile = opts.timeSample
     ? await stopTimeProfiling(cdp)
     : undefined;

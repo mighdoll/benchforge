@@ -33,14 +33,12 @@ export async function runPageLoad(
   const { url, waitFor } = params;
 
   // Navigate with appropriate wait strategy
-  if (waitFor === "load" || waitFor === "domcontentloaded") {
-    await page.navigate(url, { waitUntil: waitFor });
-  } else {
-    await page.navigate(url, { waitUntil: "networkidle" });
-  }
+  const isBuiltinWait = waitFor === "load" || waitFor === "domcontentloaded";
+  const waitUntil = isBuiltinWait ? waitFor : "networkidle";
+  await page.navigate(url, { waitUntil });
 
   // Custom wait: CSS selector or JS expression
-  if (waitFor && waitFor !== "load" && waitFor !== "domcontentloaded") {
+  if (waitFor && !isBuiltinWait) {
     if (/^[#.[]/.test(waitFor)) {
       await page.waitForSelector(waitFor);
     } else {

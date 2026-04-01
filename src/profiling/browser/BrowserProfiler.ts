@@ -60,14 +60,14 @@ export interface BrowserProfileResult {
 export async function profileBrowser(
   params: BrowserProfileParams,
 ): Promise<BrowserProfileResult> {
-  const { headless = false, chromePath, chromeProfile, chromeArgs } = params;
-
-  const chrome = await launchChrome({
+  const { headless = false, chromePath, chromeProfile } = params;
+  const launchOpts = {
     headless,
     chromePath,
     chromeProfile,
-    args: chromeArgs,
-  });
+    args: params.chromeArgs,
+  };
+  const chrome = await launchChrome(launchOpts);
   try {
     const pageWsUrl = await createTab(chrome.port);
     const cdp = await connectCdp(pageWsUrl);
