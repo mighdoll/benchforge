@@ -51,11 +51,11 @@ export async function collectTracing(
   cdp: CdpClient,
   traceEvents: TraceEvent[],
 ): Promise<GcStats> {
-  const complete = new Promise<void>(resolve =>
+  const tracingDone = new Promise<void>(resolve =>
     cdp.once("Tracing.tracingComplete", () => resolve()),
   );
   await cdp.send("Tracing.end");
-  await complete;
+  await tracingDone;
   return browserGcStats(traceEvents);
 }
 
@@ -64,9 +64,7 @@ export async function startTimeProfiling(
   cdp: CdpClient,
   interval?: number,
 ): Promise<void> {
-  if (interval) {
-    await cdp.send("Profiler.setSamplingInterval", { interval });
-  }
+  if (interval) await cdp.send("Profiler.setSamplingInterval", { interval });
   await cdp.send("Profiler.start");
 }
 
@@ -108,10 +106,10 @@ export async function stopInstruments(
   timeProfile?: TimeProfile;
   coverage?: CoverageData;
 }> {
-  const heap = opts.alloc
+  const heapResult = opts.alloc
     ? await cdp.send("HeapProfiler.stopSampling")
     : undefined;
-  const heapProfile = heap?.profile as HeapProfile | undefined;
+  const heapProfile = heapResult?.profile as HeapProfile | undefined;
   const timeProfile = opts.timeSample
     ? await stopTimeProfiling(cdp)
     : undefined;

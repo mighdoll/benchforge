@@ -61,13 +61,12 @@ export async function profileBrowser(
   params: BrowserProfileParams,
 ): Promise<BrowserProfileResult> {
   const { headless = false, chromePath, chromeProfile } = params;
-  const launchOpts = {
+  const chrome = await launchChrome({
     headless,
     chromePath,
     chromeProfile,
     args: params.chromeArgs,
-  };
-  const chrome = await launchChrome(launchOpts);
+  });
   try {
     const pageWsUrl = await createTab(chrome.port);
     const cdp = await connectCdp(pageWsUrl);
@@ -86,24 +85,30 @@ async function runProfile(
   params: BrowserProfileParams,
 ): Promise<BrowserProfileResult> {
   const { url } = params;
-  const collectGc = params.gcStats;
+  const wantGc = params.gcStats;
   const samplingInterval = params.allocOptions?.samplingInterval ?? 32768;
 
   const pageErrors: string[] = [];
   page.onPageError(msg => pageErrors.push(msg));
 
-  const traceEvents = collectGc ? await startGcTracing(cdp) : [];
+  const traceEvents = wantGc ? await startGcTracing(cdp) : [];
 
   if (params.pageLoad) {
     let result = await runPageLoad(page, cdp, params, samplingInterval);
-    if (collectGc)
+    if (wantGc)
       result = { ...result, gcStats: await collectTracing(cdp, traceEvents) };
     return result;
   }
 
   const timeout = params.timeout ?? 60;
-  const lapArgs = { page, cdp, params, samplingInterval, timeout, pageErrors };
-  const lapMode = await setupLapMode(lapArgs);
+  const lapMode = await setupLapMode({
+    page,
+    cdp,
+    params,
+    samplingInterval,
+    timeout,
+    pageErrors,
+  });
 
   await page.navigate(url, { waitUntil: "load" });
   const hasBench = await page.evaluate(
@@ -120,7 +125,7 @@ async function runProfile(
     lapMode.cancel();
   }
 
-  if (collectGc)
+  if (wantGc)
     result = { ...result, gcStats: await collectTracing(cdp, traceEvents) };
   return result;
 }

@@ -23,18 +23,18 @@ export async function createCdpPage(
   opts?: { timeout?: number },
 ): Promise<CdpPage> {
   const timeout = opts?.timeout ?? 30_000;
-  const net = { inFlight: 0 };
+  const netState = { inFlight: 0 };
 
   await cdp.send("Page.enable");
   await cdp.send("Runtime.enable");
   await cdp.send("Network.enable");
 
-  cdp.on("Network.requestWillBeSent", () => net.inFlight++);
-  cdp.on("Network.loadingFinished", () => net.inFlight--);
-  cdp.on("Network.loadingFailed", () => net.inFlight--);
+  cdp.on("Network.requestWillBeSent", () => netState.inFlight++);
+  cdp.on("Network.loadingFinished", () => netState.inFlight--);
+  cdp.on("Network.loadingFailed", () => netState.inFlight--);
 
   return {
-    navigate: (url, navOpts) => cdpNavigate(cdp, net, url, navOpts),
+    navigate: (url, navOpts) => cdpNavigate(cdp, netState, url, navOpts),
     evaluate: (fn, arg) => cdpEvaluate(cdp, fn, arg),
     exposeFunction: (name, fn) => cdpExpose(cdp, name, fn),
     async addInitScript(fn) {
@@ -60,12 +60,12 @@ type NetState = { inFlight: number };
 /** Navigate to a URL and wait for the specified load condition. */
 async function cdpNavigate(
   cdp: CdpClient,
-  net: NetState,
+  netState: NetState,
   url: string,
   navOpts?: { waitUntil?: "load" | "domcontentloaded" | "networkidle" },
 ): Promise<void> {
   const waitUntil = navOpts?.waitUntil ?? "load";
-  net.inFlight = 0;
+  netState.inFlight = 0;
   const event =
     waitUntil === "domcontentloaded"
       ? "Page.domContentEventFired"
@@ -73,15 +73,15 @@ async function cdpNavigate(
   const loaded = new Promise<void>(r => cdp.once(event, () => r()));
   await cdp.send("Page.navigate", { url });
   await loaded;
-  if (waitUntil === "networkidle") await waitNetworkIdle(net);
+  if (waitUntil === "networkidle") await waitNetworkIdle(netState);
 }
 
 /** Wait until no network requests in flight for 500ms. */
-async function waitNetworkIdle(net: NetState): Promise<void> {
+async function waitNetworkIdle(netState: NetState): Promise<void> {
   let quietSince = 0;
   while (true) {
     await new Promise(r => setTimeout(r, 100));
-    if (net.inFlight > 0) {
+    if (netState.inFlight > 0) {
       quietSince = 0;
       continue;
     }
