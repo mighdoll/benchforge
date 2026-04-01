@@ -1,11 +1,12 @@
-import { type BrowserServer, chromium } from "playwright";
-
 import type { GcStats } from "../../runners/GcStats.ts";
 import type { CoverageData } from "../node/CoverageTypes.ts";
 import type { HeapProfile, HeapSampleOptions } from "../node/HeapSampler.ts";
 import type { TimeProfile } from "../node/TimeSampler.ts";
 import { runBenchLoop } from "./BenchLoop.ts";
 import { collectTracing, startGcTracing } from "./BrowserCDP.ts";
+import { connectCdp } from "./CdpClient.ts";
+import { createCdpPage } from "./CdpPage.ts";
+import { createTab, launchChrome } from "./ChromeLauncher.ts";
 import { setupLapMode } from "./LapMode.ts";
 import { runPageLoad } from "./PageLoadMode.ts";
 
@@ -19,6 +20,8 @@ export interface BrowserProfileParams {
   callCounts?: boolean;
   gcStats?: boolean;
   headless?: boolean;
+  chromePath?: string;
+  chromeProfile?: string;
   chromeArgs?: string[];
   timeout?: number; // seconds
   maxTime?: number; // ms, bench function iteration time limit
@@ -57,20 +60,24 @@ export interface BrowserProfileResult {
 export async function profileBrowser(
   params: BrowserProfileParams,
 ): Promise<BrowserProfileResult> {
-  const { url, headless = true, chromeArgs, timeout = 60 } = params;
+  const { url, headless = false, chromePath, chromeProfile } = params;
+  const { chromeArgs, timeout = 60 } = params;
   const collectGc = params.gcStats;
   const samplingInterval = params.allocOptions?.samplingInterval ?? 32768;
 
-  const server = await chromium.launchServer({ headless, args: chromeArgs });
-  pipeChromeOutput(server);
-  const browser = await chromium.connect(server.wsEndpoint());
+  const chrome = await launchChrome({
+    headless,
+    chromePath,
+    chromeProfile,
+    args: chromeArgs,
+  });
   try {
-    const page = await browser.newPage();
-    page.setDefaultTimeout(timeout * 1000);
-    const cdp = await page.context().newCDPSession(page);
+    const pageWsUrl = await createTab(chrome.port);
+    const cdp = await connectCdp(pageWsUrl);
+    const page = await createCdpPage(cdp, { timeout: timeout * 1000 });
 
     const pageErrors: string[] = [];
-    page.on("pageerror", err => pageErrors.push(err.message));
+    page.onPageError(msg => pageErrors.push(msg));
 
     const traceEvents = collectGc ? await startGcTracing(cdp) : [];
 
@@ -91,7 +98,7 @@ export async function profileBrowser(
     };
     const lapMode = await setupLapMode(lapArgs);
 
-    await page.goto(url, { waitUntil: "load" });
+    await page.navigate(url, { waitUntil: "load" });
     const hasBench = await page.evaluate(
       () => typeof (globalThis as any).__bench === "function",
     );
@@ -111,23 +118,6 @@ export async function profileBrowser(
     }
     return result;
   } finally {
-    await browser.close();
-    await server.close();
+    await chrome.close();
   }
-}
-
-/** Forward Chrome's stdout/stderr to the terminal so V8 flag output is visible. */
-function pipeChromeOutput(server: BrowserServer): void {
-  const proc = server.process();
-  const forward = (stream: NodeJS.ReadableStream | null) =>
-    stream?.on("data", (chunk: Buffer) => {
-      const lines = chunk
-        .toString()
-        .split("\n")
-        .map(l => l.trim())
-        .filter(Boolean);
-      for (const line of lines) process.stderr.write(`[chrome] ${line}\n`);
-    });
-  forward(proc.stdout);
-  forward(proc.stderr);
 }

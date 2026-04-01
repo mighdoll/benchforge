@@ -1,9 +1,9 @@
-import type { CDPSession } from "playwright";
 import type { GcStats } from "../../runners/GcStats.ts";
 import type { CoverageData, ScriptCoverage } from "../node/CoverageTypes.ts";
 import type { HeapProfile } from "../node/HeapSampler.ts";
 import type { TimeProfile } from "../node/TimeSampler.ts";
 import { browserGcStats, type TraceEvent } from "./BrowserGcStats.ts";
+import type { CdpClient } from "./CdpClient.ts";
 
 /** Options for starting/stopping CDP instruments (heap, CPU, coverage). */
 export interface InstrumentOpts {
@@ -34,7 +34,7 @@ export function instrumentOpts(
 }
 
 /** Start CDP GC tracing, returns the event collector array. */
-export async function startGcTracing(cdp: CDPSession): Promise<TraceEvent[]> {
+export async function startGcTracing(cdp: CdpClient): Promise<TraceEvent[]> {
   const events: TraceEvent[] = [];
   cdp.on("Tracing.dataCollected", ({ value }) => {
     events.push(...(value as unknown as TraceEvent[]));
@@ -47,7 +47,7 @@ export async function startGcTracing(cdp: CDPSession): Promise<TraceEvent[]> {
 
 /** Stop CDP tracing and parse GC events into GcStats. */
 export async function collectTracing(
-  cdp: CDPSession,
+  cdp: CdpClient,
   traceEvents: TraceEvent[],
 ): Promise<GcStats> {
   const complete = new Promise<void>(resolve =>
@@ -60,7 +60,7 @@ export async function collectTracing(
 
 /** Start CDP Profiler for CPU time sampling (caller manages Profiler.enable/disable) */
 export async function startTimeProfiling(
-  cdp: CDPSession,
+  cdp: CdpClient,
   interval?: number,
 ): Promise<void> {
   if (interval) {
@@ -70,13 +70,13 @@ export async function startTimeProfiling(
 }
 
 /** Stop CDP Profiler CPU sampling and return the profile */
-export async function stopTimeProfiling(cdp: CDPSession): Promise<TimeProfile> {
+export async function stopTimeProfiling(cdp: CdpClient): Promise<TimeProfile> {
   const { profile } = await cdp.send("Profiler.stop");
   return profile as unknown as TimeProfile;
 }
 
 /** Start CDP precise coverage (caller manages Profiler.enable/disable) */
-export async function startCoverageCollection(cdp: CDPSession): Promise<void> {
+export async function startCoverageCollection(cdp: CdpClient): Promise<void> {
   await cdp.send("Profiler.startPreciseCoverage", {
     callCount: true,
     detailed: true,
@@ -84,7 +84,7 @@ export async function startCoverageCollection(cdp: CDPSession): Promise<void> {
 }
 
 /** Collect precise coverage and filter to page-relevant URLs */
-export async function collectCoverage(cdp: CDPSession): Promise<CoverageData> {
+export async function collectCoverage(cdp: CdpClient): Promise<CoverageData> {
   const { result } = await cdp.send("Profiler.takePreciseCoverage");
   await cdp.send("Profiler.stopPreciseCoverage");
   const scripts = (result as unknown as ScriptCoverage[]).filter(isPageScript);
@@ -100,7 +100,7 @@ function isPageScript(s: ScriptCoverage): boolean {
 
 /** Stop all active CDP instruments and return collected profiles/coverage. */
 export async function stopInstruments(
-  cdp: CDPSession,
+  cdp: CdpClient,
   opts: InstrumentOpts,
 ): Promise<{
   heapProfile?: HeapProfile;
@@ -121,7 +121,7 @@ export async function stopInstruments(
 
 /** Start all requested CDP instruments. */
 export async function startInstruments(
-  cdp: CDPSession,
+  cdp: CdpClient,
   opts: InstrumentOpts,
 ): Promise<void> {
   if (opts.alloc) {

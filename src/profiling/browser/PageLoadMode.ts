@@ -1,4 +1,3 @@
-import type { CDPSession, Page } from "playwright";
 import {
   instrumentOpts,
   startInstruments,
@@ -8,11 +7,13 @@ import type {
   BrowserProfileParams,
   BrowserProfileResult,
 } from "./BrowserProfiler.ts";
+import type { CdpClient } from "./CdpClient.ts";
+import type { CdpPage } from "./CdpPage.ts";
 
 /** Run passive page-load profiling: instrument ==> navigate ==> wait ==> collect. */
 export async function runPageLoad(
-  page: Page,
-  cdp: CDPSession,
+  page: CdpPage,
+  cdp: CdpClient,
   params: BrowserProfileParams,
   samplingInterval: number,
 ): Promise<BrowserProfileResult> {
@@ -33,9 +34,9 @@ export async function runPageLoad(
 
   // Navigate with appropriate wait strategy
   if (waitFor === "load" || waitFor === "domcontentloaded") {
-    await page.goto(url, { waitUntil: waitFor });
+    await page.navigate(url, { waitUntil: waitFor });
   } else {
-    await page.goto(url, { waitUntil: "networkidle" });
+    await page.navigate(url, { waitUntil: "networkidle" });
   }
 
   // Custom wait: CSS selector or JS expression

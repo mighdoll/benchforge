@@ -17,7 +17,6 @@ export default defineConfig({
       "esbuild",
       "open",
       "picocolors",
-      "playwright",
       "sirv",
       "table",
       "yargs",

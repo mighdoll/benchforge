@@ -1,4 +1,3 @@
-import type { CDPSession, Page } from "playwright";
 import {
   instrumentOpts,
   startInstruments,
@@ -8,11 +7,13 @@ import type {
   BrowserProfileParams,
   BrowserProfileResult,
 } from "./BrowserProfiler.ts";
+import type { CdpClient } from "./CdpClient.ts";
+import type { CdpPage } from "./CdpPage.ts";
 
 /** Bench function mode: run window.__bench in a timed iteration loop. */
 export async function runBenchLoop(
-  page: Page,
-  cdp: CDPSession,
+  page: CdpPage,
+  cdp: CdpClient,
   params: BrowserProfileParams,
   samplingInterval: number,
 ): Promise<BrowserProfileResult> {

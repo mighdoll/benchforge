@@ -1,4 +1,3 @@
-import type { CDPSession, Page } from "playwright";
 import {
   instrumentOpts,
   startInstruments,
@@ -8,6 +7,8 @@ import type {
   BrowserProfileParams,
   BrowserProfileResult,
 } from "./BrowserProfiler.ts";
+import type { CdpClient } from "./CdpClient.ts";
+import type { CdpPage } from "./CdpPage.ts";
 
 /** Handle for a pending lap-mode benchmark, with cancellation for the timeout. */
 export interface LapModeHandle {
@@ -22,8 +23,8 @@ export interface LapModeHandle {
  * triggers instrument start. __done() stops instruments and collects timing data.
  */
 export async function setupLapMode(args: {
-  page: Page;
-  cdp: CDPSession;
+  page: CdpPage;
+  cdp: CdpClient;
   params: BrowserProfileParams;
   samplingInterval: number;
   timeout: number;

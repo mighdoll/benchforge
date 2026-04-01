@@ -50,8 +50,10 @@ const cliOptions = {
   url:              { type: "string",  requiresArg: true, describe: "page URL for browser profiling (enables browser mode)" },
   "page-load":      { type: "boolean", default: false, describe: "passive page-load profiling (no __bench/__start needed)" },
   "wait-for":       { type: "string",  requiresArg: true, describe: "page-load completion: CSS selector, JS expression, 'load', or 'domcontentloaded'" },
-  headless:         { type: "boolean", default: true, describe: "run browser in headless mode" },
+  headless:         { type: "boolean", default: false, describe: "run browser in headless mode (default: headed)" },
   timeout:          { type: "number",  default: 60, describe: "browser page timeout in seconds" },
+  chrome:           { type: "string",  requiresArg: true, describe: "Chrome binary path (default: auto-detect or CHROME_PATH)" },
+  "chrome-profile": { type: "string",  requiresArg: true, describe: "Chrome user profile directory (default: temp profile)" },
   "chrome-args":    { type: "string",  array: true, requiresArg: true, describe: "extra Chromium flags" },
 } as const;
 
@@ -96,6 +98,8 @@ const optionGroups = {
     "wait-for",
     "headless",
     "timeout",
+    "chrome",
+    "chrome-profile",
     "chrome-args",
   ],
   "Advanced:": ["inspect", "trace-opt", "skip-settle"],

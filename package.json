@@ -17,7 +17,7 @@
     "example:time": "bin/benchforge examples/simple-cli.ts --alloc --time-sample --view --skip-settle --filter quicksort",
     "example:bench": "bin/benchforge --url file://$PWD/examples/browser-bench/index.html --gc-stats --alloc --view",
     "example:counts": "bin/benchforge examples/simple-cli.ts --alloc --time-sample --call-counts --view --skip-settle --iterations 5",
-    "example:heap": "node benchforge-browser/bin.mjs file://$PWD/examples/browser-heap/index.html --gc-stats --view",
+    "example:heap": "bin/benchforge --url file://$PWD/examples/browser-heap/index.html --gc-stats --view",
     "example:lap": "bin/benchforge --url file://$PWD/examples/browser-lap/index.html --gc-stats --alloc --view",
     "example:page-load": "bin/benchforge --url file://$PWD/examples/browser-page-load/index.html --page-load --alloc --time-sample --call-counts --gc-stats --view",
     "fix": "biome check --fix --unsafe --error-on-warnings",
@@ -29,7 +29,7 @@
     "test:once": "pnpm --node-options=--expose-gc vitest run --exclude '**/*.e2e.test.ts'",
     "typecheck": "tsgo && tsgo -p src/viewer",
     "prepush": "run-s fix typecheck test:once build test:e2e test:static:e2e",
-    "publish:all": "pnpm publish && pnpm --filter benchforge-browser publish"
+    "publish:all": "pnpm publish"
   },
   "publishConfig": {
     "bin": {
@@ -53,14 +53,6 @@
     "sirv": "^3.0.2",
     "table": "^6.9.0",
     "yargs": "^18.0.0"
-  },
-  "peerDependencies": {
-    "playwright": ">=1.40.0"
-  },
-  "peerDependenciesMeta": {
-    "playwright": {
-      "optional": true
-    }
   },
   "devDependencies": {
     "@biomejs/biome": "^2.4.9",

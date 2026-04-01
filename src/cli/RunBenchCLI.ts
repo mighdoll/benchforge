@@ -85,7 +85,7 @@ export async function benchExports(
   await finishReports(results, args, suite.name);
 }
 
-/** Run browser profiling via Playwright + CDP and report with standard pipeline. */
+/** Run browser profiling via CDP and report with standard pipeline. */
 export async function browserBenchExports(args: DefaultCliArgs): Promise<void> {
   warnBrowserFlags(args);
   const profileBrowser = await loadBrowserProfiler();
@@ -103,6 +103,8 @@ export async function browserBenchExports(args: DefaultCliArgs): Promise<void> {
     timeSample: needsTimeSample(args),
     timeInterval: args["time-interval"],
     headless: args.headless,
+    chromePath: args.chrome,
+    chromeProfile: args["chrome-profile"],
     chromeArgs: args["chrome-args"]
       ?.flatMap(a => a.split(/\s+/))
       .map(stripQuotes)
@@ -122,23 +124,13 @@ export async function browserBenchExports(args: DefaultCliArgs): Promise<void> {
   await exportReports({ results, args });
 }
 
-/** Dynamically import the browser profiler. Throws a helpful error if Playwright is missing. */
+/** Dynamically import the browser profiler (lazy-loaded for non-browser benchmarks). */
 async function loadBrowserProfiler() {
   type BrowserMod = typeof import("../profiling/browser/BrowserProfiler.ts");
-  try {
-    const mod: BrowserMod = await import(
-      "../profiling/browser/BrowserProfiler.ts"
-    );
-    return mod.profileBrowser;
-  } catch {
-    throw new Error(
-      "playwright is required for browser benchmarking (--url).\n\n" +
-        "Quick start:  npx benchforge-browser <your-url>\n\n" +
-        "Or install manually:\n" +
-        "  npm install playwright\n" +
-        "  npx playwright install chromium",
-    );
-  }
+  const mod: BrowserMod = await import(
+    "../profiling/browser/BrowserProfiler.ts"
+  );
+  return mod.profileBrowser;
 }
 
 /** Run matrix suite with full CLI handling (parse, run, report, export). */
