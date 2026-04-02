@@ -40,6 +40,14 @@ type BootstrapOptions = {
   confidence?: number;
   /** Custom stat function applied to both samples (default: median) */
   statFn?: (s: number[]) => number;
+  /** Block boundaries for block bootstrap (indices where each batch starts) */
+  blocks?: number[];
+};
+
+/** Options for bootstrapDifferenceCI with per-side block boundaries */
+type DiffBootstrapOptions = BootstrapOptions & {
+  /** Block boundaries for the second sample array */
+  blocksB?: number[];
 };
 const defaultConfidence = 0.95;
 const outlierMultiplier = 1.5; // Tukey's fence multiplier
@@ -110,9 +118,8 @@ export function bootstrapStat(
 ): BootstrapResult {
   const { resamples = bootstrapSamples, confidence: conf = defaultConfidence } =
     options;
-  const stats = Array.from({ length: resamples }, () =>
-    statFn(createResample(samples)),
-  );
+  const resample = makeResampler(samples, options.blocks);
+  const stats = Array.from({ length: resamples }, () => statFn(resample()));
   return {
     estimate: statFn(samples),
     ci: computeInterval(stats, conf),
@@ -151,6 +158,31 @@ export function createResample(samples: number[]): number[] {
   );
 }
 
+/** @return resampler using block bootstrap when offsets are provided, else standard */
+function makeResampler(
+  samples: number[],
+  offsets?: number[],
+): () => number[] {
+  if (offsets) return () => createBlockResample(samples, offsets);
+  return () => createResample(samples);
+}
+
+/** @return block bootstrap resample: pick blocks with replacement, concatenate */
+function createBlockResample(
+  samples: number[],
+  offsets: number[],
+): number[] {
+  const n = offsets.length;
+  const result: number[] = [];
+  for (let i = 0; i < n; i++) {
+    const pick = Math.floor(Math.random() * n);
+    const start = offsets[pick];
+    const end = pick + 1 < n ? offsets[pick + 1] : samples.length;
+    for (let j = start; j < end; j++) result.push(samples[j]);
+  }
+  return result;
+}
+
 /**
  * @return bootstrap CI for percentage difference between baseline and current.
  * Resamples both distributions independently and computes the stat difference
@@ -158,23 +190,26 @@ export function createResample(samples: number[]): number[] {
  * or a custom stat function via the statFn option.
  */
 export function bootstrapDifferenceCI(
-  baseline: number[],
-  current: number[],
-  options: BootstrapOptions = {},
+  a: number[],
+  b: number[],
+  options: DiffBootstrapOptions = {},
 ): DifferenceCI {
   const { resamples = bootstrapSamples, confidence: conf = defaultConfidence } =
     options;
   const fn = options.statFn ?? ((s: number[]) => percentile(s, 0.5));
 
-  const baseVal = fn(baseline);
-  const currVal = fn(current);
+  const baseVal = fn(a);
+  const currVal = fn(b);
   const observedPct = ((currVal - baseVal) / baseVal) * 100;
+
+  const resampleA = makeResampler(a, options.blocks);
+  const resampleB = makeResampler(b, options.blocksB ?? options.blocks);
 
   const diffs: number[] = [];
   for (let i = 0; i < resamples; i++) {
-    const valB = fn(createResample(baseline));
-    const valC = fn(createResample(current));
-    diffs.push(((valC - valB) / valB) * 100);
+    const valA = fn(resampleA());
+    const valB = fn(resampleB());
+    diffs.push(((valB - valA) / valA) * 100);
   }
 
   const ci = computeInterval(diffs, conf);

@@ -84,6 +84,9 @@ export interface MeasuredResults {
   /** Points where pauses occurred for V8 optimization */
   pausePoints?: PausePoint[];
 
+  /** Batch boundaries for block bootstrap (indices into samples where each batch starts) */
+  batchOffsets?: number[];
+
   /** GC stats from V8's --trace-gc-nvp (requires --gc-stats and worker mode) */
   gcStats?: GcStats;
 

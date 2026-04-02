@@ -102,6 +102,7 @@ function CollapsibleGroup({ group }: { group: BenchmarkGroup }) {
         <span class="group-toggle">{open ? "\u25be" : "\u25b8"}</span>
         <h2>{group.name}</h2>
         {ci && <ComparisonBadge ci={ci} />}
+        {group.warning && <span class="batch-warning">{group.warning}</span>}
       </div>
       {open && <GroupContent current={current} />}
     </div>

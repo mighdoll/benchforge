@@ -82,6 +82,7 @@
 .report-panel .badge-faster { background: #dcfce7; color: #166534; }
 .report-panel .badge-slower { background: #fee2e2; color: #991b1b; }
 .report-panel .badge-uncertain { background: #dbeafe; color: #1e40af; }
+.report-panel .batch-warning { font-size: 11px; color: #92400e; margin-left: 8px; }
 
 .report-panel .comparison-badge {
   display: inline-flex;

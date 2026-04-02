@@ -68,6 +68,8 @@ export function prepareHtmlData(
   };
 }
 
+const minBatches = 8;
+
 /** @return group data with structured ViewerSections and bootstrap CIs */
 function prepareGroupData(
   group: ReportGroup,
@@ -80,15 +82,20 @@ function prepareGroupData(
     ? { ...baseData, comparisonCI: undefined }
     : undefined;
   const primaryCol = findPrimaryColumn(sections);
+  const lowBatches = hasLowBatchCount(baseM, group.reports[0]?.measuredResults);
 
   return {
     name: group.name,
     baseline,
+    warning: lowBatches
+      ? `Too few batches for reliable comparison (need ${minBatches}+)`
+      : undefined,
     benchmarks: group.reports.map(report => {
       const m = report.measuredResults;
       const comparisonCI = buildGroupCI(
         baseM, m, report.metadata, primaryCol,
       );
+      if (lowBatches && comparisonCI) comparisonCI.direction = "uncertain";
       const viewerSections = sections
         ? buildViewerSections(
             sections,
@@ -105,6 +112,18 @@ function prepareGroupData(
       };
     }),
   };
+}
+
+/** @return true if batched but below the minimum for reliable block bootstrap */
+function hasLowBatchCount(
+  baseline: MeasuredResults | undefined,
+  current: MeasuredResults | undefined,
+): boolean {
+  const batchCount = (m?: MeasuredResults) => m?.batchOffsets?.length ?? 0;
+  const baseN = batchCount(baseline);
+  const curN = batchCount(current);
+  if (baseN === 0 && curN === 0) return false; // not batched
+  return baseN < minBatches || curN < minBatches;
 }
 
 /** Find the first comparable column with a statFn across all sections */
@@ -129,9 +148,11 @@ function buildGroupCI(
   primaryCol: ReportColumn<Record<string, unknown>> | undefined,
 ): DifferenceCI | undefined {
   if (!baseline?.samples?.length || !current.samples?.length) return undefined;
-  const opts = primaryCol?.statFn
+  const opts: Parameters<typeof bootstrapDifferenceCI>[2] = primaryCol?.statFn
     ? { statFn: (s: number[]) => primaryCol.statFn!(s, metadata) }
     : {};
+  opts.blocks = baseline.batchOffsets;
+  opts.blocksB = current.batchOffsets;
   const rawCI = bootstrapDifferenceCI(baseline.samples, current.samples, opts);
   if (primaryCol?.higherIsBetter) return swapDirection(rawCI);
   return rawCI;
@@ -243,7 +264,7 @@ function buildColumnRow(
       ctx.current.name,
       format(curRaw),
       col,
-      ctx.current.samples,
+      ctx.current,
       ctx.currentMeta,
     ),
   ];
@@ -253,7 +274,7 @@ function buildColumnRow(
         "baseline",
         format(baseRaw),
         col,
-        ctx.baseline.samples,
+        ctx.baseline,
         ctx.baselineMeta,
       ),
     );
@@ -279,8 +300,13 @@ function buildComparisonCI(
   const rawCI = bootstrapDifferenceCI(
     ctx.baseline.samples,
     ctx.current.samples,
-    { statFn: s => col.statFn!(s, ctx.currentMeta) },
+    {
+      statFn: s => col.statFn!(s, ctx.currentMeta),
+      blocks: ctx.baseline.batchOffsets,
+      blocksB: ctx.current.batchOffsets,
+    },
   );
+  if (hasLowBatchCount(ctx.baseline, ctx.current)) rawCI.direction = "uncertain";
   // statFn computes in the metric's natural domain. bootstrapDifferenceCI
   // assumes lower-is-better for direction labels. For higher-is-better
   // metrics (like loc/sec), swap the direction without negating the values.
@@ -293,13 +319,16 @@ function buildEntry(
   runName: string,
   value: string,
   col: ReportColumn<Record<string, unknown>>,
-  samples: number[] | undefined,
+  measured: MeasuredResults | undefined,
   metadata?: UnknownRecord,
 ): ViewerEntry {
   let bootstrapCI: BootstrapCIData | undefined;
+  const samples = measured?.samples;
   if (col.comparable && col.statFn && samples && samples.length > 1) {
     const fn = (s: number[]) => col.statFn!(s, metadata);
-    const result = bootstrapStat(samples, fn);
+    const result = bootstrapStat(samples, fn, {
+      blocks: measured?.batchOffsets,
+    });
     const format = (v: number) => (col.formatter ? col.formatter(v) : String(v)) ?? String(v);
     bootstrapCI = {
       ...binBootstrapResult(result),

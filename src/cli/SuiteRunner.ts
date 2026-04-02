@@ -250,7 +250,9 @@ function mergeResults(results: MeasuredResults[]): MeasuredResults {
   const time = computeStats(allSamples);
 
   let offset = 0;
+  const batchOffsets: number[] = [];
   const pauses = results.flatMap(r => {
+    batchOffsets.push(offset);
     const shifted = (r.pausePoints ?? []).map(p => ({
       sampleIndex: p.sampleIndex + offset,
       durationMs: p.durationMs,
@@ -266,5 +268,6 @@ function mergeResults(results: MeasuredResults[]): MeasuredResults {
     time,
     totalTime: results.reduce((sum, r) => sum + (r.totalTime || 0), 0),
     pausePoints: pauses.length ? pauses : undefined,
+    batchOffsets,
   };
 }

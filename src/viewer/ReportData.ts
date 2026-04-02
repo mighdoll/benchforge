@@ -19,6 +19,7 @@ export interface BenchmarkGroup {
   name: string;
   baseline?: BenchmarkEntry;
   benchmarks: BenchmarkEntry[];
+  warning?: string;
 }
 
 /** One benchmark's raw data, statistics, and optional comparison results */
