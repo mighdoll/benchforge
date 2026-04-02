@@ -33,7 +33,7 @@ const defaultOpts = {
   width: 260,
   height: 85,
   title: "Δ%",
-  smooth: false,
+  smooth: true,
   direction: "uncertain" as const,
   includeZero: true,
 };
@@ -66,8 +66,10 @@ export function createDistributionPlot(
 
   const ciX = scales.x(ci[0]);
   const ciW = scales.x(ci[1]) - ciX;
-  const ciOpacity = opts.includeZero ? "0.5" : "0.3";
-  add(rect(ciX, margin.top, ciW, plot.h, { fill, opacity: ciOpacity }));
+  const ciRect = rect(ciX, margin.top, ciW, plot.h, { fill });
+  const strength = opts.includeZero ? "ci-region-strong" : "ci-region";
+  ciRect.classList.add(strength, `ci-${opts.direction}`);
+  add(ciRect);
 
   if (opts.smooth) drawSmoothedDist(svg, histogram, scales, stroke);
   else drawHistogramBars(svg, histogram, scales, layout, stroke);

@@ -230,6 +230,12 @@
 .report-panel .plot-area svg { overflow: visible; }
 .report-panel .plot-area svg g[aria-label="x-axis label"] text { font-size: 14px; }
 
+/* --- CI region overlay opacity (light/dark aware) --- */
+.ci-region { opacity: 0.45; }
+.ci-region-strong { opacity: 0.6; }
+.ci-region.ci-faster, .ci-region.ci-equivalent { opacity: 0.3; }
+.ci-region-strong.ci-faster, .ci-region-strong.ci-equivalent { opacity: 0.35; }
+
 /* --- Misc --- */
 
 .report-panel .loading { color: #666; font-style: italic; padding: 20px; text-align: center; }
@@ -280,6 +286,12 @@
   :root:not([data-theme="light"]) .report-panel .loading { color: #999; }
   :root:not([data-theme="light"]) .report-panel .empty-state { color: #666; }
   :root:not([data-theme="light"]) .report-panel .empty-state code { background: #333; }
+  :root:not([data-theme="light"]) .ci-region { opacity: 0.2; }
+  :root:not([data-theme="light"]) .ci-region-strong { opacity: 0.35; }
+  :root:not([data-theme="light"]) .ci-region.ci-faster,
+  :root:not([data-theme="light"]) .ci-region.ci-equivalent { opacity: 0.15; }
+  :root:not([data-theme="light"]) .ci-region-strong.ci-faster,
+  :root:not([data-theme="light"]) .ci-region-strong.ci-equivalent { opacity: 0.25; }
 }
 
 /* --- Dark mode — user forced --- */
@@ -305,3 +317,9 @@
 :root[data-theme="dark"] .report-panel .loading { color: #999; }
 :root[data-theme="dark"] .report-panel .empty-state { color: #666; }
 :root[data-theme="dark"] .report-panel .empty-state code { background: #333; }
+:root[data-theme="dark"] .ci-region { opacity: 0.2; }
+:root[data-theme="dark"] .ci-region-strong { opacity: 0.35; }
+:root[data-theme="dark"] .ci-region.ci-faster,
+:root[data-theme="dark"] .ci-region.ci-equivalent { opacity: 0.15; }
+:root[data-theme="dark"] .ci-region-strong.ci-faster,
+:root[data-theme="dark"] .ci-region-strong.ci-equivalent { opacity: 0.25; }

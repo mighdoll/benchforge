@@ -121,8 +121,12 @@ function CollapsibleGroup({ group }: { group: BenchmarkGroup }) {
 }
 
 function GroupContent({ current }: { current: BenchmarkEntry }) {
+  const ref = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (ref.current) alignRunColumns(ref.current);
+  });
   return (
-    <div class="panel-grid">
+    <div class="panel-grid" ref={ref}>
       {current.sections?.map((s, i) => <SectionPanel key={i} section={s} />)}
       <HeapPanel entry={current} />
       <CoveragePanel entry={current} />
@@ -132,18 +136,12 @@ function GroupContent({ current }: { current: BenchmarkEntry }) {
 
 function SectionPanel({ section }: { section: ViewerSection }) {
   if (!section.rows.length) return null;
-  const ref = useRef<HTMLDivElement>(null);
   const titleEl = section.tabLink
     ? <a class="panel-title-link" onClick={() => (activeTabId.value = section.tabLink!)}>{section.title}</a>
     : <span>{section.title}</span>;
 
-  useEffect(() => {
-    if (!ref.current) return;
-    alignRunColumns(ref.current);
-  });
-
   return (
-    <div class="section-panel" ref={ref}>
+    <div class="section-panel">
       <div class="panel-header">{titleEl}</div>
       <div class="panel-body">
         {section.rows.map((row, i) => <StatRow key={i} row={row} />)}
