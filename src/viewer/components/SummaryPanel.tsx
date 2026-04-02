@@ -70,13 +70,16 @@ declare const __BENCHFORGE_GIT_HASH__: string;
 declare const __BENCHFORGE_GIT_DIRTY__: boolean;
 declare const __BENCHFORGE_BUILD_DATE__: string;
 
+function safeGlobal<T>(v: T, fallback: T): T {
+  return typeof v !== "undefined" ? v : fallback;
+}
+
 function benchforgeLabel(): string {
-  const hash = typeof __BENCHFORGE_GIT_HASH__ !== "undefined" ? __BENCHFORGE_GIT_HASH__ : "dev";
-  const dirty = typeof __BENCHFORGE_GIT_DIRTY__ !== "undefined" && __BENCHFORGE_GIT_DIRTY__;
-  const date = typeof __BENCHFORGE_BUILD_DATE__ !== "undefined" ? __BENCHFORGE_BUILD_DATE__ : "";
-  const parts = [`benchforge ${hash}${dirty ? "*" : ""}`];
-  if (date) parts.push(formatRelativeTime(date));
-  return parts.join(" ");
+  const hash = safeGlobal(__BENCHFORGE_GIT_HASH__, "dev");
+  const dirty = safeGlobal(__BENCHFORGE_GIT_DIRTY__, false);
+  const date = safeGlobal(__BENCHFORGE_BUILD_DATE__, "");
+  const label = `benchforge ${hash}${dirty ? "*" : ""}`;
+  return date ? `${label} ${formatRelativeTime(date)}` : label;
 }
 
 function ReportHeader({ metadata }: { metadata: Record<string, unknown> }) {

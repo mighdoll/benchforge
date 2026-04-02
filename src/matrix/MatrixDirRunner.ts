@@ -18,6 +18,8 @@ import type { CasesModule } from "./CaseLoader.ts";
 import { loadCaseData } from "./CaseLoader.ts";
 import { discoverVariants } from "./VariantLoader.ts";
 
+type VariantArgs = Parameters<typeof runMatrixVariant>[0];
+
 /** Shared state for directory-based matrix execution */
 interface DirMatrixContext<T> {
   matrix: BenchMatrix<T>;
@@ -61,6 +63,7 @@ async function createDirContext<T>(
   const batches = options.batches ?? 1;
   const runnerOpts = buildRunnerOptions(options);
   if (batches > 1) runnerOpts.maxTime = (runnerOpts.maxTime ?? 1000) / batches;
+  const warmupBatch = options.warmupBatch ?? false;
   return {
     matrix,
     casesModule,
@@ -68,7 +71,7 @@ async function createDirContext<T>(
     caseIds,
     runnerOpts,
     batches,
-    warmupBatch: options.warmupBatch ?? false,
+    warmupBatch,
   };
 }
 
@@ -125,8 +128,8 @@ async function runDirVariantCases<T>(
 
 /** Run a single unbatched measurement for a case. */
 async function runCaseSingle(
-  variantArgs: Parameters<typeof runMatrixVariant>[0],
-  baselineArgs: Parameters<typeof runMatrixVariant>[0] | undefined,
+  variantArgs: VariantArgs,
+  baselineArgs: VariantArgs | undefined,
 ): Promise<{ measured: MeasuredResults; baseline?: MeasuredResults }> {
   const [measured] = await runMatrixVariant(variantArgs);
   const baseline = baselineArgs
@@ -137,17 +140,17 @@ async function runCaseSingle(
 
 /** Run a batched measurement for a case, alternating current/baseline order. */
 async function runCaseBatched<T>(
-  variantArgs: Parameters<typeof runMatrixVariant>[0],
-  baselineArgs: Parameters<typeof runMatrixVariant>[0] | undefined,
+  variantArgs: VariantArgs,
+  baselineArgs: VariantArgs | undefined,
   ctx: DirMatrixContext<T>,
 ): Promise<{ measured: MeasuredResults; baseline?: MeasuredResults }> {
   const runCurrent = async () => (await runMatrixVariant(variantArgs))[0];
-  const runBaseline = baselineArgs
+  const runBase = baselineArgs
     ? async () => (await runMatrixVariant(baselineArgs))[0]
     : undefined;
   const { current, baseline } = await runBatchedPair(
     runCurrent,
-    runBaseline,
+    runBase,
     ctx.batches,
     ctx.warmupBatch,
   );

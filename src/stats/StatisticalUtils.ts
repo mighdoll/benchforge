@@ -134,11 +134,10 @@ export function bootstrapStat(
   const blockVals = options.blocks
     ? blockValues(samples, options.blocks, statFn)
     : undefined;
-  const stats = blockVals
-    ? Array.from({ length: resamples }, () =>
-        average(createResample(blockVals)),
-      )
-    : Array.from({ length: resamples }, () => statFn(createResample(samples)));
+  const draw = blockVals
+    ? () => average(createResample(blockVals))
+    : () => statFn(createResample(samples));
+  const stats = Array.from({ length: resamples }, draw);
   return {
     estimate: statFn(samples),
     ci: computeInterval(stats, conf),
@@ -246,16 +245,17 @@ export function bootstrapDifferenceCI(
 
   const { meansA, meansB, trimmed } = prepareBlockMeans(a, b, options);
 
-  const diffs: number[] = [];
-  for (let i = 0; i < resamples; i++) {
-    const valA = meansA
-      ? average(createResample(meansA))
-      : fn(createResample(a));
-    const valB = meansB
-      ? average(createResample(meansB))
-      : fn(createResample(b));
-    diffs.push(((valB - valA) / valA) * 100);
-  }
+  const drawA = meansA
+    ? () => average(createResample(meansA))
+    : () => fn(createResample(a));
+  const drawB = meansB
+    ? () => average(createResample(meansB))
+    : () => fn(createResample(b));
+  const diffs = Array.from({ length: resamples }, () => {
+    const valA = drawA();
+    const valB = drawB();
+    return ((valB - valA) / valA) * 100;
+  });
 
   const ci = computeInterval(diffs, conf);
   const direction = classifyDirection(ci, observedPct, options.equivMargin);

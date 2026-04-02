@@ -54,7 +54,7 @@ function analyzeBenchmark(
       : undefined;
 
   const nBatches = bBatches.length;
-  const totalRuns = bench.samples.length;
+  const { length: totalRuns } = bench.samples;
   const baseRuns = baseline?.samples?.length;
   const batchDur = bench.totalTime
     ? (bench.totalTime / nBatches).toFixed(1) + "s"
@@ -116,32 +116,25 @@ function printBatchTable(
     const n = String(benches[i].length).padStart(4);
     const bStr = (timeMs(percentile(benches[i], 0.5)) ?? "").padStart(10);
     const idx = String(i).padEnd(7);
-
     if (!baselines?.[i]) {
       console.log(`  ${idx} ${n}  ${bStr}`);
       continue;
     }
     const baseStr = (timeMs(percentile(baselines[i], 0.5)) ?? "").padStart(10);
-    const deltaStr = formatDelta(
-      medianDelta(benches[i], baselines[i]),
-    ).padStart(8);
+    const delta = formatDelta(medianDelta(benches[i], baselines[i])).padStart(
+      8,
+    );
     const order = i % 2 === 0 ? dim(" B>C") : dim(" C>B");
-    console.log(`  ${idx} ${n}  ${bStr}  ${baseStr}  ${deltaStr}${order}`);
+    console.log(`  ${idx} ${n}  ${bStr}  ${baseStr}  ${delta}${order}`);
   }
 }
 
 /** Analyze order effect: does running second make a difference? */
 function printOrderEffect(benches: number[][], baselines: number[][]): void {
   // Even batches: baseline runs first (B>C), odd: current runs first (C>B)
-  const baseFirstDeltas: number[] = []; // even: baseline ran first
-  const currFirstDeltas: number[] = []; // odd: current ran first
-
-  for (let i = 0; i < benches.length; i++) {
-    const delta = medianDelta(benches[i], baselines[i]);
-    if (i % 2 === 0) baseFirstDeltas.push(delta);
-    else currFirstDeltas.push(delta);
-  }
-
+  const deltas = benches.map((b, i) => medianDelta(b, baselines[i]));
+  const baseFirstDeltas = deltas.filter((_, i) => i % 2 === 0);
+  const currFirstDeltas = deltas.filter((_, i) => i % 2 === 1);
   const baseFirstAvg = baseFirstDeltas.length ? average(baseFirstDeltas) : 0;
   const currFirstAvg = currFirstDeltas.length ? average(currFirstDeltas) : 0;
 
@@ -201,13 +194,16 @@ function printTrimmedBlocks(
   baselines: number[][],
   name: string,
 ): void {
-  const curMeans = benches.map(b => average(b));
-  const baseMeans = baselines.map(b => average(b));
-
   console.log();
   console.log(bold("  Trimmed blocks:"));
-  printSideTrim("baseline", baseMeans);
-  printSideTrim(name, curMeans);
+  printSideTrim(
+    "baseline",
+    baselines.map(b => average(b)),
+  );
+  printSideTrim(
+    name,
+    benches.map(b => average(b)),
+  );
 }
 
 /** Print trimming info for one side using 3x IQR fences. */

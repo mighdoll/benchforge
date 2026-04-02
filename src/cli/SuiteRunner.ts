@@ -56,10 +56,8 @@ export async function runBenchmarks(
 
 /** Execute all groups in a suite sequentially. */
 async function runSuite(params: SuiteParams): Promise<ReportGroup[]> {
-  const { suite, runner, options, useWorker, batches, warmupBatch } = params;
-  return serialMap(suite.groups, g =>
-    runGroup(g, runner, options, useWorker, batches, warmupBatch),
-  );
+  const { suite, ...rest } = params;
+  return serialMap(suite.groups, g => runGroup(g, rest));
 }
 
 /** Like Promise.all(arr.map(fn)) but runs one at a time. */
@@ -77,12 +75,15 @@ async function serialMap<T, R>(
 /** Execute group with shared setup, optionally batching to reduce ordering bias. */
 async function runGroup(
   group: BenchGroup,
-  runner: KnownRunner,
-  options: RunnerOptions,
-  useWorker: boolean,
-  batches = 1,
-  warmupBatch = false,
+  suiteParams: Omit<SuiteParams, "suite">,
 ): Promise<ReportGroup> {
+  const {
+    runner,
+    options,
+    useWorker,
+    batches = 1,
+    warmupBatch = false,
+  } = suiteParams;
   const { name, benchmarks, baseline, setup, metadata } = group;
   const setupParams = await setup?.();
   validateBenchmarkParameters(group);
@@ -94,9 +95,8 @@ async function runGroup(
     params: setupParams,
     metadata,
   };
-  if (batches === 1) {
+  if (batches === 1)
     return runSingleBatch(name, benchmarks, baseline, runParams);
-  }
   return runMultipleBatches(
     name,
     benchmarks,
@@ -113,8 +113,7 @@ function validateBenchmarkParameters(group: BenchGroup): void {
   const all = group.baseline
     ? [...group.benchmarks, group.baseline]
     : group.benchmarks;
-  const parameterized = all.filter(b => b.fn.length > 0);
-  for (const bench of parameterized) {
+  for (const bench of all.filter(b => b.fn.length > 0)) {
     console.warn(
       `Benchmark "${bench.name}" in group "${group.name}" expects parameters but no setup() provided.`,
     );

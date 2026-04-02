@@ -50,11 +50,16 @@ export function reportResults<S extends ReadonlyArray<ResultsMapper<any>>>(
   options?: TextReportOptions,
 ): string {
   const primaryCol = findPrimaryColumn(sections as unknown as ResultsMapper[]);
-  const results = groups.map(group =>
-    resultGroupValues(group, sections, primaryCol, options),
+  const results = groups.map(g =>
+    resultGroupValues(g, sections, primaryCol, options),
   );
-  const hasBaseline = results.some(g => g.baseline);
-  return buildTable(createColumnGroups(sections, hasBaseline), results);
+  return buildTable(
+    createColumnGroups(
+      sections,
+      results.some(g => g.baseline),
+    ),
+    results,
+  );
 }
 
 /** Extract stats from all sections into typed row objects for each report */
@@ -99,15 +104,10 @@ function resultGroupValues<S extends ReadonlyArray<ResultsMapper<any>>>(
 ): ResultGroup<ReportRowData<S>> {
   const { reports, baseline } = group;
   const baseM = baseline?.measuredResults;
+  const margin = options?.equivMargin;
   const results = reports.map(report => {
     const { measuredResults: m, metadata } = report;
-    const diffCI = computeDiffCI(
-      baseM,
-      m,
-      primaryCol,
-      metadata,
-      options?.equivMargin,
-    );
+    const diffCI = computeDiffCI(baseM, m, primaryCol, metadata, margin);
     return {
       name: truncate(report.name),
       ...extractSectionValues(m, sections, metadata),

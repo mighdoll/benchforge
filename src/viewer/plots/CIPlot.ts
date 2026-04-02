@@ -62,7 +62,7 @@ export function createDistributionPlot(
   const { margin, plot } = layout;
   const add = (el: SVGElement) => svg.appendChild(el);
 
-  drawTitles(svg, opts, margin, plot);
+  drawTitles(svg, opts, margin, scales.x(pointEstimate));
 
   const ciX = scales.x(ci[0]);
   const ciW = scales.x(ci[1]) - ciX;
@@ -93,18 +93,25 @@ function drawTitles(
   svg: SVGSVGElement,
   opts: DistributionPlotOptions,
   margin: Layout["margin"],
-  plot: Layout["plot"],
+  pointX: number,
 ): void {
+  const add = (el: SVGElement) => svg.appendChild(el);
   if (opts.title)
-    svg.appendChild(
-      text(margin.left, 14, opts.title, "start", "13", "#333", "600"),
+    add(
+      text(margin.left, 14, opts.title, "start", "13", "currentColor", "600"),
     );
-  if (opts.pointLabel) {
-    const cx = margin.left + plot.w / 2;
-    svg.appendChild(
-      text(cx, margin.top - 6, opts.pointLabel, "middle", "15", "#333", "700"),
+  if (opts.pointLabel)
+    add(
+      text(
+        pointX,
+        margin.top - 6,
+        opts.pointLabel,
+        "middle",
+        "15",
+        "currentColor",
+        "700",
+      ),
     );
-  }
 }
 
 /** Draw zero reference line extending past plot area (comparison CIs only) */
@@ -118,13 +125,13 @@ function drawReferenceLine(
   const zeroX = scales.x(0);
   const { margin, plot } = layout;
   const inRange = zeroX >= margin.left && zeroX <= layout.width - margin.right;
-  if (inRange)
+  if (inRange) {
+    const y1 = margin.top - 4;
+    const y2 = margin.top + plot.h + 4;
     svg.appendChild(
-      line(zeroX, margin.top - 4, zeroX, margin.top + plot.h + 4, {
-        stroke: "#000",
-        strokeWidth: "1",
-      }),
+      line(zeroX, y1, zeroX, y2, { stroke: "#000", strokeWidth: "1" }),
     );
+  }
 }
 
 /** Convenience wrapper for DifferenceCI data */
@@ -229,16 +236,20 @@ function drawSmoothedDist(
   const sorted = [...histogram].sort((a, b) => a.x - b.x);
   const smoothed = gaussianSmooth(sorted, 2);
   const pts = smoothed.map(b => `${scales.x(b.x)},${scales.y(b.count)}`);
-  const baseline = scales.y(0);
-  svg.appendChild(
-    path(
-      `M${scales.x(smoothed[0].x)},${baseline}L${pts.join("L")}L${scales.x(smoothed.at(-1)!.x)},${baseline}Z`,
-      { fill: stroke, opacity: "0.4" },
-    ),
-  );
-  svg.appendChild(
-    path(`M${pts.join("L")}`, { stroke, fill: "none", strokeWidth: "1.5" }),
-  );
+  const base = scales.y(0);
+  const startX = scales.x(smoothed[0].x);
+  const endX = scales.x(smoothed.at(-1)!.x);
+  const fillD = `M${startX},${base}L${pts.join("L")}L${endX},${base}Z`;
+  const fillPath = path(fillD, { fill: stroke });
+  fillPath.classList.add("dist-fill");
+  svg.appendChild(fillPath);
+  const strokePath = path(`M${pts.join("L")}`, {
+    stroke,
+    fill: "none",
+    strokeWidth: "1.5",
+  });
+  strokePath.classList.add("dist-stroke");
+  svg.appendChild(strokePath);
 }
 
 /** Draw individual histogram bars centered on each bin position */
@@ -275,17 +286,10 @@ function drawCILabels(
   const labelY = layout.height - 4;
   const loLabel = opts.ciLabels?.[0] ?? formatPct(ci[0], 0);
   const hiLabel = opts.ciLabels?.[1] ?? formatPct(ci[1], 0);
-  if (!opts.includeZero) {
-    svg.appendChild(text(layout.margin.left, labelY, loLabel, "start", "11"));
-    svg.appendChild(
-      text(layout.width - layout.margin.right, labelY, hiLabel, "end", "11"),
-    );
-    return;
-  }
   const loX = scales.x(ci[0]);
   const hiX = scales.x(ci[1]);
   const minGap = Math.max(loLabel.length, hiLabel.length) * 6;
-  if (hiX - loX >= minGap) {
+  if (!opts.includeZero || hiX - loX >= minGap) {
     svg.appendChild(text(loX, labelY, loLabel, "middle", "11"));
     svg.appendChild(text(hiX, labelY, hiLabel, "middle", "11"));
   }

@@ -157,13 +157,12 @@ export function parseCliArgs<T = DefaultCliArgs>(
 /** Strip yargs internals (`_`, `$0`) and undefined values, converting kebab-case to camelCase. */
 export function cleanCliArgs(args: DefaultCliArgs): Record<string, unknown> {
   const skip = new Set(["_", "$0"]);
+  const toCamel = (k: string) =>
+    k.replace(/-([a-z])/g, (_, l: string) => l.toUpperCase());
   return Object.fromEntries(
     Object.entries(args)
       .filter(([k, v]) => v !== undefined && v !== null && !skip.has(k))
-      .map(([k, v]) => [
-        k.replace(/-([a-z])/g, (_, l: string) => l.toUpperCase()),
-        v,
-      ]),
+      .map(([k, v]) => [toCamel(k), v]),
   );
 }
 

@@ -50,11 +50,17 @@ type FrameContainer = {
 
 /** Export reports (JSON, Perfetto, archive, viewer) based on CLI args. */
 export async function exportReports(options: ExportOptions): Promise<void> {
-  const { results, args, suiteName } = options;
-  const { sections, currentVersion, baselineVersion } = options;
+  const {
+    results,
+    args,
+    suiteName,
+    sections,
+    currentVersion,
+    baselineVersion,
+  } = options;
 
   const needsReportData = args.view || args.archive != null;
-  const htmlOptions = {
+  const htmlOpts = {
     cliArgs: args,
     sections,
     currentVersion,
@@ -62,7 +68,7 @@ export async function exportReports(options: ExportOptions): Promise<void> {
     equivMargin: args["equiv-margin"],
   };
   const reportData = needsReportData
-    ? prepareHtmlData(results, htmlOptions)
+    ? prepareHtmlData(results, htmlOpts)
     : undefined;
 
   exportFileFormats(results, args, suiteName);
@@ -70,19 +76,17 @@ export async function exportReports(options: ExportOptions): Promise<void> {
   const profileFile = buildSpeedscopeFile(results);
   const timeFile = buildAllTimeProfiles(results);
   const coverageData = await annotateCoverage(results, profileFile, timeFile);
-
   const timeData = timeFile ? JSON.stringify(timeFile) : undefined;
+
   if (args.archive != null) {
-    const archivePath = args.archive || undefined;
     await archiveBenchmark({
       groups: results,
       reportData,
       timeProfileData: timeData,
       coverageData,
-      outputPath: archivePath,
+      outputPath: args.archive || undefined,
     });
   }
-
   if (args.view) {
     await openViewer(profileFile, timeData, coverageData, reportData, args);
   }
@@ -137,13 +141,13 @@ async function annotateCoverage(
   const coverage = mergeCoverage(results);
   if (!coverage) return undefined;
 
-  const coverageUrls = coverage.scripts.map(s => ({ file: s.url }));
-  const sources = await collectSources(coverageUrls);
-  const result = buildCoverageMap(coverage, sources);
-  if (profileFile) annotateFramesWithCounts(profileFile.shared.frames, result);
-  if (timeFile) annotateFramesWithCounts(timeFile.shared.frames, result);
-
-  return JSON.stringify(Object.fromEntries(result.map));
+  const sources = await collectSources(
+    coverage.scripts.map(s => ({ file: s.url })),
+  );
+  const covMap = buildCoverageMap(coverage, sources);
+  if (profileFile) annotateFramesWithCounts(profileFile.shared.frames, covMap);
+  if (timeFile) annotateFramesWithCounts(timeFile.shared.frames, covMap);
+  return JSON.stringify(Object.fromEntries(covMap.map));
 }
 
 /** Start viewer server with profile data and block until Ctrl+C. */
@@ -168,12 +172,8 @@ async function openViewer(
 /** Export the first raw V8 TimeProfile to a JSON file. */
 function exportTimeProfile(results: ReportGroup[], path: string): void {
   const profile = findTimeProfile(results);
-  if (!profile) {
-    console.log("No time profiles to export.");
-    return;
-  }
-  const absPath = resolve(path);
-  writeFileSync(absPath, JSON.stringify(profile));
+  if (!profile) return void console.log("No time profiles to export.");
+  writeFileSync(resolve(path), JSON.stringify(profile));
   console.log(`Time profile exported to: ${path}`);
 }
 
@@ -191,7 +191,7 @@ function mergeCoverage(
 function findTimeProfile(
   results: ReportGroup[],
 ): import("../profiling/node/TimeSampler.ts").TimeProfile | undefined {
-  const reports = results.flatMap(g => groupReports(g));
-  return reports.find(r => r.measuredResults.timeProfile)?.measuredResults
-    .timeProfile;
+  return results
+    .flatMap(g => groupReports(g))
+    .find(r => r.measuredResults.timeProfile)?.measuredResults.timeProfile;
 }

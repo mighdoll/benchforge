@@ -300,11 +300,12 @@ function buildEntry(
   const result = bootstrapStat(samples, fn, { blocks: measured?.batchOffsets });
   const fmt = (v: number) =>
     (col.formatter ? col.formatter(v) : String(v)) ?? String(v);
-  const bootstrapCI = {
-    ...binBootstrapResult(result),
-    ciLabels: [fmt(result.ci[0]), fmt(result.ci[1])] as [string, string],
+  const ciLabels = [fmt(result.ci[0]), fmt(result.ci[1])] as [string, string];
+  return {
+    runName,
+    value,
+    bootstrapCI: { ...binBootstrapResult(result), ciLabels },
   };
-  return { runName, value, bootstrapCI };
 }
 
 /** Compute heap allocation summary from profile */
@@ -319,10 +320,8 @@ function summarizeCoverage(coverage: CoverageData): CoverageSummary {
   const calledFns = coverage.scripts
     .flatMap(s => s.functions)
     .filter(fn => fn.ranges.length > 0 && fn.ranges[0].count > 0);
-  return {
-    functionCount: calledFns.length,
-    totalCalls: calledFns.reduce((sum, fn) => sum + fn.ranges[0].count, 0),
-  };
+  const totalCalls = calledFns.reduce((sum, fn) => sum + fn.ranges[0].count, 0);
+  return { functionCount: calledFns.length, totalCalls };
 }
 
 /** Build default sections when caller doesn't provide custom ones */

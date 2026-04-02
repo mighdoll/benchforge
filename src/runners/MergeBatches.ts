@@ -98,10 +98,8 @@ export async function runBatchedPair(
     baselineBatches.shift();
   }
 
-  return {
-    current: mergeBatchResults(currentBatches),
-    baseline: baselineBatches.length
-      ? mergeBatchResults(baselineBatches)
-      : undefined,
-  };
+  const baseline = baselineBatches.length
+    ? mergeBatchResults(baselineBatches)
+    : undefined;
+  return { current: mergeBatchResults(currentBatches), baseline };
 }

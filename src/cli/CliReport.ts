@@ -96,19 +96,18 @@ export function printHeapReports(
   groups: ReportGroup[],
   options: HeapReportOptions,
 ): void {
-  const reports = groups.flatMap(g => groupReports(g));
-  for (const report of reports) {
+  for (const report of groups.flatMap(g => groupReports(g))) {
     const { heapProfile } = report.measuredResults;
     if (!heapProfile) continue;
-
     console.log(dim(`\n─── Heap profile: ${report.name} ───`));
     const resolved = resolveProfile(heapProfile);
     const sites = flattenProfile(resolved);
     const userSites = filterSites(sites, options.isUserCode);
     const agg = aggregateSites(options.userOnly ? userSites : sites);
+    const totalUserCode = userSites.reduce((sum, s) => sum + s.bytes, 0);
     const extra = {
       totalAll: resolved.totalBytes,
-      totalUserCode: userSites.reduce((sum, s) => sum + s.bytes, 0),
+      totalUserCode,
       sampleCount: resolved.sortedSamples?.length,
     };
     console.log(formatHeapReport(agg, { ...options, ...extra }));
@@ -161,16 +160,19 @@ export function matrixToReportGroups(results: MatrixResults[]): ReportGroup[] {
 
 /** Apply default sections and extra columns for matrix reports. */
 function mergeMatrixDefaults(
-  reportOptions: MatrixReportOptions | undefined,
+  opts: MatrixReportOptions | undefined,
   args: DefaultCliArgs,
   results: MatrixResults[],
 ): MatrixReportOptions {
-  const merged: MatrixReportOptions = { ...reportOptions };
+  const merged: MatrixReportOptions = { ...opts };
   if (!merged.sections?.length) {
-    const groups = matrixToReportGroups(results);
-    const hasOpt = args["trace-opt"] && hasField(groups, "optStatus");
-    const { adaptive, "gc-stats": gcStats } = args;
-    merged.sections = buildReportSections(adaptive, gcStats, hasOpt);
+    const hasOpt =
+      args["trace-opt"] && hasField(matrixToReportGroups(results), "optStatus");
+    merged.sections = buildReportSections(
+      args.adaptive,
+      args["gc-stats"],
+      hasOpt,
+    );
   }
   if (merged.equivMargin == null) merged.equivMargin = args["equiv-margin"];
   return merged;

@@ -5,21 +5,18 @@ import { defineConfig, type Plugin } from "vite";
 
 function gitBuildInfo(): Record<string, string> {
   const run = (cmd: string) => execSync(cmd, { encoding: "utf8" }).trim();
+  let hash = "unknown";
+  let dirty = false;
   try {
-    const hash = run("git rev-parse --short HEAD");
-    const dirty = run("git status --porcelain") !== "";
-    return {
-      __BENCHFORGE_GIT_HASH__: JSON.stringify(hash),
-      __BENCHFORGE_GIT_DIRTY__: JSON.stringify(dirty),
-      __BENCHFORGE_BUILD_DATE__: JSON.stringify(new Date().toISOString()),
-    };
-  } catch {
-    return {
-      __BENCHFORGE_GIT_HASH__: JSON.stringify("unknown"),
-      __BENCHFORGE_GIT_DIRTY__: JSON.stringify(false),
-      __BENCHFORGE_BUILD_DATE__: JSON.stringify(new Date().toISOString()),
-    };
-  }
+    hash = run("git rev-parse --short HEAD");
+    dirty = run("git status --porcelain") !== "";
+  } catch {}
+  const j = JSON.stringify;
+  return {
+    __BENCHFORGE_GIT_HASH__: j(hash),
+    __BENCHFORGE_GIT_DIRTY__: j(dirty),
+    __BENCHFORGE_BUILD_DATE__: j(new Date().toISOString()),
+  };
 }
 
 /** Dev middleware: serve vendor/speedscope/ at /speedscope/ */
@@ -47,10 +44,8 @@ function serveSpeedscope(): Plugin {
           txt: "text/plain",
           map: "application/json",
         };
-        res.setHeader(
-          "Content-Type",
-          mimeTypes[ext] || "application/octet-stream",
-        );
+        const mime = mimeTypes[ext] || "application/octet-stream";
+        res.setHeader("Content-Type", mime);
         createReadStream(file).pipe(res);
       });
     },

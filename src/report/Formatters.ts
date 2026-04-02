@@ -44,9 +44,7 @@ export function formatBytes(
 ): string | null {
   if (typeof bytes !== "number") return null;
   const s = opts?.space ? " " : "";
-  const kb = 1024;
-  const mb = kb * 1024;
-  const gb = mb * 1024;
+  const [kb, mb, gb] = [1024, 1024 ** 2, 1024 ** 3];
   if (bytes < kb) return `${bytes.toFixed(0)}${s}B`;
   if (bytes < mb) return `${(bytes / kb).toFixed(1)}${s}KB`;
   if (bytes < gb) return `${(bytes / mb).toFixed(1)}${s}MB`;

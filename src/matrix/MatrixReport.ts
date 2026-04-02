@@ -129,11 +129,8 @@ function buildCaseTable(
     return buildSectionTable(results, caseId, options, title);
 
   const rows = buildCaseRows(results, caseId, options);
-  const cols = buildColumns(
-    rows.some(r => r.diffCI),
-    options,
-  );
-  return `${title}\n${buildTable(cols, [{ results: rows }])}`;
+  const hasDiff = rows.some(r => r.diffCI);
+  return `${title}\n${buildTable(buildColumns(hasDiff, options), [{ results: rows }])}`;
 }
 
 /** Format case title with metadata if available */
@@ -166,13 +163,14 @@ function buildSectionTable(
   const rows: Row[] = caseResults.flatMap(({ variant, cr }) => {
     const vals = extractSectionValues(cr.measured, sections, cr.metadata);
     const row: Row = { name: truncate(variant.id, 25), ...vals };
+    const margin = options.equivMargin;
     if (cr.baseline)
       row.diffCI = computeDiffCI(
         cr.baseline,
         cr.measured,
         primaryCol,
         cr.metadata,
-        options.equivMargin,
+        margin,
       );
     const out: Row[] = [row];
     if (cr.baseline && !shared) {
@@ -188,11 +186,8 @@ function buildSectionTable(
       ...extractSectionValues(shared, sections),
     });
 
-  const cols = sectionColumnGroups<Row>(
-    sections,
-    rows.some(r => r.diffCI),
-    variantTitle,
-  );
+  const hasDiff = rows.some(r => r.diffCI);
+  const cols = sectionColumnGroups<Row>(sections, hasDiff, variantTitle);
   return `${caseTitle}\n${buildTable(cols, [{ results: rows }])}`;
 }
 
@@ -229,25 +224,23 @@ function buildColumns(
   hasBaseline: boolean,
   options?: MatrixReportOptions,
 ): ColumnGroup<MatrixReportRow>[] {
+  type K = keyof MatrixReportRow;
   const title = options?.variantTitle ?? "variant";
   const nameCol: ColumnGroup<MatrixReportRow> = {
     columns: [{ key: "name", title }],
   };
   const diffCol = {
-    key: "diffCI" as keyof MatrixReportRow,
+    key: "diffCI" as K,
     title: "Δ% CI",
     formatter: formatDiffWithCI,
   };
-  const timeCols = [
-    {
-      key: "time" as keyof MatrixReportRow,
-      title: "time",
-      formatter: timeMs,
-    },
-    ...(hasBaseline ? [diffCol] : []),
+  const timeCol = { key: "time" as K, title: "time", formatter: timeMs };
+  const timeCols = [timeCol, ...(hasBaseline ? [diffCol] : [])];
+  return [
+    nameCol,
+    { columns: timeCols },
+    ...extraColumnGroups(options?.extraColumns),
   ];
-  const timeCol: ColumnGroup<MatrixReportRow> = { columns: timeCols };
-  return [nameCol, timeCol, ...extraColumnGroups(options?.extraColumns)];
 }
 
 /** Build a table row from a variant's case result */
@@ -265,11 +258,12 @@ function buildRow(
     samples: samples.length,
   };
   if (baseline) {
-    row.diffCI = bootstrapDifferenceCI(baseline.samples, samples, {
+    const opts = {
       blocks: baseline.batchOffsets,
       blocksB: measured.batchOffsets,
       equivMargin,
-    });
+    };
+    row.diffCI = bootstrapDifferenceCI(baseline.samples, samples, opts);
   }
   if (extraColumns)
     for (const col of extraColumns) row[col.key] = col.extract(caseResult);

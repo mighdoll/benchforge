@@ -172,10 +172,8 @@ export async function resolveCases<T>(
 
 /** Convert matrix options to runner options */
 export function buildRunnerOptions(opts: RunMatrixOptions): RunnerOptions {
+  const { iterations, maxTime, warmup } = opts;
   const {
-    iterations,
-    maxTime,
-    warmup,
     filteredCases,
     filteredVariants,
     useWorker,

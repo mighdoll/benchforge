@@ -231,10 +231,12 @@
 .report-panel .plot-area svg g[aria-label="x-axis label"] text { font-size: 14px; }
 
 /* --- CI region overlay opacity (light/dark aware) --- */
-.ci-region { opacity: 0.45; }
-.ci-region-strong { opacity: 0.6; }
-.ci-region.ci-faster, .ci-region.ci-equivalent { opacity: 0.3; }
-.ci-region-strong.ci-faster, .ci-region-strong.ci-equivalent { opacity: 0.35; }
+.ci-region { opacity: 0.55; }
+.ci-region-strong { opacity: 0.65; }
+.ci-region.ci-faster, .ci-region.ci-equivalent { opacity: 0.5; }
+.ci-region-strong.ci-faster, .ci-region-strong.ci-equivalent { opacity: 0.55; }
+.dist-stroke { opacity: 0.35; }
+.dist-fill { opacity: 0.08; }
 
 /* --- Misc --- */
 
@@ -286,6 +288,12 @@
   :root:not([data-theme="light"]) .report-panel .loading { color: #999; }
   :root:not([data-theme="light"]) .report-panel .empty-state { color: #666; }
   :root:not([data-theme="light"]) .report-panel .empty-state code { background: #333; }
+  :root:not([data-theme="light"]) .dist-stroke { opacity: 0.35; }
+  :root:not([data-theme="light"]) .dist-fill { opacity: 0.08; }
+  :root:not([data-theme="light"]) .report-panel .badge-faster { background: #166534; color: #bbf7d0; }
+  :root:not([data-theme="light"]) .report-panel .badge-slower { background: #991b1b; color: #fecaca; }
+  :root:not([data-theme="light"]) .report-panel .badge-uncertain { background: #1e40af; color: #bfdbfe; }
+  :root:not([data-theme="light"]) .report-panel .badge-equivalent { background: #166534; color: #bbf7d0; }
   :root:not([data-theme="light"]) .ci-region { opacity: 0.2; }
   :root:not([data-theme="light"]) .ci-region-strong { opacity: 0.35; }
   :root:not([data-theme="light"]) .ci-region.ci-faster,
@@ -317,6 +325,12 @@
 :root[data-theme="dark"] .report-panel .loading { color: #999; }
 :root[data-theme="dark"] .report-panel .empty-state { color: #666; }
 :root[data-theme="dark"] .report-panel .empty-state code { background: #333; }
+:root[data-theme="dark"] .dist-stroke { opacity: 0.35; }
+:root[data-theme="dark"] .dist-fill { opacity: 0.08; }
+:root[data-theme="dark"] .report-panel .badge-faster { background: #166534; color: #bbf7d0; }
+:root[data-theme="dark"] .report-panel .badge-slower { background: #991b1b; color: #fecaca; }
+:root[data-theme="dark"] .report-panel .badge-uncertain { background: #1e40af; color: #bfdbfe; }
+:root[data-theme="dark"] .report-panel .badge-equivalent { background: #166534; color: #bbf7d0; }
 :root[data-theme="dark"] .ci-region { opacity: 0.2; }
 :root[data-theme="dark"] .ci-region-strong { opacity: 0.35; }
 :root[data-theme="dark"] .ci-region.ci-faster,

@@ -14,14 +14,13 @@ export function validateArgs(args: DefaultCliArgs): void {
 
 /** Convert CLI args to runner options. */
 export function cliToRunnerOptions(args: DefaultCliArgs): RunnerOptions {
-  const { inspect, iterations } = args;
+  const { inspect, iterations, adaptive, duration } = args;
   const gcForce = args["gc-force"];
   if (inspect)
     return { maxIterations: iterations ?? 1, warmupTime: 0, gcForce };
-  if (args.adaptive) return createAdaptiveOptions(args);
-
+  if (adaptive) return createAdaptiveOptions(args);
   return {
-    maxTime: iterations ? Number.POSITIVE_INFINITY : args.duration * 1000,
+    maxTime: iterations ? Number.POSITIVE_INFINITY : duration * 1000,
     maxIterations: iterations,
     ...cliCommonOptions(args),
   };
@@ -87,8 +86,6 @@ function cliCommonOptions(args: DefaultCliArgs) {
   const { "pause-duration": pauseDuration } = args;
   const { "alloc-interval": allocInterval, "alloc-depth": allocDepth } = args;
   const { "time-interval": timeInterval, "call-counts": callCounts } = args;
-  const alloc = needsAlloc(args);
-  const timeSample = needsTimeSample(args);
   return {
     gcForce,
     warmup,
@@ -98,10 +95,10 @@ function cliCommonOptions(args: DefaultCliArgs) {
     pauseInterval,
     pauseDuration,
     gcStats,
-    alloc,
+    alloc: needsAlloc(args),
     allocInterval,
     allocDepth,
-    timeSample,
+    timeSample: needsTimeSample(args),
     timeInterval,
     callCounts,
   };
