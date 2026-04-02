@@ -91,7 +91,7 @@ function prepareGroupData(
       : undefined,
     benchmarks: group.reports.map(report => {
       const m = report.measuredResults;
-      const ci = buildGroupCI(baseM, m, report.metadata, primaryCol);
+      const ci = computeDiffCI(baseM, m, primaryCol, report.metadata);
       if (lowBatches && ci) ci.direction = "uncertain";
       const sects = sections
         ? buildViewerSections(
@@ -132,26 +132,6 @@ function findPrimaryColumn(
   return allColumns.find(c => c.comparable && c.statFn) as
     | ReportColumn<Record<string, unknown>>
     | undefined;
-}
-
-/** Build group-level comparison CI using the primary column's stat function */
-function buildGroupCI(
-  baseline: MeasuredResults | undefined,
-  current: MeasuredResults,
-  metadata: UnknownRecord | undefined,
-  col: ReportColumn<Record<string, unknown>> | undefined,
-): DifferenceCI | undefined {
-  if (!baseline?.samples?.length || !current.samples?.length) return undefined;
-  const statFn = col?.statFn
-    ? (s: number[]) => col.statFn!(s, metadata)
-    : undefined;
-  const opts = {
-    statFn,
-    blocks: baseline.batchOffsets,
-    blocksB: current.batchOffsets,
-  };
-  const rawCI = bootstrapDifferenceCI(baseline.samples, current.samples, opts);
-  return col?.higherIsBetter ? swapDirection(rawCI) : rawCI;
 }
 
 /** @return benchmark data with samples, stats, and profiling summaries */
@@ -287,28 +267,34 @@ function buildComparisonCI(
   col: ReportColumn<Record<string, unknown>>,
   ctx: RowContext,
 ) {
-  if (
-    !col.statFn ||
-    !ctx.baseline?.samples?.length ||
-    !ctx.current.samples?.length
-  )
-    return undefined;
+  const ci = computeDiffCI(ctx.baseline, ctx.current, col, ctx.currentMeta);
+  if (ci && hasLowBatchCount(ctx.baseline, ctx.current))
+    ci.direction = "uncertain";
+  return ci;
+}
+
+/** Shared bootstrap difference CI computation for a column */
+function computeDiffCI(
+  baseline: MeasuredResults | undefined,
+  current: MeasuredResults,
+  col: ReportColumn<Record<string, unknown>> | undefined,
+  metadata: UnknownRecord | undefined,
+): DifferenceCI | undefined {
+  if (!baseline?.samples?.length || !current.samples?.length) return undefined;
+  if (col && !col.statFn) return undefined;
+  const statFn = col?.statFn
+    ? (s: number[]) => col.statFn!(s, metadata)
+    : undefined;
   const opts = {
-    statFn: (s: number[]) => col.statFn!(s, ctx.currentMeta),
-    blocks: ctx.baseline.batchOffsets,
-    blocksB: ctx.current.batchOffsets,
+    statFn,
+    blocks: baseline.batchOffsets,
+    blocksB: current.batchOffsets,
   };
-  const rawCI = bootstrapDifferenceCI(
-    ctx.baseline.samples,
-    ctx.current.samples,
-    opts,
-  );
-  if (hasLowBatchCount(ctx.baseline, ctx.current))
-    rawCI.direction = "uncertain";
+  const rawCI = bootstrapDifferenceCI(baseline.samples, current.samples, opts);
   // statFn computes in the metric's natural domain. bootstrapDifferenceCI
   // assumes lower-is-better for direction labels. For higher-is-better
   // metrics (like loc/sec), swap the direction without negating the values.
-  return col.higherIsBetter ? swapDirection(rawCI) : rawCI;
+  return col?.higherIsBetter ? swapDirection(rawCI) : rawCI;
 }
 
 /** Build a ViewerEntry with optional bootstrap CI */

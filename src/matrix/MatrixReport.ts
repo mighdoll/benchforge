@@ -4,9 +4,9 @@ import {
   type ResultsMapper,
 } from "../report/BenchmarkReport.ts";
 import {
-  duration,
   formatBytes,
   formatDiffWithCI,
+  timeMs,
   truncate,
 } from "../report/Formatters.ts";
 import {
@@ -231,7 +231,7 @@ function buildColumns(
     {
       key: "time" as keyof MatrixReportRow,
       title: "time",
-      formatter: duration,
+      formatter: timeMs,
     },
     ...(hasBaseline ? [diffCol] : []),
   ];

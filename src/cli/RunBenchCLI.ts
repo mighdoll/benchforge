@@ -9,6 +9,7 @@ import {
   filterMatrix,
   type MatrixFilter,
   parseMatrixFilter,
+  resolveCaseIds,
   resolveVariantIds,
 } from "../matrix/MatrixFilter.ts";
 import type { MatrixReportOptions } from "../matrix/MatrixReport.ts";
@@ -221,9 +222,7 @@ function listSuite(suite: BenchSuite): void {
 async function listMatrixSuite(suite: MatrixSuite): Promise<void> {
   for (const matrix of suite.matrices) {
     console.log(matrix.name);
-    const caseIds = matrix.casesModule
-      ? (await loadCasesModule(matrix.casesModule)).cases
-      : matrix.cases;
+    const caseIds = await resolveCaseIds(matrix);
     if (caseIds) {
       console.log("  cases:");
       for (const id of caseIds) console.log(`    ${id}`);

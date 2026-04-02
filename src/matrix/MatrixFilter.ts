@@ -56,9 +56,7 @@ async function getFilteredCases<T>(
 ): Promise<string[] | undefined> {
   if (!casePattern) return undefined;
 
-  const caseIds = matrix.casesModule
-    ? (await loadCasesModule(matrix.casesModule)).cases
-    : matrix.cases;
+  const caseIds = await resolveCaseIds(matrix);
   if (!caseIds) return ["default"]; // implicit single case
 
   const filtered = caseIds.filter(id => matchPattern(id, casePattern));
@@ -87,6 +85,15 @@ async function getFilteredVariants<T>(
 /** Case-insensitive substring match */
 function matchPattern(id: string, pattern: string): boolean {
   return id.toLowerCase().includes(pattern.toLowerCase());
+}
+
+/** Collect all case IDs from either casesModule or inline cases */
+export async function resolveCaseIds<T>(
+  matrix: BenchMatrix<T>,
+): Promise<string[] | undefined> {
+  if (matrix.casesModule)
+    return (await loadCasesModule(matrix.casesModule)).cases;
+  return matrix.cases;
 }
 
 /** Collect all variant IDs from either inline variants or variantDir */

@@ -2,7 +2,7 @@
 import { readFile } from "node:fs/promises";
 import { resolve } from "node:path";
 import colors from "../report/Colors.ts";
-import { timeMs } from "../report/Formatters.ts";
+import { formatSignedPercent, timeMs } from "../report/Formatters.ts";
 import { average, percentile } from "../stats/StatisticalUtils.ts";
 import type { BenchmarkEntry, BenchmarkGroup } from "../viewer/ReportData.ts";
 
@@ -182,8 +182,7 @@ function printPairedDeltas(benches: number[][], baselines: number[][]): void {
 }
 
 function formatDelta(pct: number): string {
-  const sign = pct >= 0 ? "+" : "";
-  const str = `${sign}${pct.toFixed(1)}%`;
+  const str = formatSignedPercent(pct);
   if (pct > 1) return red(str);
   if (pct < -1) return green(str);
   return str;
