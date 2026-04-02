@@ -54,7 +54,18 @@ function analyzeBenchmark(
       : undefined;
 
   const nBatches = bBatches.length;
-  console.log(bold(`  ${bench.name}`) + dim(` (${nBatches} batches)`));
+  const totalRuns = bench.samples.length;
+  const baseRuns = baseline?.samples?.length;
+  const batchDur = bench.totalTime
+    ? (bench.totalTime / nBatches).toFixed(1) + "s"
+    : "?";
+  const runInfo = baseRuns
+    ? `${totalRuns}+${baseRuns} runs`
+    : `${totalRuns} runs`;
+  console.log(
+    bold(`  ${bench.name}`) +
+      dim(` (${nBatches} batches, ${runInfo}, ~${batchDur}/batch)`),
+  );
 
   printBatchTable(bBatches, baseBatches);
 
