@@ -180,7 +180,7 @@
 .report-panel .run-name {
   font-size: 12px;
   color: #999;
-  min-width: 64px;
+  flex: 0 0 var(--run-name-width, 80px);
 }
 
 .report-panel .run-value {
@@ -188,6 +188,8 @@
   font-weight: 600;
   color: #333;
   font-variant-numeric: tabular-nums;
+  text-align: right;
+  flex: 0 0 var(--run-value-width, 80px);
 }
 
 /* --- Plot areas (kept for SamplesPanel) --- */

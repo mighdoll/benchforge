@@ -110,18 +110,38 @@ function GroupContent({ current }: { current: BenchmarkEntry }) {
 
 function SectionPanel({ section }: { section: ViewerSection }) {
   if (!section.rows.length) return null;
+  const ref = useRef<HTMLDivElement>(null);
   const titleEl = section.tabLink
     ? <a class="panel-title-link" onClick={() => (activeTabId.value = section.tabLink!)}>{section.title}</a>
     : <span>{section.title}</span>;
 
+  useEffect(() => {
+    if (!ref.current) return;
+    alignRunColumns(ref.current);
+  });
+
   return (
-    <div class="section-panel">
+    <div class="section-panel" ref={ref}>
       <div class="panel-header">{titleEl}</div>
       <div class="panel-body">
         {section.rows.map((row, i) => <StatRow key={i} row={row} />)}
       </div>
     </div>
   );
+}
+
+/** Measure max run-name and run-value widths, then set CSS vars on the panel */
+function alignRunColumns(panel: HTMLElement): void {
+  let maxName = 0;
+  let maxValue = 0;
+  for (const el of panel.querySelectorAll<HTMLElement>(".run-name")) {
+    maxName = Math.max(maxName, el.scrollWidth);
+  }
+  for (const el of panel.querySelectorAll<HTMLElement>(".run-value")) {
+    maxValue = Math.max(maxValue, el.scrollWidth);
+  }
+  if (maxName) panel.style.setProperty("--run-name-width", `${maxName}px`);
+  if (maxValue) panel.style.setProperty("--run-value-width", `${maxValue}px`);
 }
 
 function StatRow({ row }: { row: ViewerRow }) {
