@@ -36,7 +36,7 @@ export function defaultReport(
   const { adaptive, "gc-stats": gcStats, "trace-opt": traceOpt } = args;
   const hasOpt = hasField(groups, "optStatus");
   const sections = buildReportSections(adaptive, gcStats, traceOpt && hasOpt);
-  return reportResults(groups, sections);
+  return reportResults(groups, sections, { equivMargin: args["equiv-margin"] });
 }
 
 /** Build report sections based on CLI options. */
@@ -172,5 +172,6 @@ function mergeMatrixDefaults(
     const { adaptive, "gc-stats": gcStats } = args;
     merged.sections = buildReportSections(adaptive, gcStats, hasOpt);
   }
+  if (merged.equivMargin == null) merged.equivMargin = args["equiv-margin"];
   return merged;
 }

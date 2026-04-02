@@ -1,4 +1,9 @@
 import type { MeasuredResults } from "../runners/MeasuredResults.ts";
+import {
+  bootstrapDifferenceCI,
+  type DifferenceCI,
+  swapDirection,
+} from "../stats/StatisticalUtils.ts";
 
 import type { AnyColumn } from "./text/TableReport.ts";
 
@@ -69,6 +74,43 @@ export function isHigherIsBetter(
     groups.flatMap(g => g.columns).find(c => c.comparable)?.higherIsBetter ??
     false
   );
+}
+
+/** @return the first comparable column with a statFn across all sections */
+export function findPrimaryColumn(
+  sections?: ResultsMapper[],
+): ReportColumn<Record<string, unknown>> | undefined {
+  if (!sections) return undefined;
+  const allColumns = sections.flatMap(s => s.columns().flatMap(g => g.columns));
+  return allColumns.find(c => c.comparable && c.statFn) as
+    | ReportColumn<Record<string, unknown>>
+    | undefined;
+}
+
+/** Bootstrap difference CI for a column, using batch structure when available */
+export function computeDiffCI(
+  baseline: MeasuredResults | undefined,
+  current: MeasuredResults,
+  col: ReportColumn<Record<string, unknown>> | undefined,
+  metadata: UnknownRecord | undefined,
+  equivMargin?: number,
+): DifferenceCI | undefined {
+  if (!baseline?.samples?.length || !current.samples?.length) return undefined;
+  if (col && !col.statFn) return undefined;
+  const statFn = col?.statFn
+    ? (s: number[]) => col.statFn!(s, metadata)
+    : undefined;
+  const opts = {
+    statFn,
+    blocks: baseline.batchOffsets,
+    blocksB: current.batchOffsets,
+    equivMargin,
+  };
+  const rawCI = bootstrapDifferenceCI(baseline.samples, current.samples, opts);
+  // statFn computes in the metric's natural domain. bootstrapDifferenceCI
+  // assumes lower-is-better for direction labels. For higher-is-better
+  // metrics (like loc/sec), swap the direction without negating the values.
+  return col?.higherIsBetter ? swapDirection(rawCI) : rawCI;
 }
 
 /** Type guard: distinguishes ResultsMapper[] from ReportColumnGroup[] */

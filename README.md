@@ -362,17 +362,29 @@ both zero and the margin to produce four verdicts:
 - **Inconclusive**: the CI extends past the margin but doesn't clearly exclude zero.
   More batches would narrow the CI and resolve it.
 
-The default margin of 2% is reasonable for most benchmarks. For higher precision, run a
-self-comparison (identical baseline and current) to measure your system's noise floor,
-then set the margin accordingly:
+The default margin of 2% is reasonable for most benchmarks. For higher precision,
+calibrate the margin to your specific benchmark's noise floor:
+
+**Calibration:** Run a self-comparison where baseline and current are identical code.
+Any observed difference is pure measurement noise. The CI bounds tell you the noise floor.
 
 ```bash
-# Calibration: compare identical code, observe CI width
+# 1. Run identical code against itself with enough batches
 benchforge my-bench.ts --baseline --batches 50
 
-# Use the observed noise floor as the margin
-benchforge my-bench.ts --baseline --batches 50 --equiv-margin 1.5
+# 2. Check the CI in the viewer or text output, e.g.:
+#      +0.3% [-1.8%, +2.4%]
+#    The max absolute CI bound (2.4%) is the noise floor.
+#    Round up to the nearest integer for the margin.
+
+# 3. Use the calibrated margin for future comparisons
+benchforge my-bench.ts --baseline --batches 50 --equiv-margin 3
 ```
+
+The noise floor varies per benchmark -- fast microbenchmarks may have < 1% noise,
+while slow macro benchmarks with GC pressure may have 3-5%. Calibrate each benchmark
+you care about separately. Use `--equiv-margin 0` to disable equivalence testing
+and fall back to the traditional CI-excludes-zero approach.
 
 ## Warmup and Batching
 

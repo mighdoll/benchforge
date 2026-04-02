@@ -9,10 +9,7 @@ import { resolveProfile } from "../profiling/node/ResolvedProfile.ts";
 import type { MeasuredResults } from "../runners/MeasuredResults.ts";
 import {
   binBootstrapResult,
-  bootstrapDifferenceCI,
   bootstrapStat,
-  type DifferenceCI,
-  swapDirection,
 } from "../stats/StatisticalUtils.ts";
 import type {
   BenchmarkEntry,
@@ -25,6 +22,8 @@ import type {
   ViewerSection,
 } from "../viewer/ReportData.ts";
 import {
+  computeDiffCI,
+  findPrimaryColumn,
   groupReports,
   type ReportColumn,
   type ReportGroup,
@@ -134,17 +133,6 @@ function hasLowBatchCount(
   const curN = batchCount(current);
   if (baseN === 0 && curN === 0) return false; // not batched
   return baseN < minBatches || curN < minBatches;
-}
-
-/** Find the first comparable column with a statFn across all sections */
-function findPrimaryColumn(
-  sections?: ResultsMapper[],
-): ReportColumn<Record<string, unknown>> | undefined {
-  if (!sections) return undefined;
-  const allColumns = sections.flatMap(s => s.columns().flatMap(g => g.columns));
-  return allColumns.find(c => c.comparable && c.statFn) as
-    | ReportColumn<Record<string, unknown>>
-    | undefined;
 }
 
 /** @return benchmark data with samples, stats, and profiling summaries */
@@ -295,32 +283,6 @@ function buildComparisonCI(
     if (col.title) ci.label = `${col.title} Δ%`;
   }
   return ci;
-}
-
-/** Shared bootstrap difference CI computation for a column */
-function computeDiffCI(
-  baseline: MeasuredResults | undefined,
-  current: MeasuredResults,
-  col: ReportColumn<Record<string, unknown>> | undefined,
-  metadata: UnknownRecord | undefined,
-  equivMargin?: number,
-): DifferenceCI | undefined {
-  if (!baseline?.samples?.length || !current.samples?.length) return undefined;
-  if (col && !col.statFn) return undefined;
-  const statFn = col?.statFn
-    ? (s: number[]) => col.statFn!(s, metadata)
-    : undefined;
-  const opts = {
-    statFn,
-    blocks: baseline.batchOffsets,
-    blocksB: current.batchOffsets,
-    equivMargin,
-  };
-  const rawCI = bootstrapDifferenceCI(baseline.samples, current.samples, opts);
-  // statFn computes in the metric's natural domain. bootstrapDifferenceCI
-  // assumes lower-is-better for direction labels. For higher-is-better
-  // metrics (like loc/sec), swap the direction without negating the values.
-  return col?.higherIsBetter ? swapDirection(rawCI) : rawCI;
 }
 
 /** Build a ViewerEntry with optional bootstrap CI */

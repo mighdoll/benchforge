@@ -91,9 +91,9 @@ function isDifferenceCI(x: unknown): x is DifferenceCI {
   return typeof x === "object" && x !== null && "ci" in x && "direction" in x;
 }
 
-/** @return text colored green for faster, red for slower */
+/** @return text colored green for faster/equivalent, red for slower */
 function colorByDirection(text: string, direction: CIDirection): string {
-  if (direction === "faster") return green(text);
+  if (direction === "faster" || direction === "equivalent") return green(text);
   if (direction === "slower") return red(text);
   return text;
 }

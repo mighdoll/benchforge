@@ -1,8 +1,10 @@
-import { bootstrapDifferenceCI } from "../../stats/StatisticalUtils.ts";
 import {
   type BenchmarkReport,
+  computeDiffCI,
   extractSectionValues,
+  findPrimaryColumn,
   isHigherIsBetter,
+  type ReportColumn,
   type ReportColumnGroup,
   type ReportGroup,
   type ResultsMapper,
@@ -35,12 +37,22 @@ type UnionToIntersection<U> = (U extends any ? (k: U) => void : never) extends (
   ? I
   : never;
 
+/** Options for text report generation */
+export interface TextReportOptions {
+  /** Equivalence margin in percent for baseline comparison */
+  equivMargin?: number;
+}
+
 /** Build a formatted text table from benchmark groups, with baseline diff columns when present */
 export function reportResults<S extends ReadonlyArray<ResultsMapper<any>>>(
   groups: ReportGroup[],
   sections: S,
+  options?: TextReportOptions,
 ): string {
-  const results = groups.map(group => resultGroupValues(group, sections));
+  const primaryCol = findPrimaryColumn(sections as unknown as ResultsMapper[]);
+  const results = groups.map(group =>
+    resultGroupValues(group, sections, primaryCol, options),
+  );
   const hasBaseline = results.some(g => g.baseline);
   return buildTable(createColumnGroups(sections, hasBaseline), results);
 }
@@ -82,15 +94,20 @@ export function injectDiffColumns<T>(
 function resultGroupValues<S extends ReadonlyArray<ResultsMapper<any>>>(
   group: ReportGroup,
   sections: S,
+  primaryCol?: ReportColumn<Record<string, unknown>>,
+  options?: TextReportOptions,
 ): ResultGroup<ReportRowData<S>> {
   const { reports, baseline } = group;
-  const baseSamples = baseline?.measuredResults.samples;
+  const baseM = baseline?.measuredResults;
   const results = reports.map(report => {
     const { measuredResults: m, metadata } = report;
-    const diffCI =
-      baseSamples && m.samples
-        ? bootstrapDifferenceCI(baseSamples, m.samples)
-        : undefined;
+    const diffCI = computeDiffCI(
+      baseM,
+      m,
+      primaryCol,
+      metadata,
+      options?.equivMargin,
+    );
     return {
       name: truncate(report.name),
       ...extractSectionValues(m, sections, metadata),
