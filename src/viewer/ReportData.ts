@@ -32,6 +32,7 @@ export interface BenchmarkEntry {
   gcEvents?: GcEvent[];
   optSamples?: number[];
   pausePoints?: PausePoint[];
+  batchOffsets?: number[];
   stats: BenchmarkStats;
   heapSize?: { min: number; max: number; avg: number };
   totalTime?: number;

@@ -174,6 +174,7 @@ function prepareBenchmarkData(report: {
     gcEvents: m.nodeGcTime?.events,
     optSamples: m.optSamples,
     pausePoints: m.pausePoints,
+    batchOffsets: m.batchOffsets,
     stats: m.time,
     heapSize: m.heapSize,
     totalTime: m.totalTime,

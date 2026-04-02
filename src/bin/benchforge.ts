@@ -12,6 +12,14 @@ if (argv[0] === "view") {
   }
   const { viewArchive } = await import("../cli/ViewerServer.ts");
   await viewArchive(filePath);
+} else if (argv[0] === "analyze") {
+  const filePath = argv[1];
+  if (!filePath) {
+    console.error("Usage: benchforge analyze <file.benchforge>");
+    process.exit(1);
+  }
+  const { analyzeArchive } = await import("../cli/AnalyzeArchive.ts");
+  await analyzeArchive(filePath);
 } else {
   const { runDefaultBench } = await import("../index.ts");
   await runDefaultBench();
