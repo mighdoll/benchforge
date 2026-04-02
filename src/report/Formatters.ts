@@ -16,13 +16,14 @@ export function duration(ms: unknown): string | null {
   return `${(ms / 1000).toFixed(2)}s`;
 }
 
-/** Format time in milliseconds, showing very small values with units */
+/** Format time in milliseconds with appropriate units */
 export function timeMs(ms: unknown): string | null {
   if (typeof ms !== "number") return null;
   if (ms < 0.001) return `${(ms * 1000000).toFixed(0)}ns`;
   if (ms < 0.01) return `${(ms * 1000).toFixed(1)}μs`;
-  if (ms >= 10) return ms.toFixed(0);
-  return ms.toFixed(2);
+  if (ms >= 1000) return `${(ms / 1000).toFixed(2)}s`;
+  if (ms >= 10) return `${ms.toFixed(0)}ms`;
+  return `${ms.toFixed(2)}ms`;
 }
 
 /** Format integer with thousand separators */
