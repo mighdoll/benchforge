@@ -3,11 +3,7 @@ import { readFile } from "node:fs/promises";
 import { resolve } from "node:path";
 import colors from "../report/Colors.ts";
 import { formatSignedPercent, timeMs } from "../report/Formatters.ts";
-import {
-  average,
-  findOutliers,
-  percentile,
-} from "../stats/StatisticalUtils.ts";
+import { average, percentile } from "../stats/StatisticalUtils.ts";
 import type { BenchmarkEntry, BenchmarkGroup } from "../viewer/ReportData.ts";
 
 const { bold, dim, red, green, yellow } = colors;
@@ -197,6 +193,8 @@ function printPairedDeltas(benches: number[][], baselines: number[][]): void {
   }
 }
 
+const blockFenceMultiplier = 3; // extreme outliers only (not 1.5x mild)
+
 /** Show which blocks would be Tukey-trimmed per side. */
 function printTrimmedBlocks(
   benches: number[][],
@@ -205,31 +203,27 @@ function printTrimmedBlocks(
 ): void {
   const curMeans = benches.map(b => average(b));
   const baseMeans = baselines.map(b => average(b));
-  const curOut = findOutliers(curMeans);
-  const baseOut = findOutliers(baseMeans);
 
   console.log();
   console.log(bold("  Trimmed blocks:"));
-  printSideTrim("baseline", baseMeans, baseOut);
-  printSideTrim(name, curMeans, curOut);
+  printSideTrim("baseline", baseMeans);
+  printSideTrim(name, curMeans);
 }
 
-/** Print trimming info for one side. */
-function printSideTrim(
-  label: string,
-  means: number[],
-  outliers: { rate: number; indices: number[] },
-): void {
-  const { indices } = outliers;
+/** Print trimming info for one side using 3x IQR fences. */
+function printSideTrim(label: string, means: number[]): void {
+  const q1 = percentile(means, 0.25);
+  const q3 = percentile(means, 0.75);
+  const iqr = q3 - q1;
+  const lo = q1 - blockFenceMultiplier * iqr;
+  const hi = q3 + blockFenceMultiplier * iqr;
+  const indices = means
+    .map((v, i) => (v < lo || v > hi ? i : -1))
+    .filter(i => i >= 0);
   if (indices.length === 0) {
     console.log(dim(`    ${label}: 0 trimmed`));
     return;
   }
-  const q1 = percentile(means, 0.25);
-  const q3 = percentile(means, 0.75);
-  const iqr = q3 - q1;
-  const lo = q1 - 1.5 * iqr;
-  const hi = q3 + 1.5 * iqr;
   const vals = indices.map(i => timeMs(means[i]) ?? "?").join(", ");
   const fence = `[${timeMs(lo)}, ${timeMs(hi)}]`;
   console.log(

@@ -177,14 +177,15 @@ export function createResample(samples: number[]): number[] {
   );
 }
 
-/** @return values with Tukey fence outliers removed */
+/** @return values with extreme Tukey fence outliers removed.
+ *  Uses 3x IQR (not 1.5x) to only catch clearly contaminated blocks. */
 function tukeyTrim(values: number[]): number[] {
   if (values.length < 4) return values;
   const q1 = percentile(values, 0.25);
   const q3 = percentile(values, 0.75);
   const iqr = q3 - q1;
-  const lo = q1 - outlierMultiplier * iqr;
-  const hi = q3 + outlierMultiplier * iqr;
+  const lo = q1 - 3 * iqr;
+  const hi = q3 + 3 * iqr;
   return values.filter(v => v >= lo && v <= hi);
 }
 
