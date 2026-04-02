@@ -6,7 +6,7 @@ import { timeMs } from "../report/Formatters.ts";
 import { average, percentile } from "../stats/StatisticalUtils.ts";
 import type { BenchmarkEntry, BenchmarkGroup } from "../viewer/ReportData.ts";
 
-const { bold, dim, red, green, yellow, cyan } = colors;
+const { bold, dim, red, green, yellow } = colors;
 
 /** Read an archive and print per-batch diagnostic analysis. */
 export async function analyzeArchive(filePath: string): Promise<void> {
@@ -85,6 +85,13 @@ function splitBatches(samples: number[], offsets: number[]): number[][] {
   });
 }
 
+/** Percent delta between two medians. */
+function medianDelta(samples: number[], baseSamples: number[]): number {
+  const med = percentile(samples, 0.5);
+  const baseMed = percentile(baseSamples, 0.5);
+  return ((med - baseMed) / baseMed) * 100;
+}
+
 /** Print per-batch median table for current and baseline. */
 function printBatchTable(
   benches: number[][],
@@ -96,22 +103,20 @@ function printBatchTable(
   console.log(dim(header));
 
   for (let i = 0; i < benches.length; i++) {
-    const bMed = percentile(benches[i], 0.5);
     const n = String(benches[i].length).padStart(4);
-    const bStr = (timeMs(bMed) ?? "").padStart(10);
+    const bStr = (timeMs(percentile(benches[i], 0.5)) ?? "").padStart(10);
+    const idx = String(i).padEnd(7);
 
-    if (baselines?.[i]) {
-      const baseMed = percentile(baselines[i], 0.5);
-      const baseStr = (timeMs(baseMed) ?? "").padStart(10);
-      const delta = ((bMed - baseMed) / baseMed) * 100;
-      const deltaStr = formatDelta(delta).padStart(8);
-      const order = i % 2 === 0 ? dim(" B>C") : dim(" C>B");
-      console.log(
-        `  ${String(i).padEnd(7)} ${n}  ${bStr}  ${baseStr}  ${deltaStr}${order}`,
-      );
-    } else {
-      console.log(`  ${String(i).padEnd(7)} ${n}  ${bStr}`);
+    if (!baselines?.[i]) {
+      console.log(`  ${idx} ${n}  ${bStr}`);
+      continue;
     }
+    const baseStr = (timeMs(percentile(baselines[i], 0.5)) ?? "").padStart(10);
+    const deltaStr = formatDelta(
+      medianDelta(benches[i], baselines[i]),
+    ).padStart(8);
+    const order = i % 2 === 0 ? dim(" B>C") : dim(" C>B");
+    console.log(`  ${idx} ${n}  ${bStr}  ${baseStr}  ${deltaStr}${order}`);
   }
 }
 
@@ -122,9 +127,7 @@ function printOrderEffect(benches: number[][], baselines: number[][]): void {
   const currFirstDeltas: number[] = []; // odd: current ran first
 
   for (let i = 0; i < benches.length; i++) {
-    const bMed = percentile(benches[i], 0.5);
-    const baseMed = percentile(baselines[i], 0.5);
-    const delta = ((bMed - baseMed) / baseMed) * 100;
+    const delta = medianDelta(benches[i], baselines[i]);
     if (i % 2 === 0) baseFirstDeltas.push(delta);
     else currFirstDeltas.push(delta);
   }
@@ -153,11 +156,7 @@ function printOrderEffect(benches: number[][], baselines: number[][]): void {
 
 /** Print paired batch deltas and their consistency. */
 function printPairedDeltas(benches: number[][], baselines: number[][]): void {
-  const deltas = benches.map((b, i) => {
-    const bMed = percentile(b, 0.5);
-    const baseMed = percentile(baselines[i], 0.5);
-    return ((bMed - baseMed) / baseMed) * 100;
-  });
+  const deltas = benches.map((b, i) => medianDelta(b, baselines[i]));
 
   const positive = deltas.filter(d => d > 0).length;
   const negative = deltas.filter(d => d < 0).length;

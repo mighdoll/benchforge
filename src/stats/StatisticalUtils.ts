@@ -55,13 +55,12 @@ const bootstrapSamples = 10000;
 
 /** Swap direction labels for higher-is-better metrics (positive = faster) */
 export function swapDirection(ci: DifferenceCI): DifferenceCI {
-  const d =
-    ci.direction === "faster"
-      ? "slower"
-      : ci.direction === "slower"
-        ? "faster"
-        : "uncertain";
-  return { ...ci, direction: d };
+  const swapped: Record<CIDirection, CIDirection> = {
+    faster: "slower",
+    slower: "faster",
+    uncertain: "uncertain",
+  };
+  return { ...ci, direction: swapped[ci.direction] };
 }
 
 /** Negate percent and CI for "higher is better" metrics (e.g., throughput) */

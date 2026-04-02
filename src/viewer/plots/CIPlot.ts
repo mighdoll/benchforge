@@ -262,14 +262,14 @@ function drawCILabels(
     svg.appendChild(
       text(layout.width - layout.margin.right, labelY, hiLabel, "end", "11"),
     );
-  } else {
-    const loX = scales.x(ci[0]);
-    const hiX = scales.x(ci[1]);
-    const minGap = Math.max(loLabel.length, hiLabel.length) * 6;
-    if (hiX - loX >= minGap) {
-      svg.appendChild(text(loX, labelY, loLabel, "middle", "11"));
-      svg.appendChild(text(hiX, labelY, hiLabel, "middle", "11"));
-    }
+    return;
+  }
+  const loX = scales.x(ci[0]);
+  const hiX = scales.x(ci[1]);
+  const minGap = Math.max(loLabel.length, hiLabel.length) * 6;
+  if (hiX - loX >= minGap) {
+    svg.appendChild(text(loX, labelY, loLabel, "middle", "11"));
+    svg.appendChild(text(hiX, labelY, hiLabel, "middle", "11"));
   }
 }
 

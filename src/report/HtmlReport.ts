@@ -128,13 +128,10 @@ function findPrimaryColumn(
   sections?: ResultsMapper[],
 ): ReportColumn<Record<string, unknown>> | undefined {
   if (!sections) return undefined;
-  for (const section of sections) {
-    for (const group of section.columns()) {
-      const col = group.columns.find(c => c.comparable && c.statFn);
-      if (col) return col as ReportColumn<Record<string, unknown>>;
-    }
-  }
-  return undefined;
+  const allColumns = sections.flatMap(s => s.columns().flatMap(g => g.columns));
+  return allColumns.find(c => c.comparable && c.statFn) as
+    | ReportColumn<Record<string, unknown>>
+    | undefined;
 }
 
 /** Build group-level comparison CI using the primary column's stat function */
@@ -345,19 +342,13 @@ function summarizeHeap(profile: HeapProfile): HeapSummary {
 
 /** Compute coverage summary from V8 coverage data */
 function summarizeCoverage(coverage: CoverageData): CoverageSummary {
-  let functionCount = 0;
-  let totalCalls = 0;
-  for (const script of coverage.scripts) {
-    for (const fn of script.functions) {
-      if (!fn.ranges.length) continue;
-      const count = fn.ranges[0].count;
-      if (count > 0) {
-        functionCount++;
-        totalCalls += count;
-      }
-    }
-  }
-  return { functionCount, totalCalls };
+  const calledFns = coverage.scripts
+    .flatMap(s => s.functions)
+    .filter(fn => fn.ranges.length > 0 && fn.ranges[0].count > 0);
+  return {
+    functionCount: calledFns.length,
+    totalCalls: calledFns.reduce((sum, fn) => sum + fn.ranges[0].count, 0),
+  };
 }
 
 /** Build default sections when caller doesn't provide custom ones */

@@ -240,8 +240,7 @@ async function fileBenchExports(
   args: DefaultCliArgs,
 ): Promise<void> {
   const fileUrl = pathToFileURL(resolve(filePath)).href;
-  const mod = await import(fileUrl);
-  const candidate = mod.default;
+  const { default: candidate } = await import(fileUrl);
 
   if (candidate && Array.isArray(candidate.matrices)) {
     if (args.list) return listMatrixSuite(candidate as MatrixSuite);
@@ -261,15 +260,16 @@ async function fileBenchExports(
 
 /** Warn about Node-only flags ignored in browser mode. */
 function warnBrowserFlags(args: DefaultCliArgs): void {
-  const ignoredFlags = [
-    !args.worker && "--no-worker",
-    args["trace-opt"] && "--trace-opt",
-    args["gc-force"] && "--gc-force",
-    args.adaptive && "--adaptive",
-    args.batches > 1 && "--batches",
-  ].filter(Boolean) as string[];
-  if (ignoredFlags.length > 0)
-    console.warn(yellow(`Ignored in browser mode: ${ignoredFlags.join(", ")}`));
+  const checks: [boolean, string][] = [
+    [!args.worker, "--no-worker"],
+    [!!args["trace-opt"], "--trace-opt"],
+    [!!args["gc-force"], "--gc-force"],
+    [!!args.adaptive, "--adaptive"],
+    [args.batches > 1, "--batches"],
+  ];
+  const ignored = checks.filter(([active]) => active).map(([, flag]) => flag);
+  if (ignored.length > 0)
+    console.warn(yellow(`Ignored in browser mode: ${ignored.join(", ")}`));
 }
 
 /** Strip surrounding quotes from a chrome-args token. */

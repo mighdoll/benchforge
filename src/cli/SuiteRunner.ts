@@ -102,12 +102,11 @@ function validateBenchmarkParameters(group: BenchGroup): void {
   const all = group.baseline
     ? [...group.benchmarks, group.baseline]
     : group.benchmarks;
-  for (const bench of all) {
-    if (bench.fn.length > 0) {
-      console.warn(
-        `Benchmark "${bench.name}" in group "${group.name}" expects parameters but no setup() provided.`,
-      );
-    }
+  const parameterized = all.filter(b => b.fn.length > 0);
+  for (const bench of parameterized) {
+    console.warn(
+      `Benchmark "${bench.name}" in group "${group.name}" expects parameters but no setup() provided.`,
+    );
   }
 }
 
