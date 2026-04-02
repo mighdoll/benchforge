@@ -16,7 +16,7 @@ let port: number;
 test("static viewer: drop zone appears on load", {
   timeout: 30_000,
 }, async () => {
-  const browser = await chromium.launch();
+  const browser = await chromium.launch({ headless: true });
   try {
     const page = await browser.newPage();
     await page.goto(`http://localhost:${port}`, { waitUntil: "networkidle" });
@@ -30,7 +30,7 @@ test("static viewer: drop zone appears on load", {
 test("static viewer: archive upload shows summary with stats", {
   timeout: 30_000,
 }, async () => {
-  const browser = await chromium.launch();
+  const browser = await chromium.launch({ headless: true });
   const consoleErrors: string[] = [];
   try {
     const page = await browser.newPage();
@@ -48,10 +48,10 @@ test("static viewer: archive upload shows summary with stats", {
       .waitFor({ state: "detached", timeout: 15_000 });
 
     const summaryPanel = page.locator("#summary-panel");
-    const stats = summaryPanel.locator(".stats-grid").first();
+    const stats = summaryPanel.locator(".section-panel").first();
     await stats.waitFor({ state: "visible", timeout: 15_000 });
-    const statItems = await summaryPanel.locator(".stat-item").count();
-    expect(statItems).toBeGreaterThan(0);
+    const statRows = await summaryPanel.locator(".stat-row").count();
+    expect(statRows).toBeGreaterThan(0);
   } finally {
     await browser.close();
   }
@@ -61,7 +61,7 @@ test("static viewer: archive upload shows summary with stats", {
 test("static viewer: tab navigation after archive upload", {
   timeout: 30_000,
 }, async () => {
-  const browser = await chromium.launch();
+  const browser = await chromium.launch({ headless: true });
   const consoleErrors: string[] = [];
   try {
     const page = await browser.newPage();
@@ -80,7 +80,7 @@ test("static viewer: tab navigation after archive upload", {
     // Wait for summary to load
     const summaryPanel = page.locator("#summary-panel");
     await summaryPanel
-      .locator(".stats-grid")
+      .locator(".section-panel")
       .first()
       .waitFor({ state: "visible", timeout: 15_000 });
 
@@ -103,7 +103,7 @@ test("static viewer: tab navigation after archive upload", {
     // Back to Summary
     await page.locator("#tab-summary").click();
     await summaryPanel
-      .locator(".stats-grid")
+      .locator(".section-panel")
       .first()
       .waitFor({ state: "visible" });
   } finally {

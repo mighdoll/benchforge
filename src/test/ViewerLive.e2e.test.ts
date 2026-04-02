@@ -16,7 +16,7 @@ let port: number;
 test("live viewer: summary tab shows stats", {
   timeout: 30_000,
 }, async () => {
-  const browser = await chromium.launch();
+  const browser = await chromium.launch({ headless: true });
   const consoleErrors: string[] = [];
   try {
     const page = await browser.newPage();
@@ -40,7 +40,7 @@ test("live viewer: summary tab shows stats", {
 test("live viewer: samples tab shows chart SVG", {
   timeout: 30_000,
 }, async () => {
-  const browser = await chromium.launch();
+  const browser = await chromium.launch({ headless: true });
   const consoleErrors: string[] = [];
   try {
     const page = await browser.newPage();
@@ -74,7 +74,7 @@ test("live viewer: samples tab shows chart SVG", {
 test("live viewer: allocation tab has speedscope content", {
   timeout: 30_000,
 }, async () => {
-  const browser = await chromium.launch();
+  const browser = await chromium.launch({ headless: true });
   try {
     const page = await browser.newPage();
     await page.goto(`http://localhost:${port}`, { waitUntil: "networkidle" });
@@ -93,7 +93,7 @@ test("live viewer: allocation tab has speedscope content", {
 test("live viewer: timing tab has speedscope content", {
   timeout: 30_000,
 }, async () => {
-  const browser = await chromium.launch();
+  const browser = await chromium.launch({ headless: true });
   try {
     const page = await browser.newPage();
     await page.goto(`http://localhost:${port}`, { waitUntil: "networkidle" });
