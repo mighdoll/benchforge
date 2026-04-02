@@ -83,6 +83,7 @@ export {
   adaptiveSection,
   buildGenericSections,
   gcSection,
+  gcSections,
   gcStatsSection,
   optSection,
   runsSection,

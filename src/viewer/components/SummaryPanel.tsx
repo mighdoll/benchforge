@@ -288,10 +288,11 @@ function BootstrapCIMount({ ci }: { ci: BootstrapCIData }) {
       ref.current.innerHTML = "";
       ref.current.appendChild(
         createDistributionPlot(ci.histogram, ci.ci, ci.estimate, {
-          width: 140,
-          height: 40,
+          width: 240,
+          height: 80,
           title: "",
           direction: "uncertain",
+          ciLabels: ci.ciLabels,
         }),
       );
     });

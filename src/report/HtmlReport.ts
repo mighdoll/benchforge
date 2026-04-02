@@ -272,7 +272,11 @@ function buildEntry(
   if (col.comparable && col.statFn && samples && samples.length > 1) {
     const fn = (s: number[]) => col.statFn!(s, metadata);
     const result = bootstrapStat(samples, fn);
-    bootstrapCI = binBootstrapResult(result);
+    const format = (v: number) => (col.formatter ? col.formatter(v) : String(v)) ?? String(v);
+    bootstrapCI = {
+      ...binBootstrapResult(result),
+      ciLabels: [format(result.ci[0]), format(result.ci[1])],
+    };
   }
   return { runName, value, bootstrapCI };
 }

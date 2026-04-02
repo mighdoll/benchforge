@@ -10,6 +10,8 @@ export interface DistributionPlotOptions {
   title?: string;
   smooth?: boolean;
   direction?: "faster" | "slower" | "uncertain";
+  /** Pre-formatted CI bound labels (overrides default formatPct) */
+  ciLabels?: [string, string];
 }
 
 type Scales = { x: (v: number) => number; y: (v: number) => number };
@@ -23,12 +25,12 @@ const defaultMargin = { top: 22, right: 12, bottom: 22, left: 12 };
 
 const svgNS = "http://www.w3.org/2000/svg";
 
-const defaultOpts: Required<DistributionPlotOptions> = {
+const defaultOpts = {
   width: 260,
   height: 85,
   title: "p50 Δ%",
   smooth: false,
-  direction: "uncertain",
+  direction: "uncertain" as const,
 };
 
 const colors = {
@@ -80,8 +82,24 @@ export function createDistributionPlot(
   );
   if (layout.margin.bottom >= 15) {
     const labelY = layout.height - 4;
-    add(text(scales.x(ci[0]), labelY, formatPct(ci[0], 0), "middle", "12"));
-    add(text(scales.x(ci[1]), labelY, formatPct(ci[1], 0), "middle", "12"));
+    const loLabel = opts.ciLabels?.[0] ?? formatPct(ci[0], 0);
+    const hiLabel = opts.ciLabels?.[1] ?? formatPct(ci[1], 0);
+    const loX = scales.x(ci[0]);
+    const hiX = scales.x(ci[1]);
+    const estCharW = 6;
+    const loW = loLabel.length * estCharW;
+    const hiW = hiLabel.length * estCharW;
+    const gap = hiX - loX;
+    if (gap >= (loW + hiW) / 2 + 4) {
+      add(text(loX, labelY, loLabel, "middle", "11"));
+      add(text(hiX, labelY, hiLabel, "middle", "11"));
+    } else {
+      // Push labels to left/right edges to avoid overlap
+      const loEdge = Math.max(margin.left + loW / 2, loX);
+      const hiEdge = Math.min(layout.width - margin.right - hiW / 2, hiX);
+      add(text(loEdge, labelY, loLabel, "end", "11"));
+      add(text(hiEdge, labelY, hiLabel, "start", "11"));
+    }
   }
   return svg;
 }

@@ -338,10 +338,15 @@ export const pageLoadSection: ResultsMapper<PageLoadStats> = {
   ],
 };
 
+/** @return GC stats sections if enabled by CLI flags */
+export function gcSections(args: { "gc-stats"?: boolean }): ResultsMapper[] {
+  return args["gc-stats"] ? [gcStatsSection] : [];
+}
+
 /** Build default report sections (GC stats if enabled, plus run count) from CLI flags */
 export function buildGenericSections(args: {
   "gc-stats"?: boolean;
   alloc?: boolean;
 }): ResultsMapper[] {
-  return [...(args["gc-stats"] ? [gcStatsSection] : []), runsSection];
+  return [...gcSections(args), runsSection];
 }

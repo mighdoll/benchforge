@@ -81,6 +81,8 @@ export interface BootstrapCIData {
   estimate: number;
   ci: [number, number];
   histogram: HistogramBin[];
+  /** Formatted CI bounds for display (e.g., ["0.12ms", "0.15ms"]) */
+  ciLabels?: [string, string];
 }
 
 /** Summary of coverage/call-count data */
