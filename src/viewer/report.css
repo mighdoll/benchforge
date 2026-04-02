@@ -37,6 +37,7 @@
 }
 
 .report-panel .metadata { color: #666; font-size: 12px; }
+.report-panel .benchforge-version { font-size: 10px; color: #999; }
 .report-panel .header-right { text-align: right; }
 .report-panel .version-info { font-size: 12px; color: #666; margin-top: 6px; }
 
@@ -260,6 +261,7 @@
   :root:not([data-theme="light"]) .report-panel .report-header { background: #252525; box-shadow: 0 2px 4px rgba(0,0,0,0.3); }
   :root:not([data-theme="light"]) .report-panel .cli-args { color: #bbb; background: #333; }
   :root:not([data-theme="light"]) .report-panel .metadata { color: #999; }
+  :root:not([data-theme="light"]) .report-panel .benchforge-version { color: #666; }
   :root:not([data-theme="light"]) .report-panel .version-info { color: #999; }
   :root:not([data-theme="light"]) .report-panel .group-header { border-color: #444; }
   :root:not([data-theme="light"]) .report-panel .group-header h2 { color: #ccc; }
@@ -284,6 +286,7 @@
 :root[data-theme="dark"] .report-panel .report-header { background: #252525; box-shadow: 0 2px 4px rgba(0,0,0,0.3); }
 :root[data-theme="dark"] .report-panel .cli-args { color: #bbb; background: #333; }
 :root[data-theme="dark"] .report-panel .metadata { color: #999; }
+:root[data-theme="dark"] .report-panel .benchforge-version { color: #666; }
 :root[data-theme="dark"] .report-panel .version-info { color: #999; }
 :root[data-theme="dark"] .report-panel .group-header { border-color: #444; }
 :root[data-theme="dark"] .report-panel .group-header h2 { color: #ccc; }

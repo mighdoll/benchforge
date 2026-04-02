@@ -76,7 +76,7 @@ export function createDistributionPlot(
   // CI shading — subtle for bootstrap, normal for comparison
   const ciX = scales.x(ci[0]);
   const ciW = scales.x(ci[1]) - ciX;
-  const ciOpacity = opts.includeZero ? "0.5" : "0.15";
+  const ciOpacity = opts.includeZero ? "0.5" : "0.3";
   add(rect(ciX, margin.top, ciW, plot.h, { fill, opacity: ciOpacity }));
 
   if (opts.smooth) drawSmoothedDist(svg, histogram, scales, stroke);
@@ -213,7 +213,7 @@ function drawSmoothedDist(
   svg.appendChild(
     path(
       `M${scales.x(smoothed[0].x)},${baseline}L${pts.join("L")}L${scales.x(smoothed.at(-1)!.x)},${baseline}Z`,
-      { fill: stroke, opacity: "0.3" },
+      { fill: stroke, opacity: "0.4" },
     ),
   );
   svg.appendChild(

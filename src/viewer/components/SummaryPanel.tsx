@@ -65,6 +65,19 @@ export function SummaryPanel() {
   );
 }
 
+declare const __BENCHFORGE_GIT_HASH__: string;
+declare const __BENCHFORGE_GIT_DIRTY__: boolean;
+declare const __BENCHFORGE_BUILD_DATE__: string;
+
+function benchforgeLabel(): string {
+  const hash = typeof __BENCHFORGE_GIT_HASH__ !== "undefined" ? __BENCHFORGE_GIT_HASH__ : "dev";
+  const dirty = typeof __BENCHFORGE_GIT_DIRTY__ !== "undefined" && __BENCHFORGE_GIT_DIRTY__;
+  const date = typeof __BENCHFORGE_BUILD_DATE__ !== "undefined" ? __BENCHFORGE_BUILD_DATE__ : "";
+  const parts = [`benchforge ${hash}${dirty ? "*" : ""}`];
+  if (date) parts.push(formatRelativeTime(date));
+  return parts.join(" ");
+}
+
 function ReportHeader({ metadata }: { metadata: Record<string, unknown> }) {
   const args = metadata.cliArgs as Record<string, unknown> | undefined;
   const cur = metadata.currentVersion as GitVersion | undefined;
@@ -77,7 +90,8 @@ function ReportHeader({ metadata }: { metadata: Record<string, unknown> }) {
     <div class="report-header">
       <div class="cli-args">{formatCliArgs(args)}</div>
       <div class="header-right">
-        <div class="metadata">Generated: {new Date().toLocaleString()}</div>
+        <div class="metadata">{new Date().toLocaleString()}</div>
+        <div class="metadata benchforge-version">{benchforgeLabel()}</div>
         {versionParts.length > 0 && (
           <div class="version-info">{versionParts.join(" | ")}</div>
         )}

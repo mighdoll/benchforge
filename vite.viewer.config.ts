@@ -1,6 +1,26 @@
+import { execSync } from "node:child_process";
 import { cpSync, createReadStream, existsSync, statSync } from "node:fs";
 import { join } from "node:path";
 import { defineConfig, type Plugin } from "vite";
+
+function gitBuildInfo(): Record<string, string> {
+  const run = (cmd: string) => execSync(cmd, { encoding: "utf8" }).trim();
+  try {
+    const hash = run("git rev-parse --short HEAD");
+    const dirty = run("git status --porcelain") !== "";
+    return {
+      __BENCHFORGE_GIT_HASH__: JSON.stringify(hash),
+      __BENCHFORGE_GIT_DIRTY__: JSON.stringify(dirty),
+      __BENCHFORGE_BUILD_DATE__: JSON.stringify(new Date().toISOString()),
+    };
+  } catch {
+    return {
+      __BENCHFORGE_GIT_HASH__: JSON.stringify("unknown"),
+      __BENCHFORGE_GIT_DIRTY__: JSON.stringify(false),
+      __BENCHFORGE_BUILD_DATE__: JSON.stringify(new Date().toISOString()),
+    };
+  }
+}
 
 /** Dev middleware: serve vendor/speedscope/ at /speedscope/ */
 function serveSpeedscope(): Plugin {
@@ -61,5 +81,6 @@ export default defineConfig({
     chunkSizeWarningLimit: 700,
   },
   server: { port: 5173 },
+  define: gitBuildInfo(),
   plugins: [serveSpeedscope(), copySpeedscope()],
 });
