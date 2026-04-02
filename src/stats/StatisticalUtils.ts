@@ -121,8 +121,12 @@ export function bootstrapStat(
 ): BootstrapResult {
   const { resamples = bootstrapSamples, confidence: conf = defaultConfidence } =
     options;
-  const resample = makeResampler(samples, options.blocks);
-  const stats = Array.from({ length: resamples }, () => statFn(resample()));
+  // With blocks: derive CI from per-block means (independent observations)
+  // Point estimate uses all samples via statFn
+  const means = options.blocks ? blockMeans(samples, options.blocks) : undefined;
+  const stats = means
+    ? Array.from({ length: resamples }, () => average(createResample(means)))
+    : Array.from({ length: resamples }, () => statFn(createResample(samples)));
   return {
     estimate: statFn(samples),
     ci: computeInterval(stats, conf),
@@ -161,23 +165,12 @@ export function createResample(samples: number[]): number[] {
   );
 }
 
-/** @return resampler using block bootstrap when offsets are provided, else standard */
-function makeResampler(samples: number[], offsets?: number[]): () => number[] {
-  if (offsets) return () => createBlockResample(samples, offsets);
-  return () => createResample(samples);
-}
-
-/** @return block bootstrap resample: pick blocks with replacement, concatenate */
-function createBlockResample(samples: number[], offsets: number[]): number[] {
-  const n = offsets.length;
-  const result: number[] = [];
-  for (let i = 0; i < n; i++) {
-    const pick = Math.floor(Math.random() * n);
-    const start = offsets[pick];
-    const end = pick + 1 < n ? offsets[pick + 1] : samples.length;
-    for (let j = start; j < end; j++) result.push(samples[j]);
-  }
-  return result;
+/** @return per-block means from sample data split by offsets */
+function blockMeans(samples: number[], offsets: number[]): number[] {
+  return offsets.map((start, i) => {
+    const end = i + 1 < offsets.length ? offsets[i + 1] : samples.length;
+    return average(samples.slice(start, end));
+  });
 }
 
 /**
@@ -195,17 +188,26 @@ export function bootstrapDifferenceCI(
     options;
   const fn = options.statFn ?? ((s: number[]) => percentile(s, 0.5));
 
+  // Point estimate: pooled statistic from all samples
   const baseVal = fn(a);
   const currVal = fn(b);
   const observedPct = ((currVal - baseVal) / baseVal) * 100;
 
-  const resampleA = makeResampler(a, options.blocks);
-  const resampleB = makeResampler(b, options.blocksB ?? options.blocks);
+  // CI: with blocks, bootstrap per-block means (independent observations).
+  // Without blocks, resample individual samples (standard bootstrap).
+  const meansA = options.blocks ? blockMeans(a, options.blocks) : undefined;
+  const meansB = (options.blocksB ?? options.blocks)
+    ? blockMeans(b, options.blocksB ?? options.blocks!)
+    : undefined;
 
   const diffs: number[] = [];
   for (let i = 0; i < resamples; i++) {
-    const valA = fn(resampleA());
-    const valB = fn(resampleB());
+    const valA = meansA
+      ? average(createResample(meansA))
+      : fn(createResample(a));
+    const valB = meansB
+      ? average(createResample(meansB))
+      : fn(createResample(b));
     diffs.push(((valB - valA) / valA) * 100);
   }
 
