@@ -67,7 +67,7 @@ export function createDistributionPlot(
   // Point label centered above chart (bootstrap CIs)
   if (opts.pointLabel) {
     const cx = margin.left + plot.w / 2;
-    add(text(cx, margin.top - 6, opts.pointLabel, "middle", "14", "#333", "600"));
+    add(text(cx, margin.top - 6, opts.pointLabel, "middle", "15", "#333", "700"));
   }
 
   // CI shading — subtle for bootstrap, normal for comparison

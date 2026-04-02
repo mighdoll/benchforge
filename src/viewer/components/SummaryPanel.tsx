@@ -168,7 +168,7 @@ function StatRow({ row }: { row: ViewerRow }) {
   }
 
   return (
-    <div class="stat-row">
+    <div class={`stat-row${row.primary ? " primary-row" : ""}`}>
       <div class="row-header">
         <span class="row-label">{row.label}</span>
         {row.comparisonCI && <ComparisonBadge ci={row.comparisonCI} compact />}

@@ -67,6 +67,8 @@ export interface ViewerRow {
   entries: ViewerEntry[];
   comparisonCI?: DifferenceCI;
   shared?: boolean;
+  /** First comparable row with a statFn in the section */
+  primary?: boolean;
 }
 
 /** A single run's value for a stat */

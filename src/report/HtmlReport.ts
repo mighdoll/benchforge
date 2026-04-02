@@ -201,14 +201,17 @@ interface RowContext {
   baselineMeta?: UnknownRecord;
 }
 
-/** Build ViewerRow[] for a column group */
+/** Build ViewerRow[] for a column group, marking the first CI row as primary */
 function buildGroupRows(
   columns: ReportColumn<Record<string, unknown>>[],
   ctx: RowContext,
 ): ViewerRow[] {
-  return columns
+  const rows = columns
     .map(col => buildColumnRow(col, ctx))
     .filter((row): row is ViewerRow => row !== undefined);
+  const first = rows.find(r => r.entries.some(e => e.bootstrapCI));
+  if (first) first.primary = true;
+  return rows;
 }
 
 /** Build a ViewerRow for a single column, or undefined if no data */

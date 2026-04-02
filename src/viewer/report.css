@@ -155,6 +155,12 @@
   color: #666;
 }
 
+.report-panel .primary-row .row-label {
+  font-size: 14px;
+  font-weight: 700;
+  color: #444;
+}
+
 .report-panel .shared-row {
   display: flex;
   justify-content: space-between;
@@ -260,6 +266,7 @@
   :root:not([data-theme="light"]) .report-panel .section-panel { background: #252525; box-shadow: 0 1px 3px rgba(0,0,0,0.3); }
   :root:not([data-theme="light"]) .report-panel .panel-header { color: #777; border-color: #333; }
   :root:not([data-theme="light"]) .report-panel .row-label { color: #999; }
+  :root:not([data-theme="light"]) .report-panel .primary-row .row-label { color: #ccc; }
   :root:not([data-theme="light"]) .report-panel .row-value,
   :root:not([data-theme="light"]) .report-panel .run-value { color: #ddd; }
   :root:not([data-theme="light"]) .report-panel .run-name { color: #777; }
@@ -283,6 +290,7 @@
 :root[data-theme="dark"] .report-panel .section-panel { background: #252525; box-shadow: 0 1px 3px rgba(0,0,0,0.3); }
 :root[data-theme="dark"] .report-panel .panel-header { color: #777; border-color: #333; }
 :root[data-theme="dark"] .report-panel .row-label { color: #999; }
+:root[data-theme="dark"] .report-panel .primary-row .row-label { color: #ccc; }
 :root[data-theme="dark"] .report-panel .row-value,
 :root[data-theme="dark"] .report-panel .run-value { color: #ddd; }
 :root[data-theme="dark"] .report-panel .run-name { color: #777; }
