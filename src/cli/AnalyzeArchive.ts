@@ -3,7 +3,11 @@ import { readFile } from "node:fs/promises";
 import { resolve } from "node:path";
 import colors from "../report/Colors.ts";
 import { formatSignedPercent, timeMs } from "../report/Formatters.ts";
-import { average, percentile } from "../stats/StatisticalUtils.ts";
+import {
+  average,
+  findOutliers,
+  percentile,
+} from "../stats/StatisticalUtils.ts";
 import type { BenchmarkEntry, BenchmarkGroup } from "../viewer/ReportData.ts";
 
 const { bold, dim, red, green, yellow } = colors;
@@ -72,6 +76,7 @@ function analyzeBenchmark(
   if (baseBatches && baseBatches.length === nBatches) {
     printOrderEffect(bBatches, baseBatches);
     printPairedDeltas(bBatches, baseBatches);
+    printTrimmedBlocks(bBatches, baseBatches, bench.name);
   }
   console.log();
 }
@@ -190,6 +195,47 @@ function printPairedDeltas(benches: number[][], baselines: number[][]): void {
       red("    ==> all batches agree on direction (systematic bias?)"),
     );
   }
+}
+
+/** Show which blocks would be Tukey-trimmed per side. */
+function printTrimmedBlocks(
+  benches: number[][],
+  baselines: number[][],
+  name: string,
+): void {
+  const curMeans = benches.map(b => average(b));
+  const baseMeans = baselines.map(b => average(b));
+  const curOut = findOutliers(curMeans);
+  const baseOut = findOutliers(baseMeans);
+
+  console.log();
+  console.log(bold("  Trimmed blocks:"));
+  printSideTrim("baseline", baseMeans, baseOut);
+  printSideTrim(name, curMeans, curOut);
+}
+
+/** Print trimming info for one side. */
+function printSideTrim(
+  label: string,
+  means: number[],
+  outliers: { rate: number; indices: number[] },
+): void {
+  const { indices } = outliers;
+  if (indices.length === 0) {
+    console.log(dim(`    ${label}: 0 trimmed`));
+    return;
+  }
+  const q1 = percentile(means, 0.25);
+  const q3 = percentile(means, 0.75);
+  const iqr = q3 - q1;
+  const lo = q1 - 1.5 * iqr;
+  const hi = q3 + 1.5 * iqr;
+  const vals = indices.map(i => timeMs(means[i]) ?? "?").join(", ");
+  const fence = `[${timeMs(lo)}, ${timeMs(hi)}]`;
+  console.log(
+    `    ${label}: ${yellow(`${indices.length} trimmed`)} (${vals})` +
+      dim(`  fence: ${fence}`),
+  );
 }
 
 function formatDelta(pct: number): string {

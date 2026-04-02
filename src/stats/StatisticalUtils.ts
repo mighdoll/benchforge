@@ -32,6 +32,8 @@ export interface DifferenceCI {
   histogram?: HistogramBin[];
   /** Label for the CI plot title (e.g. "mean Δ%") */
   label?: string;
+  /** Blocks trimmed per side [baseline, current] via Tukey fences */
+  trimmed?: [number, number];
 }
 
 /** Options for bootstrap resampling methods */
@@ -175,6 +177,17 @@ export function createResample(samples: number[]): number[] {
   );
 }
 
+/** @return values with Tukey fence outliers removed */
+function tukeyTrim(values: number[]): number[] {
+  if (values.length < 4) return values;
+  const q1 = percentile(values, 0.25);
+  const q3 = percentile(values, 0.75);
+  const iqr = q3 - q1;
+  const lo = q1 - outlierMultiplier * iqr;
+  const hi = q3 + outlierMultiplier * iqr;
+  return values.filter(v => v >= lo && v <= hi);
+}
+
 /** @return per-block statistic values from sample data split by offsets */
 function blockValues(
   samples: number[],
@@ -187,11 +200,34 @@ function blockValues(
   });
 }
 
+/** Compute Tukey-trimmed block means for each side of a difference CI */
+function prepareBlockMeans(
+  a: number[],
+  b: number[],
+  options: DiffBootstrapOptions,
+): { meansA?: number[]; meansB?: number[]; trimmed?: [number, number] } {
+  const blocksB = options.blocksB ?? options.blocks;
+  const rawA = options.blocks
+    ? blockValues(a, options.blocks, average)
+    : undefined;
+  const rawB = blocksB ? blockValues(b, blocksB, average) : undefined;
+  if (!rawA && !rawB) return {};
+  const meansA = rawA ? tukeyTrim(rawA) : undefined;
+  const meansB = rawB ? tukeyTrim(rawB) : undefined;
+  const trimmedA = rawA ? rawA.length - (meansA?.length ?? 0) : 0;
+  const trimmedB = rawB ? rawB.length - (meansB?.length ?? 0) : 0;
+  return { meansA, meansB, trimmed: [trimmedA, trimmedB] };
+}
+
 /**
  * @return bootstrap CI for percentage difference between baseline and current.
  * Resamples both distributions independently and computes the stat difference
  * distribution to derive a confidence interval. Uses median by default,
  * or a custom stat function via the statFn option.
+ *
+ * When block boundaries are provided, computes per-block means and applies
+ * Tukey trimming to remove environmentally disturbed blocks before
+ * bootstrapping.
  */
 export function bootstrapDifferenceCI(
   a: number[],
@@ -207,16 +243,7 @@ export function bootstrapDifferenceCI(
   const currVal = fn(b);
   const observedPct = ((currVal - baseVal) / baseVal) * 100;
 
-  // CI: with blocks, bootstrap per-block means (independent observations).
-  // Without blocks, resample individual samples (standard bootstrap).
-  // Uses average (not statFn) for blocks because percentage diffs are unit-free.
-  const meansA = options.blocks
-    ? blockValues(a, options.blocks, average)
-    : undefined;
-  const meansB =
-    (options.blocksB ?? options.blocks)
-      ? blockValues(b, options.blocksB ?? options.blocks!, average)
-      : undefined;
+  const { meansA, meansB, trimmed } = prepareBlockMeans(a, b, options);
 
   const diffs: number[] = [];
   for (let i = 0; i < resamples; i++) {
@@ -231,7 +258,13 @@ export function bootstrapDifferenceCI(
 
   const ci = computeInterval(diffs, conf);
   const direction = classifyDirection(ci, observedPct, options.equivMargin);
-  return { percent: observedPct, ci, direction, histogram: binValues(diffs) };
+  return {
+    percent: observedPct,
+    ci,
+    direction,
+    histogram: binValues(diffs),
+    trimmed,
+  };
 }
 
 /** Classify CI direction, with optional equivalence margin (in percent) */
