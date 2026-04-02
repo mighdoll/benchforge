@@ -12,13 +12,17 @@ export interface DistributionPlotOptions {
   direction?: "faster" | "slower" | "uncertain";
   /** Pre-formatted CI bound labels (overrides default formatPct) */
   ciLabels?: [string, string];
+  /** Include zero in x scale (default true, set false for absolute-value plots) */
+  includeZero?: boolean;
+  /** Centered label above chart (e.g., the formatted point estimate) */
+  pointLabel?: string;
 }
 
 type Scales = { x: (v: number) => number; y: (v: number) => number };
 type Layout = {
   width: number;
   height: number;
-  margin: typeof defaultMargin;
+  margin: { top: number; right: number; bottom: number; left: number };
   plot: { w: number; h: number };
 };
 const defaultMargin = { top: 22, right: 12, bottom: 22, left: 12 };
@@ -31,6 +35,7 @@ const defaultOpts = {
   title: "p50 Δ%",
   smooth: false,
   direction: "uncertain" as const,
+  includeZero: true,
 };
 
 const colors = {
@@ -47,60 +52,52 @@ export function createDistributionPlot(
   options: DistributionPlotOptions = {},
 ): SVGSVGElement {
   const opts = { ...defaultOpts, ...options };
-  const layout = buildLayout(opts.width, opts.height);
+  const layout = buildLayout(opts.width, opts.height, !!opts.pointLabel);
   const svg = createSvg(layout.width, layout.height);
   if (!histogram?.length) return svg;
 
   const { fill, stroke } = colors[opts.direction];
-  const scales = buildScales(histogram, ci, layout);
+  const scales = buildScales(histogram, ci, layout, opts.includeZero);
   const { margin, plot } = layout;
   const add = (el: SVGElement) => svg.appendChild(el);
 
-  if (opts.title)
-    add(text(margin.left, 14, opts.title, "start", "13", "#333", "600"));
+  // Title (comparison CIs)
+  if (opts.title) add(text(margin.left, 14, opts.title, "start", "13", "#333", "600"));
+
+  // Point label centered above chart (bootstrap CIs)
+  if (opts.pointLabel) {
+    const cx = margin.left + plot.w / 2;
+    add(text(cx, margin.top - 6, opts.pointLabel, "middle", "14", "#333", "600"));
+  }
+
+  // CI shading — subtle for bootstrap, normal for comparison
   const ciX = scales.x(ci[0]);
   const ciW = scales.x(ci[1]) - ciX;
-  add(rect(ciX, margin.top, ciW, plot.h, { fill, opacity: "0.5" }));
+  const ciOpacity = opts.includeZero ? "0.5" : "0.15";
+  add(rect(ciX, margin.top, ciW, plot.h, { fill, opacity: ciOpacity }));
+
+  // Distribution
   if (opts.smooth) drawSmoothedDist(svg, histogram, scales, stroke);
   else drawHistogramBars(svg, histogram, scales, layout, stroke);
-  const zeroX = scales.x(0);
-  const inRange = zeroX >= margin.left && zeroX <= layout.width - margin.right;
-  if (inRange) {
-    const zeroAttrs = {
-      stroke: "#666",
-      strokeWidth: "1",
-      strokeDasharray: "3,2",
-    };
-    add(line(zeroX, margin.top, zeroX, margin.top + plot.h, zeroAttrs));
-  }
-  const ptX = scales.x(pointEstimate);
-  add(
-    line(ptX, margin.top, ptX, margin.top + plot.h, {
-      stroke,
-      strokeWidth: "2",
-    }),
-  );
-  if (layout.margin.bottom >= 15) {
-    const labelY = layout.height - 4;
-    const loLabel = opts.ciLabels?.[0] ?? formatPct(ci[0], 0);
-    const hiLabel = opts.ciLabels?.[1] ?? formatPct(ci[1], 0);
-    const loX = scales.x(ci[0]);
-    const hiX = scales.x(ci[1]);
-    const estCharW = 6;
-    const loW = loLabel.length * estCharW;
-    const hiW = hiLabel.length * estCharW;
-    const gap = hiX - loX;
-    if (gap >= (loW + hiW) / 2 + 4) {
-      add(text(loX, labelY, loLabel, "middle", "11"));
-      add(text(hiX, labelY, hiLabel, "middle", "11"));
-    } else {
-      // Push labels to left/right edges to avoid overlap
-      const loEdge = Math.max(margin.left + loW / 2, loX);
-      const hiEdge = Math.min(layout.width - margin.right - hiW / 2, hiX);
-      add(text(loEdge, labelY, loLabel, "end", "11"));
-      add(text(hiEdge, labelY, hiLabel, "start", "11"));
+
+  // Zero reference — solid black extending past plot area (comparison CIs only)
+  if (opts.includeZero) {
+    const zeroX = scales.x(0);
+    const inRange = zeroX >= margin.left && zeroX <= layout.width - margin.right;
+    if (inRange) {
+      const extend = 4;
+      add(line(zeroX, margin.top - extend, zeroX, margin.top + plot.h + extend, {
+        stroke: "#000",
+        strokeWidth: "1",
+      }));
     }
   }
+
+  // Point estimate line
+  const ptX = scales.x(pointEstimate);
+  add(line(ptX, margin.top, ptX, margin.top + plot.h, { stroke, strokeWidth: "2" }));
+
+  drawCILabels(svg, ci, scales, layout, opts);
   return svg;
 }
 
@@ -117,11 +114,11 @@ export function createCIPlot(
 }
 
 /** Compute plot layout dimensions, scaling margins for compact sizes */
-function buildLayout(width: number, height: number): Layout {
+function buildLayout(width: number, height: number, hasPointLabel?: boolean): Layout {
   const compact = height < defaultMargin.top + defaultMargin.bottom + 10;
   const margin = compact
     ? { top: 4, right: 6, bottom: 4, left: 6 }
-    : defaultMargin;
+    : { ...defaultMargin, top: hasPointLabel ? 30 : defaultMargin.top };
   const w = width - margin.left - margin.right;
   const h = height - margin.top - margin.bottom;
   return { width, height, margin, plot: { w, h } };
@@ -140,14 +137,16 @@ function buildScales(
   histogram: HistogramBin[],
   ci: [number, number],
   layout: Layout,
+  includeZero: boolean,
 ): Scales {
   const { margin, plot } = layout;
   const xs = histogram.map(b => b.x);
-  const xMin = Math.min(...xs, ci[0], 0);
-  const xMax = Math.max(...xs, ci[1], 0);
+  const xMin = includeZero ? Math.min(...xs, ci[0], 0) : Math.min(...xs, ci[0]);
+  const xMax = includeZero ? Math.max(...xs, ci[1], 0) : Math.max(...xs, ci[1]);
   const yMax = Math.max(...histogram.map(b => b.count));
+  const xRange = xMax - xMin || 1;
   return {
-    x: (v: number) => margin.left + ((v - xMin) / (xMax - xMin)) * plot.w,
+    x: (v: number) => margin.left + ((v - xMin) / xRange) * plot.w,
     y: (v: number) => margin.top + plot.h - (v / yMax) * plot.h,
   };
 }
@@ -229,6 +228,32 @@ function drawHistogramBars(
     const barH = (bin.count / yMax) * layout.plot.h;
     const x = scales.x(bin.x) - barW / 2;
     svg.appendChild(rect(x, base - barH, barW, barH, attrs));
+  }
+}
+
+/** Draw CI bound labels below the plot */
+function drawCILabels(
+  svg: SVGSVGElement,
+  ci: [number, number],
+  scales: Scales,
+  layout: Layout,
+  opts: DistributionPlotOptions & { includeZero: boolean },
+): void {
+  if (layout.margin.bottom < 15) return;
+  const labelY = layout.height - 4;
+  const loLabel = opts.ciLabels?.[0] ?? formatPct(ci[0], 0);
+  const hiLabel = opts.ciLabels?.[1] ?? formatPct(ci[1], 0);
+  if (!opts.includeZero) {
+    svg.appendChild(text(layout.margin.left, labelY, loLabel, "start", "11"));
+    svg.appendChild(text(layout.width - layout.margin.right, labelY, hiLabel, "end", "11"));
+  } else {
+    const loX = scales.x(ci[0]);
+    const hiX = scales.x(ci[1]);
+    const minGap = Math.max(loLabel.length, hiLabel.length) * 6;
+    if (hiX - loX >= minGap) {
+      svg.appendChild(text(loX, labelY, loLabel, "middle", "11"));
+      svg.appendChild(text(hiX, labelY, hiLabel, "middle", "11"));
+    }
   }
 }
 

@@ -179,11 +179,12 @@ function StatRow({ row }: { row: ViewerRow }) {
 }
 
 function RunEntry({ entry }: { entry: ViewerEntry }) {
+  const hasCI = !!entry.bootstrapCI;
   return (
     <div class="run-entry">
       <span class="run-name">{entry.runName}</span>
-      <span class="run-value">{entry.value}</span>
-      {entry.bootstrapCI && <BootstrapCIMount ci={entry.bootstrapCI} />}
+      {!hasCI && <span class="run-value">{entry.value}</span>}
+      {hasCI && <BootstrapCIMount ci={entry.bootstrapCI!} label={entry.value} />}
     </div>
   );
 }
@@ -280,7 +281,7 @@ function CIPlotMount({ ci, compact }: { ci: DifferenceCI; compact?: boolean }) {
   return <div class="ci-plot-container" ref={ref} />;
 }
 
-function BootstrapCIMount({ ci }: { ci: BootstrapCIData }) {
+function BootstrapCIMount({ ci, label }: { ci: BootstrapCIData; label?: string }) {
   const ref = useRef<HTMLDivElement>(null);
   useEffect(() => {
     import("../plots/CIPlot.ts").then(({ createDistributionPlot }) => {
@@ -293,10 +294,13 @@ function BootstrapCIMount({ ci }: { ci: BootstrapCIData }) {
           title: "",
           direction: "uncertain",
           ciLabels: ci.ciLabels,
+          includeZero: false,
+          smooth: true,
+          pointLabel: label,
         }),
       );
     });
-  }, [ci]);
+  }, [ci, label]);
   return <div class="ci-plot-inline" ref={ref} />;
 }
 
