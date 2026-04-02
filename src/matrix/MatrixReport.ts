@@ -113,7 +113,7 @@ function buildCaseTables(
 ): string[] {
   if (results.variants.length === 0) return [];
 
-  // Get all case IDs from first variant (all variants have same cases)
+  // all variants have the same cases
   const caseIds = results.variants[0].cases.map(c => c.caseId);
   return caseIds.map(caseId => buildCaseTable(results, caseId, options));
 }

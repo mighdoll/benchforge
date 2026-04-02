@@ -14,7 +14,6 @@ export function mergeBatchResults(results: MeasuredResults[]): MeasuredResults {
   const allSamples = results.flatMap(r => r.samples);
   const time = computeStats(allSamples);
 
-  // concat per-sample arrays, tracking batch boundaries
   let offset = 0;
   const batchOffsets: number[] = [];
   const pauses = results.flatMap(r => {

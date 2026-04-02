@@ -36,8 +36,7 @@ export function diffPercent(main: unknown, base: unknown): string {
   return coloredPercent(diff, base);
 }
 
-/** Format bytes with appropriate units (B, KB, MB, GB).
- *  Use `space: true` for human-readable console output (`1.5 KB`). */
+/** Format bytes with appropriate units. Use `space: true` for `1.5 KB` style. */
 export function formatBytes(
   bytes: unknown,
   opts?: { space?: boolean },

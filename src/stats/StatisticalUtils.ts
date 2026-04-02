@@ -56,7 +56,7 @@ type DiffBootstrapOptions = BootstrapOptions & {
   equivMargin?: number;
 };
 const defaultConfidence = 0.95;
-const outlierMultiplier = 1.5; // Tukey's fence multiplier
+const outlierMultiplier = 1.5;
 const bootstrapSamples = 10000;
 
 /** Swap direction labels for higher-is-better metrics (positive = faster) */
@@ -176,8 +176,7 @@ export function createResample(samples: number[]): number[] {
   );
 }
 
-/** @return values with extreme Tukey fence outliers removed.
- *  Uses 3x IQR (not 1.5x) to only catch clearly contaminated blocks. */
+/** @return values with extreme outliers removed (3x IQR Tukey fences) */
 function tukeyTrim(values: number[]): number[] {
   if (values.length < 4) return values;
   const q1 = percentile(values, 0.25);
@@ -219,16 +218,8 @@ function prepareBlockMeans(
   return { meansA, meansB, trimmed: [trimmedA, trimmedB] };
 }
 
-/**
- * @return bootstrap CI for percentage difference between baseline and current.
- * Resamples both distributions independently and computes the stat difference
- * distribution to derive a confidence interval. Uses median by default,
- * or a custom stat function via the statFn option.
- *
- * When block boundaries are provided, computes per-block means and applies
- * Tukey trimming to remove environmentally disturbed blocks before
- * bootstrapping.
- */
+/** @return bootstrap CI for percentage difference between baseline (a) and current (b).
+ *  With block boundaries, uses Tukey-trimmed per-block means as independent observations. */
 export function bootstrapDifferenceCI(
   a: number[],
   b: number[],

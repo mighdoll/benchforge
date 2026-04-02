@@ -3,6 +3,7 @@ import { cpSync, createReadStream, existsSync, statSync } from "node:fs";
 import { join } from "node:path";
 import { defineConfig, type Plugin } from "vite";
 
+/** @return Vite define entries for git hash, dirty flag, and build date */
 function gitBuildInfo(): Record<string, string> {
   const run = (cmd: string) => execSync(cmd, { encoding: "utf8" }).trim();
   let hash = "unknown";

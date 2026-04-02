@@ -24,6 +24,7 @@ export async function analyzeArchive(filePath: string): Promise<void> {
   }
 }
 
+/** Print analysis for all benchmarks in a group. */
 function analyzeGroup(group: BenchmarkGroup, batchCount?: number): void {
   console.log(bold(`\n=== ${group.name} ===\n`));
 
@@ -33,6 +34,7 @@ function analyzeGroup(group: BenchmarkGroup, batchCount?: number): void {
   }
 }
 
+/** Print per-batch analysis for one benchmark entry. */
 function analyzeBenchmark(
   bench: BenchmarkEntry,
   baseline: BenchmarkEntry | undefined,
@@ -234,6 +236,7 @@ function printSideTrim(label: string, means: number[]): void {
   );
 }
 
+/** Color a percent delta: red if >1%, green if <-1%. */
 function formatDelta(pct: number): string {
   const str = formatSignedPercent(pct);
   if (pct > 1) return red(str);

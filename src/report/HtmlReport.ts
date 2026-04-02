@@ -179,7 +179,7 @@ function prepareBenchmarkData(report: {
   };
 }
 
-/** Build ViewerSection[] from ResultsMapper sections, with bootstrap CIs for perRun columns */
+/** Build ViewerSections from ResultsMapper sections, with bootstrap CIs for comparable columns */
 function buildViewerSections(
   sections: ResultsMapper[],
   current: MeasuredResults,
