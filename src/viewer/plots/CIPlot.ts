@@ -32,7 +32,7 @@ const svgNS = "http://www.w3.org/2000/svg";
 const defaultOpts = {
   width: 260,
   height: 85,
-  title: "p50 Δ%",
+  title: "Δ%",
   smooth: false,
   direction: "uncertain" as const,
   includeZero: true,
@@ -115,6 +115,7 @@ export function createCIPlot(
 ): SVGSVGElement {
   if (!ci.histogram) return createSvg(0, 0);
   return createDistributionPlot(ci.histogram, ci.ci, ci.percent, {
+    title: ci.label,
     direction: ci.direction,
     ...options,
   });

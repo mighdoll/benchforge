@@ -92,7 +92,10 @@ function prepareGroupData(
     benchmarks: group.reports.map(report => {
       const m = report.measuredResults;
       const ci = computeDiffCI(baseM, m, primaryCol, report.metadata);
-      if (lowBatches && ci) ci.direction = "uncertain";
+      if (ci) {
+        if (lowBatches) ci.direction = "uncertain";
+        if (primaryCol?.title) ci.label = `${primaryCol.title} Δ%`;
+      }
       const sects = sections
         ? buildViewerSections(
             sections,
@@ -268,8 +271,10 @@ function buildComparisonCI(
   ctx: RowContext,
 ) {
   const ci = computeDiffCI(ctx.baseline, ctx.current, col, ctx.currentMeta);
-  if (ci && hasLowBatchCount(ctx.baseline, ctx.current))
-    ci.direction = "uncertain";
+  if (ci) {
+    if (hasLowBatchCount(ctx.baseline, ctx.current)) ci.direction = "uncertain";
+    if (col.title) ci.label = `${col.title} Δ%`;
+  }
   return ci;
 }
 

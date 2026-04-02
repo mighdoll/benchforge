@@ -30,6 +30,8 @@ export interface DifferenceCI {
   direction: CIDirection;
   /** Bootstrap distribution histogram for visualization */
   histogram?: HistogramBin[];
+  /** Label for the CI plot title (e.g. "mean Δ%") */
+  label?: string;
 }
 
 /** Options for bootstrap resampling methods */

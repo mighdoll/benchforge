@@ -165,9 +165,14 @@ function StatRow({ row }: { row: ViewerRow }) {
   if (row.shared) {
     const entry = row.entries[0];
     return (
-      <div class="stat-row shared-row">
-        <span class="row-label">{row.label}</span>
-        <span class="row-value">{entry?.value}</span>
+      <div class="stat-row">
+        <div class="row-header">
+          <span class="row-label">{row.label}</span>
+        </div>
+        <div class="run-entry">
+          <span class="run-name" />
+          <span class="run-value">{entry?.value}</span>
+        </div>
       </div>
     );
   }
