@@ -56,7 +56,7 @@ export function valuesForReports<S extends ReadonlyArray<ResultsMapper<any>>>(
   })) as ReportRowData<S>[];
 }
 
-/** Insert a single "delta% CI" column after the first comparable column in each group */
+/** Insert a single "delta% CI" column after the first perRun column in each group */
 export function injectDiffColumns<T>(
   reportGroups: ReportColumnGroup<T>[],
 ): ColumnGroup<T>[] {

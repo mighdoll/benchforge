@@ -1,5 +1,5 @@
 import type { GitVersion } from "../report/GitUtils.ts";
-import type { DifferenceCI } from "../stats/StatisticalUtils.ts";
+import type { DifferenceCI, HistogramBin } from "../stats/StatisticalUtils.ts";
 
 /** Top-level data structure for the HTML benchmark report */
 export interface ReportData {
@@ -33,7 +33,10 @@ export interface BenchmarkEntry {
   pausePoints?: PausePoint[];
   stats: BenchmarkStats;
   heapSize?: { min: number; max: number; avg: number };
-  sectionStats?: SectionStat[];
+  totalTime?: number;
+  sections?: ViewerSection[];
+  coverageSummary?: CoverageSummary;
+  heapSummary?: HeapSummary;
   comparisonCI?: DifferenceCI;
 }
 
@@ -46,13 +49,50 @@ export interface BenchmarkStats {
   p75: number;
   p99: number;
   p999: number;
+  cv?: number;
+  mad?: number;
+  outlierRate?: number;
 }
 
-/** A labeled value displayed in a report section card. */
-export interface SectionStat {
+/** A section of related stats for the viewer (e.g., "Lines / Sec", "GC") */
+export interface ViewerSection {
+  title: string;
+  tabLink?: string;
+  rows: ViewerRow[];
+}
+
+/** A stat row with per-run values and optional comparison CI */
+export interface ViewerRow {
   label: string;
+  entries: ViewerEntry[];
+  comparisonCI?: DifferenceCI;
+  shared?: boolean;
+}
+
+/** A single run's value for a stat */
+export interface ViewerEntry {
+  runName: string;
   value: string;
-  groupTitle?: string;
+  bootstrapCI?: BootstrapCIData;
+}
+
+/** Bootstrap CI data for inline visualization */
+export interface BootstrapCIData {
+  estimate: number;
+  ci: [number, number];
+  histogram: HistogramBin[];
+}
+
+/** Summary of coverage/call-count data */
+export interface CoverageSummary {
+  functionCount: number;
+  totalCalls: number;
+}
+
+/** Summary of heap allocation profile */
+export interface HeapSummary {
+  totalBytes: number;
+  userBytes: number;
 }
 
 /** A garbage collection event with timing relative to the benchmark start. */

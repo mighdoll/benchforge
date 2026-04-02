@@ -28,6 +28,8 @@ export type ReportColumn<T> = AnyColumn<T> & {
   comparable?: boolean;
   /** Set true for throughput metrics where higher values are better (e.g., lines/sec) */
   higherIsBetter?: boolean;
+  /** Compute this stat from raw samples for bootstrap CI (comparable columns only) */
+  statFn?: (samples: number[], metadata?: Record<string, unknown>) => number;
 };
 
 /** Maps benchmark results to table columns */

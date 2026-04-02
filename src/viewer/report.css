@@ -1,4 +1,4 @@
-/* Report panel — benchmark results rendered by plots.js */
+/* Report panel — benchmark results rendered by SummaryPanel */
 
 .report-panel {
   position: absolute;
@@ -12,6 +12,8 @@
 }
 
 .report-panel.active { display: block; }
+
+/* --- Header --- */
 
 .report-panel .report-header {
   background: white;
@@ -38,40 +40,157 @@
 .report-panel .header-right { text-align: right; }
 .report-panel .version-info { font-size: 12px; color: #666; margin-top: 6px; }
 
-.report-panel h2 {
-  color: #555;
-  margin: 30px 0 20px;
-  font-size: 20px;
-  border-bottom: 2px solid #e0e0e0;
-  padding-bottom: 10px;
-}
+/* --- Group --- */
+
+.report-panel .benchmark-group { margin-bottom: 24px; }
 
 .report-panel .group-header {
   display: flex;
   align-items: center;
-  gap: 12px;
-  margin: 30px 0 20px;
-  padding-bottom: 10px;
+  gap: 10px;
+  padding: 8px 0;
   border-bottom: 2px solid #e0e0e0;
+  cursor: pointer;
+  user-select: none;
 }
 
-.report-panel .group-header h2 { margin: 0; border: none; padding: 0; }
+.report-panel .group-header h2 {
+  margin: 0;
+  font-size: 18px;
+  color: #555;
+}
+
+.report-panel .group-toggle {
+  font-size: 14px;
+  color: #999;
+  width: 16px;
+  text-align: center;
+}
+
+/* --- Badges --- */
 
 .report-panel .badge {
-  font-size: 12px;
+  font-size: 11px;
   font-weight: 600;
-  padding: 4px 10px;
-  border-radius: 12px;
+  padding: 2px 8px;
+  border-radius: 10px;
   text-transform: uppercase;
-  letter-spacing: 0.5px;
+  letter-spacing: 0.4px;
+  white-space: nowrap;
 }
 
 .report-panel .badge-faster { background: #dcfce7; color: #166534; }
 .report-panel .badge-slower { background: #fee2e2; color: #991b1b; }
 .report-panel .badge-uncertain { background: #dbeafe; color: #1e40af; }
 
-.report-panel .ci-plot-container { display: inline-block; vertical-align: middle; margin-left: 8px; }
+.report-panel .comparison-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+/* --- CI plots --- */
+
+.report-panel .ci-plot-container { display: inline-block; vertical-align: middle; }
 .report-panel .ci-plot-container svg { display: block; }
+.report-panel .ci-plot-inline { display: inline-block; vertical-align: middle; margin-left: 6px; }
+.report-panel .ci-plot-inline svg { display: block; }
+
+/* --- Panel grid --- */
+
+.report-panel .panel-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  gap: 12px;
+  margin-top: 12px;
+}
+
+/* --- Section panel --- */
+
+.report-panel .section-panel {
+  background: white;
+  border-radius: 8px;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+  overflow: hidden;
+}
+
+.report-panel .panel-header {
+  padding: 8px 14px;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: #888;
+  border-bottom: 1px solid #f0f0f0;
+}
+
+.report-panel .panel-title-link {
+  color: #5f61d8;
+  cursor: pointer;
+  text-decoration: none;
+}
+
+.report-panel .panel-title-link:hover { text-decoration: underline; }
+
+.report-panel .panel-body { padding: 8px 14px; }
+
+/* --- Stat rows --- */
+
+.report-panel .stat-row {
+  margin-bottom: 8px;
+}
+
+.report-panel .stat-row:last-child { margin-bottom: 0; }
+
+.report-panel .row-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 2px;
+}
+
+.report-panel .row-label {
+  font-size: 12px;
+  font-weight: 600;
+  color: #666;
+}
+
+.report-panel .shared-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.report-panel .shared-row .row-value {
+  font-size: 14px;
+  font-weight: 600;
+  color: #333;
+  font-variant-numeric: tabular-nums;
+}
+
+/* --- Run entries --- */
+
+.report-panel .run-entry {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 1px 0 1px 16px;
+}
+
+.report-panel .run-name {
+  font-size: 12px;
+  color: #999;
+  min-width: 64px;
+}
+
+.report-panel .run-value {
+  font-size: 14px;
+  font-weight: 600;
+  color: #333;
+  font-variant-numeric: tabular-nums;
+}
+
+/* --- Plot areas (kept for SamplesPanel) --- */
 
 .report-panel .plot-grid {
   display: grid;
@@ -100,18 +219,7 @@
 .report-panel .plot-area svg { overflow: visible; }
 .report-panel .plot-area svg g[aria-label="x-axis label"] text { font-size: 14px; }
 
-.report-panel .summary-stats { background: #f8f9fa; padding: 15px; border-radius: 6px; margin-top: 20px; }
-
-.report-panel .stats-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
-  gap: 10px;
-  margin-top: 10px;
-}
-
-.report-panel .stat-item { background: white; padding: 10px; border-radius: 4px; text-align: center; }
-.report-panel .stat-label { font-size: 12px; color: #666; text-transform: uppercase; letter-spacing: 0.5px; }
-.report-panel .stat-value { font-size: 18px; font-weight: 600; color: #333; margin-top: 4px; }
+/* --- Misc --- */
 
 .report-panel .loading { color: #666; font-style: italic; padding: 20px; text-align: center; }
 .report-panel .single-sample-notice { color: #999; font-style: italic; padding: 20px; text-align: center; }
@@ -121,7 +229,6 @@
 .report-panel .ci-slower { color: #ef4444; }
 .report-panel .ci-uncertain { color: #6b7280; }
 
-/* Empty state when no data */
 .report-panel .empty-state {
   display: flex;
   align-items: center;
@@ -138,42 +245,48 @@
   font-size: 13px;
 }
 
-/* Dark mode — system preference (not overridden to light) */
+/* --- Dark mode — system preference --- */
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) .report-panel { background: #181818; }
   :root:not([data-theme="light"]) .report-panel .report-header { background: #252525; box-shadow: 0 2px 4px rgba(0,0,0,0.3); }
   :root:not([data-theme="light"]) .report-panel .cli-args { color: #bbb; background: #333; }
   :root:not([data-theme="light"]) .report-panel .metadata { color: #999; }
   :root:not([data-theme="light"]) .report-panel .version-info { color: #999; }
-  :root:not([data-theme="light"]) .report-panel h2 { color: #ccc; border-color: #444; }
   :root:not([data-theme="light"]) .report-panel .group-header { border-color: #444; }
+  :root:not([data-theme="light"]) .report-panel .group-header h2 { color: #ccc; }
+  :root:not([data-theme="light"]) .report-panel .group-toggle { color: #666; }
+  :root:not([data-theme="light"]) .report-panel .section-panel { background: #252525; box-shadow: 0 1px 3px rgba(0,0,0,0.3); }
+  :root:not([data-theme="light"]) .report-panel .panel-header { color: #777; border-color: #333; }
+  :root:not([data-theme="light"]) .report-panel .row-label { color: #999; }
+  :root:not([data-theme="light"]) .report-panel .row-value,
+  :root:not([data-theme="light"]) .report-panel .run-value { color: #ddd; }
+  :root:not([data-theme="light"]) .report-panel .run-name { color: #777; }
   :root:not([data-theme="light"]) .report-panel .plot-container { background: #252525; box-shadow: 0 2px 4px rgba(0,0,0,0.3); }
   :root:not([data-theme="light"]) .report-panel .plot-title { color: #ddd; }
   :root:not([data-theme="light"]) .report-panel .plot-description { color: #999; }
-  :root:not([data-theme="light"]) .report-panel .summary-stats { background: #222; }
-  :root:not([data-theme="light"]) .report-panel .stat-item { background: #2a2a2a; }
-  :root:not([data-theme="light"]) .report-panel .stat-label { color: #999; }
-  :root:not([data-theme="light"]) .report-panel .stat-value { color: #ddd; }
   :root:not([data-theme="light"]) .report-panel .loading { color: #999; }
   :root:not([data-theme="light"]) .report-panel .empty-state { color: #666; }
   :root:not([data-theme="light"]) .report-panel .empty-state code { background: #333; }
 }
 
-/* Dark mode — user forced */
+/* --- Dark mode — user forced --- */
 :root[data-theme="dark"] .report-panel { background: #181818; }
 :root[data-theme="dark"] .report-panel .report-header { background: #252525; box-shadow: 0 2px 4px rgba(0,0,0,0.3); }
 :root[data-theme="dark"] .report-panel .cli-args { color: #bbb; background: #333; }
 :root[data-theme="dark"] .report-panel .metadata { color: #999; }
 :root[data-theme="dark"] .report-panel .version-info { color: #999; }
-:root[data-theme="dark"] .report-panel h2 { color: #ccc; border-color: #444; }
 :root[data-theme="dark"] .report-panel .group-header { border-color: #444; }
+:root[data-theme="dark"] .report-panel .group-header h2 { color: #ccc; }
+:root[data-theme="dark"] .report-panel .group-toggle { color: #666; }
+:root[data-theme="dark"] .report-panel .section-panel { background: #252525; box-shadow: 0 1px 3px rgba(0,0,0,0.3); }
+:root[data-theme="dark"] .report-panel .panel-header { color: #777; border-color: #333; }
+:root[data-theme="dark"] .report-panel .row-label { color: #999; }
+:root[data-theme="dark"] .report-panel .row-value,
+:root[data-theme="dark"] .report-panel .run-value { color: #ddd; }
+:root[data-theme="dark"] .report-panel .run-name { color: #777; }
 :root[data-theme="dark"] .report-panel .plot-container { background: #252525; box-shadow: 0 2px 4px rgba(0,0,0,0.3); }
 :root[data-theme="dark"] .report-panel .plot-title { color: #ddd; }
 :root[data-theme="dark"] .report-panel .plot-description { color: #999; }
-:root[data-theme="dark"] .report-panel .summary-stats { background: #222; }
-:root[data-theme="dark"] .report-panel .stat-item { background: #2a2a2a; }
-:root[data-theme="dark"] .report-panel .stat-label { color: #999; }
-:root[data-theme="dark"] .report-panel .stat-value { color: #ddd; }
 :root[data-theme="dark"] .report-panel .loading { color: #999; }
 :root[data-theme="dark"] .report-panel .empty-state { color: #666; }
 :root[data-theme="dark"] .report-panel .empty-state code { background: #333; }

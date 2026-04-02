@@ -2,6 +2,7 @@ import type {
   MeasuredResults,
   OptStatusInfo,
 } from "../runners/MeasuredResults.ts";
+import { average, percentile } from "../stats/StatisticalUtils.ts";
 import type { ReportColumnGroup, ResultsMapper } from "./BenchmarkReport.ts";
 import { formatBytes, integer, percent, timeMs } from "./Formatters.ts";
 import { formatConvergence } from "./text/ConvergenceFormatters.ts";
@@ -61,9 +62,27 @@ export const timeSection: ResultsMapper<TimeStats> = {
     {
       groupTitle: "time",
       columns: [
-        { key: "mean", title: "mean", formatter: timeMs, comparable: true },
-        { key: "p50", title: "p50", formatter: timeMs, comparable: true },
-        { key: "p99", title: "p99", formatter: timeMs, comparable: true },
+        {
+          key: "mean",
+          title: "mean",
+          formatter: timeMs,
+          comparable: true,
+          statFn: average,
+        },
+        {
+          key: "p50",
+          title: "p50",
+          formatter: timeMs,
+          comparable: true,
+          statFn: s => percentile(s, 0.5),
+        },
+        {
+          key: "p99",
+          title: "p99",
+          formatter: timeMs,
+          comparable: true,
+          statFn: s => percentile(s, 0.99),
+        },
       ],
     },
   ],
@@ -114,12 +133,37 @@ export const gcStatsSection: ResultsMapper<GcStatsInfo> = {
     {
       groupTitle: "gc",
       columns: [
-        { key: "allocPerIter", title: "alloc/iter", formatter: formatBytes },
-        { key: "collected", title: "collected", formatter: formatBytes },
-        { key: "scavenges", title: "scav", formatter: integer },
-        { key: "fullGCs", title: "full", formatter: integer },
-        { key: "promoPercent", title: "promo%", formatter: percent },
-        { key: "pausePerIter", title: "pause/iter", formatter: timeMs },
+        {
+          key: "allocPerIter",
+          title: "alloc/iter",
+          formatter: formatBytes,
+          comparable: true,
+        },
+        {
+          key: "collected",
+          title: "collected",
+          formatter: formatBytes,
+          comparable: true,
+        },
+        {
+          key: "scavenges",
+          title: "scav",
+          formatter: integer,
+          comparable: true,
+        },
+        { key: "fullGCs", title: "full", formatter: integer, comparable: true },
+        {
+          key: "promoPercent",
+          title: "promo%",
+          formatter: percent,
+          comparable: true,
+        },
+        {
+          key: "pausePerIter",
+          title: "pause/iter",
+          formatter: timeMs,
+          comparable: true,
+        },
       ],
     },
   ],
@@ -132,10 +176,25 @@ export const browserGcStatsSection: ResultsMapper<GcStatsInfo> = {
     {
       groupTitle: "gc",
       columns: [
-        { key: "collected", title: "collected", formatter: formatBytes },
-        { key: "scavenges", title: "scav", formatter: integer },
-        { key: "fullGCs", title: "full", formatter: integer },
-        { key: "pausePerIter", title: "pause", formatter: timeMs },
+        {
+          key: "collected",
+          title: "collected",
+          formatter: formatBytes,
+          comparable: true,
+        },
+        {
+          key: "scavenges",
+          title: "scav",
+          formatter: integer,
+          comparable: true,
+        },
+        { key: "fullGCs", title: "full", formatter: integer, comparable: true },
+        {
+          key: "pausePerIter",
+          title: "pause",
+          formatter: timeMs,
+          comparable: true,
+        },
       ],
     },
   ],
@@ -187,8 +246,20 @@ export const adaptiveSection: ResultsMapper<AdaptiveStats> = {
     {
       groupTitle: "time",
       columns: [
-        { key: "median", title: "median", formatter: timeMs, comparable: true },
-        { key: "mean", title: "mean", formatter: timeMs, comparable: true },
+        {
+          key: "median",
+          title: "median",
+          formatter: timeMs,
+          comparable: true,
+          statFn: s => percentile(s, 0.5),
+        },
+        {
+          key: "mean",
+          title: "mean",
+          formatter: timeMs,
+          comparable: true,
+          statFn: average,
+        },
         { key: "p99", title: "p99", formatter: timeMs },
       ],
     },

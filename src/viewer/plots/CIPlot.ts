@@ -54,7 +54,8 @@ export function createDistributionPlot(
   const { margin, plot } = layout;
   const add = (el: SVGElement) => svg.appendChild(el);
 
-  add(text(margin.left, 14, opts.title, "start", "13", "#333", "600"));
+  if (opts.title)
+    add(text(margin.left, 14, opts.title, "start", "13", "#333", "600"));
   const ciX = scales.x(ci[0]);
   const ciW = scales.x(ci[1]) - ciX;
   add(rect(ciX, margin.top, ciW, plot.h, { fill, opacity: "0.5" }));
@@ -77,9 +78,11 @@ export function createDistributionPlot(
       strokeWidth: "2",
     }),
   );
-  const labelY = layout.height - 4;
-  add(text(scales.x(ci[0]), labelY, formatPct(ci[0], 0), "middle", "12"));
-  add(text(scales.x(ci[1]), labelY, formatPct(ci[1], 0), "middle", "12"));
+  if (layout.margin.bottom >= 15) {
+    const labelY = layout.height - 4;
+    add(text(scales.x(ci[0]), labelY, formatPct(ci[0], 0), "middle", "12"));
+    add(text(scales.x(ci[1]), labelY, formatPct(ci[1], 0), "middle", "12"));
+  }
   return svg;
 }
 
@@ -95,9 +98,12 @@ export function createCIPlot(
   });
 }
 
-/** Compute plot layout dimensions from outer width/height and default margins */
+/** Compute plot layout dimensions, scaling margins for compact sizes */
 function buildLayout(width: number, height: number): Layout {
-  const margin = defaultMargin;
+  const compact = height < defaultMargin.top + defaultMargin.bottom + 10;
+  const margin = compact
+    ? { top: 4, right: 6, bottom: 4, left: 6 }
+    : defaultMargin;
   const w = width - margin.left - margin.right;
   const h = height - margin.top - margin.bottom;
   return { width, height, margin, plot: { w, h } };

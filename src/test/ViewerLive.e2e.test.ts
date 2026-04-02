@@ -27,10 +27,10 @@ test("live viewer: summary tab shows stats", {
     await page.goto(`http://localhost:${port}`, { waitUntil: "networkidle" });
 
     const summaryPanel = page.locator("#summary-panel");
-    const stats = summaryPanel.locator(".stats-grid").first();
-    await stats.waitFor({ state: "visible", timeout: 15_000 });
-    const statItems = await summaryPanel.locator(".stat-item").count();
-    expect(statItems).toBeGreaterThan(0);
+    const panel = summaryPanel.locator(".section-panel").first();
+    await panel.waitFor({ state: "visible", timeout: 15_000 });
+    const statRows = await summaryPanel.locator(".stat-row").count();
+    expect(statRows).toBeGreaterThan(0);
   } finally {
     await browser.close();
   }
@@ -52,7 +52,7 @@ test("live viewer: samples tab shows chart SVG", {
 
     // Wait for summary to load (samples tab becomes enabled)
     await page
-      .locator("#summary-panel .stats-grid")
+      .locator("#summary-panel .section-panel")
       .first()
       .waitFor({ state: "visible", timeout: 15_000 });
 

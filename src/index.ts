@@ -59,6 +59,7 @@ export {
 } from "./matrix/MatrixReport.ts";
 export type {
   BenchmarkReport,
+  ReportColumn,
   ReportColumnGroup,
   ReportGroup,
   ResultsMapper,
@@ -97,7 +98,7 @@ export type {
 } from "./runners/BenchmarkSpec.ts";
 export type { RunnerOptions } from "./runners/BenchRunner.ts";
 export type { MeasuredResults } from "./runners/MeasuredResults.ts";
-export { average } from "./stats/StatisticalUtils.ts";
+export { average, percentile } from "./stats/StatisticalUtils.ts";
 export {
   formatDateWithTimezone,
   formatRelativeTime,

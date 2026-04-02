@@ -2,11 +2,17 @@ import { useEffect, useRef, useState } from "preact/hooks";
 import type { GitVersion } from "../../report/GitUtils.ts";
 import type { DifferenceCI } from "../../stats/StatisticalUtils.ts";
 import { formatRelativeTime } from "../DateFormat.ts";
-import type { BenchmarkGroup, BenchmarkStats, SectionStat } from "../ReportData.ts";
-import type { ReportData } from "../ReportData.ts";
+import type {
+  BenchmarkEntry,
+  BenchmarkGroup,
+  BootstrapCIData,
+  ReportData,
+  ViewerEntry,
+  ViewerRow,
+  ViewerSection,
+} from "../ReportData.ts";
 import { formatPct } from "../plots/PlotTypes.ts";
-import { prepareBenchmarks, type PreparedBenchmark } from "../plots/RenderPlots.ts";
-import { provider, reportData } from "../State.ts";
+import { activeTabId, provider, reportData } from "../State.ts";
 
 const defaultArgs: Record<string, unknown> = {
   worker: true,
@@ -24,9 +30,7 @@ export function SummaryPanel() {
 
   useEffect(() => {
     p.fetchReportData()
-      .then(d => {
-        reportData.value = d as ReportData;
-      })
+      .then(d => (reportData.value = d as ReportData))
       .catch(err => {
         console.error("Report load failed:", err);
         setError(String(err));
@@ -34,49 +38,34 @@ export function SummaryPanel() {
   }, [p]);
 
   if (error)
-    return (
-      <div class="empty-state">
-        <p>Failed to load report data: {error}</p>
-      </div>
-    );
+    return <div class="empty-state"><p>Failed to load report data: {error}</p></div>;
   if (!data)
-    return (
-      <div class="empty-state">
-        <p>Loading report&hellip;</p>
-      </div>
-    );
+    return <div class="empty-state"><p>Loading report&hellip;</p></div>;
 
   const metadata = data.metadata as unknown as Record<string, unknown>;
-  const gcEnabled = !!metadata.gcTrackingEnabled;
-
   return (
     <>
       <ReportHeader metadata={metadata} />
       {data.groups.map((group, i) => (
-        <SummaryGroup
-          key={i}
-          group={group}
-          index={i}
-          gcEnabled={gcEnabled}
-        />
+        <CollapsibleGroup key={i} group={group} />
       ))}
     </>
   );
 }
 
+// --- Header ---
+
 function ReportHeader({ metadata }: { metadata: Record<string, unknown> }) {
   const args = metadata.cliArgs as Record<string, unknown> | undefined;
-  const cliArgs = formatCliArgs(args);
   const cur = metadata.currentVersion as GitVersion | undefined;
   const base = metadata.baselineVersion as GitVersion | undefined;
-
   const versionParts: string[] = [];
   if (cur) versionParts.push("Current: " + formatVersion(cur));
   if (base) versionParts.push("Baseline: " + formatVersion(base));
 
   return (
     <div class="report-header">
-      <div class="cli-args">{cliArgs}</div>
+      <div class="cli-args">{formatCliArgs(args)}</div>
       <div class="header-right">
         <div class="metadata">Generated: {new Date().toLocaleString()}</div>
         {versionParts.length > 0 && (
@@ -87,144 +76,217 @@ function ReportHeader({ metadata }: { metadata: Record<string, unknown> }) {
   );
 }
 
-function SummaryGroup({
-  group,
-  index,
-  gcEnabled,
-}: {
-  group: BenchmarkGroup;
-  index: number;
-  gcEnabled: boolean;
-}) {
-  const benchmarks = prepareBenchmarks(group);
-  if (!benchmarks.length || !group.benchmarks?.length)
-    return (
-      <div>
-        <div class="error">No benchmark data available for this group</div>
-      </div>
-    );
+// --- Collapsible Group ---
 
-  const current = benchmarks.find(b => !b.isBaseline);
-  const ci = current?.comparisonCI;
+function CollapsibleGroup({ group }: { group: BenchmarkGroup }) {
+  const [open, setOpen] = useState(true);
+  const current = group.benchmarks?.[0];
+  if (!current) return <div class="error">No benchmark data for this group</div>;
+
+  const ci = current.comparisonCI;
+  return (
+    <div class="benchmark-group">
+      <div class="group-header" onClick={() => setOpen(o => !o)}>
+        <span class="group-toggle">{open ? "\u25be" : "\u25b8"}</span>
+        <h2>{group.name}</h2>
+        {ci && <ComparisonBadge ci={ci} />}
+      </div>
+      {open && <GroupContent current={current} />}
+    </div>
+  );
+}
+
+function GroupContent({ current }: { current: BenchmarkEntry }) {
+  return (
+    <div class="panel-grid">
+      {current.sections?.map((s, i) => <SectionPanel key={i} section={s} />)}
+      <HeapPanel entry={current} />
+      <CoveragePanel entry={current} />
+    </div>
+  );
+}
+
+// --- Section Panels ---
+
+function SectionPanel({ section }: { section: ViewerSection }) {
+  if (!section.rows.length) return null;
+  const titleEl = section.tabLink
+    ? <a class="panel-title-link" onClick={() => (activeTabId.value = section.tabLink!)}>{section.title}</a>
+    : <span>{section.title}</span>;
 
   return (
-    <div>
-      <div class="group-header">
-        <h2>{group.name}</h2>
-        {ci && <ComparisonBadge ci={ci} index={index} />}
-      </div>
-      <div id={`stats-${index}`}>
-        {benchmarks.map(b => (
-          <StatsCard key={b.name} benchmark={b} gcEnabled={gcEnabled} />
-        ))}
+    <div class="section-panel">
+      <div class="panel-header">{titleEl}</div>
+      <div class="panel-body">
+        {section.rows.map((row, i) => <StatRow key={i} row={row} />)}
       </div>
     </div>
   );
 }
 
-function ComparisonBadge({
-  ci,
-  index,
-}: {
-  ci: DifferenceCI;
-  index: number;
-}) {
+function StatRow({ row }: { row: ViewerRow }) {
+  if (row.shared) {
+    const entry = row.entries[0];
+    return (
+      <div class="stat-row shared-row">
+        <span class="row-label">{row.label}</span>
+        <span class="row-value">{entry?.value}</span>
+      </div>
+    );
+  }
+
+  return (
+    <div class="stat-row">
+      <div class="row-header">
+        <span class="row-label">{row.label}</span>
+        {row.comparisonCI && <ComparisonBadge ci={row.comparisonCI} compact />}
+      </div>
+      {row.entries.map((entry, i) => <RunEntry key={i} entry={entry} />)}
+    </div>
+  );
+}
+
+function RunEntry({ entry }: { entry: ViewerEntry }) {
+  return (
+    <div class="run-entry">
+      <span class="run-name">{entry.runName}</span>
+      <span class="run-value">{entry.value}</span>
+      {entry.bootstrapCI && <BootstrapCIMount ci={entry.bootstrapCI} />}
+    </div>
+  );
+}
+
+// --- Heap & Coverage Panels ---
+
+function HeapPanel({ entry }: { entry: BenchmarkEntry }) {
+  const heap = entry.heapSummary;
+  const allocSamples = entry.allocationSamples;
+  if (!heap && !allocSamples?.length) return null;
+
+  return (
+    <div class="section-panel">
+      <div class="panel-header">
+        <a class="panel-title-link" onClick={() => (activeTabId.value = "flamechart")}>
+          heap allocation
+        </a>
+      </div>
+      <div class="panel-body">
+        {heap && (
+          <>
+            <div class="stat-row shared-row">
+              <span class="row-label">total bytes</span>
+              <span class="row-value">{formatBytesCompact(heap.totalBytes)}</span>
+            </div>
+            <div class="stat-row shared-row">
+              <span class="row-label">user bytes</span>
+              <span class="row-value">{formatBytesCompact(heap.userBytes)}</span>
+            </div>
+          </>
+        )}
+        {allocSamples && allocSamples.length > 0 && (
+          <div class="stat-row shared-row">
+            <span class="row-label">alloc samples</span>
+            <span class="row-value">{allocSamples.length.toLocaleString()}</span>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function CoveragePanel({ entry }: { entry: BenchmarkEntry }) {
+  const cov = entry.coverageSummary;
+  if (!cov) return null;
+
+  return (
+    <div class="section-panel">
+      <div class="panel-header">
+        <span>calls</span>
+      </div>
+      <div class="panel-body">
+        <div class="stat-row shared-row">
+          <span class="row-label">functions tracked</span>
+          <span class="row-value">{cov.functionCount.toLocaleString()}</span>
+        </div>
+        <div class="stat-row shared-row">
+          <span class="row-label">total calls</span>
+          <span class="row-value">{formatCount(cov.totalCalls)}</span>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// --- CI Visualizations ---
+
+function ComparisonBadge({ ci, compact }: { ci: DifferenceCI; compact?: boolean }) {
   const labels: Record<string, string> = {
     faster: "Faster",
     slower: "Slower",
     uncertain: "Inconclusive",
   };
   return (
-    <>
-      <span class={`badge badge-${ci.direction}`}>{labels[ci.direction]}</span>
-      {ci.histogram && <CIPlotMount ci={ci} index={index} />}
-    </>
+    <span class="comparison-badge">
+      <span class={`badge badge-${ci.direction}`}>
+        {compact ? formatPct(ci.percent) : labels[ci.direction]}
+      </span>
+      {ci.histogram && <CIPlotMount ci={ci} compact={compact} />}
+    </span>
   );
 }
 
-function CIPlotMount({ ci, index }: { ci: DifferenceCI; index: number }) {
+function CIPlotMount({ ci, compact }: { ci: DifferenceCI; compact?: boolean }) {
   const ref = useRef<HTMLDivElement>(null);
   useEffect(() => {
     import("../plots/CIPlot.ts").then(({ createCIPlot }) => {
-      if (ref.current) {
-        ref.current.innerHTML = "";
-        ref.current.appendChild(createCIPlot(ci));
-      }
+      if (!ref.current) return;
+      ref.current.innerHTML = "";
+      const opts = compact ? { width: 160, height: 50, title: "" } : {};
+      ref.current.appendChild(createCIPlot(ci, opts));
+    });
+  }, [ci, compact]);
+  return <div class="ci-plot-container" ref={ref} />;
+}
+
+function BootstrapCIMount({ ci }: { ci: BootstrapCIData }) {
+  const ref = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    import("../plots/CIPlot.ts").then(({ createDistributionPlot }) => {
+      if (!ref.current) return;
+      ref.current.innerHTML = "";
+      ref.current.appendChild(
+        createDistributionPlot(ci.histogram, ci.ci, ci.estimate, {
+          width: 140,
+          height: 40,
+          title: "",
+          direction: "uncertain",
+        }),
+      );
     });
   }, [ci]);
-  return <div id={`ci-plot-${index}`} class="ci-plot-container" ref={ref} />;
+  return <div class="ci-plot-inline" ref={ref} />;
 }
 
-function StatsCard({
-  benchmark,
-  gcEnabled,
-}: {
-  benchmark: PreparedBenchmark;
-  gcEnabled: boolean;
-}) {
-  const ci = benchmark.comparisonCI;
-  return (
-    <div class="summary-stats">
-      <h3 style={{ marginBottom: 10, color: "#333" }}>{benchmark.name}</h3>
-      <div class="stats-grid">
-        {ci && (
-          <div class="stat-item">
-            <div class="stat-label">vs Baseline</div>
-            <div class={`stat-value ci-${ci.direction}`}>
-              {formatPct(ci.percent)} [{formatPct(ci.ci[0])},{" "}
-              {formatPct(ci.ci[1])}]
-            </div>
-          </div>
-        )}
-        {benchmark.sectionStats?.length
-          ? renderSectionStats(benchmark.sectionStats, gcEnabled)
-          : renderFallbackStats(benchmark.stats)}
-      </div>
-    </div>
-  );
+// --- Formatters ---
+
+function formatBytesCompact(bytes: number): string {
+  if (bytes >= 1e9) return `${(bytes / 1e9).toFixed(1)} GB`;
+  if (bytes >= 1e6) return `${(bytes / 1e6).toFixed(1)} MB`;
+  if (bytes >= 1e3) return `${(bytes / 1e3).toFixed(1)} KB`;
+  return `${bytes} B`;
 }
 
-/** Render section stats, hiding GC rows when GC tracking is disabled. */
-function renderSectionStats(stats: SectionStat[], gcEnabled: boolean) {
-  const filtered = gcEnabled
-    ? stats
-    : stats.filter(s => s.groupTitle !== "gc");
-  return filtered.map((stat, i) => (
-    <div key={i} class="stat-item">
-      <div class="stat-label">
-        {stat.groupTitle ? stat.groupTitle + " " : ""}
-        {stat.label}
-      </div>
-      <div class="stat-value">{stat.value}</div>
-    </div>
-  ));
+function formatCount(n: number): string {
+  if (n >= 1e6) return `${(n / 1e6).toFixed(1)}M`;
+  if (n >= 1e3) return `${(n / 1e3).toFixed(1)}K`;
+  return n.toLocaleString();
 }
 
-/** Show basic percentile stats when section stats are unavailable. */
-function renderFallbackStats(stats: BenchmarkStats) {
-  const items: [string, number][] = [
-    ["Min", stats.min],
-    ["Median", stats.p50],
-    ["Mean", stats.avg],
-    ["Max", stats.max],
-    ["P75", stats.p75],
-    ["P99", stats.p99],
-  ];
-  return items.map(([label, value]) => (
-    <div key={label} class="stat-item">
-      <div class="stat-label">{label}</div>
-      <div class="stat-value">{value.toFixed(3)}ms</div>
-    </div>
-  ));
-}
-
-/** Reconstruct the CLI invocation string, omitting default and internal args. */
 function formatCliArgs(args?: Record<string, unknown>): string {
   if (!args) return "benchforge";
   const flags = Object.entries(args)
     .filter(([key, value]) => {
-      if (skipArgs.has(key) || value === undefined || value === false)
-        return false;
+      if (skipArgs.has(key) || value === undefined || value === false) return false;
       if (defaultArgs[key] === value) return false;
       if (!key.includes("-") && key !== key.toLowerCase()) return false;
       if (key === "convergence" && !args.adaptive) return false;

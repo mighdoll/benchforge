@@ -38,6 +38,8 @@ type BootstrapOptions = {
   resamples?: number;
   /** Confidence level 0-1 (default: 0.95) */
   confidence?: number;
+  /** Custom stat function applied to both samples (default: median) */
+  statFn?: (s: number[]) => number;
 };
 const defaultConfidence = 0.95;
 const outlierMultiplier = 1.5; // Tukey's fence multiplier
@@ -90,17 +92,24 @@ export function bootstrapMedian(
   samples: number[],
   options: BootstrapOptions = {},
 ): BootstrapResult {
+  return bootstrapStat(samples, s => percentile(s, 0.5), options);
+}
+
+/** @return bootstrap CI for an arbitrary statistic function */
+export function bootstrapStat(
+  samples: number[],
+  statFn: (s: number[]) => number,
+  options: BootstrapOptions = {},
+): BootstrapResult {
   const { resamples = bootstrapSamples, confidence: conf = defaultConfidence } =
     options;
-  const medians = Array.from({ length: resamples }, () =>
-    percentile(createResample(samples), 0.5),
+  const stats = Array.from({ length: resamples }, () =>
+    statFn(createResample(samples)),
   );
-  const ci = computeInterval(medians, conf);
-
   return {
-    estimate: percentile(samples, 0.5),
-    ci,
-    samples: medians,
+    estimate: statFn(samples),
+    ci: computeInterval(stats, conf),
+    samples: stats,
   };
 }
 
@@ -136,9 +145,10 @@ export function createResample(samples: number[]): number[] {
 }
 
 /**
- * @return bootstrap CI for percentage difference between baseline and current medians.
- * Resamples both distributions independently and computes the median difference
- * distribution to derive a confidence interval.
+ * @return bootstrap CI for percentage difference between baseline and current.
+ * Resamples both distributions independently and computes the stat difference
+ * distribution to derive a confidence interval. Uses median by default,
+ * or a custom stat function via the statFn option.
  */
 export function bootstrapDifferenceCI(
   baseline: number[],
@@ -147,18 +157,17 @@ export function bootstrapDifferenceCI(
 ): DifferenceCI {
   const { resamples = bootstrapSamples, confidence: conf = defaultConfidence } =
     options;
+  const fn = options.statFn ?? ((s: number[]) => percentile(s, 0.5));
 
-  const baseMed = percentile(baseline, 0.5);
-  const currMed = percentile(current, 0.5);
-  const observedPct = ((currMed - baseMed) / baseMed) * 100;
+  const baseVal = fn(baseline);
+  const currVal = fn(current);
+  const observedPct = ((currVal - baseVal) / baseVal) * 100;
 
   const diffs: number[] = [];
   for (let i = 0; i < resamples; i++) {
-    const resB = createResample(baseline);
-    const resC = createResample(current);
-    const medB = percentile(resB, 0.5);
-    const medC = percentile(resC, 0.5);
-    diffs.push(((medC - medB) / medB) * 100);
+    const valB = fn(createResample(baseline));
+    const valC = fn(createResample(current));
+    diffs.push(((valC - valB) / valB) * 100);
   }
 
   const ci = computeInterval(diffs, conf);
@@ -166,8 +175,20 @@ export function bootstrapDifferenceCI(
   let direction: CIDirection = "uncertain";
   if (ciExcludesZero && observedPct < 0) direction = "faster";
   else if (ciExcludesZero) direction = "slower";
-  const histogram = binValues(diffs);
-  return { percent: observedPct, ci, direction, histogram };
+  return { percent: observedPct, ci, direction, histogram: binValues(diffs) };
+}
+
+/** Convert a BootstrapResult to BootstrapCIData with binned histogram */
+export function binBootstrapResult(result: BootstrapResult): {
+  estimate: number;
+  ci: [number, number];
+  histogram: HistogramBin[];
+} {
+  return {
+    estimate: result.estimate,
+    ci: result.ci,
+    histogram: binValues(result.samples),
+  };
 }
 
 /** @return confidence interval [lower, upper] */
