@@ -1,6 +1,6 @@
 import type { RunnerOptions } from "../runners/BenchRunner.ts";
-import { runBatchedPair } from "../runners/MergeBatches.ts";
 import type { MeasuredResults } from "../runners/MeasuredResults.ts";
+import { runBatchedPair } from "../runners/MergeBatches.ts";
 import { runMatrixVariant } from "../runners/RunnerOrchestrator.ts";
 import type {
   BenchMatrix,
@@ -62,8 +62,13 @@ async function createDirContext<T>(
   const runnerOpts = buildRunnerOptions(options);
   if (batches > 1) runnerOpts.maxTime = (runnerOpts.maxTime ?? 1000) / batches;
   return {
-    matrix, casesModule, baselineIds, caseIds, runnerOpts,
-    batches, warmupBatch: options.warmupBatch ?? false,
+    matrix,
+    casesModule,
+    baselineIds,
+    caseIds,
+    runnerOpts,
+    batches,
+    warmupBatch: options.warmupBatch ?? false,
   };
 }
 
@@ -92,7 +97,9 @@ async function runDirVariantCases<T>(
     const caseData = !matrix.casesModule && matrix.cases ? caseId : undefined;
     const variantArgs = {
       variantDir: matrix.variantDir!,
-      variantId, caseId, caseData,
+      variantId,
+      caseId,
+      caseData,
       casesModule: matrix.casesModule,
       runner: "basic" as const,
       options: runnerOpts,
@@ -104,9 +111,10 @@ async function runDirVariantCases<T>(
       : undefined;
 
     const { metadata } = await loadCaseData(casesModule, caseId);
-    const { measured, baseline } = batches > 1
-      ? await runCaseBatched(variantArgs, baselineArgs, ctx)
-      : await runCaseSingle(variantArgs, baselineArgs);
+    const { measured, baseline } =
+      batches > 1
+        ? await runCaseBatched(variantArgs, baselineArgs, ctx)
+        : await runCaseSingle(variantArgs, baselineArgs);
     const deltaPercent = baseline
       ? computeDeltaPercent(baseline, measured)
       : undefined;
@@ -138,8 +146,10 @@ async function runCaseBatched<T>(
     ? async () => (await runMatrixVariant(baselineArgs))[0]
     : undefined;
   const { current, baseline } = await runBatchedPair(
-    runCurrent, runBaseline, ctx.batches, ctx.warmupBatch,
+    runCurrent,
+    runBaseline,
+    ctx.batches,
+    ctx.warmupBatch,
   );
   return { measured: current, baseline };
 }
-

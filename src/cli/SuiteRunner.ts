@@ -2,7 +2,6 @@ import type {
   BenchmarkReport,
   ReportGroup,
 } from "../report/BenchmarkReport.ts";
-import { mergeBatchResults as mergeResults } from "../runners/MergeBatches.ts";
 import type {
   BenchGroup,
   BenchmarkSpec,
@@ -11,6 +10,7 @@ import type {
 import type { RunnerOptions } from "../runners/BenchRunner.ts";
 import type { KnownRunner } from "../runners/CreateRunner.ts";
 import type { MeasuredResults } from "../runners/MeasuredResults.ts";
+import { mergeBatchResults as mergeResults } from "../runners/MergeBatches.ts";
 import { runBenchmark } from "../runners/RunnerOrchestrator.ts";
 import type { DefaultCliArgs } from "./CliArgs.ts";
 import { cliToRunnerOptions, validateArgs } from "./CliOptions.ts";
@@ -98,7 +98,12 @@ async function runGroup(
     return runSingleBatch(name, benchmarks, baseline, runParams);
   }
   return runMultipleBatches(
-    name, benchmarks, baseline, runParams, batches, warmupBatch,
+    name,
+    benchmarks,
+    baseline,
+    runParams,
+    batches,
+    warmupBatch,
   );
 }
 

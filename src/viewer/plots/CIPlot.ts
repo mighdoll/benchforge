@@ -9,7 +9,7 @@ export interface DistributionPlotOptions {
   height?: number;
   title?: string;
   smooth?: boolean;
-  direction?: "faster" | "slower" | "uncertain";
+  direction?: "faster" | "slower" | "uncertain" | "equivalent";
   /** Pre-formatted CI bound labels (overrides default formatPct) */
   ciLabels?: [string, string];
   /** Include zero in x scale (default true, set false for absolute-value plots) */
@@ -42,6 +42,7 @@ const colors = {
   faster: { fill: "#dcfce7", stroke: "#22c55e" },
   slower: { fill: "#fee2e2", stroke: "#ef4444" },
   uncertain: { fill: "#dbeafe", stroke: "#3b82f6" },
+  equivalent: { fill: "#f0fdf4", stroke: "#86efac" },
 };
 
 /** Create a small distribution plot showing histogram with CI shading */
@@ -61,19 +62,8 @@ export function createDistributionPlot(
   const { margin, plot } = layout;
   const add = (el: SVGElement) => svg.appendChild(el);
 
-  // Title (comparison CIs)
-  if (opts.title)
-    add(text(margin.left, 14, opts.title, "start", "13", "#333", "600"));
+  drawTitles(svg, opts, margin, plot);
 
-  // Point label centered above chart (bootstrap CIs)
-  if (opts.pointLabel) {
-    const cx = margin.left + plot.w / 2;
-    add(
-      text(cx, margin.top - 6, opts.pointLabel, "middle", "15", "#333", "700"),
-    );
-  }
-
-  // CI shading — subtle for bootstrap, normal for comparison
   const ciX = scales.x(ci[0]);
   const ciW = scales.x(ci[1]) - ciX;
   const ciOpacity = opts.includeZero ? "0.5" : "0.3";
@@ -82,19 +72,7 @@ export function createDistributionPlot(
   if (opts.smooth) drawSmoothedDist(svg, histogram, scales, stroke);
   else drawHistogramBars(svg, histogram, scales, layout, stroke);
 
-  // Zero reference — solid black extending past plot area (comparison CIs only)
-  if (opts.includeZero) {
-    const zeroX = scales.x(0);
-    const inRange =
-      zeroX >= margin.left && zeroX <= layout.width - margin.right;
-    if (inRange)
-      add(
-        line(zeroX, margin.top - 4, zeroX, margin.top + plot.h + 4, {
-          stroke: "#000",
-          strokeWidth: "1",
-        }),
-      );
-  }
+  drawReferenceLine(svg, scales, layout, opts.includeZero);
 
   const ptX = scales.x(pointEstimate);
   add(
@@ -106,6 +84,45 @@ export function createDistributionPlot(
 
   drawCILabels(svg, ci, scales, layout, opts);
   return svg;
+}
+
+/** Draw title and point label text above the chart */
+function drawTitles(
+  svg: SVGSVGElement,
+  opts: DistributionPlotOptions,
+  margin: Layout["margin"],
+  plot: Layout["plot"],
+): void {
+  if (opts.title)
+    svg.appendChild(
+      text(margin.left, 14, opts.title, "start", "13", "#333", "600"),
+    );
+  if (opts.pointLabel) {
+    const cx = margin.left + plot.w / 2;
+    svg.appendChild(
+      text(cx, margin.top - 6, opts.pointLabel, "middle", "15", "#333", "700"),
+    );
+  }
+}
+
+/** Draw zero reference line extending past plot area (comparison CIs only) */
+function drawReferenceLine(
+  svg: SVGSVGElement,
+  scales: Scales,
+  layout: Layout,
+  includeZero: boolean,
+): void {
+  if (!includeZero) return;
+  const zeroX = scales.x(0);
+  const { margin, plot } = layout;
+  const inRange = zeroX >= margin.left && zeroX <= layout.width - margin.right;
+  if (inRange)
+    svg.appendChild(
+      line(zeroX, margin.top - 4, zeroX, margin.top + plot.h + 4, {
+        stroke: "#000",
+        strokeWidth: "1",
+      }),
+    );
 }
 
 /** Convenience wrapper for DifferenceCI data */

@@ -25,6 +25,7 @@ const defaultArgs: Record<string, unknown> = {
   "min-time": 1,
   convergence: 95,
   "alloc-interval": 32768,
+  "equiv-margin": 2,
   "alloc-depth": 64,
   "alloc-rows": 20,
   "alloc-stack": 3,
@@ -264,6 +265,7 @@ function ComparisonBadge({ ci, compact }: { ci: DifferenceCI; compact?: boolean 
     faster: "Faster",
     slower: "Slower",
     uncertain: "Inconclusive",
+    equivalent: "Equivalent",
   };
   return (
     <span class="comparison-badge">

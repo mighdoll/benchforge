@@ -8,7 +8,7 @@ export interface BootstrapResult {
   samples: number[];
 }
 
-export type CIDirection = "faster" | "slower" | "uncertain";
+export type CIDirection = "faster" | "slower" | "uncertain" | "equivalent";
 
 /** Binned histogram for efficient transfer to browser */
 export interface HistogramBin {
@@ -50,6 +50,8 @@ type BootstrapOptions = {
 type DiffBootstrapOptions = BootstrapOptions & {
   /** Block boundaries for the second sample array */
   blocksB?: number[];
+  /** Equivalence margin in percent. CI within [-margin, +margin] ==> "equivalent" */
+  equivMargin?: number;
 };
 const defaultConfidence = 0.95;
 const outlierMultiplier = 1.5; // Tukey's fence multiplier
@@ -61,6 +63,7 @@ export function swapDirection(ci: DifferenceCI): DifferenceCI {
     faster: "slower",
     slower: "faster",
     uncertain: "uncertain",
+    equivalent: "equivalent",
   };
   return { ...ci, direction: swapped[ci.direction] };
 }
@@ -123,11 +126,16 @@ export function bootstrapStat(
 ): BootstrapResult {
   const { resamples = bootstrapSamples, confidence: conf = defaultConfidence } =
     options;
-  // With blocks: derive CI from per-block means (independent observations)
-  // Point estimate uses all samples via statFn
-  const means = options.blocks ? blockMeans(samples, options.blocks) : undefined;
-  const stats = means
-    ? Array.from({ length: resamples }, () => average(createResample(means)))
+  // With blocks: apply statFn per block (independent observations), then
+  // resample those block-level values. This keeps CIs in the metric's native
+  // domain (e.g. lines/sec) rather than raw time.
+  const blockVals = options.blocks
+    ? blockValues(samples, options.blocks, statFn)
+    : undefined;
+  const stats = blockVals
+    ? Array.from({ length: resamples }, () =>
+        average(createResample(blockVals)),
+      )
     : Array.from({ length: resamples }, () => statFn(createResample(samples)));
   return {
     estimate: statFn(samples),
@@ -167,11 +175,15 @@ export function createResample(samples: number[]): number[] {
   );
 }
 
-/** @return per-block means from sample data split by offsets */
-function blockMeans(samples: number[], offsets: number[]): number[] {
+/** @return per-block statistic values from sample data split by offsets */
+function blockValues(
+  samples: number[],
+  offsets: number[],
+  fn: (s: number[]) => number,
+): number[] {
   return offsets.map((start, i) => {
     const end = i + 1 < offsets.length ? offsets[i + 1] : samples.length;
-    return average(samples.slice(start, end));
+    return fn(samples.slice(start, end));
   });
 }
 
@@ -197,10 +209,14 @@ export function bootstrapDifferenceCI(
 
   // CI: with blocks, bootstrap per-block means (independent observations).
   // Without blocks, resample individual samples (standard bootstrap).
-  const meansA = options.blocks ? blockMeans(a, options.blocks) : undefined;
-  const meansB = (options.blocksB ?? options.blocks)
-    ? blockMeans(b, options.blocksB ?? options.blocks!)
+  // Uses average (not statFn) for blocks because percentage diffs are unit-free.
+  const meansA = options.blocks
+    ? blockValues(a, options.blocks, average)
     : undefined;
+  const meansB =
+    (options.blocksB ?? options.blocks)
+      ? blockValues(b, options.blocksB ?? options.blocks!, average)
+      : undefined;
 
   const diffs: number[] = [];
   for (let i = 0; i < resamples; i++) {
@@ -214,11 +230,22 @@ export function bootstrapDifferenceCI(
   }
 
   const ci = computeInterval(diffs, conf);
-  const ciExcludesZero = ci[0] > 0 || ci[1] < 0;
-  let direction: CIDirection = "uncertain";
-  if (ciExcludesZero && observedPct < 0) direction = "faster";
-  else if (ciExcludesZero) direction = "slower";
+  const direction = classifyDirection(ci, observedPct, options.equivMargin);
   return { percent: observedPct, ci, direction, histogram: binValues(diffs) };
+}
+
+/** Classify CI direction, with optional equivalence margin (in percent) */
+function classifyDirection(
+  ci: [number, number],
+  observed: number,
+  margin?: number,
+): CIDirection {
+  const withinMargin =
+    margin != null && margin > 0 && ci[0] >= -margin && ci[1] <= margin;
+  if (withinMargin) return "equivalent";
+  const excludesZero = ci[0] > 0 || ci[1] < 0;
+  if (excludesZero) return observed < 0 ? "faster" : "slower";
+  return "uncertain";
 }
 
 type BinnedCI = {

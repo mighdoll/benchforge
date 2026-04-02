@@ -115,6 +115,7 @@ This eliminates manual caching boilerplate in worker modules.
 - `--warmup <count>` - Warmup iterations before measurement (default: 0)
 - `--batches <n>` - Divide time into N interleaved batches for baseline comparison (default: 1)
 - `--warmup-batch` - Include first batch in results (normally dropped to avoid OS cache warmup)
+- `--equiv-margin <percent>` - Equivalence margin for baseline comparison (default: 2%)
 - `--help` - Show all available options
 
 ### Allocation Profiling
@@ -329,6 +330,49 @@ The benchmark is 5.5% slower than baseline, with a bootstrap confidence interval
 p50: 0.15ms, p99: 0.27ms
 ```
 50% of runs completed in ≤0.15ms and 99% in ≤0.27ms. Use percentiles when you care about consistency and tail latencies.
+
+### Equivalence Testing
+
+When comparing against a baseline, benchforge needs to distinguish three cases:
+the code got faster, it got slower, or nothing meaningful changed.
+
+Traditional CI-based testing only asks "does the confidence interval exclude zero?"
+This can detect differences but can never confirm equivalence — with enough samples,
+even trivial noise (ASLR, scheduler jitter) can push the CI away from zero,
+leaving the result stuck at **Inconclusive** even when comparing identical code.
+
+Benchforge uses an **equivalence margin** (`--equiv-margin`, default 2%) to resolve this.
+The margin defines the smallest difference that matters. The CI is compared against
+both zero and the margin to produce four verdicts:
+
+```
+         -margin       0       +margin
+            |          |          |
+    [---]   |          |          |        ==> FASTER  (CI excludes zero, beyond margin)
+            |          |          | [---]  ==> SLOWER  (CI excludes zero, beyond margin)
+            |   [----------]     |        ==> EQUIVALENT (CI within margin -- proven trivial)
+            |      [--]          |        ==> EQUIVALENT (excludes zero, but within margin)
+   [------------]  |             |        ==> INCONCLUSIVE (CI extends past margin, need more data)
+```
+
+- **Equivalent**: the entire CI fits within the margin. The difference is provably smaller
+  than what matters, whether or not it's statistically significant.
+- **Faster / Slower**: the CI excludes zero and extends beyond the margin. A real,
+  meaningful change was detected.
+- **Inconclusive**: the CI extends past the margin but doesn't clearly exclude zero.
+  More batches would narrow the CI and resolve it.
+
+The default margin of 2% is reasonable for most benchmarks. For higher precision, run a
+self-comparison (identical baseline and current) to measure your system's noise floor,
+then set the margin accordingly:
+
+```bash
+# Calibration: compare identical code, observe CI width
+benchforge my-bench.ts --baseline --batches 50
+
+# Use the observed noise floor as the margin
+benchforge my-bench.ts --baseline --batches 50 --equiv-margin 1.5
+```
 
 ## Warmup and Batching
 

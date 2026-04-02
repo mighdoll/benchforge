@@ -5,9 +5,7 @@ import type { MeasuredResults } from "./MeasuredResults.ts";
 
 /** Merge multiple batch results, concatenating samples and tracking batch boundaries.
  *  Unhandled fields fall through from the last batch (reasonable default). */
-export function mergeBatchResults(
-  results: MeasuredResults[],
-): MeasuredResults {
+export function mergeBatchResults(results: MeasuredResults[]): MeasuredResults {
   if (results.length === 0) {
     throw new Error("Cannot merge empty results array");
   }

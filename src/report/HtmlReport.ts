@@ -45,6 +45,8 @@ export interface PrepareHtmlOptions {
   sections?: ResultsMapper[];
   currentVersion?: GitVersion;
   baselineVersion?: GitVersion;
+  /** Equivalence margin in percent for baseline comparison (default: 0, disabled) */
+  equivMargin?: number;
 }
 
 /** Convert benchmark results into a ReportData payload for the HTML viewer */
@@ -52,10 +54,10 @@ export function prepareHtmlData(
   groups: ReportGroup[],
   options: PrepareHtmlOptions,
 ): ReportData {
-  const { cliArgs, currentVersion, baselineVersion } = options;
+  const { cliArgs, currentVersion, baselineVersion, equivMargin } = options;
   const sections = options.sections ?? defaultSections(groups, cliArgs);
   return {
-    groups: groups.map(group => prepareGroupData(group, sections)),
+    groups: groups.map(group => prepareGroupData(group, sections, equivMargin)),
     metadata: {
       timestamp: new Date().toISOString(),
       bencherVersion: process.env.npm_package_version || "unknown",
@@ -73,6 +75,7 @@ const minBatches = 8;
 function prepareGroupData(
   group: ReportGroup,
   sections?: ResultsMapper[],
+  equivMargin?: number,
 ): BenchmarkGroup {
   const base = group.baseline;
   const baseM = base?.measuredResults;
@@ -91,7 +94,13 @@ function prepareGroupData(
       : undefined,
     benchmarks: group.reports.map(report => {
       const m = report.measuredResults;
-      const ci = computeDiffCI(baseM, m, primaryCol, report.metadata);
+      const ci = computeDiffCI(
+        baseM,
+        m,
+        primaryCol,
+        report.metadata,
+        equivMargin,
+      );
       if (ci) {
         if (lowBatches) ci.direction = "uncertain";
         if (primaryCol?.title) ci.label = `${primaryCol.title} Δ%`;
@@ -103,6 +112,7 @@ function prepareGroupData(
             baseM,
             report.metadata,
             base?.metadata,
+            equivMargin,
           )
         : undefined;
       return {
@@ -169,6 +179,7 @@ function buildViewerSections(
   baseline: MeasuredResults | undefined,
   currentMeta?: UnknownRecord,
   baselineMeta?: UnknownRecord,
+  equivMargin?: number,
 ): ViewerSection[] {
   return sections.flatMap(section => {
     const curVals = section.extract(current, currentMeta);
@@ -182,6 +193,7 @@ function buildViewerSections(
       baseVals,
       currentMeta,
       baselineMeta,
+      equivMargin,
     };
     return section.columns().flatMap(group => {
       const cols = group.columns as ReportColumn<Record<string, unknown>>[];
@@ -200,6 +212,7 @@ interface RowContext {
   baseVals?: Record<string, unknown>;
   currentMeta?: UnknownRecord;
   baselineMeta?: UnknownRecord;
+  equivMargin?: number;
 }
 
 /** Build ViewerRow[] for a column group, marking the first CI row as primary */
@@ -270,7 +283,13 @@ function buildComparisonCI(
   col: ReportColumn<Record<string, unknown>>,
   ctx: RowContext,
 ) {
-  const ci = computeDiffCI(ctx.baseline, ctx.current, col, ctx.currentMeta);
+  const ci = computeDiffCI(
+    ctx.baseline,
+    ctx.current,
+    col,
+    ctx.currentMeta,
+    ctx.equivMargin,
+  );
   if (ci) {
     if (hasLowBatchCount(ctx.baseline, ctx.current)) ci.direction = "uncertain";
     if (col.title) ci.label = `${col.title} Δ%`;
@@ -284,6 +303,7 @@ function computeDiffCI(
   current: MeasuredResults,
   col: ReportColumn<Record<string, unknown>> | undefined,
   metadata: UnknownRecord | undefined,
+  equivMargin?: number,
 ): DifferenceCI | undefined {
   if (!baseline?.samples?.length || !current.samples?.length) return undefined;
   if (col && !col.statFn) return undefined;
@@ -294,6 +314,7 @@ function computeDiffCI(
     statFn,
     blocks: baseline.batchOffsets,
     blocksB: current.batchOffsets,
+    equivMargin,
   };
   const rawCI = bootstrapDifferenceCI(baseline.samples, current.samples, opts);
   // statFn computes in the metric's natural domain. bootstrapDifferenceCI

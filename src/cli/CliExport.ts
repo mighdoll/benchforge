@@ -59,6 +59,7 @@ export async function exportReports(options: ExportOptions): Promise<void> {
     sections,
     currentVersion,
     baselineVersion,
+    equivMargin: args["equiv-margin"],
   };
   const reportData = needsReportData
     ? prepareHtmlData(results, htmlOptions)
