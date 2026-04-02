@@ -29,11 +29,13 @@ export function cliToRunnerOptions(args: DefaultCliArgs): RunnerOptions {
 
 /** Convert CLI args to matrix run options. */
 export function cliToMatrixOptions(args: DefaultCliArgs): RunMatrixOptions {
-  const { duration, iterations, worker } = args;
+  const { duration, iterations, worker, batches } = args;
   return {
     iterations,
     maxTime: iterations ? undefined : duration * 1000,
     useWorker: worker,
+    batches,
+    warmupBatch: args["warmup-batch"],
     ...cliCommonOptions(args),
   };
 }

@@ -82,6 +82,10 @@ export interface RunMatrixOptions {
   warmup?: number;
   /** Use worker process isolation (default: true for variantDir) */
   useWorker?: boolean;
+  /** Number of interleaved batches for baseline comparison */
+  batches?: number;
+  /** Include first batch in results (normally dropped for OS cache warmup) */
+  warmupBatch?: boolean;
   /** Run only these cases (from --filter) */
   filteredCases?: string[];
   /** Run only these variants (from --filter) */
@@ -175,6 +179,8 @@ export function buildRunnerOptions(opts: RunMatrixOptions): RunnerOptions {
     filteredCases,
     filteredVariants,
     useWorker,
+    batches,
+    warmupBatch,
     ...rest
   } = opts;
   return {
