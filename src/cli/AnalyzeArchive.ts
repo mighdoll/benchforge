@@ -56,10 +56,8 @@ function analyzeBenchmark(
   const nBatches = bBatches.length;
   console.log(bold(`  ${bench.name}`) + dim(` (${nBatches} batches)`));
 
-  // Per-batch medians
   printBatchTable(bBatches, baseBatches);
 
-  // Order effect analysis
   if (baseBatches && baseBatches.length === nBatches) {
     printOrderEffect(bBatches, baseBatches);
     printPairedDeltas(bBatches, baseBatches);

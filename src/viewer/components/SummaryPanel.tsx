@@ -65,8 +65,6 @@ export function SummaryPanel() {
   );
 }
 
-// --- Header ---
-
 function ReportHeader({ metadata }: { metadata: Record<string, unknown> }) {
   const args = metadata.cliArgs as Record<string, unknown> | undefined;
   const cur = metadata.currentVersion as GitVersion | undefined;
@@ -87,8 +85,6 @@ function ReportHeader({ metadata }: { metadata: Record<string, unknown> }) {
     </div>
   );
 }
-
-// --- Collapsible Group ---
 
 function CollapsibleGroup({ group }: { group: BenchmarkGroup }) {
   const [open, setOpen] = useState(true);
@@ -118,8 +114,6 @@ function GroupContent({ current }: { current: BenchmarkEntry }) {
     </div>
   );
 }
-
-// --- Section Panels ---
 
 function SectionPanel({ section }: { section: ViewerSection }) {
   if (!section.rows.length) return null;
@@ -187,8 +181,6 @@ function RunEntry({ entry }: { entry: ViewerEntry }) {
   );
 }
 
-// --- Heap & Coverage Panels ---
-
 function HeapPanel({ entry }: { entry: BenchmarkEntry }) {
   const heap = entry.heapSummary;
   const allocSamples = entry.allocationSamples;
@@ -248,8 +240,6 @@ function CoveragePanel({ entry }: { entry: BenchmarkEntry }) {
   );
 }
 
-// --- CI Visualizations ---
-
 function ComparisonBadge({ ci, compact }: { ci: DifferenceCI; compact?: boolean }) {
   const labels: Record<string, string> = {
     faster: "Faster",
@@ -294,8 +284,6 @@ function BootstrapCIMount({ ci, label }: { ci: BootstrapCIData; label?: string }
   }, [ci, label]);
   return <div class="ci-plot-inline" ref={ref} />;
 }
-
-// --- Formatters ---
 
 function formatBytesCompact(bytes: number): string {
   if (bytes >= 1e9) return `${(bytes / 1e9).toFixed(1)} GB`;

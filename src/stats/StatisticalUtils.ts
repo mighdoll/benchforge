@@ -223,7 +223,7 @@ type BinnedCI = {
   histogram: HistogramBin[];
 };
 
-/** Convert a BootstrapResult to BootstrapCIData with binned histogram */
+/** Convert a BootstrapResult to a binned CI with histogram */
 export function binBootstrapResult(result: BootstrapResult): BinnedCI {
   const { estimate, ci, samples } = result;
   return { estimate, ci, histogram: binValues(samples) };

@@ -96,7 +96,6 @@ function coloredPercent(numerator: number, denominator: number): string {
   return fraction >= 0 ? green(percentStr) : red(percentStr);
 }
 
-/** @return true if value is a DifferenceCI object */
 function isDifferenceCI(x: unknown): x is DifferenceCI {
   return typeof x === "object" && x !== null && "ci" in x && "direction" in x;
 }

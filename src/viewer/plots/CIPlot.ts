@@ -79,7 +79,6 @@ export function createDistributionPlot(
   const ciOpacity = opts.includeZero ? "0.5" : "0.15";
   add(rect(ciX, margin.top, ciW, plot.h, { fill, opacity: ciOpacity }));
 
-  // Distribution
   if (opts.smooth) drawSmoothedDist(svg, histogram, scales, stroke);
   else drawHistogramBars(svg, histogram, scales, layout, stroke);
 
@@ -97,7 +96,6 @@ export function createDistributionPlot(
       );
   }
 
-  // Point estimate line
   const ptX = scales.x(pointEstimate);
   add(
     line(ptX, margin.top, ptX, margin.top + plot.h, {
