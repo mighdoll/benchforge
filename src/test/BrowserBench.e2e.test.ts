@@ -6,7 +6,12 @@ const examplesDir = path.resolve(import.meta.dirname!, "../../examples");
 
 test("bench function mode (window.__bench)", { timeout: 30000 }, async () => {
   const url = `file://${examplesDir}/browser-bench/index.html`;
-  const result = await profileBrowser({ url, maxTime: 500, gcStats: true, headless: true });
+  const result = await profileBrowser({
+    url,
+    maxTime: 500,
+    gcStats: true,
+    headless: true,
+  });
 
   expect(result.samples).toBeDefined();
   expect(result.samples!.length).toBeGreaterThan(5);
@@ -45,7 +50,12 @@ test("lap mode 0 laps with heap profiling", { timeout: 30000 }, async () => {
 
 test("bench function mode with call counts", { timeout: 30000 }, async () => {
   const url = `file://${examplesDir}/browser-bench/index.html`;
-  const result = await profileBrowser({ url, maxTime: 500, callCounts: true, headless: true });
+  const result = await profileBrowser({
+    url,
+    maxTime: 500,
+    callCounts: true,
+    headless: true,
+  });
 
   expect(result.coverage).toBeDefined();
   expect(result.coverage!.scripts.length).toBeGreaterThan(0);
@@ -70,7 +80,12 @@ test("bench function mode with call counts", { timeout: 30000 }, async () => {
 
 test("page-load mode with navTiming", { timeout: 30000 }, async () => {
   const url = `file://${examplesDir}/browser-page-load/index.html`;
-  const result = await profileBrowser({ url, pageLoad: true, alloc: true, headless: true });
+  const result = await profileBrowser({
+    url,
+    pageLoad: true,
+    alloc: true,
+    headless: true,
+  });
 
   expect(result.navTiming).toBeDefined();
   expect(result.navTiming!.domContentLoaded).toBeGreaterThan(0);
@@ -106,7 +121,12 @@ test("page-load mode with call counts", { timeout: 30000 }, async () => {
 
 test("page-load mode with gc stats", { timeout: 30000 }, async () => {
   const url = `file://${examplesDir}/browser-page-load/index.html`;
-  const result = await profileBrowser({ url, pageLoad: true, gcStats: true, headless: true });
+  const result = await profileBrowser({
+    url,
+    pageLoad: true,
+    gcStats: true,
+    headless: true,
+  });
 
   expect(result.navTiming).toBeDefined();
   expect(result.gcStats).toBeDefined();
