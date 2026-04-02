@@ -14,14 +14,26 @@ import type {
 import { formatPct } from "../plots/PlotTypes.ts";
 import { activeTabId, provider, reportData } from "../State.ts";
 
+/** CLI args that match defaults — omit from display */
 const defaultArgs: Record<string, unknown> = {
+  duration: 0.642,
+  warmup: 0,
   worker: true,
-  time: 5,
-  warmup: 500,
+  batches: 1,
   "pause-interval": 0,
   "pause-duration": 100,
+  "min-time": 1,
+  convergence: 95,
+  "alloc-interval": 32768,
+  "alloc-depth": 64,
+  "alloc-rows": 20,
+  "alloc-stack": 3,
+  "time-interval": 1000,
+  editor: "vscode",
+  timeout: 60,
 };
-const skipArgs = new Set(["_", "$0", "view"]);
+/** Internal/display-only args to always hide */
+const skipArgs = new Set(["_", "$0", "view", "file"]);
 
 export function SummaryPanel() {
   const p = provider.value!;
