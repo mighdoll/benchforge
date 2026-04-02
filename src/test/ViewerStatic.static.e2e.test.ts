@@ -7,7 +7,7 @@ import { afterAll, beforeAll, expect, test } from "vitest";
 const viewerDir = path.resolve(import.meta.dirname!, "../../dist/viewer");
 const archivePath = path.resolve(
   import.meta.dirname!,
-  "../../examples/link-2026-03-29T15-00-30-087Z.benchforge",
+  "../../examples/simple-cli.benchforge",
 );
 
 let server: Server;
