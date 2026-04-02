@@ -90,7 +90,9 @@ function matchPattern(id: string, pattern: string): boolean {
 }
 
 /** Collect all variant IDs from either inline variants or variantDir */
-export async function resolveVariantIds<T>(matrix: BenchMatrix<T>): Promise<string[]> {
+export async function resolveVariantIds<T>(
+  matrix: BenchMatrix<T>,
+): Promise<string[]> {
   if (matrix.variants) return Object.keys(matrix.variants);
   if (matrix.variantDir) return discoverVariants(matrix.variantDir);
   throw new Error("BenchMatrix requires 'variants' or 'variantDir'");

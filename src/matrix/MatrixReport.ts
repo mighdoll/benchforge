@@ -15,13 +15,17 @@ import {
 } from "../report/StandardSections.ts";
 import { buildTable, type ColumnGroup } from "../report/text/TableReport.ts";
 import { sectionColumnGroups } from "../report/text/TextReport.ts";
+import type { MeasuredResults } from "../runners/MeasuredResults.ts";
 import {
   average,
   bootstrapDifferenceCI,
   type DifferenceCI,
 } from "../stats/StatisticalUtils.ts";
-import type { MeasuredResults } from "../runners/MeasuredResults.ts";
-import type { CaseResult, MatrixResults, VariantResult } from "./BenchMatrix.ts";
+import type {
+  CaseResult,
+  MatrixResults,
+  VariantResult,
+} from "./BenchMatrix.ts";
 
 /** User-defined column that extracts and formats a metric from case results */
 export interface ExtraColumn {
@@ -161,7 +165,10 @@ function buildSectionTable(
       ...extractSectionValues(cr.measured, sections, cr.metadata),
     };
     if (cr.baseline) {
-      row.diffCI = bootstrapDifferenceCI(cr.baseline.samples, cr.measured.samples);
+      row.diffCI = bootstrapDifferenceCI(
+        cr.baseline.samples,
+        cr.measured.samples,
+      );
     }
     const out: Row[] = [row];
     if (cr.baseline && !shared) {
@@ -198,17 +205,21 @@ function buildCaseRows(
   const rows = caseResults.flatMap(({ variant, cr }) => {
     const out: MatrixReportRow[] = [buildRow(variant.id, cr, extraColumns)];
     if (cr.baseline && !shared) {
-      out.push(buildRow(" \u21B3 baseline", {
-        ...cr, measured: cr.baseline, baseline: undefined,
-      }, extraColumns));
+      out.push(
+        buildRow(
+          " \u21B3 baseline",
+          { ...cr, measured: cr.baseline, baseline: undefined },
+          extraColumns,
+        ),
+      );
     }
     return out;
   });
 
   if (shared) {
-    rows.push(buildRow("=> baseline", {
-      caseId, measured: shared,
-    }, extraColumns));
+    rows.push(
+      buildRow("=> baseline", { caseId, measured: shared }, extraColumns),
+    );
   }
   return rows;
 }
@@ -284,10 +295,16 @@ function extraColumnGroups(
   }));
 }
 
-interface VariantCase { variant: VariantResult; cr: CaseResult }
+interface VariantCase {
+  variant: VariantResult;
+  cr: CaseResult;
+}
 
 /** Collect (variant, caseResult) pairs for a given caseId */
-function collectCaseResults(results: MatrixResults, caseId: string): VariantCase[] {
+function collectCaseResults(
+  results: MatrixResults,
+  caseId: string,
+): VariantCase[] {
   return results.variants.flatMap(variant => {
     const cr = variant.cases.find(c => c.caseId === caseId);
     return cr ? [{ variant, cr }] : [];
@@ -295,7 +312,9 @@ function collectCaseResults(results: MatrixResults, caseId: string): VariantCase
 }
 
 /** If all baselines are the same reference (baselineVariant mode), return it */
-function hasSharedBaseline(caseResults: VariantCase[]): MeasuredResults | undefined {
+function hasSharedBaseline(
+  caseResults: VariantCase[],
+): MeasuredResults | undefined {
   const baselines = caseResults.map(({ cr }) => cr.baseline).filter(Boolean);
   if (baselines.length < 2) return undefined;
   return baselines.every(b => b === baselines[0]) ? baselines[0] : undefined;
