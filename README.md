@@ -113,6 +113,8 @@ This eliminates manual caching boilerplate in worker modules.
 - `--worker` / `--no-worker` - Run in isolated worker process (default: true)
 - `--inspect` - Run once for external profiler attach (single iteration, no warmup)
 - `--warmup <count>` - Warmup iterations before measurement (default: 0)
+- `--batches <n>` - Divide time into N interleaved batches for baseline comparison (default: 1)
+- `--warmup-batch` - Include first batch in results (normally dropped to avoid OS cache warmup)
 - `--help` - Show all available options
 
 ### Allocation Profiling
@@ -327,6 +329,33 @@ The benchmark is 5.5% slower than baseline, with a bootstrap confidence interval
 p50: 0.15ms, p99: 0.27ms
 ```
 50% of runs completed in ≤0.15ms and 99% in ≤0.27ms. Use percentiles when you care about consistency and tail latencies.
+
+## Warmup and Batching
+
+### Batched Comparisons
+
+When comparing against a baseline, use `--batches` to interleave runs and reduce ordering bias:
+
+```bash
+benchforge my-bench.ts --baseline --batches 10 --duration 2
+```
+
+With `--batches 10`, benchforge runs 10 alternating rounds of baseline and current, reversing the order on odd rounds to cancel out systematic effects. Results from all batches are merged for the final comparison.
+
+**Warmup batch**: The first batch typically runs slower due to OS-level effects (page cache, CPU cache, memory allocator warmup). Since this affects both baseline and current but adds noise to the comparison, batch 0 is automatically dropped. Use `--warmup-batch` to include it.
+
+For reliable comparisons, use 8+ batches. Fewer batches produce wider confidence intervals since the block bootstrap has fewer independent observations to work with.
+
+### Two Kinds of Warmup
+
+**JIT warmup** (V8 optimization): The first iterations of any benchmark run through V8's interpreter and lower optimization tiers before reaching peak performance. This warmup is part of real-world execution and is **included by default** — if your code takes 3.5ms including JIT compilation, that's what users experience. Use `--warmup <count>` to add warmup iterations before measurement if you specifically want steady-state throughput numbers.
+
+**OS-level warmup** (page cache, CPU cache): The first batch in a multi-batch run pays a one-time cost for loading code into the OS page cache and CPU caches. Unlike JIT warmup, this is an artifact of the measurement harness — in production, code is almost always warm in the page cache. The first batch is **dropped by default** when `--batches > 1`.
+
+| Warmup Type | Default | Override | Rationale |
+|---|---|---|---|
+| JIT (V8 tiers) | Included | `--warmup <n>` to skip | Part of real execution cost |
+| OS (page cache) | Dropped (batch 0) | `--warmup-batch` to include | Measurement artifact |
 
 ## Understanding GC Time Measurements
 

@@ -30,6 +30,7 @@ type SuiteParams = {
   useWorker: boolean;
   suite: BenchSuite;
   batches: number;
+  warmupBatch: boolean;
 };
 
 /** Run a benchmark suite with CLI arguments. */
@@ -39,6 +40,7 @@ export async function runBenchmarks(
 ): Promise<ReportGroup[]> {
   validateArgs(args);
   const { filter, worker: useWorker, batches = 1 } = args;
+  const warmupBatch = args["warmup-batch"] ?? false;
   const options = cliToRunnerOptions(args);
   const filtered = filterBenchmarks(suite, filter);
 
@@ -48,14 +50,15 @@ export async function runBenchmarks(
     options,
     useWorker,
     batches,
+    warmupBatch,
   });
 }
 
 /** Execute all groups in a suite sequentially. */
 async function runSuite(params: SuiteParams): Promise<ReportGroup[]> {
-  const { suite, runner, options, useWorker, batches } = params;
+  const { suite, runner, options, useWorker, batches, warmupBatch } = params;
   return serialMap(suite.groups, g =>
-    runGroup(g, runner, options, useWorker, batches),
+    runGroup(g, runner, options, useWorker, batches, warmupBatch),
   );
 }
 
@@ -78,6 +81,7 @@ async function runGroup(
   options: RunnerOptions,
   useWorker: boolean,
   batches = 1,
+  warmupBatch = false,
 ): Promise<ReportGroup> {
   const { name, benchmarks, baseline, setup, metadata } = group;
   const setupParams = await setup?.();
@@ -93,7 +97,9 @@ async function runGroup(
   if (batches === 1) {
     return runSingleBatch(name, benchmarks, baseline, runParams);
   }
-  return runMultipleBatches(name, benchmarks, baseline, runParams, batches);
+  return runMultipleBatches(
+    name, benchmarks, baseline, runParams, batches, warmupBatch,
+  );
 }
 
 /** Warn if parameterized benchmarks lack a setup function. */
@@ -133,6 +139,7 @@ async function runMultipleBatches(
   baseline: BenchmarkSpec | undefined,
   runParams: RunParams,
   batches: number,
+  warmupBatch = false,
 ): Promise<ReportGroup> {
   const maxTime = (runParams.options.maxTime || 5000) / batches;
   const opts = { ...runParams.options, maxTime };
@@ -149,6 +156,14 @@ async function runMultipleBatches(
       baselineBatches,
       benchmarkBatches,
     );
+  }
+
+  // Drop batch 0 (OS cache warmup) unless --warmup-batch is set
+  if (!warmupBatch && batches > 1) {
+    baselineBatches.shift();
+    for (const [, results] of benchmarkBatches) {
+      results.shift();
+    }
   }
 
   return mergeBatchResults(
