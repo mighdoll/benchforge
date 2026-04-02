@@ -273,7 +273,7 @@ function CIPlotMount({ ci, compact }: { ci: DifferenceCI; compact?: boolean }) {
     import("../plots/CIPlot.ts").then(({ createCIPlot }) => {
       if (!ref.current) return;
       ref.current.innerHTML = "";
-      const opts = compact ? { width: 160, height: 50, title: "" } : {};
+      const opts = compact ? { width: 200, height: 70, title: "" } : {};
       ref.current.appendChild(createCIPlot(ci, opts));
     });
   }, [ci, compact]);

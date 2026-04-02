@@ -45,6 +45,13 @@ const defaultConfidence = 0.95;
 const outlierMultiplier = 1.5; // Tukey's fence multiplier
 const bootstrapSamples = 10000;
 
+/** Swap direction labels for higher-is-better metrics (positive = faster) */
+export function swapDirection(ci: DifferenceCI): DifferenceCI {
+  const d = ci.direction === "faster" ? "slower"
+    : ci.direction === "slower" ? "faster" : "uncertain";
+  return { ...ci, direction: d };
+}
+
 /** Negate percent and CI for "higher is better" metrics (e.g., throughput) */
 export function flipCI(ci: DifferenceCI): DifferenceCI {
   return {

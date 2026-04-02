@@ -11,7 +11,8 @@ import {
   binBootstrapResult,
   bootstrapDifferenceCI,
   bootstrapStat,
-  flipCI,
+  type DifferenceCI,
+  swapDirection,
 } from "../stats/StatisticalUtils.ts";
 import type {
   BenchmarkEntry,
@@ -26,7 +27,6 @@ import type {
 } from "../viewer/ReportData.ts";
 import {
   groupReports,
-  isHigherIsBetter,
   type ReportColumn,
   type ReportGroup,
   type ResultsMapper,
@@ -55,11 +55,8 @@ export function prepareHtmlData(
 ): ReportData {
   const { cliArgs, currentVersion, baselineVersion } = options;
   const sections = options.sections ?? defaultSections(groups, cliArgs);
-  const higherIsBetter = isHigherIsBetter(sections);
   return {
-    groups: groups.map(group =>
-      prepareGroupData(group, sections, higherIsBetter),
-    ),
+    groups: groups.map(group => prepareGroupData(group, sections)),
     metadata: {
       timestamp: new Date().toISOString(),
       bencherVersion: process.env.npm_package_version || "unknown",
@@ -75,7 +72,6 @@ export function prepareHtmlData(
 function prepareGroupData(
   group: ReportGroup,
   sections?: ResultsMapper[],
-  higherIsBetter?: boolean,
 ): BenchmarkGroup {
   const base = group.baseline;
   const baseM = base?.measuredResults;
@@ -83,17 +79,16 @@ function prepareGroupData(
   const baseline = baseData
     ? { ...baseData, comparisonCI: undefined }
     : undefined;
+  const primaryCol = findPrimaryColumn(sections);
 
   return {
     name: group.name,
     baseline,
     benchmarks: group.reports.map(report => {
       const m = report.measuredResults;
-      const rawCI =
-        baseM?.samples && m.samples
-          ? bootstrapDifferenceCI(baseM.samples, m.samples)
-          : undefined;
-      const comparisonCI = rawCI && higherIsBetter ? flipCI(rawCI) : rawCI;
+      const comparisonCI = buildGroupCI(
+        baseM, m, report.metadata, primaryCol,
+      );
       const viewerSections = sections
         ? buildViewerSections(
             sections,
@@ -101,7 +96,6 @@ function prepareGroupData(
             baseM,
             report.metadata,
             base?.metadata,
-            higherIsBetter,
           )
         : undefined;
       return {
@@ -111,6 +105,36 @@ function prepareGroupData(
       };
     }),
   };
+}
+
+/** Find the first comparable column with a statFn across all sections */
+function findPrimaryColumn(
+  sections?: ResultsMapper[],
+): ReportColumn<Record<string, unknown>> | undefined {
+  if (!sections) return undefined;
+  for (const section of sections) {
+    for (const group of section.columns()) {
+      const col = group.columns.find(c => c.comparable && c.statFn);
+      if (col) return col as ReportColumn<Record<string, unknown>>;
+    }
+  }
+  return undefined;
+}
+
+/** Build group-level comparison CI using the primary column's stat function */
+function buildGroupCI(
+  baseline: MeasuredResults | undefined,
+  current: MeasuredResults,
+  metadata: UnknownRecord | undefined,
+  primaryCol: ReportColumn<Record<string, unknown>> | undefined,
+): DifferenceCI | undefined {
+  if (!baseline?.samples?.length || !current.samples?.length) return undefined;
+  const opts = primaryCol?.statFn
+    ? { statFn: (s: number[]) => primaryCol.statFn!(s, metadata) }
+    : {};
+  const rawCI = bootstrapDifferenceCI(baseline.samples, current.samples, opts);
+  if (primaryCol?.higherIsBetter) return swapDirection(rawCI);
+  return rawCI;
 }
 
 /** @return benchmark data with samples, stats, and profiling summaries */
@@ -144,7 +168,6 @@ function buildViewerSections(
   baseline: MeasuredResults | undefined,
   currentMeta?: UnknownRecord,
   baselineMeta?: UnknownRecord,
-  higherIsBetter?: boolean,
 ): ViewerSection[] {
   return sections.flatMap(section => {
     const curVals = section.extract(current, currentMeta);
@@ -158,7 +181,6 @@ function buildViewerSections(
       baseVals,
       currentMeta,
       baselineMeta,
-      higherIsBetter,
     };
     return section.columns().flatMap(group => {
       const cols = group.columns as ReportColumn<Record<string, unknown>>[];
@@ -177,7 +199,6 @@ interface RowContext {
   baseVals?: Record<string, unknown>;
   currentMeta?: UnknownRecord;
   baselineMeta?: UnknownRecord;
-  higherIsBetter?: boolean;
 }
 
 /** Build ViewerRow[] for a column group */
@@ -257,7 +278,11 @@ function buildComparisonCI(
     ctx.current.samples,
     { statFn: s => col.statFn!(s, ctx.currentMeta) },
   );
-  return ctx.higherIsBetter ? flipCI(rawCI) : rawCI;
+  // statFn computes in the metric's natural domain. bootstrapDifferenceCI
+  // assumes lower-is-better for direction labels. For higher-is-better
+  // metrics (like loc/sec), swap the direction without negating the values.
+  if (col.higherIsBetter) return swapDirection(rawCI);
+  return rawCI;
 }
 
 /** Build a ViewerEntry with optional bootstrap CI */
