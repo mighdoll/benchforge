@@ -97,7 +97,7 @@ async function runDirVariantCases<T>(
   const cases: CaseResult[] = [];
 
   for (const caseId of caseIds) {
-    const caseData = !matrix.casesModule && matrix.cases ? caseId : undefined;
+    const caseData = matrix.cases && !matrix.casesModule ? caseId : undefined;
     const variantArgs = {
       variantDir: matrix.variantDir!,
       variantId,

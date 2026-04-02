@@ -22,6 +22,7 @@ import type {
   ViewerSection,
 } from "../viewer/ReportData.ts";
 import {
+  type BenchmarkReport,
   computeDiffCI,
   findPrimaryColumn,
   groupReports,
@@ -70,6 +71,16 @@ export function prepareHtmlData(
 
 const minBatches = 8;
 
+/** Context shared across reports in a group */
+interface GroupContext {
+  baseM?: MeasuredResults;
+  baseMeta?: UnknownRecord;
+  primaryCol?: ReportColumn<Record<string, unknown>>;
+  sections?: ResultsMapper[];
+  equivMargin?: number;
+  lowBatches: boolean;
+}
+
 /** @return group data with structured ViewerSections and bootstrap CIs */
 function prepareGroupData(
   group: ReportGroup,
@@ -82,45 +93,53 @@ function prepareGroupData(
   const baseline = baseData
     ? { ...baseData, comparisonCI: undefined }
     : undefined;
-  const primaryCol = findPrimaryColumn(sections);
-  const lowBatches = hasLowBatchCount(baseM, group.reports[0]?.measuredResults);
+  const ctx: GroupContext = {
+    baseM,
+    baseMeta: base?.metadata,
+    primaryCol: findPrimaryColumn(sections),
+    sections,
+    equivMargin,
+    lowBatches: hasLowBatchCount(baseM, group.reports[0]?.measuredResults),
+  };
 
   return {
     name: group.name,
     baseline,
-    warning: lowBatches
+    warning: ctx.lowBatches
       ? `Too few batches for reliable comparison (need ${minBatches}+)`
       : undefined,
-    benchmarks: group.reports.map(report => {
-      const m = report.measuredResults;
-      const ci = computeDiffCI(
-        baseM,
-        m,
-        primaryCol,
-        report.metadata,
-        equivMargin,
-      );
-      if (ci) {
-        if (lowBatches) ci.direction = "uncertain";
-        if (primaryCol?.title) ci.label = `${primaryCol.title} Δ%`;
-      }
-      const sects = sections
-        ? buildViewerSections(
-            sections,
-            m,
-            baseM,
-            report.metadata,
-            base?.metadata,
-            equivMargin,
-          )
-        : undefined;
-      return {
-        ...prepareBenchmarkData(report),
-        sections: sects,
-        comparisonCI: ci,
-      };
-    }),
+    benchmarks: group.reports.map(r => prepareReportEntry(r, ctx)),
   };
+}
+
+/** @return a single benchmark entry with sections and comparison CI */
+function prepareReportEntry(
+  report: BenchmarkReport,
+  ctx: GroupContext,
+): BenchmarkEntry {
+  const m = report.measuredResults;
+  const ci = computeDiffCI(
+    ctx.baseM,
+    m,
+    ctx.primaryCol,
+    report.metadata,
+    ctx.equivMargin,
+  );
+  if (ci) {
+    if (ctx.lowBatches) ci.direction = "uncertain";
+    if (ctx.primaryCol?.title) ci.label = `${ctx.primaryCol.title} Δ%`;
+  }
+  const sects = ctx.sections
+    ? buildViewerSections(
+        ctx.sections,
+        m,
+        ctx.baseM,
+        report.metadata,
+        ctx.baseMeta,
+        ctx.equivMargin,
+      )
+    : undefined;
+  return { ...prepareBenchmarkData(report), sections: sects, comparisonCI: ci };
 }
 
 /** @return true if batched but below the minimum for reliable block bootstrap */

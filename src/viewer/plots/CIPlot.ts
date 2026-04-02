@@ -60,7 +60,6 @@ export function createDistributionPlot(
   const { fill, stroke } = colors[opts.direction];
   const scales = buildScales(histogram, ci, layout, opts.includeZero);
   const { margin, plot } = layout;
-  const add = (el: SVGElement) => svg.appendChild(el);
 
   drawTitles(svg, opts, margin, scales.x(pointEstimate));
 
@@ -69,7 +68,7 @@ export function createDistributionPlot(
   const ciRect = rect(ciX, margin.top, ciW, plot.h, { fill });
   const strength = opts.includeZero ? "ci-region-strong" : "ci-region";
   ciRect.classList.add(strength, `ci-${opts.direction}`);
-  add(ciRect);
+  svg.appendChild(ciRect);
 
   if (opts.smooth) drawSmoothedDist(svg, histogram, scales, stroke);
   else drawHistogramBars(svg, histogram, scales, layout, stroke);
@@ -77,7 +76,7 @@ export function createDistributionPlot(
   drawReferenceLine(svg, scales, layout, opts.includeZero);
 
   const ptX = scales.x(pointEstimate);
-  add(
+  svg.appendChild(
     line(ptX, margin.top, ptX, margin.top + plot.h, {
       stroke,
       strokeWidth: "2",
@@ -95,13 +94,12 @@ function drawTitles(
   margin: Layout["margin"],
   pointX: number,
 ): void {
-  const add = (el: SVGElement) => svg.appendChild(el);
   if (opts.title)
-    add(
+    svg.appendChild(
       text(margin.left, 14, opts.title, "start", "13", "currentColor", "600"),
     );
   if (opts.pointLabel)
-    add(
+    svg.appendChild(
       text(
         pointX,
         margin.top - 6,

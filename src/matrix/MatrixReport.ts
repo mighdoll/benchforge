@@ -154,6 +154,7 @@ function buildSectionTable(
 ): string {
   const sections = options.sections!;
   const variantTitle = options.variantTitle ?? "name";
+  const equivMargin = options.equivMargin;
   const primaryCol = findPrimaryColumn(sections);
 
   type Row = Record<string, unknown> & { name: string };
@@ -163,14 +164,13 @@ function buildSectionTable(
   const rows: Row[] = caseResults.flatMap(({ variant, cr }) => {
     const vals = extractSectionValues(cr.measured, sections, cr.metadata);
     const row: Row = { name: truncate(variant.id, 25), ...vals };
-    const margin = options.equivMargin;
     if (cr.baseline)
       row.diffCI = computeDiffCI(
         cr.baseline,
         cr.measured,
         primaryCol,
         cr.metadata,
-        margin,
+        equivMargin,
       );
     const out: Row[] = [row];
     if (cr.baseline && !shared) {

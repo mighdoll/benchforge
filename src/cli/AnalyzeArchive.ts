@@ -47,34 +47,40 @@ function analyzeBenchmark(
     return;
   }
 
-  const bBatches = splitBatches(bench.samples, bOffsets);
+  const batches = splitBatches(bench.samples, bOffsets);
   const baseBatches =
     baseOffsets && baseline
       ? splitBatches(baseline.samples, baseOffsets)
       : undefined;
 
-  const nBatches = bBatches.length;
-  const { length: totalRuns } = bench.samples;
+  printBatchHeader(bench, baseline, batches.length);
+  printBatchTable(batches, baseBatches);
+
+  if (baseBatches && baseBatches.length === batches.length) {
+    printOrderEffect(batches, baseBatches);
+    printPairedDeltas(batches, baseBatches);
+    printTrimmedBlocks(batches, baseBatches, bench.name);
+  }
+  console.log();
+}
+
+/** Print benchmark name with batch/run summary. */
+function printBatchHeader(
+  bench: BenchmarkEntry,
+  baseline: BenchmarkEntry | undefined,
+  nBatches: number,
+): void {
   const baseRuns = baseline?.samples?.length;
   const batchDur = bench.totalTime
     ? (bench.totalTime / nBatches).toFixed(1) + "s"
     : "?";
   const runInfo = baseRuns
-    ? `${totalRuns}+${baseRuns} runs`
-    : `${totalRuns} runs`;
+    ? `${bench.samples.length}+${baseRuns} runs`
+    : `${bench.samples.length} runs`;
   console.log(
     bold(`  ${bench.name}`) +
       dim(` (${nBatches} batches, ${runInfo}, ~${batchDur}/batch)`),
   );
-
-  printBatchTable(bBatches, baseBatches);
-
-  if (baseBatches && baseBatches.length === nBatches) {
-    printOrderEffect(bBatches, baseBatches);
-    printPairedDeltas(bBatches, baseBatches);
-    printTrimmedBlocks(bBatches, baseBatches, bench.name);
-  }
-  console.log();
 }
 
 /** Infer equal-sized batch offsets when batchOffsets isn't in the archive. */
@@ -114,18 +120,18 @@ function printBatchTable(
 
   for (let i = 0; i < benches.length; i++) {
     const n = String(benches[i].length).padStart(4);
-    const bStr = (timeMs(percentile(benches[i], 0.5)) ?? "").padStart(10);
+    const med = (timeMs(percentile(benches[i], 0.5)) ?? "").padStart(10);
     const idx = String(i).padEnd(7);
     if (!baselines?.[i]) {
-      console.log(`  ${idx} ${n}  ${bStr}`);
+      console.log(`  ${idx} ${n}  ${med}`);
       continue;
     }
-    const baseStr = (timeMs(percentile(baselines[i], 0.5)) ?? "").padStart(10);
+    const baseMed = (timeMs(percentile(baselines[i], 0.5)) ?? "").padStart(10);
     const delta = formatDelta(medianDelta(benches[i], baselines[i])).padStart(
       8,
     );
     const order = i % 2 === 0 ? dim(" B>C") : dim(" C>B");
-    console.log(`  ${idx} ${n}  ${bStr}  ${baseStr}  ${delta}${order}`);
+    console.log(`  ${idx} ${n}  ${med}  ${baseMed}  ${delta}${order}`);
   }
 }
 

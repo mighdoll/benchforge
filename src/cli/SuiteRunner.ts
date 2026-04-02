@@ -77,24 +77,12 @@ async function runGroup(
   group: BenchGroup,
   suiteParams: Omit<SuiteParams, "suite">,
 ): Promise<ReportGroup> {
-  const {
-    runner,
-    options,
-    useWorker,
-    batches = 1,
-    warmupBatch = false,
-  } = suiteParams;
+  const { batches = 1, warmupBatch = false, ...rest } = suiteParams;
   const { name, benchmarks, baseline, setup, metadata } = group;
   const setupParams = await setup?.();
   validateBenchmarkParameters(group);
 
-  const runParams = {
-    runner,
-    options,
-    useWorker,
-    params: setupParams,
-    metadata,
-  };
+  const runParams: RunParams = { ...rest, params: setupParams, metadata };
   if (batches === 1)
     return runSingleBatch(name, benchmarks, baseline, runParams);
   return runMultipleBatches(

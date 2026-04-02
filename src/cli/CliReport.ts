@@ -134,28 +134,22 @@ export function defaultMatrixReport(
 export function matrixToReportGroups(results: MatrixResults[]): ReportGroup[] {
   return results.flatMap(matrix =>
     matrix.variants.flatMap(variant =>
-      variant.cases.map(c => {
-        const { metadata } = c;
-        const report = {
-          name: variant.id,
-          measuredResults: c.measured,
-          metadata,
-        };
-        const baseline = c.baseline
-          ? {
-              name: `${variant.id} (baseline)`,
-              measuredResults: c.baseline,
-              metadata,
-            }
-          : undefined;
-        return {
-          name: `${variant.id} / ${c.caseId}`,
-          reports: [report],
-          baseline,
-        };
-      }),
+      variant.cases.map(c => caseToReportGroup(variant.id, c)),
     ),
   );
+}
+
+/** Convert a single matrix case to a ReportGroup. */
+function caseToReportGroup(
+  variantId: string,
+  c: MatrixResults["variants"][0]["cases"][0],
+): ReportGroup {
+  const { metadata } = c;
+  const report = { name: variantId, measuredResults: c.measured, metadata };
+  const baseline = c.baseline
+    ? { name: `${variantId} (baseline)`, measuredResults: c.baseline, metadata }
+    : undefined;
+  return { name: `${variantId} / ${c.caseId}`, reports: [report], baseline };
 }
 
 /** Apply default sections and extra columns for matrix reports. */

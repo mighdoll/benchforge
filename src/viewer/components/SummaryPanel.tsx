@@ -202,6 +202,15 @@ function RunEntry({ entry }: { entry: ViewerEntry }) {
   );
 }
 
+function SharedStat({ label, value }: { label: string; value: string }) {
+  return (
+    <div class="stat-row shared-row">
+      <span class="row-label">{label}</span>
+      <span class="row-value">{value}</span>
+    </div>
+  );
+}
+
 function HeapPanel({ entry }: { entry: BenchmarkEntry }) {
   const heap = entry.heapSummary;
   const allocSamples = entry.allocationSamples;
@@ -217,21 +226,12 @@ function HeapPanel({ entry }: { entry: BenchmarkEntry }) {
       <div class="panel-body">
         {heap && (
           <>
-            <div class="stat-row shared-row">
-              <span class="row-label">total bytes</span>
-              <span class="row-value">{formatBytesCompact(heap.totalBytes)}</span>
-            </div>
-            <div class="stat-row shared-row">
-              <span class="row-label">user bytes</span>
-              <span class="row-value">{formatBytesCompact(heap.userBytes)}</span>
-            </div>
+            <SharedStat label="total bytes" value={formatBytesCompact(heap.totalBytes)} />
+            <SharedStat label="user bytes" value={formatBytesCompact(heap.userBytes)} />
           </>
         )}
         {allocSamples && allocSamples.length > 0 && (
-          <div class="stat-row shared-row">
-            <span class="row-label">alloc samples</span>
-            <span class="row-value">{allocSamples.length.toLocaleString()}</span>
-          </div>
+          <SharedStat label="alloc samples" value={allocSamples.length.toLocaleString()} />
         )}
       </div>
     </div>
@@ -248,14 +248,8 @@ function CoveragePanel({ entry }: { entry: BenchmarkEntry }) {
         <span>calls</span>
       </div>
       <div class="panel-body">
-        <div class="stat-row shared-row">
-          <span class="row-label">functions tracked</span>
-          <span class="row-value">{cov.functionCount.toLocaleString()}</span>
-        </div>
-        <div class="stat-row shared-row">
-          <span class="row-label">total calls</span>
-          <span class="row-value">{formatCount(cov.totalCalls)}</span>
-        </div>
+        <SharedStat label="functions tracked" value={cov.functionCount.toLocaleString()} />
+        <SharedStat label="total calls" value={formatCount(cov.totalCalls)} />
       </div>
     </div>
   );
