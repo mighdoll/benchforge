@@ -18,26 +18,29 @@ export async function analyzeArchive(filePath: string): Promise<void> {
     console.error("No report data found in archive.");
     return;
   }
+  const batchCount = report.metadata?.cliArgs?.batches as number | undefined;
   for (const group of report.groups) {
-    analyzeGroup(group);
+    analyzeGroup(group, batchCount);
   }
 }
 
-function analyzeGroup(group: BenchmarkGroup): void {
+function analyzeGroup(group: BenchmarkGroup, batchCount?: number): void {
   console.log(bold(`\n=== ${group.name} ===\n`));
 
   const baseline = group.baseline;
   for (const bench of group.benchmarks) {
-    analyzeBenchmark(bench, baseline);
+    analyzeBenchmark(bench, baseline, batchCount);
   }
 }
 
 function analyzeBenchmark(
   bench: BenchmarkEntry,
   baseline: BenchmarkEntry | undefined,
+  batchCount?: number,
 ): void {
-  const bOffsets = bench.batchOffsets;
-  const baseOffsets = baseline?.batchOffsets;
+  const bOffsets = bench.batchOffsets ?? inferOffsets(bench.samples, batchCount);
+  const baseOffsets =
+    baseline?.batchOffsets ?? inferOffsets(baseline?.samples, batchCount);
 
   if (!bOffsets?.length) {
     console.log(dim("  No batch data (single batch run)"));
@@ -45,9 +48,10 @@ function analyzeBenchmark(
   }
 
   const bBatches = splitBatches(bench.samples, bOffsets);
-  const baseBatches = baseOffsets
-    ? splitBatches(baseline!.samples, baseOffsets)
-    : undefined;
+  const baseBatches =
+    baseOffsets && baseline
+      ? splitBatches(baseline.samples, baseOffsets)
+      : undefined;
 
   const nBatches = bBatches.length;
   console.log(bold(`  ${bench.name}`) + dim(` (${nBatches} batches)`));
@@ -61,6 +65,16 @@ function analyzeBenchmark(
     printPairedDeltas(bBatches, baseBatches);
   }
   console.log();
+}
+
+/** Infer equal-sized batch offsets when batchOffsets isn't in the archive. */
+function inferOffsets(
+  samples: number[] | undefined,
+  batchCount?: number,
+): number[] | undefined {
+  if (!samples?.length || !batchCount || batchCount <= 1) return undefined;
+  const size = Math.floor(samples.length / batchCount);
+  return Array.from({ length: batchCount }, (_, i) => i * size);
 }
 
 /** Split flat samples into batches using offset boundaries. */
