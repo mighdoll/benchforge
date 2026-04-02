@@ -65,8 +65,10 @@ export function isHigherIsBetter(
   const groups = isMappers(sections)
     ? sections.flatMap(s => s.columns())
     : sections;
-  const col = groups.flatMap(g => g.columns).find(c => c.comparable);
-  return col?.higherIsBetter ?? false;
+  return (
+    groups.flatMap(g => g.columns).find(c => c.comparable)?.higherIsBetter ??
+    false
+  );
 }
 
 /** Type guard: distinguishes ResultsMapper[] from ReportColumnGroup[] */

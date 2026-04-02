@@ -38,10 +38,10 @@ function analyzeBenchmark(
   baseline: BenchmarkEntry | undefined,
   batchCount?: number,
 ): void {
-  const bOffsets = bench.batchOffsets ?? inferOffsets(bench.samples, batchCount);
+  const bOffsets =
+    bench.batchOffsets ?? inferOffsets(bench.samples, batchCount);
   const baseOffsets =
     baseline?.batchOffsets ?? inferOffsets(baseline?.samples, batchCount);
-
   if (!bOffsets?.length) {
     console.log(dim("  No batch data (single batch run)"));
     return;
@@ -100,13 +100,15 @@ function printBatchTable(
     const n = String(benches[i].length).padStart(4);
     const bStr = (timeMs(bMed) ?? "").padStart(10);
 
-    if (baselines && baselines[i]) {
+    if (baselines?.[i]) {
       const baseMed = percentile(baselines[i], 0.5);
       const baseStr = (timeMs(baseMed) ?? "").padStart(10);
       const delta = ((bMed - baseMed) / baseMed) * 100;
       const deltaStr = formatDelta(delta).padStart(8);
       const order = i % 2 === 0 ? dim(" B>C") : dim(" C>B");
-      console.log(`  ${String(i).padEnd(7)} ${n}  ${bStr}  ${baseStr}  ${deltaStr}${order}`);
+      console.log(
+        `  ${String(i).padEnd(7)} ${n}  ${bStr}  ${baseStr}  ${deltaStr}${order}`,
+      );
     } else {
       console.log(`  ${String(i).padEnd(7)} ${n}  ${bStr}`);
     }
@@ -114,10 +116,7 @@ function printBatchTable(
 }
 
 /** Analyze order effect: does running second make a difference? */
-function printOrderEffect(
-  benches: number[][],
-  baselines: number[][],
-): void {
+function printOrderEffect(benches: number[][], baselines: number[][]): void {
   // Even batches: baseline runs first (B>C), odd: current runs first (C>B)
   const baseFirstDeltas: number[] = []; // even: baseline ran first
   const currFirstDeltas: number[] = []; // odd: current ran first
@@ -153,10 +152,7 @@ function printOrderEffect(
 }
 
 /** Print paired batch deltas and their consistency. */
-function printPairedDeltas(
-  benches: number[][],
-  baselines: number[][],
-): void {
+function printPairedDeltas(benches: number[][], baselines: number[][]): void {
   const deltas = benches.map((b, i) => {
     const bMed = percentile(b, 0.5);
     const baseMed = percentile(baselines[i], 0.5);
@@ -171,7 +167,9 @@ function printPairedDeltas(
 
   console.log();
   console.log(bold("  Paired deltas:"));
-  console.log(`    mean: ${formatDelta(avgDelta)}  median: ${formatDelta(med)}  IQR: ${spread.toFixed(1)}%`);
+  console.log(
+    `    mean: ${formatDelta(avgDelta)}  median: ${formatDelta(med)}  IQR: ${spread.toFixed(1)}%`,
+  );
   console.log(
     `    direction: ${positive} slower, ${negative} faster` +
       dim(` (${deltas.length} batches)`),
@@ -180,7 +178,9 @@ function printPairedDeltas(
   if (positive > 0 && negative > 0) {
     console.log(green("    ==> batches disagree on direction"));
   } else {
-    console.log(red("    ==> all batches agree on direction (systematic bias?)"));
+    console.log(
+      red("    ==> all batches agree on direction (systematic bias?)"),
+    );
   }
 }
 

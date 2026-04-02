@@ -142,12 +142,11 @@ async function runMultipleBatches(
   const benchmarkBatches = new Map<string, MeasuredResults[]>();
 
   for (let i = 0; i < batches; i++) {
-    const reverseOrder = i % 2 === 1;
     await runBatchIteration(
       benchmarks,
       baseline,
       batchParams,
-      reverseOrder,
+      i % 2 === 1,
       baselineBatches,
       benchmarkBatches,
     );

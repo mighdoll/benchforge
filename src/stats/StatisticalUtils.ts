@@ -55,8 +55,12 @@ const bootstrapSamples = 10000;
 
 /** Swap direction labels for higher-is-better metrics (positive = faster) */
 export function swapDirection(ci: DifferenceCI): DifferenceCI {
-  const d = ci.direction === "faster" ? "slower"
-    : ci.direction === "slower" ? "faster" : "uncertain";
+  const d =
+    ci.direction === "faster"
+      ? "slower"
+      : ci.direction === "slower"
+        ? "faster"
+        : "uncertain";
   return { ...ci, direction: d };
 }
 
@@ -159,19 +163,13 @@ export function createResample(samples: number[]): number[] {
 }
 
 /** @return resampler using block bootstrap when offsets are provided, else standard */
-function makeResampler(
-  samples: number[],
-  offsets?: number[],
-): () => number[] {
+function makeResampler(samples: number[], offsets?: number[]): () => number[] {
   if (offsets) return () => createBlockResample(samples, offsets);
   return () => createResample(samples);
 }
 
 /** @return block bootstrap resample: pick blocks with replacement, concatenate */
-function createBlockResample(
-  samples: number[],
-  offsets: number[],
-): number[] {
+function createBlockResample(samples: number[], offsets: number[]): number[] {
   const n = offsets.length;
   const result: number[] = [];
   for (let i = 0; i < n; i++) {
@@ -220,17 +218,16 @@ export function bootstrapDifferenceCI(
   return { percent: observedPct, ci, direction, histogram: binValues(diffs) };
 }
 
-/** Convert a BootstrapResult to BootstrapCIData with binned histogram */
-export function binBootstrapResult(result: BootstrapResult): {
+type BinnedCI = {
   estimate: number;
   ci: [number, number];
   histogram: HistogramBin[];
-} {
-  return {
-    estimate: result.estimate,
-    ci: result.ci,
-    histogram: binValues(result.samples),
-  };
+};
+
+/** Convert a BootstrapResult to BootstrapCIData with binned histogram */
+export function binBootstrapResult(result: BootstrapResult): BinnedCI {
+  const { estimate, ci, samples } = result;
+  return { estimate, ci, histogram: binValues(samples) };
 }
 
 /** @return confidence interval [lower, upper] */

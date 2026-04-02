@@ -60,10 +60,10 @@ export function valuesForReports<S extends ReadonlyArray<ResultsMapper<any>>>(
 export function injectDiffColumns<T>(
   reportGroups: ReportColumnGroup<T>[],
 ): ColumnGroup<T>[] {
-  const ciFmt = isHigherIsBetter(reportGroups)
+  const fmt = isHigherIsBetter(reportGroups)
     ? formatDiffWithCIHigherIsBetter
     : formatDiffWithCI;
-  const ciCol = { title: "Δ% CI", key: "diffCI" as keyof T, formatter: ciFmt };
+  const ciCol = { title: "Δ% CI", key: "diffCI" as keyof T, formatter: fmt };
 
   let ciAdded = false;
   return reportGroups.map(group => ({
@@ -85,27 +85,22 @@ function resultGroupValues<S extends ReadonlyArray<ResultsMapper<any>>>(
 ): ResultGroup<ReportRowData<S>> {
   const { reports, baseline } = group;
   const baseSamples = baseline?.measuredResults.samples;
-
   const results = reports.map(report => {
-    const samples = report.measuredResults.samples;
+    const { measuredResults: m, metadata } = report;
     const diffCI =
-      baseSamples && samples
-        ? bootstrapDifferenceCI(baseSamples, samples)
+      baseSamples && m.samples
+        ? bootstrapDifferenceCI(baseSamples, m.samples)
         : undefined;
-
     return {
       name: truncate(report.name),
-      ...extractSectionValues(
-        report.measuredResults,
-        sections,
-        report.metadata,
-      ),
+      ...extractSectionValues(m, sections, metadata),
       ...(diffCI && { diffCI }),
     } as ReportRowData<S>;
   });
-
-  const baseRow = baseline && valuesForReports([baseline], sections)[0];
-  return { results, baseline: baseRow };
+  return {
+    results,
+    baseline: baseline && valuesForReports([baseline], sections)[0],
+  };
 }
 
 /** Build table columns from sections, with name column and optional CI diff columns */

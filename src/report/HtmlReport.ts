@@ -17,7 +17,6 @@ import {
 import type {
   BenchmarkEntry,
   BenchmarkGroup,
-  BootstrapCIData,
   CoverageSummary,
   HeapSummary,
   ReportData,
@@ -92,11 +91,9 @@ function prepareGroupData(
       : undefined,
     benchmarks: group.reports.map(report => {
       const m = report.measuredResults;
-      const comparisonCI = buildGroupCI(
-        baseM, m, report.metadata, primaryCol,
-      );
-      if (lowBatches && comparisonCI) comparisonCI.direction = "uncertain";
-      const viewerSections = sections
+      const ci = buildGroupCI(baseM, m, report.metadata, primaryCol);
+      if (lowBatches && ci) ci.direction = "uncertain";
+      const sects = sections
         ? buildViewerSections(
             sections,
             m,
@@ -107,8 +104,8 @@ function prepareGroupData(
         : undefined;
       return {
         ...prepareBenchmarkData(report),
-        sections: viewerSections,
-        comparisonCI,
+        sections: sects,
+        comparisonCI: ci,
       };
     }),
   };
@@ -145,17 +142,19 @@ function buildGroupCI(
   baseline: MeasuredResults | undefined,
   current: MeasuredResults,
   metadata: UnknownRecord | undefined,
-  primaryCol: ReportColumn<Record<string, unknown>> | undefined,
+  col: ReportColumn<Record<string, unknown>> | undefined,
 ): DifferenceCI | undefined {
   if (!baseline?.samples?.length || !current.samples?.length) return undefined;
-  const opts: Parameters<typeof bootstrapDifferenceCI>[2] = primaryCol?.statFn
-    ? { statFn: (s: number[]) => primaryCol.statFn!(s, metadata) }
-    : {};
-  opts.blocks = baseline.batchOffsets;
-  opts.blocksB = current.batchOffsets;
+  const statFn = col?.statFn
+    ? (s: number[]) => col.statFn!(s, metadata)
+    : undefined;
+  const opts = {
+    statFn,
+    blocks: baseline.batchOffsets,
+    blocksB: current.batchOffsets,
+  };
   const rawCI = bootstrapDifferenceCI(baseline.samples, current.samples, opts);
-  if (primaryCol?.higherIsBetter) return swapDirection(rawCI);
-  return rawCI;
+  return col?.higherIsBetter ? swapDirection(rawCI) : rawCI;
 }
 
 /** @return benchmark data with samples, stats, and profiling summaries */
@@ -164,9 +163,9 @@ function prepareBenchmarkData(report: {
   measuredResults: MeasuredResults;
   metadata?: UnknownRecord;
 }): Omit<BenchmarkEntry, "comparisonCI" | "sections"> {
-  const m = report.measuredResults;
+  const { measuredResults: m, name } = report;
   return {
-    name: report.name,
+    name,
     samples: m.samples,
     warmupSamples: m.warmupSamples,
     allocationSamples: m.allocationSamples,
@@ -269,7 +268,7 @@ function buildColumnRow(
       ctx.currentMeta,
     ),
   ];
-  if (ctx.baseline && baseRaw !== undefined) {
+  if (ctx.baseline && baseRaw !== undefined)
     entries.push(
       buildEntry(
         "baseline",
@@ -279,7 +278,6 @@ function buildColumnRow(
         ctx.baselineMeta,
       ),
     );
-  }
   return {
     label: col.title,
     entries,
@@ -298,21 +296,22 @@ function buildComparisonCI(
     !ctx.current.samples?.length
   )
     return undefined;
+  const opts = {
+    statFn: (s: number[]) => col.statFn!(s, ctx.currentMeta),
+    blocks: ctx.baseline.batchOffsets,
+    blocksB: ctx.current.batchOffsets,
+  };
   const rawCI = bootstrapDifferenceCI(
     ctx.baseline.samples,
     ctx.current.samples,
-    {
-      statFn: s => col.statFn!(s, ctx.currentMeta),
-      blocks: ctx.baseline.batchOffsets,
-      blocksB: ctx.current.batchOffsets,
-    },
+    opts,
   );
-  if (hasLowBatchCount(ctx.baseline, ctx.current)) rawCI.direction = "uncertain";
+  if (hasLowBatchCount(ctx.baseline, ctx.current))
+    rawCI.direction = "uncertain";
   // statFn computes in the metric's natural domain. bootstrapDifferenceCI
   // assumes lower-is-better for direction labels. For higher-is-better
   // metrics (like loc/sec), swap the direction without negating the values.
-  if (col.higherIsBetter) return swapDirection(rawCI);
-  return rawCI;
+  return col.higherIsBetter ? swapDirection(rawCI) : rawCI;
 }
 
 /** Build a ViewerEntry with optional bootstrap CI */
@@ -323,31 +322,25 @@ function buildEntry(
   measured: MeasuredResults | undefined,
   metadata?: UnknownRecord,
 ): ViewerEntry {
-  let bootstrapCI: BootstrapCIData | undefined;
   const samples = measured?.samples;
-  if (col.comparable && col.statFn && samples && samples.length > 1) {
-    const fn = (s: number[]) => col.statFn!(s, metadata);
-    const result = bootstrapStat(samples, fn, {
-      blocks: measured?.batchOffsets,
-    });
-    const format = (v: number) => (col.formatter ? col.formatter(v) : String(v)) ?? String(v);
-    bootstrapCI = {
-      ...binBootstrapResult(result),
-      ciLabels: [format(result.ci[0]), format(result.ci[1])],
-    };
-  }
+  if (!col.comparable || !col.statFn || !samples || samples.length <= 1)
+    return { runName, value };
+  const fn = (s: number[]) => col.statFn!(s, metadata);
+  const result = bootstrapStat(samples, fn, { blocks: measured?.batchOffsets });
+  const fmt = (v: number) =>
+    (col.formatter ? col.formatter(v) : String(v)) ?? String(v);
+  const bootstrapCI = {
+    ...binBootstrapResult(result),
+    ciLabels: [fmt(result.ci[0]), fmt(result.ci[1])] as [string, string],
+  };
   return { runName, value, bootstrapCI };
 }
 
 /** Compute heap allocation summary from profile */
 function summarizeHeap(profile: HeapProfile): HeapSummary {
   const resolved = resolveProfile(profile);
-  const allSites = flattenProfile(resolved);
-  const userSites = filterSites(allSites);
-  return {
-    totalBytes: resolved.totalBytes,
-    userBytes: totalBytes(userSites),
-  };
+  const userSites = filterSites(flattenProfile(resolved));
+  return { totalBytes: resolved.totalBytes, userBytes: totalBytes(userSites) };
 }
 
 /** Compute coverage summary from V8 coverage data */
@@ -372,14 +365,14 @@ function defaultSections(
   groups: ReportGroup[],
   cliArgs?: Record<string, unknown>,
 ): ResultsMapper[] {
-  const hasGcStats = cliArgs?.["gc-stats"] === true;
-  const hasOpt = groups.some(g =>
+  const gc = cliArgs?.["gc-stats"] === true;
+  const opt = groups.some(g =>
     groupReports(g).some(r => r.measuredResults.optStatus !== undefined),
   );
   return [
     timeSection,
-    ...(hasGcStats ? [gcStatsSection] : []),
-    ...(hasOpt ? [optSection] : []),
+    ...(gc ? [gcStatsSection] : []),
+    ...(opt ? [optSection] : []),
     runsSection,
   ];
 }

@@ -114,19 +114,17 @@ export const gcStatsSection: ResultsMapper<GcStatsInfo> = {
   extract: (results: MeasuredResults) => {
     const { gcStats, samples } = results;
     if (!gcStats) return {};
-    const iterations = samples.length || 1;
+    const iters = samples.length || 1;
     const alloc = gcStats.totalAllocated;
-    const hasAlloc = alloc && alloc > 0;
-    const promoPercent = hasAlloc
-      ? (gcStats.totalPromoted ?? 0) / alloc
-      : undefined;
+    const promo =
+      alloc && alloc > 0 ? (gcStats.totalPromoted ?? 0) / alloc : undefined;
     return {
-      allocPerIter: alloc != null ? alloc / iterations : undefined,
+      allocPerIter: alloc != null ? alloc / iters : undefined,
       collected: gcStats.totalCollected || undefined,
       scavenges: gcStats.scavenges,
       fullGCs: gcStats.markCompacts,
-      promoPercent,
-      pausePerIter: gcStats.gcPauseTime / iterations,
+      promoPercent: promo,
+      pausePerIter: gcStats.gcPauseTime / iters,
     };
   },
   columns: (): ReportColumnGroup<GcStatsInfo>[] => [

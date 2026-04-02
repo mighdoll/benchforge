@@ -104,19 +104,22 @@ export async function browserBenchExports(args: DefaultCliArgs): Promise<void> {
     .map(stripQuotes)
     .filter(Boolean);
   const maxTime = iterations ? Number.MAX_SAFE_INTEGER : duration * 1000;
+  const alloc = needsAlloc(args);
+  const timeSample = needsTimeSample(args);
+  const { headless, timeout } = args;
   const result = await profileBrowser({
     url,
     pageLoad,
     maxTime,
     chromeArgs,
     allocOptions,
-    alloc: needsAlloc(args),
-    timeSample: needsTimeSample(args),
+    alloc,
+    timeSample,
     timeInterval: args["time-interval"],
-    headless: args.headless,
+    headless,
     chromePath: args.chrome,
     chromeProfile: args["chrome-profile"],
-    timeout: args.timeout,
+    timeout,
     gcStats: args["gc-stats"],
     callCounts: args["call-counts"],
     maxIterations: iterations,
@@ -280,8 +283,8 @@ function browserResultGroups(
   name: string,
   result: BrowserProfileResult,
 ): ReportGroup[] {
-  const measured = toBrowserMeasured(name, result);
-  return [{ name, reports: [{ name, measuredResults: measured }] }];
+  const measuredResults = toBrowserMeasured(name, result);
+  return [{ name, reports: [{ name, measuredResults }] }];
 }
 
 /** Print browser benchmark tables and heap reports. */

@@ -145,14 +145,10 @@ function SectionPanel({ section }: { section: ViewerSection }) {
 
 /** Measure max run-name and run-value widths, then set CSS vars on the panel */
 function alignRunColumns(panel: HTMLElement): void {
-  let maxName = 0;
-  let maxValue = 0;
-  for (const el of panel.querySelectorAll<HTMLElement>(".run-name")) {
-    maxName = Math.max(maxName, el.scrollWidth);
-  }
-  for (const el of panel.querySelectorAll<HTMLElement>(".run-value")) {
-    maxValue = Math.max(maxValue, el.scrollWidth);
-  }
+  const maxW = (sel: string) =>
+    Math.max(0, ...[...panel.querySelectorAll<HTMLElement>(sel)].map(el => el.scrollWidth));
+  const maxName = maxW(".run-name");
+  const maxValue = maxW(".run-value");
   if (maxName) panel.style.setProperty("--run-name-width", `${maxName}px`);
   if (maxValue) panel.style.setProperty("--run-value-width", `${maxValue}px`);
 }
@@ -180,12 +176,13 @@ function StatRow({ row }: { row: ViewerRow }) {
 }
 
 function RunEntry({ entry }: { entry: ViewerEntry }) {
-  const hasCI = !!entry.bootstrapCI;
+  const ci = entry.bootstrapCI;
   return (
     <div class="run-entry">
       <span class="run-name">{entry.runName}</span>
-      {!hasCI && <span class="run-value">{entry.value}</span>}
-      {hasCI && <BootstrapCIMount ci={entry.bootstrapCI!} label={entry.value} />}
+      {ci
+        ? <BootstrapCIMount ci={ci} label={entry.value} />
+        : <span class="run-value">{entry.value}</span>}
     </div>
   );
 }
@@ -288,18 +285,11 @@ function BootstrapCIMount({ ci, label }: { ci: BootstrapCIData; label?: string }
     import("../plots/CIPlot.ts").then(({ createDistributionPlot }) => {
       if (!ref.current) return;
       ref.current.innerHTML = "";
-      ref.current.appendChild(
-        createDistributionPlot(ci.histogram, ci.ci, ci.estimate, {
-          width: 240,
-          height: 80,
-          title: "",
-          direction: "uncertain",
-          ciLabels: ci.ciLabels,
-          includeZero: false,
-          smooth: true,
-          pointLabel: label,
-        }),
-      );
+      const opts = {
+        width: 240, height: 80, title: "", direction: "uncertain" as const,
+        ciLabels: ci.ciLabels, includeZero: false, smooth: true, pointLabel: label,
+      };
+      ref.current.appendChild(createDistributionPlot(ci.histogram, ci.ci, ci.estimate, opts));
     });
   }, [ci, label]);
   return <div class="ci-plot-inline" ref={ref} />;

@@ -62,12 +62,15 @@ export function createDistributionPlot(
   const add = (el: SVGElement) => svg.appendChild(el);
 
   // Title (comparison CIs)
-  if (opts.title) add(text(margin.left, 14, opts.title, "start", "13", "#333", "600"));
+  if (opts.title)
+    add(text(margin.left, 14, opts.title, "start", "13", "#333", "600"));
 
   // Point label centered above chart (bootstrap CIs)
   if (opts.pointLabel) {
     const cx = margin.left + plot.w / 2;
-    add(text(cx, margin.top - 6, opts.pointLabel, "middle", "15", "#333", "700"));
+    add(
+      text(cx, margin.top - 6, opts.pointLabel, "middle", "15", "#333", "700"),
+    );
   }
 
   // CI shading — subtle for bootstrap, normal for comparison
@@ -83,19 +86,25 @@ export function createDistributionPlot(
   // Zero reference — solid black extending past plot area (comparison CIs only)
   if (opts.includeZero) {
     const zeroX = scales.x(0);
-    const inRange = zeroX >= margin.left && zeroX <= layout.width - margin.right;
-    if (inRange) {
-      const extend = 4;
-      add(line(zeroX, margin.top - extend, zeroX, margin.top + plot.h + extend, {
-        stroke: "#000",
-        strokeWidth: "1",
-      }));
-    }
+    const inRange =
+      zeroX >= margin.left && zeroX <= layout.width - margin.right;
+    if (inRange)
+      add(
+        line(zeroX, margin.top - 4, zeroX, margin.top + plot.h + 4, {
+          stroke: "#000",
+          strokeWidth: "1",
+        }),
+      );
   }
 
   // Point estimate line
   const ptX = scales.x(pointEstimate);
-  add(line(ptX, margin.top, ptX, margin.top + plot.h, { stroke, strokeWidth: "2" }));
+  add(
+    line(ptX, margin.top, ptX, margin.top + plot.h, {
+      stroke,
+      strokeWidth: "2",
+    }),
+  );
 
   drawCILabels(svg, ci, scales, layout, opts);
   return svg;
@@ -114,7 +123,11 @@ export function createCIPlot(
 }
 
 /** Compute plot layout dimensions, scaling margins for compact sizes */
-function buildLayout(width: number, height: number, hasPointLabel?: boolean): Layout {
+function buildLayout(
+  width: number,
+  height: number,
+  hasPointLabel?: boolean,
+): Layout {
   const compact = height < defaultMargin.top + defaultMargin.bottom + 10;
   const margin = compact
     ? { top: 4, right: 6, bottom: 4, left: 6 }
@@ -141,8 +154,9 @@ function buildScales(
 ): Scales {
   const { margin, plot } = layout;
   const xs = histogram.map(b => b.x);
-  const xMin = includeZero ? Math.min(...xs, ci[0], 0) : Math.min(...xs, ci[0]);
-  const xMax = includeZero ? Math.max(...xs, ci[1], 0) : Math.max(...xs, ci[1]);
+  const extra = includeZero ? [0] : [];
+  const xMin = Math.min(...xs, ci[0], ...extra);
+  const xMax = Math.max(...xs, ci[1], ...extra);
   const yMax = Math.max(...histogram.map(b => b.count));
   const xRange = xMax - xMin || 1;
   return {
@@ -245,7 +259,9 @@ function drawCILabels(
   const hiLabel = opts.ciLabels?.[1] ?? formatPct(ci[1], 0);
   if (!opts.includeZero) {
     svg.appendChild(text(layout.margin.left, labelY, loLabel, "start", "11"));
-    svg.appendChild(text(layout.width - layout.margin.right, labelY, hiLabel, "end", "11"));
+    svg.appendChild(
+      text(layout.width - layout.margin.right, labelY, hiLabel, "end", "11"),
+    );
   } else {
     const loX = scales.x(ci[0]);
     const hiX = scales.x(ci[1]);
