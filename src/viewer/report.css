@@ -62,9 +62,12 @@
 }
 
 .report-panel .group-toggle {
-  font-size: 18px;
+  font-size: 40px;
+  line-height: 0;
+  position: relative;
+  top: -2px;
   color: #999;
-  width: 20px;
+  width: 24px;
   text-align: center;
 }
 
