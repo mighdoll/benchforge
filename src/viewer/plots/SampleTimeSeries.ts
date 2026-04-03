@@ -386,19 +386,19 @@ function heapAxisMarks(
   const tickX = xMax + xRange * 0.01;
   const labelX = xMax + xRange * 0.06;
 
-  // Pick ~4 nice tick values spanning the heap range
   const minMB = hs.heapMinBytes / 1024 / 1024;
   const maxMB = (hs.heapMinBytes + hs.heapRangeBytes) / 1024 / 1024;
-  const ticks = d3.ticks(minMB, maxMB, 4);
+  const ticks = d3.ticks(minMB, maxMB, 3);
+  const fmtMB = (mb: number) =>
+    mb >= 100 ? `${mb.toFixed(0)}` : mb >= 10 ? `${mb.toFixed(1)}` : `${mb.toFixed(2)}`;
 
   const tickData = ticks.map(mb => ({
     x: tickX,
     y: hs.yMin + (mb * 1024 * 1024 - hs.heapMinBytes) * hs.scale,
-    label: mb >= 100 ? `${mb.toFixed(0)}` : mb >= 10 ? `${mb.toFixed(1)}` : `${mb.toFixed(2)}`,
+    label: fmtMB(mb),
   }));
 
   return [
-    // Tick labels
     Plot.text(tickData, {
       x: "x",
       y: "y",
@@ -408,7 +408,6 @@ function heapAxisMarks(
       fill: "#93c5fd",
       clip: false,
     }),
-    // Axis label
     Plot.text(
       [{ x: labelX, y: hs.yMin + hs.heapRangeBytes * hs.scale * 0.5, text: "MB" }],
       {
@@ -417,8 +416,7 @@ function heapAxisMarks(
         text: "text",
         fontSize: 10,
         textAnchor: "start",
-        fill: "#93c5fd",
-        fontStyle: "italic",
+        fill: "#333",
         clip: false,
       },
     ),
