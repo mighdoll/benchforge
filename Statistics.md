@@ -64,7 +64,8 @@ regression that median alone would hide.
 relative to median indicates occasional expensive iterations, often from GC
 pauses or JIT recompilation.
 
-Point estimates are computed from all pooled samples across batches.
+Point estimates are computed from pooled samples across batches, excluding
+any batches rejected by Tukey trimming (see Comparison Statistics below).
 
 ## Comparison Statistics
 
@@ -92,10 +93,10 @@ The block bootstrap works as follows:
 4. The 2.5th and 97.5th percentiles of this distribution form the 95%
    confidence interval.
 
-The point estimate (observed % difference) uses the pooled median across all
-samples, not the batch means. This gives the most precise single number. The
-CI width comes from the batch-level resampling, reflecting between-batch
-environmental variance.
+The point estimate (observed % difference) uses the pooled median across
+samples from kept batches -- the same Tukey filtering applies to both the
+point estimate and the CI, so they stay consistent. The CI width comes from
+the batch-level resampling, reflecting between-batch environmental variance.
 
 ### Equivalence Margin
 

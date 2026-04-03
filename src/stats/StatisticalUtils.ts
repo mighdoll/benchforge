@@ -182,11 +182,11 @@ export function tukeyFences(
   return [q1 - multiplier * iqr, q3 + multiplier * iqr];
 }
 
-/** @return values with extreme outliers removed (3x IQR Tukey fences) */
-function tukeyTrim(values: number[]): number[] {
-  if (values.length < 4) return values;
+/** @return indices of values within 3x IQR Tukey fences */
+function tukeyKeep(values: number[]): number[] {
+  if (values.length < 4) return values.map((_, i) => i);
   const [lo, hi] = tukeyFences(values);
-  return values.filter(v => v >= lo && v <= hi);
+  return values.map((v, i) => (v >= lo && v <= hi ? i : -1)).filter(i => i >= 0);
 }
 
 /** @return samples split into blocks by offset boundaries */
@@ -209,23 +209,36 @@ function blockValues(
   return splitByOffsets(samples, offsets).map(fn);
 }
 
-/** Compute Tukey-trimmed block means for each side of a difference CI */
-function prepareBlockMeans(
+/** Tukey-trim block means and return both trimmed means and filtered samples */
+function prepareBlocks(
   a: number[],
   b: number[],
   options: DiffBootstrapOptions,
-): { meansA?: number[]; meansB?: number[]; trimmed?: [number, number] } {
+): {
+  meansA?: number[];
+  meansB?: number[];
+  filteredA?: number[];
+  filteredB?: number[];
+  trimmed?: [number, number];
+} {
   const blocksB = options.blocksB ?? options.blocks;
-  const rawA = options.blocks
-    ? blockValues(a, options.blocks, average)
-    : undefined;
-  const rawB = blocksB ? blockValues(b, blocksB, average) : undefined;
-  if (!rawA && !rawB) return {};
-  const meansA = rawA ? tukeyTrim(rawA) : undefined;
-  const meansB = rawB ? tukeyTrim(rawB) : undefined;
-  const trimmedA = rawA ? rawA.length - (meansA?.length ?? 0) : 0;
-  const trimmedB = rawB ? rawB.length - (meansB?.length ?? 0) : 0;
-  return { meansA, meansB, trimmed: [trimmedA, trimmedB] };
+  const splitsA = options.blocks ? splitByOffsets(a, options.blocks) : undefined;
+  const splitsB = blocksB ? splitByOffsets(b, blocksB) : undefined;
+  if (!splitsA && !splitsB) return {};
+  const rawA = splitsA?.map(average);
+  const rawB = splitsB?.map(average);
+  const keepA = rawA ? tukeyKeep(rawA) : undefined;
+  const keepB = rawB ? tukeyKeep(rawB) : undefined;
+  return {
+    meansA: keepA && rawA ? keepA.map(i => rawA[i]) : undefined,
+    meansB: keepB && rawB ? keepB.map(i => rawB[i]) : undefined,
+    filteredA: keepA && splitsA ? keepA.flatMap(i => splitsA[i]) : undefined,
+    filteredB: keepB && splitsB ? keepB.flatMap(i => splitsB[i]) : undefined,
+    trimmed: [
+      (rawA?.length ?? 0) - (keepA?.length ?? 0),
+      (rawB?.length ?? 0) - (keepB?.length ?? 0),
+    ],
+  };
 }
 
 /** @return bootstrap CI for percentage difference between baseline (a) and current (b).
@@ -238,13 +251,13 @@ export function bootstrapDifferenceCI(
   const { resamples = bootstrapSamples, confidence: conf = defaultConfidence } =
     options;
   const fn = options.statFn ?? ((s: number[]) => percentile(s, 0.5));
+  const { meansA, meansB, filteredA, filteredB, trimmed } =
+    prepareBlocks(a, b, options);
 
-  // Point estimate: pooled statistic from all samples
-  const baseVal = fn(a);
-  const currVal = fn(b);
+  // Point estimate: pooled statistic from Tukey-filtered samples (or all if no blocks)
+  const baseVal = fn(filteredA ?? a);
+  const currVal = fn(filteredB ?? b);
   const observedPct = ((currVal - baseVal) / baseVal) * 100;
-
-  const { meansA, meansB, trimmed } = prepareBlockMeans(a, b, options);
 
   const drawA = meansA
     ? () => average(createResample(meansA))
