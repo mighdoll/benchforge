@@ -58,6 +58,7 @@ const cliOptions = {
   timeout:          { type: "number",  default: 60, describe: "browser page timeout in seconds" },
   chrome:           { type: "string",  requiresArg: true, describe: "Chrome binary path (default: auto-detect or CHROME_PATH)" },
   "chrome-profile": { type: "string",  requiresArg: true, describe: "Chrome user profile directory (default: temp profile)" },
+  "baseline-url":   { type: "string",  requiresArg: true, describe: "baseline URL for A/B comparison (fresh tab per batch)" },
   "chrome-args":    { type: "string",  array: true, requiresArg: true, describe: "extra Chromium flags" },
 } as const;
 
@@ -108,6 +109,7 @@ const optionGroups = {
   ],
   "Browser:": [
     "url",
+    "baseline-url",
     "page-load",
     "wait-for",
     "headless",

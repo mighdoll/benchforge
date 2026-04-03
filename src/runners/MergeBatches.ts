@@ -71,34 +71,43 @@ function mergeGcStats(results: MeasuredResults[]): GcStats | undefined {
   };
 }
 
-/** Run a benchmark+baseline pair in batched alternation, merge results. */
-export async function runBatchedPair(
-  runCurrent: () => Promise<MeasuredResults>,
-  runBaseline: (() => Promise<MeasuredResults>) | undefined,
+/** Run N benchmarks + optional baseline in batched alternation, merge results. */
+export async function runBatched(
+  runners: (() => Promise<MeasuredResults>)[],
+  baseline: (() => Promise<MeasuredResults>) | undefined,
   batches: number,
   warmupBatch = false,
-): Promise<{ current: MeasuredResults; baseline?: MeasuredResults }> {
-  const currentBatches: MeasuredResults[] = [];
+): Promise<{ results: MeasuredResults[]; baseline?: MeasuredResults }> {
+  const runnerBatches: MeasuredResults[][] = runners.map(() => []);
   const baselineBatches: MeasuredResults[] = [];
 
   for (let i = 0; i < batches; i++) {
     const reverse = i % 2 === 1;
+    const runAll = async () => {
+      for (let j = 0; j < runners.length; j++)
+        runnerBatches[j].push(await runners[j]());
+    };
+    const runBase = async () => {
+      if (baseline) baselineBatches.push(await baseline());
+    };
     if (reverse) {
-      currentBatches.push(await runCurrent());
-      if (runBaseline) baselineBatches.push(await runBaseline());
+      await runAll();
+      await runBase();
     } else {
-      if (runBaseline) baselineBatches.push(await runBaseline());
-      currentBatches.push(await runCurrent());
+      await runBase();
+      await runAll();
     }
   }
 
   if (!warmupBatch && batches > 1) {
-    currentBatches.shift();
+    for (const b of runnerBatches) b.shift();
     baselineBatches.shift();
   }
 
-  const baseline = baselineBatches.length
-    ? mergeBatchResults(baselineBatches)
-    : undefined;
-  return { current: mergeBatchResults(currentBatches), baseline };
+  return {
+    results: runnerBatches.map(b => mergeBatchResults(b)),
+    baseline: baselineBatches.length
+      ? mergeBatchResults(baselineBatches)
+      : undefined,
+  };
 }

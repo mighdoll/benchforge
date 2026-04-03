@@ -1,6 +1,6 @@
 import type { RunnerOptions } from "../runners/BenchRunner.ts";
 import type { MeasuredResults } from "../runners/MeasuredResults.ts";
-import { runBatchedPair } from "../runners/MergeBatches.ts";
+import { runBatched } from "../runners/MergeBatches.ts";
 import { runMatrixVariant } from "../runners/RunnerOrchestrator.ts";
 import type {
   BenchMatrix,
@@ -147,11 +147,9 @@ async function runCaseBatched<T>(
   const runBase = baselineArgs
     ? async () => (await runMatrixVariant(baselineArgs))[0]
     : undefined;
-  const { current, baseline } = await runBatchedPair(
-    runCurrent,
-    runBase,
-    ctx.batches,
-    ctx.warmupBatch,
-  );
+  const {
+    results: [current],
+    baseline,
+  } = await runBatched([runCurrent], runBase, ctx.batches, ctx.warmupBatch);
   return { measured: current, baseline };
 }

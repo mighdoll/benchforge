@@ -9,8 +9,7 @@ import type {
 } from "../runners/BenchmarkSpec.ts";
 import type { RunnerOptions } from "../runners/BenchRunner.ts";
 import type { KnownRunner } from "../runners/CreateRunner.ts";
-import type { MeasuredResults } from "../runners/MeasuredResults.ts";
-import { mergeBatchResults as mergeResults } from "../runners/MergeBatches.ts";
+import { runBatched } from "../runners/MergeBatches.ts";
 import { runBenchmark } from "../runners/RunnerOrchestrator.ts";
 import type { DefaultCliArgs } from "./CliArgs.ts";
 import { cliToRunnerOptions, validateArgs } from "./CliOptions.ts";
@@ -133,40 +132,31 @@ async function runMultipleBatches(
   batches: number,
   warmupBatch = false,
 ): Promise<ReportGroup> {
-  const opts = { ...runParams.options };
-  const batchParams = { ...runParams, options: opts };
-  const baselineBatches: MeasuredResults[] = [];
-  const benchmarkBatches = new Map<string, MeasuredResults[]>();
-
-  for (let i = 0; i < batches; i++) {
-    const reverse = i % 2 === 1;
-    await runBatchIteration(
-      benchmarks,
-      baseline,
-      batchParams,
-      reverse,
-      baselineBatches,
-      benchmarkBatches,
-    );
-  }
-
-  // Drop batch 0 (OS cache warmup) unless --warmup-batch is set
-  if (!warmupBatch && batches > 1) {
-    baselineBatches.shift();
-    for (const [, results] of benchmarkBatches) {
-      results.shift();
-    }
-  }
-
   const { metadata } = runParams;
-  return mergeBatchResults(
-    name,
-    benchmarks,
-    baseline,
-    baselineBatches,
-    benchmarkBatches,
-    metadata,
+  const run = (spec: BenchmarkSpec) => async () => {
+    const r = await runSingleBenchmark(spec, runParams);
+    return r.measuredResults;
+  };
+  const runners = benchmarks.map(run);
+  const baselineFn = baseline ? run(baseline) : undefined;
+
+  const { results, baseline: merged } = await runBatched(
+    runners,
+    baselineFn,
+    batches,
+    warmupBatch,
   );
+
+  const reports = benchmarks.map((b, i) => ({
+    name: b.name,
+    measuredResults: results[i],
+    metadata,
+  }));
+  const baselineReport =
+    merged && baseline
+      ? { name: baseline.name, measuredResults: merged, metadata }
+      : undefined;
+  return { name, reports, baseline: baselineReport };
 }
 
 /** Run single benchmark and create report. */
@@ -177,69 +167,4 @@ async function runSingleBenchmark(
   const args = { spec, runner, options, useWorker, params };
   const [result] = await runBenchmark(args);
   return { name: spec.name, measuredResults: result, metadata };
-}
-
-/** Run one batch iteration, optionally reversing benchmark/baseline order. */
-async function runBatchIteration(
-  benchmarks: BenchmarkSpec[],
-  baseline: BenchmarkSpec | undefined,
-  runParams: RunParams,
-  reverseOrder: boolean,
-  baselineBatches: MeasuredResults[],
-  benchmarkBatches: Map<string, MeasuredResults[]>,
-): Promise<void> {
-  const runBaseline = async () => {
-    if (baseline) {
-      const r = await runSingleBenchmark(baseline, runParams);
-      baselineBatches.push(r.measuredResults);
-    }
-  };
-  const runBenches = async () => {
-    for (const b of benchmarks) {
-      const r = await runSingleBenchmark(b, runParams);
-      appendToMap(benchmarkBatches, b.name, r.measuredResults);
-    }
-  };
-
-  if (reverseOrder) {
-    await runBenches();
-    await runBaseline();
-  } else {
-    await runBaseline();
-    await runBenches();
-  }
-}
-
-/** Merge batch results into final ReportGroup. */
-function mergeBatchResults(
-  name: string,
-  benchmarks: BenchmarkSpec[],
-  baseline: BenchmarkSpec | undefined,
-  baselineBatches: MeasuredResults[],
-  benchmarkBatches: Map<string, MeasuredResults[]>,
-  metadata?: Record<string, unknown>,
-): ReportGroup {
-  const mergedBaseline = baseline
-    ? {
-        name: baseline.name,
-        measuredResults: mergeResults(baselineBatches),
-        metadata,
-      }
-    : undefined;
-  const reports = benchmarks.map(b => ({
-    name: b.name,
-    measuredResults: mergeResults(benchmarkBatches.get(b.name) || []),
-    metadata,
-  }));
-  return { name, reports, baseline: mergedBaseline };
-}
-
-/** Append a value to a map of arrays, creating the array if needed. */
-function appendToMap(
-  map: Map<string, MeasuredResults[]>,
-  key: string,
-  value: MeasuredResults,
-) {
-  if (!map.has(key)) map.set(key, []);
-  map.get(key)!.push(value);
 }

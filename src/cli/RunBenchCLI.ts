@@ -27,6 +27,7 @@ import { reportResults } from "../report/text/TextReport.ts";
 import { computeStats } from "../runners/BasicRunner.ts";
 import type { BenchSuite } from "../runners/BenchmarkSpec.ts";
 import type { MeasuredResults } from "../runners/MeasuredResults.ts";
+import { runBatched } from "../runners/MergeBatches.ts";
 import {
   type Configure,
   type DefaultCliArgs,
@@ -92,45 +93,90 @@ export async function benchExports(
 export async function browserBenchExports(args: DefaultCliArgs): Promise<void> {
   warnBrowserFlags(args);
   const profileBrowser = await loadBrowserProfiler();
+  const params = buildBrowserParams(args);
+  const name = nameFromUrl(args.url!);
+  const baselineUrl = args["baseline-url"];
 
-  const url = args.url!;
-  const { iterations, duration } = args;
-  const pageLoad = args["page-load"] || !!args["wait-for"];
-  const allocOptions = {
-    samplingInterval: args["alloc-interval"],
-    stackDepth: args["alloc-depth"],
-  };
-  const chromeArgs = args["chrome-args"]
-    ?.flatMap(a => a.split(/\s+/))
-    .map(stripQuotes)
-    .filter(Boolean);
-  const maxTime = iterations ? Number.MAX_SAFE_INTEGER : duration * 1000;
-  const alloc = needsAlloc(args);
-  const timeSample = needsTimeSample(args);
-  const { headless, timeout } = args;
-  const result = await profileBrowser({
-    url,
-    pageLoad,
-    maxTime,
-    chromeArgs,
-    allocOptions,
-    alloc,
-    timeSample,
-    timeInterval: args["time-interval"],
-    headless,
+  // Single-tab, no baseline: unchanged fast path
+  if (args.batches <= 1 && !baselineUrl) {
+    const result = await profileBrowser(params);
+    const results = browserResultGroups(name, result);
+    printBrowserReport(result, results, args);
+    await exportReports({ results, args });
+    return;
+  }
+
+  // Multi-tab batching with optional baseline comparison
+  const { lastRaw, results } = await runBrowserBatches(
+    profileBrowser,
+    params,
+    name,
+    args,
+  );
+  printBrowserReport(lastRaw, results, args);
+  await exportReports({ results, args });
+}
+
+/** Launch Chrome, run batched fresh tabs, merge results. */
+async function runBrowserBatches(
+  profileBrowser: Awaited<ReturnType<typeof loadBrowserProfiler>>,
+  params: ReturnType<typeof buildBrowserParams>,
+  name: string,
+  args: DefaultCliArgs,
+): Promise<{ lastRaw: BrowserProfileResult; results: ReportGroup[] }> {
+  const launchChrome = await loadChromeLauncher();
+  const chrome = await launchChrome({
+    headless: args.headless,
     chromePath: args.chrome,
     chromeProfile: args["chrome-profile"],
-    timeout,
-    gcStats: args["gc-stats"],
-    callCounts: args["call-counts"],
-    maxIterations: iterations,
-    waitFor: args["wait-for"],
+    args: params.chromeArgs,
   });
 
-  const name = new URL(url).pathname.split("/").pop() || "browser";
-  const results = browserResultGroups(name, result);
-  printBrowserReport(result, results, args);
-  await exportReports({ results, args });
+  const baselineUrl = args["baseline-url"];
+  const warmupBatch = args["warmup-batch"] ?? false;
+  let lastRaw: BrowserProfileResult | undefined;
+  try {
+    const runCurrent = async () => {
+      const raw = await profileBrowser({ ...params, chrome });
+      lastRaw = raw;
+      return toBrowserMeasured(name, raw);
+    };
+    const runBaseline = baselineUrl
+      ? async () => {
+          const bName = nameFromUrl(baselineUrl);
+          const raw = await profileBrowser({
+            ...params,
+            chrome,
+            url: baselineUrl,
+          });
+          lastRaw ??= raw;
+          return toBrowserMeasured(bName, raw);
+        }
+      : undefined;
+
+    const batches = Math.max(args.batches, 2);
+    const {
+      results: [current],
+      baseline,
+    } = await runBatched([runCurrent], runBaseline, batches, warmupBatch);
+
+    const baselineReport =
+      baseline && baselineUrl
+        ? { name: nameFromUrl(baselineUrl), measuredResults: baseline }
+        : undefined;
+    return {
+      lastRaw: lastRaw!,
+      results: [
+        {
+          name,
+          reports: [{ name, measuredResults: current }],
+          baseline: baselineReport,
+        },
+      ],
+    };
+  } finally {
+    await chrome.close();
+  }
 }
 
 /** Dynamically import the browser profiler (lazy-loaded for non-browser benchmarks). */
@@ -138,6 +184,48 @@ async function loadBrowserProfiler() {
   const path = "../profiling/browser/BrowserProfiler.ts";
   type BrowserMod = typeof import("../profiling/browser/BrowserProfiler.ts");
   return ((await import(path)) as BrowserMod).profileBrowser;
+}
+
+/** Dynamically import Chrome launcher (lazy-loaded for multi-tab batching). */
+async function loadChromeLauncher() {
+  const path = "../profiling/browser/ChromeLauncher.ts";
+  type Mod = typeof import("../profiling/browser/ChromeLauncher.ts");
+  return ((await import(path)) as Mod).launchChrome;
+}
+
+/** Build BrowserProfileParams from CLI args. */
+function buildBrowserParams(args: DefaultCliArgs) {
+  const { iterations, duration } = args;
+  const chromeArgs = args["chrome-args"]
+    ?.flatMap(a => a.split(/\s+/))
+    .map(stripQuotes)
+    .filter(Boolean);
+  return {
+    url: args.url!,
+    pageLoad: args["page-load"] || !!args["wait-for"],
+    maxTime: iterations ? Number.MAX_SAFE_INTEGER : duration * 1000,
+    chromeArgs,
+    allocOptions: {
+      samplingInterval: args["alloc-interval"],
+      stackDepth: args["alloc-depth"],
+    },
+    alloc: needsAlloc(args),
+    timeSample: needsTimeSample(args),
+    timeInterval: args["time-interval"],
+    headless: args.headless,
+    chromePath: args.chrome,
+    chromeProfile: args["chrome-profile"],
+    timeout: args.timeout,
+    gcStats: args["gc-stats"],
+    callCounts: args["call-counts"],
+    maxIterations: iterations,
+    waitFor: args["wait-for"],
+  };
+}
+
+/** Extract a short name from a URL for report labels. */
+function nameFromUrl(url: string): string {
+  return new URL(url).pathname.split("/").pop() || "browser";
 }
 
 /** Run matrix suite with full CLI handling (parse, run, report, export). */
@@ -264,7 +352,6 @@ function warnBrowserFlags(args: DefaultCliArgs): void {
     [!!args["trace-opt"], "--trace-opt"],
     [!!args["gc-force"], "--gc-force"],
     [!!args.adaptive, "--adaptive"],
-    [args.batches > 1, "--batches"],
   ];
   const ignored = checks.filter(([active]) => active).map(([, flag]) => flag);
   if (ignored.length > 0)

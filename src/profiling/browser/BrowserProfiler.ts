@@ -57,10 +57,10 @@ export interface BrowserProfileResult {
 }
 
 /**
- * Run browser benchmark, auto-detecting bench function vs lap mode.
- *
- * Bench function (window.__bench): CLI controls iteration and timing.
- * Lap mode (__start/__lap/__done): page controls the measured region.
+ * Run browser benchmark, auto-detecting mode:
+ * - Bench function (window.__bench): CLI controls iteration and timing.
+ * - Lap mode (__start/__lap/__done): page controls the measured region.
+ * - Page load (neither): measures navigation timing.
  */
 export async function profileBrowser(
   params: BrowserProfileParams,
@@ -77,9 +77,13 @@ export async function profileBrowser(
   try {
     const pageWsUrl = await createTab(chrome.port);
     const cdp = await connectCdp(pageWsUrl);
-    const timeout = (params.timeout ?? 60) * 1000;
-    const page = await createCdpPage(cdp, { timeout });
-    return await runProfile(page, cdp, params);
+    try {
+      const timeout = (params.timeout ?? 60) * 1000;
+      const page = await createCdpPage(cdp, { timeout });
+      return await runProfile(page, cdp, params);
+    } finally {
+      cdp.close();
+    }
   } finally {
     if (owned) await chrome.close();
   }
@@ -113,7 +117,7 @@ export interface ProfileCtx {
   samplingInterval: number;
 }
 
-/** Auto-detect bench function vs lap mode after page load. */
+/** Auto-detect bench function, lap mode, or naked page load. */
 async function runBenchOrLap(
   ctx: ProfileCtx,
   pageErrors: string[],
@@ -132,7 +136,32 @@ async function runBenchOrLap(
     lapMode.promise.catch(() => {}); // suppress unused rejection
     return runBenchLoop(ctx);
   }
-  const result = await lapMode.promise;
+
+  // Check if page activated lap mode by calling __start()
+  const hasLap = await page.evaluate(
+    () => !!(globalThis as any).__benchFirstStart,
+  );
+  if (hasLap) {
+    const result = await lapMode.promise;
+    lapMode.cancel();
+    return result;
+  }
+
+  // Naked page: no __bench, no __start() ==> measure page load timing
   lapMode.cancel();
-  return result;
+  lapMode.promise.catch(() => {}); // suppress unused rejection
+  return collectNavTiming(page);
+}
+
+/** Read navigation timing from an already-loaded page. */
+async function collectNavTiming(page: CdpPage): Promise<BrowserProfileResult> {
+  const navTiming = await page.evaluate(() => {
+    const perf = performance as any;
+    const nav = perf.getEntriesByType("navigation")[0] ?? {};
+    return {
+      domContentLoaded: (nav.domContentLoadedEventEnd as number) ?? 0,
+      loadEvent: (nav.loadEventEnd as number) ?? 0,
+    };
+  });
+  return { navTiming, wallTimeMs: navTiming.loadEvent };
 }

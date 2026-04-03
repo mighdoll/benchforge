@@ -3,6 +3,8 @@ import { afterAll, beforeAll, expect, test } from "vitest";
 import { profileBrowser } from "../profiling/browser/BrowserProfiler.ts";
 import type { ChromeInstance } from "../profiling/browser/ChromeLauncher.ts";
 import { launchChrome } from "../profiling/browser/ChromeLauncher.ts";
+import { computeStats } from "../runners/BasicRunner.ts";
+import { runBatched } from "../runners/MergeBatches.ts";
 
 const examplesDir = path.resolve(import.meta.dirname!, "../../examples");
 
@@ -158,4 +160,32 @@ test("page-load mode with gc stats", { timeout: 30000 }, async () => {
   expect(result.navTiming).toBeDefined();
   expect(result.gcStats).toBeDefined();
   expect(result.gcStats!.scavenges).toBeGreaterThanOrEqual(0);
+});
+
+test("batched fresh tabs with baseline-url", { timeout: 60000 }, async () => {
+  const benchUrl = `file://${examplesDir}/browser-bench/index.html`;
+  const baselineUrl = `file://${examplesDir}/browser-bench/index.html`;
+  const params = { maxTime: 200, headless: true, chrome };
+
+  const toMeasured = (name: string) => async () => {
+    const raw = await profileBrowser({ ...params, url: name });
+    const samples = raw.samples?.length ? raw.samples : [raw.wallTimeMs ?? 0];
+    return { name, samples, time: computeStats(samples) };
+  };
+
+  const {
+    results: [current],
+    baseline,
+  } = await runBatched(
+    [toMeasured(benchUrl)],
+    toMeasured(baselineUrl),
+    2,
+    false,
+  );
+
+  // warmup batch dropped: 2 batches - 1 warmup = 1 batch each
+  expect(current.samples.length).toBeGreaterThan(0);
+  expect(current.batchOffsets).toBeUndefined(); // single batch after warmup drop
+  expect(baseline).toBeDefined();
+  expect(baseline!.samples.length).toBeGreaterThan(0);
 });
