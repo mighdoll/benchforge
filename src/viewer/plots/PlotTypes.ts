@@ -54,3 +54,37 @@ export function formatPct(v: number, precision = 1): string {
   const sign = v >= 0 ? "+" : "";
   return `${sign}${v.toFixed(precision)}%`;
 }
+
+export interface TimeUnit {
+  unitSuffix: string;
+  convertValue: (ms: number) => number;
+  formatValue: (d: number) => string;
+}
+
+/** Pick display unit (ns/us/ms) based on average value magnitude (in ms) */
+export function getTimeUnit(values: number[]): TimeUnit {
+  let sum = 0;
+  for (const v of values) sum += v;
+  const avg = sum / values.length;
+  const fmt0 = (d: number) =>
+    d.toLocaleString("en-US", { maximumFractionDigits: 0 });
+  const fmt1 = (d: number) =>
+    d.toLocaleString("en-US", { maximumFractionDigits: 1 });
+  if (avg < 0.001)
+    return {
+      unitSuffix: "ns",
+      convertValue: (ms: number) => ms * 1e6,
+      formatValue: fmt0,
+    };
+  if (avg < 1)
+    return {
+      unitSuffix: "\u00b5s",
+      convertValue: (ms: number) => ms * 1e3,
+      formatValue: fmt1,
+    };
+  return {
+    unitSuffix: "ms",
+    convertValue: (ms: number) => ms,
+    formatValue: fmt1,
+  };
+}

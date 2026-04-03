@@ -5,6 +5,7 @@ import { buildLegend, type LegendItem } from "./LegendUtils.ts";
 import {
   type FlatGcEvent,
   type FlatPausePoint,
+  getTimeUnit,
   type HeapPoint,
   plotLayout,
   type TimeSeriesPoint,
@@ -333,30 +334,6 @@ function buildSampleData(
         ? optStatusNames[d.optStatus] || "unknown"
         : null,
   }));
-}
-
-/** Pick display unit (ns/us/ms) based on average value magnitude */
-function getTimeUnit(values: number[]) {
-  const avg = d3.mean(values)!;
-  const fmt0 = (d: number) => d3.format(",.0f")(d);
-  const fmt1 = (d: number) => d3.format(",.1f")(d);
-  if (avg < 0.001)
-    return {
-      unitSuffix: "ns",
-      convertValue: (ms: number) => ms * 1e6,
-      formatValue: fmt0,
-    };
-  if (avg < 1)
-    return {
-      unitSuffix: "μs",
-      convertValue: (ms: number) => ms * 1e3,
-      formatValue: fmt1,
-    };
-  return {
-    unitSuffix: "ms",
-    convertValue: (ms: number) => ms,
-    formatValue: fmt1,
-  };
 }
 
 /** Compute Y axis range with padding, snapping yMin to a round number */

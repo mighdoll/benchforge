@@ -1,7 +1,7 @@
 import * as Plot from "@observablehq/plot";
 import * as d3 from "d3";
 import { buildLegend, type LegendItem } from "./LegendUtils.ts";
-import { plotLayout, type Sample } from "./PlotTypes.ts";
+import { getTimeUnit, plotLayout, type Sample } from "./PlotTypes.ts";
 
 interface Bar {
   benchmark: string;
@@ -15,8 +15,15 @@ export function createHistogramKde(
   allSamples: Sample[],
   benchmarkNames: string[],
 ): SVGSVGElement | HTMLElement {
+  const { unitSuffix, convertValue, formatValue } = getTimeUnit(
+    allSamples.map(d => d.value),
+  );
+  const converted = allSamples.map(d => ({
+    ...d,
+    value: convertValue(d.value),
+  }));
   const { barData, binMin, binMax, yMax } = buildBarData(
-    allSamples,
+    converted,
     benchmarkNames,
   );
   const { colorMap, legendItems } = buildColorData(benchmarkNames);
@@ -24,11 +31,11 @@ export function createHistogramKde(
   return Plot.plot({
     ...plotLayout,
     x: {
-      label: "Time (ms)",
+      label: `Time (${unitSuffix})`,
       labelAnchor: "center",
       domain: [binMin, binMax],
       labelOffset: 45,
-      tickFormat: (d: number) => d.toFixed(1),
+      tickFormat: formatValue,
       ticks: 5,
     },
     y: {
