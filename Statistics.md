@@ -81,16 +81,18 @@ independence.
 
 The block bootstrap works as follows:
 
-1. Compute the mean of each batch independently (for both baseline and current)
-2. Tukey-trim the batch means: remove batches whose means fall outside
-   3x IQR fences. This is where environmental noise gets rejected -- if a
-   browser update ran during batch 7, that batch's mean is an outlier and gets
-   dropped.
-3. For each of 10,000 bootstrap iterations:
-   - Resample baseline batch means (with replacement)
-   - Resample current batch means (with replacement)
+1. Compute the per-batch mean for each batch (both baseline and current).
+2. Tukey-trim using those means: remove batches whose mean falls outside
+   3x IQR fences. Mean is used for trimming regardless of the target
+   statistic because it's most sensitive to environmental disruption --
+   median might look normal in a noisy batch while the mean gets pulled.
+3. For kept batches, compute the target statistic per batch (mean for mean
+   comparisons, median for p50, etc.).
+4. For each of 10,000 bootstrap iterations:
+   - Resample baseline batch values (with replacement)
+   - Resample current batch values (with replacement)
    - Compute the percentage difference between their averages
-4. The 2.5th and 97.5th percentiles of this distribution form the 95%
+5. The 2.5th and 97.5th percentiles of this distribution form the 95%
    confidence interval.
 
 The point estimate (observed % difference) uses the pooled median across

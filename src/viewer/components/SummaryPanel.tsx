@@ -278,7 +278,11 @@ function CIPlotMount({ ci, compact }: { ci: DifferenceCI; compact?: boolean }) {
     import("../plots/CIPlot.ts").then(({ createCIPlot }) => {
       if (!ref.current) return;
       ref.current.innerHTML = "";
-      const opts = compact ? { width: 200, height: 70, title: "" } : {};
+      const args = reportData.value?.metadata.cliArgs as Record<string, unknown> | undefined;
+      const equivMargin = (args?.["equiv-margin"] as number) || undefined;
+      const opts = compact
+        ? { width: 200, height: 70, title: "", equivMargin }
+        : { equivMargin };
       ref.current.appendChild(createCIPlot(ci, opts));
     });
   }, [ci, compact]);

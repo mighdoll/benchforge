@@ -209,14 +209,18 @@ function blockValues(
   return splitByOffsets(samples, offsets).map(fn);
 }
 
-/** Tukey-trim block means and return both trimmed means and filtered samples */
+/** Tukey-trim blocks and compute per-block statistics.
+ *  Trimming uses batch means (sensitive to environmental noise regardless of
+ *  target statistic). Per-block values for bootstrap use the caller's statFn
+ *  so that p50 comparisons resample batch medians, mean uses batch means, etc. */
 function prepareBlocks(
   a: number[],
   b: number[],
   options: DiffBootstrapOptions,
+  fn: (s: number[]) => number,
 ): {
-  meansA?: number[];
-  meansB?: number[];
+  blockValsA?: number[];
+  blockValsB?: number[];
   filteredA?: number[];
   filteredB?: number[];
   trimmed?: [number, number];
@@ -225,18 +229,20 @@ function prepareBlocks(
   const splitsA = options.blocks ? splitByOffsets(a, options.blocks) : undefined;
   const splitsB = blocksB ? splitByOffsets(b, blocksB) : undefined;
   if (!splitsA && !splitsB) return {};
-  const rawA = splitsA?.map(average);
-  const rawB = splitsB?.map(average);
-  const keepA = rawA ? tukeyKeep(rawA) : undefined;
-  const keepB = rawB ? tukeyKeep(rawB) : undefined;
+  // Trim based on batch means — mean is most sensitive to environmental noise
+  const meansA = splitsA?.map(average);
+  const meansB = splitsB?.map(average);
+  const keepA = meansA ? tukeyKeep(meansA) : undefined;
+  const keepB = meansB ? tukeyKeep(meansB) : undefined;
+  // Per-block values for bootstrap use the target statistic
   return {
-    meansA: keepA && rawA ? keepA.map(i => rawA[i]) : undefined,
-    meansB: keepB && rawB ? keepB.map(i => rawB[i]) : undefined,
+    blockValsA: keepA && splitsA ? keepA.map(i => fn(splitsA[i])) : undefined,
+    blockValsB: keepB && splitsB ? keepB.map(i => fn(splitsB[i])) : undefined,
     filteredA: keepA && splitsA ? keepA.flatMap(i => splitsA[i]) : undefined,
     filteredB: keepB && splitsB ? keepB.flatMap(i => splitsB[i]) : undefined,
     trimmed: [
-      (rawA?.length ?? 0) - (keepA?.length ?? 0),
-      (rawB?.length ?? 0) - (keepB?.length ?? 0),
+      (meansA?.length ?? 0) - (keepA?.length ?? 0),
+      (meansB?.length ?? 0) - (keepB?.length ?? 0),
     ],
   };
 }
@@ -251,19 +257,19 @@ export function bootstrapDifferenceCI(
   const { resamples = bootstrapSamples, confidence: conf = defaultConfidence } =
     options;
   const fn = options.statFn ?? ((s: number[]) => percentile(s, 0.5));
-  const { meansA, meansB, filteredA, filteredB, trimmed } =
-    prepareBlocks(a, b, options);
+  const { blockValsA, blockValsB, filteredA, filteredB, trimmed } =
+    prepareBlocks(a, b, options, fn);
 
   // Point estimate: pooled statistic from Tukey-filtered samples (or all if no blocks)
   const baseVal = fn(filteredA ?? a);
   const currVal = fn(filteredB ?? b);
   const observedPct = ((currVal - baseVal) / baseVal) * 100;
 
-  const drawA = meansA
-    ? () => average(createResample(meansA))
+  const drawA = blockValsA
+    ? () => average(createResample(blockValsA))
     : () => fn(createResample(a));
-  const drawB = meansB
-    ? () => average(createResample(meansB))
+  const drawB = blockValsB
+    ? () => average(createResample(blockValsB))
     : () => fn(createResample(b));
   const diffs = Array.from({ length: resamples }, () => {
     const valA = drawA();

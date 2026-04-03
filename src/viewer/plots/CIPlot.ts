@@ -16,6 +16,8 @@ export interface DistributionPlotOptions {
   includeZero?: boolean;
   /** Centered label above chart (e.g., the formatted point estimate) */
   pointLabel?: string;
+  /** Equivalence margin in percent (draws shaded band at +/- margin) */
+  equivMargin?: number;
 }
 
 type Scales = { x: (v: number) => number; y: (v: number) => number };
@@ -58,10 +60,13 @@ export function createDistributionPlot(
   if (!histogram?.length) return svg;
 
   const { fill, stroke } = colors[opts.direction];
-  const scales = buildScales(histogram, ci, layout, opts.includeZero);
+  const scales = buildScales(histogram, ci, layout, opts.includeZero, opts.equivMargin);
   const { margin, plot } = layout;
 
   drawTitles(svg, opts, margin, scales.x(pointEstimate));
+
+  if (opts.equivMargin && opts.includeZero)
+    drawMarginZone(svg, opts.equivMargin, scales, layout);
 
   const ciX = scales.x(ci[0]);
   const ciW = scales.x(ci[1]) - ciX;
@@ -110,6 +115,34 @@ function drawTitles(
         "700",
       ),
     );
+}
+
+/** Draw equivalence margin zone: shaded band + dashed boundary lines */
+function drawMarginZone(
+  svg: SVGSVGElement,
+  equivMargin: number,
+  scales: Scales,
+  layout: Layout,
+): void {
+  const { margin, plot } = layout;
+  const x1 = scales.x(-equivMargin);
+  const x2 = scales.x(equivMargin);
+  const bandH = plot.h / 3;
+  const bandY = margin.top + (plot.h - bandH) / 2;
+  const zone = rect(x1, bandY, x2 - x1, bandH, { fill: "currentColor" });
+  zone.classList.add("margin-zone");
+  svg.appendChild(zone);
+  const y1 = margin.top;
+  const y2 = margin.top + plot.h;
+  for (const x of [x1, x2]) {
+    const l = line(x, y1, x, y2, {
+      stroke: "currentColor",
+      strokeWidth: "1",
+      strokeDasharray: "3,3",
+    });
+    l.classList.add("margin-line");
+    svg.appendChild(l);
+  }
 }
 
 /** Draw zero reference line extending past plot area (comparison CIs only) */
@@ -174,12 +207,14 @@ function buildScales(
   ci: [number, number],
   layout: Layout,
   includeZero: boolean,
+  equivMargin?: number,
 ): Scales {
   const { margin, plot } = layout;
   const xs = histogram.map(b => b.x);
   const extra = includeZero ? [0] : [];
-  const xMin = Math.min(...xs, ci[0], ...extra);
-  const xMax = Math.max(...xs, ci[1], ...extra);
+  const marginBounds = equivMargin ? [-equivMargin, equivMargin] : [];
+  const xMin = Math.min(...xs, ci[0], ...extra, ...marginBounds);
+  const xMax = Math.max(...xs, ci[1], ...extra, ...marginBounds);
   const yMax = Math.max(...histogram.map(b => b.count));
   const xRange = xMax - xMin || 1;
   return {
