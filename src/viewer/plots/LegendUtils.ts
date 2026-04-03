@@ -125,8 +125,9 @@ function verticalLineMark(
 
 function rectMark(pos: LegendPos, color: string): any {
   const { legendX, y, xRange, yMax } = pos;
-  const x1 = legendX - xRange * 0.01;
-  const x2 = legendX + xRange * 0.03;
+  const hw = xRange * 0.015;
+  const x1 = legendX - hw;
+  const x2 = legendX + hw;
   const y1 = y - yMax * 0.02;
   const y2 = y + yMax * 0.02;
   return Plot.rect([{ x1, x2, y1, y2 }], {
