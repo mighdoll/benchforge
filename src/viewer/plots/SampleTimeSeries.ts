@@ -56,6 +56,7 @@ const optTierColors: Record<string, string> = {
 export interface SeriesVisibility {
   baseline: boolean;
   heap: boolean;
+  baselineHeap: boolean;
   rejected: boolean;
 }
 
@@ -65,14 +66,19 @@ export function createSampleTimeSeries(
   gcEvents: FlatGcEvent[] = [],
   pausePoints: FlatPausePoint[] = [],
   heapSeries: HeapPoint[] = [],
-  visibility: SeriesVisibility = { baseline: true, heap: true, rejected: true },
+  baselineHeapSeries: HeapPoint[] = [],
+  visibility: SeriesVisibility = { baseline: true, heap: true, baselineHeap: false, rejected: true },
 ): SVGSVGElement | HTMLElement {
   const filtered = visibility.baseline
     ? timeSeries
     : timeSeries.filter(d => !d.isBaseline);
   const ctx = buildPlotContext(filtered);
+  const allHeap = [...heapSeries, ...baselineHeapSeries];
   const heapData = visibility.heap
-    ? prepareHeapData(heapSeries, ctx.yMin, ctx.yMax)
+    ? prepareHeapData(heapSeries, ctx.yMin, ctx.yMax, allHeap)
+    : [];
+  const baselineHeapData = visibility.baselineHeap
+    ? prepareHeapData(baselineHeapSeries, ctx.yMin, ctx.yMax, allHeap)
     : [];
   const showRejected = visibility.rejected && ctx.hasRejected;
   const legendItems = buildLegendItems(
@@ -80,6 +86,7 @@ export function createSampleTimeSeries(
     gcEvents.length,
     pausePoints.length,
     heapData.length > 0,
+    baselineHeapData.length > 0,
     showRejected,
     ctx.optTiers,
     ctx.benchmarks,
@@ -110,7 +117,7 @@ export function createSampleTimeSeries(
       tickFormat: ctx.formatValue,
     },
     color: { legend: false, scheme: "observable10" },
-    marks: buildMarks(ctx, heapData, gcEvents, pausePoints, legendItems, showRejected),
+    marks: buildMarks(ctx, heapData, baselineHeapData, gcEvents, pausePoints, legendItems, showRejected),
   });
 }
 
@@ -156,11 +163,19 @@ function buildPlotContext(timeSeries: TimeSeriesPoint[]): PlotContext {
   };
 }
 
-/** Scale heap byte values into the plot's Y coordinate range */
-function prepareHeapData(heapSeries: HeapPoint[], yMin: number, yMax: number) {
+/** Scale heap byte values into the plot's Y coordinate range.
+ *  When `sharedRange` is provided, min/max are computed from that array
+ *  so multiple heap series share the same vertical scale. */
+function prepareHeapData(
+  heapSeries: HeapPoint[],
+  yMin: number,
+  yMax: number,
+  sharedRange?: HeapPoint[],
+) {
   if (heapSeries.length === 0) return [];
-  const heapMin = d3.min(heapSeries, d => d.value)!;
-  const heapRange = d3.max(heapSeries, d => d.value)! - heapMin || 1;
+  const ref = sharedRange?.length ? sharedRange : heapSeries;
+  const heapMin = d3.min(ref, d => d.value)!;
+  const heapRange = d3.max(ref, d => d.value)! - heapMin || 1;
   const scale = ((yMax - yMin) * 0.25) / heapRange;
   const mapped = heapSeries.map(d => ({
     sample: d.iteration,
@@ -176,6 +191,7 @@ function buildLegendItems(
   gcCount: number,
   pauseCount: number,
   hasHeap: boolean,
+  hasBaselineHeap: boolean,
   hasRejected: boolean,
   optTiers: string[],
   benchmarks: string[],
@@ -198,6 +214,8 @@ function buildLegendItems(
       strokeDash: "4,4",
     });
   if (hasHeap) items.push({ color: "#9333ea", label: "heap", style: "rect" });
+  if (hasBaselineHeap)
+    items.push({ color: "#c084fc", label: "heap (baseline)", style: "rect" });
   items.push(
     ...optTiers.map(tier => ({
       color: optTierColors[tier] || "#4682b4",
@@ -229,6 +247,7 @@ function buildLegendItems(
 function buildMarks(
   ctx: PlotContext,
   heapData: ReturnType<typeof prepareHeapData>,
+  baselineHeapData: ReturnType<typeof prepareHeapData>,
   gcEvents: FlatGcEvent[],
   pausePoints: FlatPausePoint[],
   legendItems: LegendItem[],
@@ -245,7 +264,8 @@ function buildMarks(
     : [];
   const bounds = { xMin: ctx.xMin, xMax: ctx.xMax, yMax: ctx.yMax };
   return [
-    ...heapMarks(heapData, ctx.yMin),
+    ...heapMarks(baselineHeapData, ctx.yMin, "#c084fc"),
+    ...heapMarks(heapData, ctx.yMin, "#9333ea"),
     ...warmupRule,
     gcMark(gcEvents, ctx.yMin, ctx.convertValue),
     ...pauseMarks(pausePoints, ctx.yMin, ctx.yMax),
@@ -314,6 +334,7 @@ function computeYRange(values: number[]) {
 function heapMarks(
   heapData: { sample: number; y: number; heapMB: number }[],
   yMin: number,
+  color: string,
 ): any[] {
   if (heapData.length === 0) return [];
   return [
@@ -321,9 +342,9 @@ function heapMarks(
       x: "sample",
       y: "y",
       y1: yMin,
-      fill: "#9333ea",
+      fill: color,
       fillOpacity: 0.15,
-      stroke: "#9333ea",
+      stroke: color,
       strokeWidth: 1,
       strokeOpacity: 0.4,
     }),

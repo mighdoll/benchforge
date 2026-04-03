@@ -54,11 +54,15 @@ function SamplesGroup({ group, index }: { group: BenchmarkGroup; index: number }
   const flat = flattenSamples(benchmarks);
   const hasBaseline = !!group.baseline;
   const hasHeap = flat.heapSeries.length > 0;
+  const hasBaselineHeap = flat.baselineHeapSeries.length > 0;
   const hasRejected = flat.timeSeries.some(d => d.isRejected);
+  const totalPoints = flat.timeSeries.length;
+  const sampled = totalPoints > 1000;
 
   const [visibility, setVisibility] = useState<SeriesVisibility>({
     baseline: true,
     heap: true,
+    baselineHeap: false,
     rejected: true,
   });
 
@@ -74,11 +78,14 @@ function SamplesGroup({ group, index }: { group: BenchmarkGroup; index: number }
         <div class="plot-container">
           <div class="plot-title">Time per Iteration</div>
           <div class="plot-description">
-            Execution time for each iteration in collection order
+            {sampled
+              ? `Sampled from ${totalPoints.toLocaleString()} iterations (showing ~1,000)`
+              : "Execution time for each iteration in collection order"}
           </div>
           <SeriesToggles
             hasBaseline={hasBaseline}
             hasHeap={hasHeap}
+            hasBaselineHeap={hasBaselineHeap}
             hasRejected={hasRejected}
             visibility={visibility}
             onToggle={toggle}
@@ -105,12 +112,14 @@ function SamplesGroup({ group, index }: { group: BenchmarkGroup; index: number }
 interface ToggleProps {
   hasBaseline: boolean;
   hasHeap: boolean;
+  hasBaselineHeap: boolean;
   hasRejected: boolean;
   visibility: SeriesVisibility;
   onToggle: (key: keyof SeriesVisibility) => void;
 }
 
-function SeriesToggles({ hasBaseline, hasHeap, hasRejected, visibility, onToggle }: ToggleProps) {
+function SeriesToggles(props: ToggleProps) {
+  const { hasBaseline, hasHeap, hasBaselineHeap, hasRejected, visibility, onToggle } = props;
   if (!hasBaseline && !hasHeap && !hasRejected) return null;
   return (
     <div class="series-toggles">
@@ -128,6 +137,14 @@ function SeriesToggles({ hasBaseline, hasHeap, hasRejected, visibility, onToggle
           onClick={() => onToggle("heap")}
         >
           heap
+        </button>
+      )}
+      {hasBaselineHeap && (
+        <button
+          class={`toggle-pill${visibility.baselineHeap ? " active" : ""}`}
+          onClick={() => onToggle("baselineHeap")}
+        >
+          heap (baseline)
         </button>
       )}
       {hasRejected && (
@@ -160,9 +177,11 @@ function TimeSeriesPlot({ flat, index, visibility }: TimeSeriesPlotProps) {
     import("../plots/SampleTimeSeries.ts").then(({ createSampleTimeSeries }) => {
       if (!ref.current) return;
       ref.current.innerHTML = "";
-      const { timeSeries, allGcEvents, allPausePoints, heapSeries } = flat;
+      const { timeSeries, allGcEvents, allPausePoints, heapSeries, baselineHeapSeries } = flat;
       ref.current.appendChild(
-        createSampleTimeSeries(timeSeries, allGcEvents, allPausePoints, heapSeries, visibility),
+        createSampleTimeSeries(
+          timeSeries, allGcEvents, allPausePoints, heapSeries, baselineHeapSeries, visibility,
+        ),
       );
     });
   }, [flat, visibility]);

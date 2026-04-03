@@ -20,6 +20,7 @@ export interface FlattenedData {
   allSamples: Sample[];
   timeSeries: TimeSeriesPoint[];
   heapSeries: HeapPoint[];
+  baselineHeapSeries: HeapPoint[];
   allGcEvents: FlatGcEvent[];
   allPausePoints: FlatPausePoint[];
 }
@@ -48,6 +49,7 @@ export function flattenSamples(benchmarks: PreparedBenchmark[]): FlattenedData {
     allSamples: [],
     timeSeries: [],
     heapSeries: [],
+    baselineHeapSeries: [],
     allGcEvents: [],
     allPausePoints: [],
   };
@@ -77,12 +79,9 @@ function flattenBenchmark(b: PreparedBenchmark, out: FlattenedData): void {
       isBaseline: b.isBaseline || undefined,
       optStatus: b.optSamples?.[i],
     });
-    if (!b.isBaseline && b.heapSamples?.[i] !== undefined) {
-      out.heapSeries.push({
-        benchmark: name,
-        iteration: i,
-        value: b.heapSamples[i],
-      });
+    if (b.heapSamples?.[i] !== undefined) {
+      const target = b.isBaseline ? out.baselineHeapSeries : out.heapSeries;
+      target.push({ benchmark: name, iteration: i, value: b.heapSamples[i] });
     }
   });
 
