@@ -73,12 +73,16 @@ export function createSampleTimeSeries(
     ? timeSeries
     : timeSeries.filter(d => !d.isBaseline);
   const ctx = buildPlotContext(filtered);
-  const allHeap = [...heapSeries, ...baselineHeapSeries];
-  const heapData = visibility.heap
-    ? prepareHeapData(heapSeries, ctx.yMin, ctx.yMax, allHeap)
+  const visibleHeap = [
+    ...(visibility.heap ? heapSeries : []),
+    ...(visibility.baselineHeap ? baselineHeapSeries : []),
+  ];
+  const heapScale = computeHeapScale(visibleHeap, ctx.yMin, ctx.yMax);
+  const heapData = heapScale && visibility.heap
+    ? prepareHeapData(heapSeries, heapScale)
     : [];
-  const baselineHeapData = visibility.baselineHeap
-    ? prepareHeapData(baselineHeapSeries, ctx.yMin, ctx.yMax, allHeap)
+  const baselineHeapData = heapScale && visibility.baselineHeap
+    ? prepareHeapData(baselineHeapSeries, heapScale)
     : [];
   const showRejected = visibility.rejected && ctx.hasRejected;
   const legendItems = buildLegendItems(
@@ -117,7 +121,7 @@ export function createSampleTimeSeries(
       tickFormat: ctx.formatValue,
     },
     color: { legend: false, scheme: "observable10" },
-    marks: buildMarks(ctx, heapData, baselineHeapData, gcEvents, pausePoints, legendItems, showRejected),
+    marks: buildMarks(ctx, heapData, baselineHeapData, heapScale, gcEvents, pausePoints, legendItems, showRejected),
   });
 }
 
@@ -163,23 +167,33 @@ function buildPlotContext(timeSeries: TimeSeriesPoint[]): PlotContext {
   };
 }
 
-/** Scale heap byte values into the plot's Y coordinate range.
- *  When `sharedRange` is provided, min/max are computed from that array
- *  so multiple heap series share the same vertical scale. */
-function prepareHeapData(
-  heapSeries: HeapPoint[],
+/** Heap scale info for mapping between bytes and plot Y coordinates */
+interface HeapScale {
+  heapMinBytes: number;
+  heapRangeBytes: number;
+  scale: number;
+  yMin: number;
+}
+
+/** Compute shared heap scale from all heap data (main + baseline) */
+function computeHeapScale(
+  allHeap: HeapPoint[],
   yMin: number,
   yMax: number,
-  sharedRange?: HeapPoint[],
-) {
+): HeapScale | undefined {
+  if (allHeap.length === 0) return undefined;
+  const heapMinBytes = d3.min(allHeap, d => d.value)!;
+  const heapRangeBytes = d3.max(allHeap, d => d.value)! - heapMinBytes || 1;
+  const scale = ((yMax - yMin) * 0.25) / heapRangeBytes;
+  return { heapMinBytes, heapRangeBytes, scale, yMin };
+}
+
+/** Scale heap byte values into the plot's Y coordinate range */
+function prepareHeapData(heapSeries: HeapPoint[], hs: HeapScale) {
   if (heapSeries.length === 0) return [];
-  const ref = sharedRange?.length ? sharedRange : heapSeries;
-  const heapMin = d3.min(ref, d => d.value)!;
-  const heapRange = d3.max(ref, d => d.value)! - heapMin || 1;
-  const scale = ((yMax - yMin) * 0.25) / heapRange;
   const mapped = heapSeries.map(d => ({
     sample: d.iteration,
-    y: yMin + (d.value - heapMin) * scale,
+    y: hs.yMin + (d.value - hs.heapMinBytes) * hs.scale,
     heapMB: d.value / 1024 / 1024,
   }));
   return lttb(mapped, 500, d => d.sample, d => d.y);
@@ -213,9 +227,9 @@ function buildLegendItems(
       style: "vertical-line",
       strokeDash: "4,4",
     });
-  if (hasHeap) items.push({ color: "#9333ea", label: "heap", style: "rect" });
+  if (hasHeap) items.push({ color: "#93c5fd", label: "heap", style: "rect" });
   if (hasBaselineHeap)
-    items.push({ color: "#c084fc", label: "heap (baseline)", style: "rect" });
+    items.push({ color: "#fcd34d", label: "heap (baseline)", style: "rect" });
   items.push(
     ...optTiers.map(tier => ({
       color: optTierColors[tier] || "#4682b4",
@@ -248,6 +262,7 @@ function buildMarks(
   ctx: PlotContext,
   heapData: ReturnType<typeof prepareHeapData>,
   baselineHeapData: ReturnType<typeof prepareHeapData>,
+  heapScale: HeapScale | undefined,
   gcEvents: FlatGcEvent[],
   pausePoints: FlatPausePoint[],
   legendItems: LegendItem[],
@@ -264,8 +279,9 @@ function buildMarks(
     : [];
   const bounds = { xMin: ctx.xMin, xMax: ctx.xMax, yMax: ctx.yMax };
   return [
-    ...heapMarks(baselineHeapData, ctx.yMin, "#c084fc"),
-    ...heapMarks(heapData, ctx.yMin, "#9333ea"),
+    ...heapMarks(baselineHeapData, ctx.yMin, "#fcd34d"),
+    ...heapMarks(heapData, ctx.yMin, "#93c5fd"),
+    ...heapAxisMarks(heapScale, ctx.xMax, ctx.xMin),
     ...warmupRule,
     gcMark(gcEvents, ctx.yMin, ctx.convertValue),
     ...pauseMarks(pausePoints, ctx.yMin, ctx.yMax),
@@ -355,6 +371,56 @@ function heapMarks(
         y: "y",
         title: (d: { heapMB: number }) => `Heap: ${d.heapMB.toFixed(1)} MB`,
       }),
+    ),
+  ];
+}
+
+/** Create right-side Y axis ticks and label for heap MB scale */
+function heapAxisMarks(
+  hs: HeapScale | undefined,
+  xMax: number,
+  xMin: number,
+): any[] {
+  if (!hs) return [];
+  const xRange = xMax - xMin;
+  const tickX = xMax + xRange * 0.01;
+  const labelX = xMax + xRange * 0.06;
+
+  // Pick ~4 nice tick values spanning the heap range
+  const minMB = hs.heapMinBytes / 1024 / 1024;
+  const maxMB = (hs.heapMinBytes + hs.heapRangeBytes) / 1024 / 1024;
+  const ticks = d3.ticks(minMB, maxMB, 4);
+
+  const tickData = ticks.map(mb => ({
+    x: tickX,
+    y: hs.yMin + (mb * 1024 * 1024 - hs.heapMinBytes) * hs.scale,
+    label: mb >= 100 ? `${mb.toFixed(0)}` : mb >= 10 ? `${mb.toFixed(1)}` : `${mb.toFixed(2)}`,
+  }));
+
+  return [
+    // Tick labels
+    Plot.text(tickData, {
+      x: "x",
+      y: "y",
+      text: "label",
+      fontSize: 10,
+      textAnchor: "start",
+      fill: "#93c5fd",
+      clip: false,
+    }),
+    // Axis label
+    Plot.text(
+      [{ x: labelX, y: hs.yMin + hs.heapRangeBytes * hs.scale * 0.5, text: "MB" }],
+      {
+        x: "x",
+        y: "y",
+        text: "text",
+        fontSize: 10,
+        textAnchor: "start",
+        fill: "#93c5fd",
+        fontStyle: "italic",
+        clip: false,
+      },
     ),
   ];
 }
