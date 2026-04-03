@@ -25,6 +25,7 @@ import {
 import { reportResults } from "../report/text/TextReport.ts";
 import type { MeasuredResults } from "../runners/MeasuredResults.ts";
 import type { DefaultCliArgs } from "./CliArgs.ts";
+import { cliComparisonOptions } from "./CliOptions.ts";
 
 const { yellow, dim } = colors;
 
@@ -36,10 +37,7 @@ export function defaultReport(
   const { adaptive, "gc-stats": gcStats, "trace-opt": traceOpt } = args;
   const hasOpt = hasField(groups, "optStatus");
   const sections = buildReportSections(adaptive, gcStats, traceOpt && hasOpt);
-  return reportResults(groups, sections, {
-    equivMargin: args["equiv-margin"],
-    noBatchTrim: args["no-batch-trim"],
-  });
+  return reportResults(groups, sections, cliComparisonOptions(args));
 }
 
 /** Build report sections based on CLI options. */
@@ -176,10 +174,7 @@ function mergeMatrixDefaults(
     );
   }
   if (!merged.comparison) {
-    merged.comparison = {
-      equivMargin: args["equiv-margin"],
-      noBatchTrim: args["no-batch-trim"],
-    };
+    merged.comparison = cliComparisonOptions(args);
   }
   return merged;
 }

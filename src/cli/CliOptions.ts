@@ -1,5 +1,6 @@
 import type { RunMatrixOptions } from "../matrix/BenchMatrix.ts";
 import type { HeapReportOptions } from "../profiling/node/HeapSampleReport.ts";
+import type { ComparisonOptions } from "../report/BenchmarkReport.ts";
 import type { RunnerOptions } from "../runners/BenchRunner.ts";
 import { type DefaultCliArgs, defaultAdaptiveMaxTime } from "./CliArgs.ts";
 
@@ -64,6 +65,14 @@ export function needsAlloc(args: DefaultCliArgs): boolean {
 /** True if time sampling should be enabled. */
 export function needsTimeSample(args: DefaultCliArgs): boolean {
   return args["time-sample"] || !!args["export-time"];
+}
+
+/** Extract comparison options from CLI args. */
+export function cliComparisonOptions(args: DefaultCliArgs): ComparisonOptions {
+  return {
+    equivMargin: args["equiv-margin"],
+    noBatchTrim: args["no-batch-trim"],
+  };
 }
 
 /** Create runner options for adaptive sampling mode. */

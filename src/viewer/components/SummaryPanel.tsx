@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "preact/hooks";
 import type { GitVersion } from "../../report/GitUtils.ts";
 import type { DifferenceCI } from "../../stats/StatisticalUtils.ts";
 import { formatRelativeTime } from "../DateFormat.ts";
+import { formatDecimalBytes } from "../LineData.ts";
 import type {
   BenchmarkEntry,
   BenchmarkGroup,
@@ -227,8 +228,8 @@ function HeapPanel({ entry }: { entry: BenchmarkEntry }) {
       <div class="panel-body">
         {heap && (
           <>
-            <SharedStat label="total bytes" value={formatBytesCompact(heap.totalBytes)} />
-            <SharedStat label="user bytes" value={formatBytesCompact(heap.userBytes)} />
+            <SharedStat label="total bytes" value={formatDecimalBytes(heap.totalBytes)} />
+            <SharedStat label="user bytes" value={formatDecimalBytes(heap.userBytes)} />
           </>
         )}
         {allocSamples && allocSamples.length > 0 && (
@@ -302,13 +303,6 @@ function BootstrapCIMount({ ci, label }: { ci: BootstrapCIData; label?: string }
     });
   }, [ci, label]);
   return <div class="ci-plot-inline" ref={ref} />;
-}
-
-function formatBytesCompact(bytes: number): string {
-  if (bytes >= 1e9) return `${(bytes / 1e9).toFixed(1)} GB`;
-  if (bytes >= 1e6) return `${(bytes / 1e6).toFixed(1)} MB`;
-  if (bytes >= 1e3) return `${(bytes / 1e3).toFixed(1)} KB`;
-  return `${bytes} B`;
 }
 
 function formatCount(n: number): string {

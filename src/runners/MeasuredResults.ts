@@ -124,3 +124,20 @@ export interface OptStatusInfo {
   /** Number of samples with deopt flag set */
   deoptCount: number;
 }
+
+/**
+ * V8 GetOptimizationStatus() return codes ==> human-readable tier names.
+ *   Bit 0 (1): is_function
+ *   Bit 4 (16): is_optimized (TurboFan)
+ *   Bit 5 (32): is_optimized (Maglev)
+ *   Bit 7 (128): is_baseline (Sparkplug)
+ *   Bit 3 (8): maybe_deoptimized
+ */
+export const optStatusNames: Record<number, string> = {
+  1: "interpreted",
+  129: "sparkplug", // 1 + 128
+  17: "turbofan", // 1 + 16
+  33: "maglev", // 1 + 32
+  49: "turbofan+maglev", // 1 + 16 + 32
+  32769: "optimized", // common optimized status
+};

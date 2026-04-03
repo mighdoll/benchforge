@@ -119,15 +119,17 @@ function prepareReportEntry(
   ctx: GroupContext,
 ): BenchmarkEntry {
   const m = report.measuredResults;
-  const ci = computeDiffCI(
-    ctx.baseM,
-    m,
-    ctx.primaryCol,
-    report.metadata,
-    ctx.comparison,
+  const ci = annotateCI(
+    computeDiffCI(
+      ctx.baseM,
+      m,
+      ctx.primaryCol,
+      report.metadata,
+      ctx.comparison,
+    ),
+    ctx.primaryCol?.title,
+    ctx.lowBatches,
   );
-  if (ci && ctx.lowBatches) ci.direction = "uncertain";
-  if (ci && ctx.primaryCol?.title) ci.label = `${ctx.primaryCol.title} Δ%`;
   const sections = ctx.sections
     ? buildViewerSections(
         ctx.sections,
@@ -139,6 +141,16 @@ function prepareReportEntry(
       )
     : undefined;
   return { ...prepareBenchmarkData(report), sections, comparisonCI: ci };
+}
+
+/** Add label and override direction to uncertain when batch count is low */
+function annotateCI<
+  T extends { direction: string; label?: string } | undefined,
+>(ci: T, title?: string, lowBatches?: boolean): T {
+  if (!ci) return ci;
+  if (lowBatches) ci.direction = "uncertain";
+  if (title) ci.label = `${title} Δ%`;
+  return ci;
 }
 
 /** @return true if batched but below the minimum for reliable block bootstrap */
@@ -288,17 +300,17 @@ function buildComparisonCI(
   col: ReportColumn<Record<string, unknown>>,
   ctx: RowContext,
 ) {
-  const ci = computeDiffCI(
-    ctx.baseline,
-    ctx.current,
-    col,
-    ctx.currentMeta,
-    ctx.comparison,
+  return annotateCI(
+    computeDiffCI(
+      ctx.baseline,
+      ctx.current,
+      col,
+      ctx.currentMeta,
+      ctx.comparison,
+    ),
+    col.title,
+    hasLowBatchCount(ctx.baseline, ctx.current),
   );
-  if (ci && hasLowBatchCount(ctx.baseline, ctx.current))
-    ci.direction = "uncertain";
-  if (ci && col.title) ci.label = `${col.title} Δ%`;
-  return ci;
 }
 
 /** Build a ViewerEntry with optional bootstrap CI */

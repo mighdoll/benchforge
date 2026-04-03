@@ -1,11 +1,13 @@
 import * as Plot from "@observablehq/plot";
 import * as d3 from "d3";
+import { optStatusNames } from "../../runners/MeasuredResults.ts";
 import { buildLegend, type LegendItem } from "./LegendUtils.ts";
-import type {
-  FlatGcEvent,
-  FlatPausePoint,
-  HeapPoint,
-  TimeSeriesPoint,
+import {
+  type FlatGcEvent,
+  type FlatPausePoint,
+  type HeapPoint,
+  plotLayout,
+  type TimeSeriesPoint,
 } from "./PlotTypes.ts";
 
 interface SampleData {
@@ -35,15 +37,6 @@ interface PlotContext {
   benchmarks: string[];
 }
 
-/** V8 GetOptimizationStatus() return codes mapped to human-readable tier names */
-const optStatusNames: Record<number, string> = {
-  1: "interpreted",
-  129: "sparkplug",
-  17: "turbofan",
-  33: "maglev",
-  49: "turbofan+maglev",
-  32769: "optimized",
-};
 const optTierColors: Record<string, string> = {
   turbofan: "#22c55e",
   optimized: "#22c55e",
@@ -103,13 +96,7 @@ export function createSampleTimeSeries(
   );
 
   return Plot.plot({
-    marginTop: 24,
-    marginLeft: 70,
-    marginBottom: 60,
-    marginRight: 110,
-    width: 550,
-    height: 300,
-    style: { fontSize: "14px" },
+    ...plotLayout,
     x: {
       label: "Iteration",
       labelAnchor: "center",

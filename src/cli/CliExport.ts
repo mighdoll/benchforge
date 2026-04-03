@@ -19,7 +19,11 @@ import type { GitVersion } from "../report/GitUtils.ts";
 import { prepareHtmlData } from "../report/HtmlReport.ts";
 import type { ReportData } from "../viewer/ReportData.ts";
 import type { DefaultCliArgs } from "./CliArgs.ts";
-import { cliHeapReportOptions, needsAlloc } from "./CliOptions.ts";
+import {
+  cliComparisonOptions,
+  cliHeapReportOptions,
+  needsAlloc,
+} from "./CliOptions.ts";
 import { printHeapReports } from "./CliReport.ts";
 import {
   optionalJson,
@@ -59,8 +63,7 @@ export async function exportReports(options: ExportOptions): Promise<void> {
     sections,
     currentVersion,
     baselineVersion,
-    equivMargin: args["equiv-margin"],
-    noBatchTrim: args["no-batch-trim"],
+    ...cliComparisonOptions(args),
   };
   const reportData = needsReportData
     ? prepareHtmlData(results, htmlOpts)

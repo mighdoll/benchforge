@@ -24,8 +24,14 @@ export function computeLineData(
 /** Format byte count for gutter display, scaling to KB/MB as appropriate. */
 export function formatGutterBytes(bytes: number | undefined): string {
   if (!bytes) return "";
-  if (bytes >= 1_000_000) return (bytes / 1_000_000).toFixed(1) + " MB";
-  if (bytes >= 1_000) return (bytes / 1_000).toFixed(1) + " KB";
+  return formatDecimalBytes(bytes);
+}
+
+/** Format bytes using decimal (SI) units: KB = 1000, MB = 1e6, GB = 1e9. */
+export function formatDecimalBytes(bytes: number): string {
+  if (bytes >= 1e9) return (bytes / 1e9).toFixed(1) + " GB";
+  if (bytes >= 1e6) return (bytes / 1e6).toFixed(1) + " MB";
+  if (bytes >= 1e3) return (bytes / 1e3).toFixed(1) + " KB";
   return bytes + " B";
 }
 

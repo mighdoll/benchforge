@@ -1,7 +1,7 @@
 import * as Plot from "@observablehq/plot";
 import * as d3 from "d3";
 import { buildLegend, type LegendItem } from "./LegendUtils.ts";
-import type { Sample } from "./PlotTypes.ts";
+import { plotLayout, type Sample } from "./PlotTypes.ts";
 
 interface Bar {
   benchmark: string;
@@ -22,13 +22,7 @@ export function createHistogramKde(
   const { colorMap, legendItems } = buildColorData(benchmarkNames);
 
   return Plot.plot({
-    marginTop: 24,
-    marginLeft: 70,
-    marginRight: 110,
-    marginBottom: 60,
-    width: 550,
-    height: 300,
-    style: { fontSize: "14px" },
+    ...plotLayout,
     x: {
       label: "Time (ms)",
       labelAnchor: "center",
@@ -68,7 +62,7 @@ function buildBarData(allSamples: Sample[], benchmarkNames: string[]) {
   const binCount = 25;
   const step = (binMax - binMin) / binCount;
   const thresholds = d3.range(1, binCount).map(i => binMin + i * step);
-  const plotWidth = 550;
+  const plotWidth = plotLayout.width;
 
   const bins = d3
     .bin<Sample, number>()

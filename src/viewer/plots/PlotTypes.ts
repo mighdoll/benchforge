@@ -38,6 +38,17 @@ export interface FlatPausePoint {
   durationMs: number;
 }
 
+/** Shared Observable Plot layout: margins, dimensions, font size */
+export const plotLayout = {
+  marginTop: 24,
+  marginLeft: 70,
+  marginRight: 110,
+  marginBottom: 60,
+  width: 550,
+  height: 300,
+  style: { fontSize: "14px" },
+} as const;
+
 /** Format a number as a signed percentage string (e.g. "+1.2%", "-3.4%") */
 export function formatPct(v: number, precision = 1): string {
   const sign = v >= 0 ? "+" : "";
