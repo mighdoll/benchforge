@@ -22,6 +22,7 @@ const cliOptions = {
   batches:          { type: "number",  default: 1, describe: "divide time into N batches, alternating baseline/current order" },
   "warmup-batch":   { type: "boolean", default: false, describe: "include first batch in results (normally dropped to avoid OS cache warmup)" },
   "equiv-margin":   { type: "number",  default: 2, describe: "equivalence margin % for baseline comparison (0 to disable)" },
+  "no-batch-trim":  { type: "boolean", default: false, describe: "disable Tukey trimming of outlier batches" },
   "pause-first":    { type: "number",  describe: "iterations before first pause (then pause-interval applies)" },
   "pause-interval": { type: "number", default: 0, describe: "iterations between pauses for V8 optimization (0 to disable)" },
   "pause-duration": { type: "number", default: 100, describe: "pause duration in ms for V8 optimization" },

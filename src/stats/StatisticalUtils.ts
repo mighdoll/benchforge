@@ -54,6 +54,8 @@ type DiffBootstrapOptions = BootstrapOptions & {
   blocksB?: number[];
   /** Equivalence margin in percent. CI within [-margin, +margin] ==> "equivalent" */
   equivMargin?: number;
+  /** Disable Tukey trimming of outlier batches */
+  noBatchTrim?: boolean;
 };
 const defaultConfidence = 0.95;
 const outlierMultiplier = 1.5;
@@ -209,6 +211,24 @@ function blockValues(
   return splitByOffsets(samples, offsets).map(fn);
 }
 
+/** Trim and compute per-block values for one side of a difference CI */
+function prepareSide(
+  samples: number[],
+  offsets: number[] | undefined,
+  fn: (s: number[]) => number,
+  noTrim?: boolean,
+): { blockVals: number[]; filtered: number[]; trimCount: number } | undefined {
+  if (!offsets) return undefined;
+  const splits = splitByOffsets(samples, offsets);
+  const means = splits.map(average);
+  const keep = noTrim ? means.map((_, i) => i) : tukeyKeep(means);
+  return {
+    blockVals: keep.map(i => fn(splits[i])),
+    filtered: keep.flatMap(i => splits[i]),
+    trimCount: means.length - keep.length,
+  };
+}
+
 /** Tukey-trim blocks and compute per-block statistics.
  *  Trimming uses batch means (sensitive to environmental noise regardless of
  *  target statistic). Per-block values for bootstrap use the caller's statFn
@@ -218,32 +238,16 @@ function prepareBlocks(
   b: number[],
   options: DiffBootstrapOptions,
   fn: (s: number[]) => number,
-): {
-  blockValsA?: number[];
-  blockValsB?: number[];
-  filteredA?: number[];
-  filteredB?: number[];
-  trimmed?: [number, number];
-} {
-  const blocksB = options.blocksB ?? options.blocks;
-  const splitsA = options.blocks ? splitByOffsets(a, options.blocks) : undefined;
-  const splitsB = blocksB ? splitByOffsets(b, blocksB) : undefined;
-  if (!splitsA && !splitsB) return {};
-  // Trim based on batch means — mean is most sensitive to environmental noise
-  const meansA = splitsA?.map(average);
-  const meansB = splitsB?.map(average);
-  const keepA = meansA ? tukeyKeep(meansA) : undefined;
-  const keepB = meansB ? tukeyKeep(meansB) : undefined;
-  // Per-block values for bootstrap use the target statistic
+) {
+  const sideA = prepareSide(a, options.blocks, fn, options.noBatchTrim);
+  const sideB = prepareSide(b, options.blocksB ?? options.blocks, fn, options.noBatchTrim);
+  if (!sideA && !sideB) return {};
   return {
-    blockValsA: keepA && splitsA ? keepA.map(i => fn(splitsA[i])) : undefined,
-    blockValsB: keepB && splitsB ? keepB.map(i => fn(splitsB[i])) : undefined,
-    filteredA: keepA && splitsA ? keepA.flatMap(i => splitsA[i]) : undefined,
-    filteredB: keepB && splitsB ? keepB.flatMap(i => splitsB[i]) : undefined,
-    trimmed: [
-      (meansA?.length ?? 0) - (keepA?.length ?? 0),
-      (meansB?.length ?? 0) - (keepB?.length ?? 0),
-    ],
+    blockValsA: sideA?.blockVals,
+    blockValsB: sideB?.blockVals,
+    filteredA: sideA?.filtered,
+    filteredB: sideB?.filtered,
+    trimmed: [sideA?.trimCount ?? 0, sideB?.trimCount ?? 0] as [number, number],
   };
 }
 

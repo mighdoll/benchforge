@@ -59,6 +59,7 @@ export {
 } from "./matrix/MatrixReport.ts";
 export type {
   BenchmarkReport,
+  ComparisonOptions,
   ReportColumn,
   ReportColumnGroup,
   ReportGroup,

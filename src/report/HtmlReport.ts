@@ -23,6 +23,7 @@ import type {
 } from "../viewer/ReportData.ts";
 import {
   type BenchmarkReport,
+  type ComparisonOptions,
   computeDiffCI,
   findPrimaryColumn,
   groupReports,
@@ -40,13 +41,11 @@ import {
 } from "./StandardSections.ts";
 
 /** Options for prepareHtmlData: report sections, git versions, and CLI args */
-export interface PrepareHtmlOptions {
+export interface PrepareHtmlOptions extends ComparisonOptions {
   cliArgs?: Record<string, unknown>;
   sections?: ResultsMapper[];
   currentVersion?: GitVersion;
   baselineVersion?: GitVersion;
-  /** Equivalence margin in percent for baseline comparison (default: 0, disabled) */
-  equivMargin?: number;
 }
 
 /** Convert benchmark results into a ReportData payload for the HTML viewer */
@@ -54,10 +53,14 @@ export function prepareHtmlData(
   groups: ReportGroup[],
   options: PrepareHtmlOptions,
 ): ReportData {
-  const { cliArgs, currentVersion, baselineVersion, equivMargin } = options;
+  const { cliArgs, currentVersion, baselineVersion } = options;
+  const comparison: ComparisonOptions = {
+    equivMargin: options.equivMargin,
+    noBatchTrim: options.noBatchTrim,
+  };
   const sections = options.sections ?? defaultSections(groups, cliArgs);
   return {
-    groups: groups.map(group => prepareGroupData(group, sections, equivMargin)),
+    groups: groups.map(g => prepareGroupData(g, sections, comparison)),
     metadata: {
       timestamp: new Date().toISOString(),
       bencherVersion: process.env.npm_package_version || "unknown",
@@ -77,7 +80,7 @@ interface GroupContext {
   baseMeta?: UnknownRecord;
   primaryCol?: ReportColumn<Record<string, unknown>>;
   sections?: ResultsMapper[];
-  equivMargin?: number;
+  comparison?: ComparisonOptions;
   lowBatches: boolean;
 }
 
@@ -85,7 +88,7 @@ interface GroupContext {
 function prepareGroupData(
   group: ReportGroup,
   sections?: ResultsMapper[],
-  equivMargin?: number,
+  comparison?: ComparisonOptions,
 ): BenchmarkGroup {
   const base = group.baseline;
   const baseM = base?.measuredResults;
@@ -98,7 +101,7 @@ function prepareGroupData(
     baseMeta: base?.metadata,
     primaryCol: findPrimaryColumn(sections),
     sections,
-    equivMargin,
+    comparison,
     lowBatches: hasLowBatchCount(baseM, group.reports[0]?.measuredResults),
   };
 
@@ -118,26 +121,13 @@ function prepareReportEntry(
   ctx: GroupContext,
 ): BenchmarkEntry {
   const m = report.measuredResults;
-  const ci = computeDiffCI(
-    ctx.baseM,
-    m,
-    ctx.primaryCol,
-    report.metadata,
-    ctx.equivMargin,
-  );
+  const ci = computeDiffCI(ctx.baseM, m, ctx.primaryCol, report.metadata, ctx.comparison);
   if (ci) {
     if (ctx.lowBatches) ci.direction = "uncertain";
     if (ctx.primaryCol?.title) ci.label = `${ctx.primaryCol.title} Δ%`;
   }
   const sects = ctx.sections
-    ? buildViewerSections(
-        ctx.sections,
-        m,
-        ctx.baseM,
-        report.metadata,
-        ctx.baseMeta,
-        ctx.equivMargin,
-      )
+    ? buildViewerSections(ctx.sections, m, ctx.baseM, report.metadata, ctx.baseMeta, ctx.comparison)
     : undefined;
   return { ...prepareBenchmarkData(report), sections: sects, comparisonCI: ci };
 }
@@ -186,7 +176,7 @@ function buildViewerSections(
   baseline: MeasuredResults | undefined,
   currentMeta?: UnknownRecord,
   baselineMeta?: UnknownRecord,
-  equivMargin?: number,
+  comparison?: ComparisonOptions,
 ): ViewerSection[] {
   return sections.flatMap(section => {
     const curVals = section.extract(current, currentMeta);
@@ -200,7 +190,7 @@ function buildViewerSections(
       baseVals,
       currentMeta,
       baselineMeta,
-      equivMargin,
+      comparison,
     };
     return section.columns().flatMap(group => {
       const cols = group.columns as ReportColumn<Record<string, unknown>>[];
@@ -219,7 +209,7 @@ interface RowContext {
   baseVals?: Record<string, unknown>;
   currentMeta?: UnknownRecord;
   baselineMeta?: UnknownRecord;
-  equivMargin?: number;
+  comparison?: ComparisonOptions;
 }
 
 /** Build ViewerRow[] for a column group, marking the first CI row as primary */
@@ -290,13 +280,7 @@ function buildComparisonCI(
   col: ReportColumn<Record<string, unknown>>,
   ctx: RowContext,
 ) {
-  const ci = computeDiffCI(
-    ctx.baseline,
-    ctx.current,
-    col,
-    ctx.currentMeta,
-    ctx.equivMargin,
-  );
+  const ci = computeDiffCI(ctx.baseline, ctx.current, col, ctx.currentMeta, ctx.comparison);
   if (ci) {
     if (hasLowBatchCount(ctx.baseline, ctx.current)) ci.direction = "uncertain";
     if (col.title) ci.label = `${col.title} Δ%`;

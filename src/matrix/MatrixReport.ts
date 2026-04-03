@@ -1,5 +1,6 @@
 import { totalProfileBytes } from "../profiling/node/HeapSampleReport.ts";
 import {
+  type ComparisonOptions,
   computeDiffCI,
   extractSectionValues,
   findPrimaryColumn,
@@ -42,8 +43,8 @@ export interface MatrixReportOptions {
   sections?: ResultsMapper[];
   /** Custom title for the variant column (default: "variant") */
   variantTitle?: string;
-  /** Equivalence margin in percent for baseline comparison */
-  equivMargin?: number;
+  /** Comparison options (equivalence margin, batch trimming) */
+  comparison?: ComparisonOptions;
 }
 
 /** Row data for matrix report table */
@@ -150,7 +151,6 @@ function buildSectionTable(
 ): string {
   const sections = options.sections!;
   const variantTitle = options.variantTitle ?? "name";
-  const equivMargin = options.equivMargin;
   const primaryCol = findPrimaryColumn(sections);
 
   type Row = Record<string, unknown> & { name: string };
@@ -162,11 +162,7 @@ function buildSectionTable(
     const row: Row = { name: truncate(variant.id, 25), ...vals };
     if (cr.baseline)
       row.diffCI = computeDiffCI(
-        cr.baseline,
-        cr.measured,
-        primaryCol,
-        cr.metadata,
-        equivMargin,
+        cr.baseline, cr.measured, primaryCol, cr.metadata, options.comparison,
       );
     const out: Row[] = [row];
     if (cr.baseline && !shared) {
@@ -193,13 +189,13 @@ function buildCaseRows(
   caseId: string,
   options?: MatrixReportOptions,
 ): MatrixReportRow[] {
-  const { extraColumns, equivMargin } = options ?? {};
+  const { extraColumns, comparison } = options ?? {};
   const cases = collectCaseResults(results, caseId);
   const shared = hasSharedBaseline(cases);
 
   const rows = cases.flatMap(({ variant, cr }) => {
     const out: MatrixReportRow[] = [
-      buildRow(variant.id, cr, extraColumns, equivMargin),
+      buildRow(variant.id, cr, extraColumns, comparison),
     ];
     if (cr.baseline && !shared) {
       const baseCr = { ...cr, measured: cr.baseline, baseline: undefined };
@@ -244,7 +240,7 @@ function buildRow(
   name: string,
   caseResult: CaseResult,
   extraColumns?: ExtraColumn[],
-  equivMargin?: number,
+  comparison?: ComparisonOptions,
 ): MatrixReportRow {
   const { measured, baseline } = caseResult;
   const { samples } = measured;
@@ -254,13 +250,7 @@ function buildRow(
     samples: samples.length,
   };
   if (baseline)
-    row.diffCI = computeDiffCI(
-      baseline,
-      measured,
-      undefined,
-      undefined,
-      equivMargin,
-    );
+    row.diffCI = computeDiffCI(baseline, measured, undefined, undefined, comparison);
   if (extraColumns)
     for (const col of extraColumns) row[col.key] = col.extract(caseResult);
   return row;

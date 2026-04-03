@@ -1,5 +1,6 @@
 import {
   type BenchmarkReport,
+  type ComparisonOptions,
   computeDiffCI,
   extractSectionValues,
   findPrimaryColumn,
@@ -38,10 +39,7 @@ type UnionToIntersection<U> = (U extends any ? (k: U) => void : never) extends (
   : never;
 
 /** Options for text report generation */
-export interface TextReportOptions {
-  /** Equivalence margin in percent for baseline comparison */
-  equivMargin?: number;
-}
+export interface TextReportOptions extends ComparisonOptions {}
 
 /** Build a formatted text table from benchmark groups, with baseline diff columns when present */
 export function reportResults<S extends ReadonlyArray<ResultsMapper<any>>>(
@@ -104,10 +102,9 @@ function resultGroupValues<S extends ReadonlyArray<ResultsMapper<any>>>(
 ): ResultGroup<ReportRowData<S>> {
   const { reports, baseline } = group;
   const baseM = baseline?.measuredResults;
-  const margin = options?.equivMargin;
   const results = reports.map(report => {
     const { measuredResults: m, metadata } = report;
-    const diffCI = computeDiffCI(baseM, m, primaryCol, metadata, margin);
+    const diffCI = computeDiffCI(baseM, m, primaryCol, metadata, options);
     return {
       name: truncate(report.name),
       ...extractSectionValues(m, sections, metadata),

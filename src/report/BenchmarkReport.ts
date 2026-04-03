@@ -7,6 +7,14 @@ import {
 
 import type { AnyColumn } from "./text/TableReport.ts";
 
+/** Options that affect baseline comparison statistics */
+export interface ComparisonOptions {
+  /** Equivalence margin in percent (0 to disable) */
+  equivMargin?: number;
+  /** Disable Tukey trimming of outlier batches */
+  noBatchTrim?: boolean;
+}
+
 /** Benchmark results with optional baseline for comparison */
 export interface ReportGroup {
   name: string;
@@ -93,7 +101,7 @@ export function computeDiffCI(
   current: MeasuredResults,
   col: ReportColumn<Record<string, unknown>> | undefined,
   metadata: UnknownRecord | undefined,
-  equivMargin?: number,
+  comparison?: ComparisonOptions,
 ): DifferenceCI | undefined {
   if (!baseline?.samples?.length || !current.samples?.length) return undefined;
   if (col && !col.statFn) return undefined;
@@ -104,7 +112,8 @@ export function computeDiffCI(
     statFn,
     blocks: baseline.batchOffsets,
     blocksB: current.batchOffsets,
-    equivMargin,
+    equivMargin: comparison?.equivMargin,
+    noBatchTrim: comparison?.noBatchTrim,
   };
   const rawCI = bootstrapDifferenceCI(baseline.samples, current.samples, opts);
   // statFn computes in the metric's natural domain. bootstrapDifferenceCI
