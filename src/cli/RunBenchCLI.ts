@@ -97,7 +97,6 @@ export async function browserBenchExports(args: DefaultCliArgs): Promise<void> {
   const name = nameFromUrl(args.url!);
   const baselineUrl = args["baseline-url"];
 
-  // Single-tab, no baseline: unchanged fast path
   if (args.batches <= 1 && !baselineUrl) {
     const result = await profileBrowser(params);
     const results = browserResultGroups(name, result);
@@ -106,7 +105,6 @@ export async function browserBenchExports(args: DefaultCliArgs): Promise<void> {
     return;
   }
 
-  // Multi-tab batching with optional baseline comparison
   const { lastRaw, results } = await runBrowserBatches(
     profileBrowser,
     params,

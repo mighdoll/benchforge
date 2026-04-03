@@ -104,9 +104,7 @@ export function waitForCtrlC(): Promise<void> {
   });
 }
 
-/** Resolve the package root directory.
- *
- *  Dev: src/cli/ -> up 2. Dist: dist/ -> up 1. */
+/** Resolve the package root (dev: src/cli/ ==> up 2, dist: dist/ ==> up 1). */
 function packageRoot(): string {
   const thisDir = dirname(fileURLToPath(import.meta.url));
   if (basename(thisDir) === "cli") return join(thisDir, "../..");

@@ -18,6 +18,7 @@ import { activeTabId, provider, reportData } from "../State.ts";
 /** Internal/display-only args to always hide */
 const skipArgs = new Set(["_", "$0", "view", "file"]);
 
+/** Main summary view: fetches report data, shows CLI args header and collapsible benchmark groups. */
 export function SummaryPanel() {
   const dataProvider = provider.value!;
   const data = reportData.value;
@@ -57,6 +58,7 @@ function safeGlobal<T>(v: T, fallback: T): T {
   return typeof v !== "undefined" ? v : fallback;
 }
 
+/** Assemble "benchforge <hash> <relative-date>" from compile-time globals. */
 function benchforgeLabel(): string {
   const hash = safeGlobal(__BENCHFORGE_GIT_HASH__, "dev");
   const dirty = safeGlobal(__BENCHFORGE_GIT_DIRTY__, false);

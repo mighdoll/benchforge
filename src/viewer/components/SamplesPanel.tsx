@@ -37,6 +37,7 @@ export function SamplesPanel() {
   );
 }
 
+/** Renders time-series and histogram plots for one benchmark group, with batch stepping and series toggles. */
 function SamplesGroup({ group, index }: { group: BenchmarkGroup; index: number }) {
   if (!group.benchmarks?.length) return null;
 

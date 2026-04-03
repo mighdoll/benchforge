@@ -1,4 +1,3 @@
-/** Merge multiple batch results and run batched pairs with alternation. */
 import { computeStats } from "./BasicRunner.ts";
 import type { GcStats } from "./GcStats.ts";
 import type { MeasuredResults } from "./MeasuredResults.ts";

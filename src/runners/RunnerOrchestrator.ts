@@ -248,9 +248,6 @@ function setupGcCapture(worker: ChildProcess, gcEvents: GcEvent[]): void {
   });
 }
 
-// Consider: --no-compilation-cache, --max-old-space-size=512, --no-lazy
-// for consistency (less realistic)
-
 /** Mutate results to include GC stats, heap/time profiles, and coverage */
 function attachProfilingData(
   results: MeasuredResults[],

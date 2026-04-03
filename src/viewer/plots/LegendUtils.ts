@@ -67,6 +67,7 @@ function symbolMark(pos: LegendPos, item: LegendItem): any {
   }
 }
 
+/** Create a text mark for a legend label */
 function textMark(pos: LegendPos, label: string): any {
   return Plot.text([{ x: pos.textX, y: pos.y, text: label }], {
     x: "x",
@@ -79,6 +80,7 @@ function textMark(pos: LegendPos, label: string): any {
   });
 }
 
+/** Create a filled or hollow dot mark for a legend symbol */
 function dotMark(x: number, y: number, color: string, filled: boolean): any {
   return Plot.dot(
     [{ x, y }],
@@ -96,6 +98,7 @@ function dotMark(x: number, y: number, color: string, filled: boolean): any {
   );
 }
 
+/** Create a small filled rectangle mark for histogram-style legend symbols */
 function verticalBarMark(pos: LegendPos, color: string): any {
   const { legendX, y, xRange, yRange } = pos;
   const hw = xRange * 0.006;
@@ -112,6 +115,7 @@ function verticalBarMark(pos: LegendPos, color: string): any {
   });
 }
 
+/** Create a short vertical rule mark for line-style legend symbols */
 function verticalLineMark(
   pos: LegendPos,
   color: string,
@@ -129,6 +133,7 @@ function verticalLineMark(
   });
 }
 
+/** Create a filled+stroked rectangle mark for area-style legend symbols */
 function rectMark(pos: LegendPos, color: string): any {
   const { legendX, y, xRange, yRange } = pos;
   const hw = xRange * 0.015;
