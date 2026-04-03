@@ -21,7 +21,6 @@ test("BasicRunner runs benchmark in worker mode", async () => {
     options: {
       maxTime: 5,
       maxIterations: 50,
-      settle: 0,
     },
     useWorker: true,
   });
@@ -51,7 +50,6 @@ test("BasicRunner runs benchmark in non-worker mode", async () => {
     options: {
       maxTime: 5,
       maxIterations: 50,
-      settle: 0,
     },
     useWorker: false,
   });
@@ -77,7 +75,7 @@ test("BasicRunner with parameterized benchmark", async () => {
   const results = await runBenchmark({
     spec,
     runner: "basic",
-    options: { maxTime: 5, maxIterations: 20, settle: 0 },
+    options: { maxTime: 5, maxIterations: 20 },
     useWorker: false,
     params: 100,
   });
@@ -97,7 +95,7 @@ test("RunnerOrchestrator propagates errors from worker", async () => {
   const promise = runBenchmark({
     spec,
     runner: "basic",
-    options: { maxTime: 1, maxIterations: 1, settle: 0 },
+    options: { maxTime: 1, maxIterations: 1 },
     useWorker: true,
   });
   await expect(promise).rejects.toThrow("Test error from benchmark");

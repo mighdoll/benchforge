@@ -117,7 +117,6 @@ beforeAll(async () => {
     "3",
     "--warmup",
     "0",
-    "--settle", "0",
   ];
 
   proc = spawn(binPath, args, {
