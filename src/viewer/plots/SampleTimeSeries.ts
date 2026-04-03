@@ -405,7 +405,7 @@ function heapAxisMarks(
       text: "label",
       fontSize: 10,
       textAnchor: "start",
-      fill: "#93c5fd",
+      fill: "#333",
       clip: false,
     }),
     Plot.text(
