@@ -2,6 +2,7 @@ import type { MeasuredResults } from "../runners/MeasuredResults.ts";
 import {
   bootstrapDifferenceCI,
   type DifferenceCI,
+  flipCI,
   swapDirection,
 } from "../stats/StatisticalUtils.ts";
 
@@ -116,10 +117,9 @@ export function computeDiffCI(
     noBatchTrim: comparison?.noBatchTrim,
   };
   const rawCI = bootstrapDifferenceCI(baseline.samples, current.samples, opts);
-  // statFn computes in the metric's natural domain. bootstrapDifferenceCI
-  // assumes lower-is-better for direction labels. For higher-is-better
-  // metrics (like loc/sec), swap the direction without negating the values.
-  return col?.higherIsBetter ? swapDirection(rawCI) : rawCI;
+  // Bootstrap operates in the timing domain (lower = faster). For higher-is-better
+  // metrics (like lines/sec), negate the percentage and swap direction labels.
+  return col?.higherIsBetter ? swapDirection(flipCI(rawCI)) : rawCI;
 }
 
 /** Type guard: distinguishes ResultsMapper[] from ReportColumnGroup[] */

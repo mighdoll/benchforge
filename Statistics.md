@@ -95,10 +95,16 @@ The block bootstrap works as follows:
 5. The 2.5th and 97.5th percentiles of this distribution form the 95%
    confidence interval.
 
-The point estimate (observed % difference) uses the pooled median across
+The point estimate (observed % difference) uses the pooled statistic across
 samples from kept batches -- the same Tukey filtering applies to both the
 point estimate and the CI, so they stay consistent. The CI width comes from
 the batch-level resampling, reflecting between-batch environmental variance.
+
+The bootstrap always operates in the timing domain, even for throughput
+metrics like lines/sec. Non-linear transformations (like converting time to
+throughput via `lines / time`) would cause Jensen's inequality bias if applied
+per-batch. Instead, the CI is computed on timing percentages and then negated
+for higher-is-better display.
 
 ### Equivalence Margin
 
