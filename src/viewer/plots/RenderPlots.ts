@@ -1,5 +1,6 @@
 import {
   average,
+  percentile,
   splitByOffsets,
   tukeyFences,
 } from "../../stats/StatisticalUtils.ts";
@@ -112,7 +113,8 @@ function rejectedIndices(b: PreparedBenchmark): Set<number> | undefined {
 
   const blocks = splitByOffsets(b.samples, offsets);
   const means = blocks.map(s => average(s));
-  const [lo, hi] = tukeyFences(means, 3);
+  const minIqr = percentile(means, 0.5) * 0.02;
+  const [lo, hi] = tukeyFences(means, 3, minIqr);
 
   const rejected = new Set<number>();
   for (let bi = 0; bi < blocks.length; bi++) {

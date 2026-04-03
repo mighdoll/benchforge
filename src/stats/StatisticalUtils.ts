@@ -173,21 +173,25 @@ export function createResample(samples: number[]): number[] {
   );
 }
 
-/** @return Tukey fence bounds [lo, hi] for the given IQR multiplier */
+/** @return Tukey fence bounds [lo, hi] for the given IQR multiplier.
+ *  minIqr floors the IQR to prevent degenerate fences when values are tightly clustered. */
 export function tukeyFences(
   values: number[],
   multiplier = 3,
+  minIqr = 0,
 ): [lo: number, hi: number] {
   const q1 = percentile(values, 0.25);
   const q3 = percentile(values, 0.75);
-  const iqr = q3 - q1;
+  const iqr = Math.max(q3 - q1, minIqr);
   return [q1 - multiplier * iqr, q3 + multiplier * iqr];
 }
 
-/** @return indices of values within 3x IQR Tukey fences */
+/** @return indices of values within 3x IQR Tukey fences.
+ *  Floors IQR at 2% of median to avoid over-trimming tightly clustered batch means. */
 function tukeyKeep(values: number[]): number[] {
   if (values.length < 4) return values.map((_, i) => i);
-  const [lo, hi] = tukeyFences(values);
+  const minIqr = percentile(values, 0.5) * 0.02;
+  const [lo, hi] = tukeyFences(values, 3, minIqr);
   return values
     .map((v, i) => (v >= lo && v <= hi ? i : -1))
     .filter(i => i >= 0);
