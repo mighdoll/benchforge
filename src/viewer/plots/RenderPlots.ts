@@ -68,15 +68,18 @@ function flattenBenchmark(b: PreparedBenchmark, out: FlattenedData): void {
     out.timeSeries.push({ benchmark: name, iteration, value, isWarmup: true });
   });
 
+  const rejected = rejectedIndices(b);
   const endTimes = cumulativeSum(b.samples);
   b.samples.forEach((value, i) => {
-    out.allSamples.push({ benchmark: name, value, iteration: i });
+    const isRejected = rejected?.has(i) || undefined;
+    if (!isRejected) out.allSamples.push({ benchmark: name, value, iteration: i });
     out.timeSeries.push({
       benchmark: name,
       iteration: i,
       value,
       isWarmup: false,
       isBaseline: b.isBaseline || undefined,
+      isRejected,
       optStatus: b.optSamples?.[i],
     });
     if (b.heapSamples?.[i] !== undefined) {
@@ -84,8 +87,6 @@ function flattenBenchmark(b: PreparedBenchmark, out: FlattenedData): void {
       target.push({ benchmark: name, iteration: i, value: b.heapSamples[i] });
     }
   });
-
-  markRejectedBlocks(b, out.timeSeries);
 
   b.gcEvents?.forEach(gc => {
     const idx = endTimes.findIndex(t => t >= gc.offset);
@@ -108,12 +109,10 @@ function flattenBenchmark(b: PreparedBenchmark, out: FlattenedData): void {
 }
 
 /** Flag timeSeries entries in Tukey-rejected blocks (3x IQR on block means) */
-function markRejectedBlocks(
-  b: PreparedBenchmark,
-  timeSeries: TimeSeriesPoint[],
-): void {
+/** @return sample indices in Tukey-rejected batches, or undefined if none */
+function rejectedIndices(b: PreparedBenchmark): Set<number> | undefined {
   const offsets = b.batchOffsets;
-  if (!offsets || offsets.length < 4) return;
+  if (!offsets || offsets.length < 4) return undefined;
 
   const blocks = splitByOffsets(b.samples, offsets);
   const means = blocks.map(s => average(s));
@@ -127,13 +126,7 @@ function markRejectedBlocks(
       for (let j = start; j < end; j++) rejected.add(j);
     }
   }
-  if (rejected.size === 0) return;
-
-  // Flag the entries we just added (last b.samples.length entries for this benchmark)
-  const startIdx = timeSeries.length - b.samples.length;
-  for (let i = 0; i < b.samples.length; i++) {
-    if (rejected.has(i)) timeSeries[startIdx + i].isRejected = true;
-  }
+  return rejected.size > 0 ? rejected : undefined;
 }
 
 /** Running total array, used to map GC event offsets to sample indices */
