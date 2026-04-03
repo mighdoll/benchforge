@@ -42,8 +42,10 @@ export type ReportColumn<T> = AnyColumn<T> & {
   comparable?: boolean;
   /** Set true for throughput metrics where higher values are better (e.g., lines/sec) */
   higherIsBetter?: boolean;
-  /** Compute this stat from raw samples for bootstrap CI (comparable columns only) */
+  /** Compute this stat from raw timing samples for bootstrap CI (comparable columns only) */
   statFn?: (samples: number[], metadata?: Record<string, unknown>) => number;
+  /** Convert a timing-domain value to display domain (e.g., ms to lines/sec) */
+  toDisplay?: (timingValue: number, metadata?: Record<string, unknown>) => number;
 };
 
 /** Maps benchmark results to table columns */

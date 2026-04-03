@@ -301,8 +301,11 @@ function buildEntry(
     return { runName, value };
   const fn = (s: number[]) => col.statFn!(s, metadata);
   const result = bootstrapStat(samples, fn, { blocks: measured?.batchOffsets });
+  const toDisplay = col.toDisplay
+    ? (v: number) => col.toDisplay!(v, metadata)
+    : (v: number) => v;
   const fmt = (v: number) =>
-    (col.formatter ? col.formatter(v) : String(v)) ?? String(v);
+    (col.formatter ? col.formatter(toDisplay(v)) : String(toDisplay(v))) ?? String(toDisplay(v));
   const ciLabels = [fmt(result.ci[0]), fmt(result.ci[1])] as [string, string];
   return {
     runName,
