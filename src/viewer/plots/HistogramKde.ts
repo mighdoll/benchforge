@@ -45,8 +45,6 @@ export function createHistogramKde(
         y: "count",
         fill: (d: Bar) => colorMap.get(d.benchmark),
         fillOpacity: 0.6,
-        tip: true,
-        title: (d: Bar) => `${d.benchmark}: ${d.count}`,
       }),
       Plot.ruleY([0]),
       ...buildLegend({ xMin: binMin, xMax: binMax, yMax }, legendItems),

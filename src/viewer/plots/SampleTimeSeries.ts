@@ -216,7 +216,6 @@ function prepareHeapData(heapSeries: HeapPoint[], hs: HeapScale) {
   const mapped = heapSeries.map(d => ({
     sample: d.iteration,
     y: hs.yMin + (d.value - hs.heapMinBytes) * hs.scale,
-    heapMB: d.value / 1024 / 1024,
   }));
   return lttb(
     mapped,
@@ -372,9 +371,9 @@ function computeYRange(values: number[]) {
   return { yMin, yMax: dataMax + range * 0.05 };
 }
 
-/** Create area + tooltip marks for the heap usage overlay */
+/** Create area marks for the heap usage overlay */
 function heapMarks(
-  heapData: { sample: number; y: number; heapMB: number }[],
+  heapData: { sample: number; y: number }[],
   yMin: number,
   color: string,
 ): any[] {
@@ -390,14 +389,6 @@ function heapMarks(
       strokeWidth: 1,
       strokeOpacity: 0.4,
     }),
-    Plot.tip(
-      heapData,
-      Plot.pointerX({
-        x: "sample",
-        y: "y",
-        title: (d: { heapMB: number }) => `Heap: ${d.heapMB.toFixed(1)} MB`,
-      }),
-    ),
   ];
 }
 
