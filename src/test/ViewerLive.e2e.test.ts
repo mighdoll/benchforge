@@ -1,6 +1,7 @@
 import type { ChildProcess } from "node:child_process";
 import { spawn } from "node:child_process";
 import path from "node:path";
+import type { Browser } from "playwright";
 import { chromium } from "playwright";
 import { afterAll, beforeAll, expect, test } from "vitest";
 
@@ -12,14 +13,14 @@ const examplePath = path.resolve(
 
 let proc: ChildProcess;
 let port: number;
+let browser: Browser;
 
 test("live viewer: summary tab shows stats", {
   timeout: 30_000,
 }, async () => {
-  const browser = await chromium.launch({ headless: true });
   const consoleErrors: string[] = [];
+  const page = await browser.newPage();
   try {
-    const page = await browser.newPage();
     page.on("console", msg => {
       if (msg.type() === "error" && !msg.text().includes("WebGL"))
         consoleErrors.push(msg.text());
@@ -32,7 +33,7 @@ test("live viewer: summary tab shows stats", {
     const statRows = await summaryPanel.locator(".stat-row").count();
     expect(statRows).toBeGreaterThan(0);
   } finally {
-    await browser.close();
+    await page.close();
   }
   expect(consoleErrors).toEqual([]);
 });
@@ -40,10 +41,9 @@ test("live viewer: summary tab shows stats", {
 test("live viewer: samples tab shows chart SVG", {
   timeout: 30_000,
 }, async () => {
-  const browser = await chromium.launch({ headless: true });
   const consoleErrors: string[] = [];
+  const page = await browser.newPage();
   try {
-    const page = await browser.newPage();
     page.on("console", msg => {
       if (msg.type() === "error" && !msg.text().includes("WebGL"))
         consoleErrors.push(msg.text());
@@ -66,7 +66,7 @@ test("live viewer: samples tab shows chart SVG", {
       .count();
     expect(childCount).toBeGreaterThan(0);
   } finally {
-    await browser.close();
+    await page.close();
   }
   expect(consoleErrors).toEqual([]);
 });
@@ -74,9 +74,8 @@ test("live viewer: samples tab shows chart SVG", {
 test("live viewer: allocation tab has speedscope content", {
   timeout: 30_000,
 }, async () => {
-  const browser = await chromium.launch({ headless: true });
+  const page = await browser.newPage();
   try {
-    const page = await browser.newPage();
     await page.goto(`http://localhost:${port}`, { waitUntil: "networkidle" });
 
     await page.locator("#tab-flamechart").click();
@@ -86,16 +85,15 @@ test("live viewer: allocation tab has speedscope content", {
       .first()
       .waitFor({ state: "visible", timeout: 15_000 });
   } finally {
-    await browser.close();
+    await page.close();
   }
 });
 
 test("live viewer: timing tab has speedscope content", {
   timeout: 30_000,
 }, async () => {
-  const browser = await chromium.launch({ headless: true });
+  const page = await browser.newPage();
   try {
-    const page = await browser.newPage();
     await page.goto(`http://localhost:${port}`, { waitUntil: "networkidle" });
 
     await page.locator("#tab-time-flamechart").click();
@@ -105,7 +103,7 @@ test("live viewer: timing tab has speedscope content", {
       .first()
       .waitFor({ state: "visible", timeout: 15_000 });
   } finally {
-    await browser.close();
+    await page.close();
   }
 });
 
@@ -128,7 +126,7 @@ beforeAll(async () => {
   });
 
   // Parse port from stdout line like "Viewer: http://localhost:3939"
-  port = await new Promise<number>((resolve, reject) => {
+  const portP = new Promise<number>((resolve, reject) => {
     let stdout = "";
     proc.stdout!.on("data", (chunk: Buffer) => {
       stdout += chunk.toString();
@@ -150,8 +148,14 @@ beforeAll(async () => {
       60_000,
     );
   });
+
+  [port, browser] = await Promise.all([
+    portP,
+    chromium.launch({ headless: true }),
+  ]);
 }, 90_000);
 
-afterAll(() => {
+afterAll(async () => {
+  await browser?.close();
   proc?.kill();
 });

@@ -1,5 +1,6 @@
 import { createServer, type Server } from "node:http";
 import path from "node:path";
+import type { Browser } from "playwright";
 import { chromium } from "playwright";
 import sirv from "sirv";
 import { afterAll, beforeAll, expect, test } from "vitest";
@@ -12,28 +13,26 @@ const archivePath = path.resolve(
 
 let server: Server;
 let port: number;
+let browser: Browser;
 
 test("static viewer: drop zone appears on load", {
   timeout: 30_000,
 }, async () => {
-  const browser = await chromium.launch({ headless: true });
+  const page = await browser.newPage();
   try {
-    const page = await browser.newPage();
     await page.goto(`http://localhost:${port}`, { waitUntil: "networkidle" });
-
     await page.locator(".drop-zone").waitFor({ state: "visible" });
   } finally {
-    await browser.close();
+    await page.close();
   }
 });
 
 test("static viewer: archive upload shows summary with stats", {
   timeout: 30_000,
 }, async () => {
-  const browser = await chromium.launch({ headless: true });
   const consoleErrors: string[] = [];
+  const page = await browser.newPage();
   try {
-    const page = await browser.newPage();
     page.on("console", msg => {
       if (msg.type() === "error" && !msg.text().includes("WebGL"))
         consoleErrors.push(msg.text());
@@ -53,7 +52,7 @@ test("static viewer: archive upload shows summary with stats", {
     const statRows = await summaryPanel.locator(".stat-row").count();
     expect(statRows).toBeGreaterThan(0);
   } finally {
-    await browser.close();
+    await page.close();
   }
   expect(consoleErrors).toEqual([]);
 });
@@ -61,10 +60,9 @@ test("static viewer: archive upload shows summary with stats", {
 test("static viewer: tab navigation after archive upload", {
   timeout: 30_000,
 }, async () => {
-  const browser = await chromium.launch({ headless: true });
   const consoleErrors: string[] = [];
+  const page = await browser.newPage();
   try {
-    const page = await browser.newPage();
     page.on("console", msg => {
       if (msg.type() === "error" && !msg.text().includes("WebGL"))
         consoleErrors.push(msg.text());
@@ -107,7 +105,7 @@ test("static viewer: tab navigation after archive upload", {
       .first()
       .waitFor({ state: "visible" });
   } finally {
-    await browser.close();
+    await page.close();
   }
   expect(consoleErrors).toEqual([]);
 });
@@ -120,15 +118,20 @@ beforeAll(async () => {
       res.end("Not found");
     });
   });
-  port = await new Promise<number>((resolve, reject) => {
+  const portP = new Promise<number>((resolve, reject) => {
     server.listen(0, "127.0.0.1", () => {
       const addr = server.address();
       if (typeof addr === "object" && addr) resolve(addr.port);
       else reject(new Error("Failed to get server address"));
     });
   });
+  [port, browser] = await Promise.all([
+    portP,
+    chromium.launch({ headless: true }),
+  ]);
 });
 
-afterAll(() => {
+afterAll(async () => {
+  await browser?.close();
   server?.close();
 });

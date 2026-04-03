@@ -6,7 +6,7 @@ import { runBenchLoop } from "./BenchLoop.ts";
 import { collectTracing, startGcTracing } from "./BrowserCDP.ts";
 import { type CdpClient, connectCdp } from "./CdpClient.ts";
 import { type CdpPage, createCdpPage } from "./CdpPage.ts";
-import { createTab, launchChrome } from "./ChromeLauncher.ts";
+import { type ChromeInstance, createTab, launchChrome } from "./ChromeLauncher.ts";
 import { setupLapMode } from "./LapMode.ts";
 import { runPageLoad } from "./PageLoadMode.ts";
 
@@ -28,6 +28,7 @@ export interface BrowserProfileParams {
   maxIterations?: number; // exact iteration count (bench function mode)
   pageLoad?: boolean; // passive page-load profiling mode
   waitFor?: string; // completion signal: selector, JS expression, "load", "domcontentloaded"
+  chrome?: ChromeInstance; // reuse an existing Chrome instance (caller manages lifecycle)
 }
 
 /** Navigation timing metrics from the page's Performance API. */
@@ -61,12 +62,15 @@ export async function profileBrowser(
   params: BrowserProfileParams,
 ): Promise<BrowserProfileResult> {
   const { headless = false, chromePath, chromeProfile } = params;
-  const chrome = await launchChrome({
-    headless,
-    chromePath,
-    chromeProfile,
-    args: params.chromeArgs,
-  });
+  const owned = !params.chrome;
+  const chrome =
+    params.chrome ??
+    (await launchChrome({
+      headless,
+      chromePath,
+      chromeProfile,
+      args: params.chromeArgs,
+    }));
   try {
     const pageWsUrl = await createTab(chrome.port);
     const cdp = await connectCdp(pageWsUrl);
@@ -74,7 +78,7 @@ export async function profileBrowser(
     const page = await createCdpPage(cdp, { timeout });
     return await runProfile(page, cdp, params);
   } finally {
-    await chrome.close();
+    if (owned) await chrome.close();
   }
 }
 
