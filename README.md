@@ -107,13 +107,13 @@ This eliminates manual caching boilerplate in worker modules.
 ## CLI Options
 
 ### Basic Options
-- `--duration <seconds>` - Benchmark duration per test (default: 0.642s)
+- `--duration <seconds>` - Benchmark duration per batch (default: 0.642s)
 - `--iterations <count>` - Exact number of iterations (overrides --duration)
 - `--filter <pattern>` - Run only benchmarks matching regex/substring
 - `--worker` / `--no-worker` - Run in isolated worker process (default: true)
 - `--inspect` - Run once for external profiler attach (single iteration, no warmup)
 - `--warmup <count>` - Warmup iterations before measurement (default: 0)
-- `--batches <n>` - Divide time into N interleaved batches for baseline comparison (default: 1)
+- `--batches <n>` - Run N interleaved batches for baseline comparison (default: 1)
 - `--warmup-batch` - Include first batch in results (normally dropped to avoid OS cache warmup)
 - `--equiv-margin <percent>` - Equivalence margin for baseline comparison (default: 2%)
 - `--help` - Show all available options
@@ -396,7 +396,7 @@ When comparing against a baseline, use `--batches` to interleave runs and reduce
 benchforge my-bench.ts --baseline --batches 10 --duration 2
 ```
 
-With `--batches 10`, benchforge runs 10 alternating rounds of baseline and current, reversing the order on odd rounds to cancel out systematic effects. Results from all batches are merged for the final comparison.
+With `--batches 10 --duration 2`, benchforge runs 10 alternating rounds of baseline and current (each batch runs for the full `--duration`), reversing the order on odd rounds to cancel out systematic effects. Total time is duration x batches. Results from all batches are merged for the final comparison.
 
 **Warmup batch**: The first batch typically runs slower due to OS-level effects (page cache, CPU cache, memory allocator warmup). Since this affects both baseline and current but adds noise to the comparison, batch 0 is automatically dropped. Use `--warmup-batch` to include it.
 

@@ -12,7 +12,7 @@ export const defaultAdaptiveMaxTime = 20;
 
 // biome-ignore format: compact option definitions
 const cliOptions = {
-  duration:         { type: "number",  default: 0.642, requiresArg: true, describe: "test duration in seconds" },
+  duration:         { type: "number",  default: 0.642, requiresArg: true, describe: "duration per batch in seconds" },
   iterations:       { type: "number",  requiresArg: true, describe: "exact number of iterations (overrides --duration)" },
   warmup:           { type: "number",  default: 0, describe: "warmup iterations before measurement" },
   filter:           { type: "string",  requiresArg: true, describe: "filter by name/regex. Matrix: case/variant, case/, /variant" },

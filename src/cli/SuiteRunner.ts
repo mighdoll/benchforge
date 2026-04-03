@@ -133,8 +133,7 @@ async function runMultipleBatches(
   batches: number,
   warmupBatch = false,
 ): Promise<ReportGroup> {
-  const maxTime = (runParams.options.maxTime || 5000) / batches;
-  const opts = { ...runParams.options, maxTime };
+  const opts = { ...runParams.options };
   const batchParams = { ...runParams, options: opts };
   const baselineBatches: MeasuredResults[] = [];
   const benchmarkBatches = new Map<string, MeasuredResults[]>();

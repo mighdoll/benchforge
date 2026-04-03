@@ -62,7 +62,6 @@ async function createDirContext<T>(
   const { casesModule, caseIds } = await resolveCases(matrix, options);
   const batches = options.batches ?? 1;
   const runnerOpts = buildRunnerOptions(options);
-  if (batches > 1) runnerOpts.maxTime = (runnerOpts.maxTime ?? 1000) / batches;
   const warmupBatch = options.warmupBatch ?? false;
   return {
     matrix,
