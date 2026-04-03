@@ -100,14 +100,9 @@ export function findOutliers(samples: number[]): {
   rate: number;
   indices: number[];
 } {
-  const q1 = percentile(samples, 0.25);
-  const q3 = percentile(samples, 0.75);
-  const iqr = q3 - q1;
-  const lowerBound = q1 - outlierMultiplier * iqr;
-  const upperBound = q3 + outlierMultiplier * iqr;
-
+  const [lo, hi] = tukeyFences(samples, outlierMultiplier);
   const indices = samples
-    .map((v, i) => (v < lowerBound || v > upperBound ? i : -1))
+    .map((v, i) => (v < lo || v > hi ? i : -1))
     .filter(i => i >= 0);
   return { rate: indices.length / samples.length, indices };
 }
@@ -176,15 +171,33 @@ export function createResample(samples: number[]): number[] {
   );
 }
 
-/** @return values with extreme outliers removed (3x IQR Tukey fences) */
-function tukeyTrim(values: number[]): number[] {
-  if (values.length < 4) return values;
+/** @return Tukey fence bounds [lo, hi] for the given IQR multiplier */
+export function tukeyFences(
+  values: number[],
+  multiplier = 3,
+): [lo: number, hi: number] {
   const q1 = percentile(values, 0.25);
   const q3 = percentile(values, 0.75);
   const iqr = q3 - q1;
-  const lo = q1 - 3 * iqr;
-  const hi = q3 + 3 * iqr;
+  return [q1 - multiplier * iqr, q3 + multiplier * iqr];
+}
+
+/** @return values with extreme outliers removed (3x IQR Tukey fences) */
+function tukeyTrim(values: number[]): number[] {
+  if (values.length < 4) return values;
+  const [lo, hi] = tukeyFences(values);
   return values.filter(v => v >= lo && v <= hi);
+}
+
+/** @return samples split into blocks by offset boundaries */
+export function splitByOffsets(
+  samples: number[],
+  offsets: number[],
+): number[][] {
+  return offsets.map((start, i) => {
+    const end = i + 1 < offsets.length ? offsets[i + 1] : samples.length;
+    return samples.slice(start, end);
+  });
 }
 
 /** @return per-block statistic values from sample data split by offsets */
@@ -193,10 +206,7 @@ function blockValues(
   offsets: number[],
   fn: (s: number[]) => number,
 ): number[] {
-  return offsets.map((start, i) => {
-    const end = i + 1 < offsets.length ? offsets[i + 1] : samples.length;
-    return fn(samples.slice(start, end));
-  });
+  return splitByOffsets(samples, offsets).map(fn);
 }
 
 /** Compute Tukey-trimmed block means for each side of a difference CI */

@@ -3,7 +3,12 @@ import { readFile } from "node:fs/promises";
 import { resolve } from "node:path";
 import colors from "../report/Colors.ts";
 import { formatSignedPercent, timeMs } from "../report/Formatters.ts";
-import { average, percentile } from "../stats/StatisticalUtils.ts";
+import {
+  average,
+  percentile,
+  splitByOffsets,
+  tukeyFences,
+} from "../stats/StatisticalUtils.ts";
 import type { BenchmarkEntry, BenchmarkGroup } from "../viewer/ReportData.ts";
 
 const { bold, dim, red, green, yellow } = colors;
@@ -49,10 +54,10 @@ function analyzeBenchmark(
     return;
   }
 
-  const batches = splitBatches(bench.samples, bOffsets);
+  const batches = splitByOffsets(bench.samples, bOffsets);
   const baseBatches =
     baseOffsets && baseline
-      ? splitBatches(baseline.samples, baseOffsets)
+      ? splitByOffsets(baseline.samples, baseOffsets)
       : undefined;
 
   printBatchHeader(bench, baseline, batches.length);
@@ -93,14 +98,6 @@ function inferOffsets(
   if (!samples?.length || !batchCount || batchCount <= 1) return undefined;
   const size = Math.floor(samples.length / batchCount);
   return Array.from({ length: batchCount }, (_, i) => i * size);
-}
-
-/** Split flat samples into batches using offset boundaries. */
-function splitBatches(samples: number[], offsets: number[]): number[][] {
-  return offsets.map((start, i) => {
-    const end = i + 1 < offsets.length ? offsets[i + 1] : samples.length;
-    return samples.slice(start, end);
-  });
 }
 
 /** Percent delta between two medians. */
@@ -216,11 +213,7 @@ function printTrimmedBlocks(
 
 /** Print trimming info for one side using 3x IQR fences. */
 function printSideTrim(label: string, means: number[]): void {
-  const q1 = percentile(means, 0.25);
-  const q3 = percentile(means, 0.75);
-  const iqr = q3 - q1;
-  const lo = q1 - blockFenceMultiplier * iqr;
-  const hi = q3 + blockFenceMultiplier * iqr;
+  const [lo, hi] = tukeyFences(means, blockFenceMultiplier);
   const indices = means
     .map((v, i) => (v < lo || v > hi ? i : -1))
     .filter(i => i >= 0);
