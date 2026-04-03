@@ -4,6 +4,7 @@ import * as Plot from "@observablehq/plot";
 export interface LegendBounds {
   xMin: number;
   xMax: number;
+  yMin?: number;
   yMax: number;
 }
 
@@ -25,23 +26,24 @@ interface LegendPos {
   y: number;
   textX: number;
   xRange: number;
-  yMax: number;
+  yRange: number;
 }
 
 /** Build complete legend marks array, positioned in the right margin */
 export function buildLegend(bounds: LegendBounds, items: LegendItem[]): any[] {
-  const xRange = bounds.xMax - bounds.xMin;
+  const xRange = Math.max(bounds.xMax - bounds.xMin, bounds.xMax * 0.1 || 1);
+  const yRange = bounds.yMax - (bounds.yMin ?? 0);
   const legendX = bounds.xMax + xRange * 0.04;
   const textX = legendX + xRange * 0.03;
-  const itemHeight = bounds.yMax * 0.07;
-  const topY = bounds.yMax * 0.98;
+  const itemHeight = yRange * 0.07;
+  const topY = bounds.yMax - yRange * 0.02;
 
   const pos = (i: number): LegendPos => ({
     legendX,
     y: topY - i * itemHeight,
     textX,
     xRange,
-    yMax: bounds.yMax,
+    yRange,
   });
   return items.flatMap((item, i) => [
     symbolMark(pos(i), item),
@@ -95,9 +97,9 @@ function dotMark(x: number, y: number, color: string, filled: boolean): any {
 }
 
 function verticalBarMark(pos: LegendPos, color: string): any {
-  const { legendX, y, xRange, yMax } = pos;
+  const { legendX, y, xRange, yRange } = pos;
   const hw = xRange * 0.006;
-  const hh = yMax * 0.025;
+  const hh = yRange * 0.025;
   return Plot.rect(
     [{ x1: legendX - hw, x2: legendX + hw, y1: y - hh, y2: y + hh }],
     {
@@ -117,8 +119,8 @@ function verticalLineMark(
   color: string,
   strokeDash?: string,
 ): any {
-  const { legendX, y, yMax } = pos;
-  const half = yMax * 0.025;
+  const { legendX, y, yRange } = pos;
+  const half = yRange * 0.025;
   return Plot.ruleX([legendX], {
     y1: y - half,
     y2: y + half,
@@ -130,9 +132,9 @@ function verticalLineMark(
 }
 
 function rectMark(pos: LegendPos, color: string): any {
-  const { legendX, y, xRange, yMax } = pos;
+  const { legendX, y, xRange, yRange } = pos;
   const hw = xRange * 0.015;
-  const hh = yMax * 0.02;
+  const hh = yRange * 0.02;
   return Plot.rect(
     [{ x1: legendX - hw, x2: legendX + hw, y1: y - hh, y2: y + hh }],
     {

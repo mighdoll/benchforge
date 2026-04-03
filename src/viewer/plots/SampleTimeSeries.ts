@@ -159,8 +159,9 @@ function buildPlotContext(timeSeries: TimeSeriesPoint[]): PlotContext {
     displayValue: convertValue(d.value),
   }));
   const { yMin, yMax } = computeYRange(convertedData.map(d => d.displayValue));
-  const xMin = d3.min(convertedData, d => d.sample)!;
-  const xMax = d3.max(convertedData, d => d.sample)!;
+  let xMin = d3.min(convertedData, d => d.sample)!;
+  let xMax = d3.max(convertedData, d => d.sample)!;
+  if (xMin === xMax) { xMin -= 0.5; xMax += 0.5; }
   const hasWarmup = convertedData.some(d => d.isWarmup);
   const hasRejected = convertedData.some(d => d.isRejected);
   const baselineNames = new Set(
@@ -304,7 +305,7 @@ function buildMarks(
         }),
       ]
     : [];
-  const bounds = { xMin: ctx.xMin, xMax: ctx.xMax, yMax: ctx.yMax };
+  const bounds = { xMin: ctx.xMin, xMax: ctx.xMax, yMin: ctx.yMin, yMax: ctx.yMax };
   return [
     ...heapMarks(baselineHeapData, ctx.yMin, "#fcd34d"),
     ...heapMarks(heapData, ctx.yMin, "#93c5fd"),
