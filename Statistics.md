@@ -162,6 +162,29 @@ Benchforge warns when a comparison has fewer than 20 batches and disables the
 direction indicator. For reliable comparisons, use 40+ batches. More batches
 always narrow the CI further -- the only cost is wall-clock time.
 
+### Batch Duration
+
+Batch count controls CI width, but `--duration` controls what each batch
+actually measures. Each batch starts with a fresh heap, so allocation builds
+from zero. If the batch is too short, the heap may never fill enough to trigger
+a full (major) GC -- the batch mean then reflects only young-generation
+scavenges, missing the amortized cost of major collections entirely.
+
+With medium-length batches, a full collection fires but exactly when it fires
+varies from batch to batch. That timing jitter has a larger effect on the
+per-batch mean when there's only one full GC in the batch. With longer batches,
+multiple full collections happen and the per-batch mean stabilizes.
+
+This matters most when you care about mean (amortized throughput). If you're
+only tracking median, GC timing is less significant since median is robust to
+individual pauses.
+
+**Guidance:** if per-batch means have high variance, try increasing `--duration`
+before adding more batches. Total measurement time is `duration x batches`, and
+you can trade between them -- but longer batches give more stable per-batch
+means, while more batches give tighter CIs. Start with `--duration 2` or higher
+for benchmarks with significant allocation.
+
 ## Reading the Results
 
 Results are displayed as: `+2.5% [-1.2%, +6.1%]`
