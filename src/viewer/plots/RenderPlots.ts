@@ -108,7 +108,6 @@ function flattenBenchmark(b: PreparedBenchmark, out: FlattenedData): void {
   }
 }
 
-/** Flag timeSeries entries in Tukey-rejected blocks (3x IQR on block means) */
 /** @return sample indices in Tukey-rejected batches, or undefined if none */
 function rejectedIndices(b: PreparedBenchmark): Set<number> | undefined {
   const offsets = b.batchOffsets;
