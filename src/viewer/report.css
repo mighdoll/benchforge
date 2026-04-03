@@ -297,8 +297,8 @@
 .report-panel .plot-area svg g[aria-label="x-axis label"] text { font-size: 14px; }
 
 /* --- Equivalence margin zone --- */
-.margin-zone { opacity: 0.06; }
-.margin-line { opacity: 0.25; }
+.margin-zone { stroke: #f59e0b; opacity: .7 }
+.margin-hatch-stroke { stroke: #f59e0b; stroke-width: 3.5; opacity: .7; }
 
 /* --- CI region overlay opacity (light/dark aware) --- */
 .ci-region { opacity: 0.55; }
@@ -370,8 +370,8 @@
   :root:not([data-theme="light"]) .report-panel .badge-slower { background: #991b1b; color: #fecaca; }
   :root:not([data-theme="light"]) .report-panel .badge-uncertain { background: #1e40af; color: #bfdbfe; }
   :root:not([data-theme="light"]) .report-panel .badge-equivalent { background: #166534; color: #bbf7d0; }
-  :root:not([data-theme="light"]) .margin-zone { opacity: 0.08; }
-  :root:not([data-theme="light"]) .margin-line { opacity: 0.2; }
+  :root:not([data-theme="light"]) .margin-hatch-stroke { opacity: 0.65; }
+  :root:not([data-theme="light"]) .margin-zone { opacity: 0.65; }
   :root:not([data-theme="light"]) .ci-region { opacity: 0.2; }
   :root:not([data-theme="light"]) .ci-region-strong { opacity: 0.35; }
   :root:not([data-theme="light"]) .ci-region.ci-faster,
@@ -415,8 +415,8 @@
 :root[data-theme="dark"] .report-panel .badge-slower { background: #991b1b; color: #fecaca; }
 :root[data-theme="dark"] .report-panel .badge-uncertain { background: #1e40af; color: #bfdbfe; }
 :root[data-theme="dark"] .report-panel .badge-equivalent { background: #166534; color: #bbf7d0; }
-:root[data-theme="dark"] .margin-zone { opacity: 0.08; }
-:root[data-theme="dark"] .margin-line { opacity: 0.2; }
+:root[data-theme="dark"] .margin-hatch-stroke { opacity: 0.4; }
+:root[data-theme="dark"] .margin-zone { opacity: 0.4; }
 :root[data-theme="dark"] .ci-region { opacity: 0.2; }
 :root[data-theme="dark"] .ci-region-strong { opacity: 0.35; }
 :root[data-theme="dark"] .ci-region.ci-faster,

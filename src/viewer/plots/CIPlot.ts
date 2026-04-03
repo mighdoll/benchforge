@@ -123,7 +123,30 @@ function drawTitles(
     );
 }
 
-/** Draw equivalence margin zone: shaded band + dashed boundary lines */
+/** Create an SVG diagonal hatch pattern definition */
+function ensureHatchPattern(svg: SVGSVGElement): string {
+  const id = "margin-hatch";
+  if (svg.querySelector(`#${id}`)) return id;
+  const defs = document.createElementNS(svgNS, "defs");
+  const pattern = document.createElementNS(svgNS, "pattern");
+  pattern.setAttribute("id", id);
+  pattern.setAttribute("patternUnits", "userSpaceOnUse");
+  pattern.setAttribute("width", "5");
+  pattern.setAttribute("height", "5");
+  pattern.setAttribute("patternTransform", "rotate(45)");
+  const stripe = document.createElementNS(svgNS, "line");
+  stripe.setAttribute("x1", "0");
+  stripe.setAttribute("y1", "0");
+  stripe.setAttribute("x2", "0");
+  stripe.setAttribute("y2", "5");
+  stripe.classList.add("margin-hatch-stroke");
+  pattern.appendChild(stripe);
+  defs.appendChild(pattern);
+  svg.insertBefore(defs, svg.firstChild);
+  return id;
+}
+
+/** Draw equivalence margin zone: hatched band centered vertically */
 function drawMarginZone(
   svg: SVGSVGElement,
   equivMargin: number,
@@ -133,21 +156,15 @@ function drawMarginZone(
   const { margin, plot } = layout;
   const x1 = scales.x(-equivMargin);
   const x2 = scales.x(equivMargin);
+  const patternId = ensureHatchPattern(svg);
   const bandH = plot.h / 3;
   const bandY = margin.top + (plot.h - bandH) / 2;
-  const zone = rect(x1, bandY, x2 - x1, bandH, { fill: "currentColor" });
+  const zone = rect(x1, bandY, x2 - x1, bandH, {
+    fill: `url(#${patternId})`,
+    strokeWidth: "1.5",
+  });
   zone.classList.add("margin-zone");
   svg.appendChild(zone);
-  const attrs = {
-    stroke: "currentColor",
-    strokeWidth: "1",
-    strokeDasharray: "3,3",
-  };
-  for (const x of [x1, x2]) {
-    const l = line(x, margin.top, x, margin.top + plot.h, attrs);
-    l.classList.add("margin-line");
-    svg.appendChild(l);
-  }
 }
 
 /** Draw zero reference line extending past plot area (comparison CIs only) */
