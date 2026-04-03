@@ -39,10 +39,10 @@ const defaultOpts = {
 };
 
 const colors = {
-  faster: { fill: "#dcfce7", stroke: "#22c55e" },
+  faster: { fill: "#bbf7d0", stroke: "#22c55e" },
   slower: { fill: "#fee2e2", stroke: "#ef4444" },
   uncertain: { fill: "#dbeafe", stroke: "#3b82f6" },
-  equivalent: { fill: "#f0fdf4", stroke: "#86efac" },
+  equivalent: { fill: "#dcfce7", stroke: "#86efac" },
 };
 
 /** Create a small distribution plot showing histogram with CI shading */
