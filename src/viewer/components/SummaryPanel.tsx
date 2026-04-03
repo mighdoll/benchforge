@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "preact/hooks";
+import { useEffect, useMemo, useRef, useState } from "preact/hooks";
 import type { GitVersion } from "../../report/GitUtils.ts";
 import type { DifferenceCI } from "../../stats/StatisticalUtils.ts";
 import { formatRelativeTime } from "../DateFormat.ts";
@@ -141,6 +141,7 @@ function GroupContent({ current }: { current: BenchmarkEntry }) {
 
 function SectionPanel({ section }: { section: ViewerSection }) {
   if (!section.rows.length) return null;
+  const range = useMemo(() => sectionEstimateRange(section), [section]);
   const titleEl = section.tabLink
     ? <a class="panel-title-link" onClick={() => (activeTabId.value = section.tabLink!)}>{section.title}</a>
     : <span>{section.title}</span>;
@@ -149,7 +150,7 @@ function SectionPanel({ section }: { section: ViewerSection }) {
     <div class="section-panel">
       <div class="panel-header">{titleEl}</div>
       <div class="panel-body">
-        {section.rows.map((row, i) => <StatRow key={i} row={row} />)}
+        {section.rows.map((row, i) => <StatRow key={i} row={row} estimateRange={range} />)}
       </div>
     </div>
   );
@@ -165,7 +166,7 @@ function alignRunColumns(panel: HTMLElement): void {
   if (maxValue) panel.style.setProperty("--run-value-width", `${maxValue}px`);
 }
 
-function StatRow({ row }: { row: ViewerRow }) {
+function StatRow({ row, estimateRange }: { row: ViewerRow; estimateRange?: [number, number] }) {
   if (row.shared) {
     const entry = row.entries[0];
     return (
@@ -187,18 +188,26 @@ function StatRow({ row }: { row: ViewerRow }) {
         <span class="row-label">{row.label}</span>
         {row.comparisonCI && <ComparisonBadge ci={row.comparisonCI} compact />}
       </div>
-      {row.entries.map((entry, i) => <RunEntry key={i} entry={entry} />)}
+      {row.entries.map((entry, i) => (
+        <RunEntry key={i} entry={entry} estimateRange={estimateRange} />
+      ))}
     </div>
   );
 }
 
-function RunEntry({ entry }: { entry: ViewerEntry }) {
+/** Max horizontal shift (px) for proportional positioning of bootstrap CI plots */
+const maxCIShift = 80;
+
+function RunEntry({ entry, estimateRange }: { entry: ViewerEntry; estimateRange?: [number, number] }) {
   const ci = entry.bootstrapCI;
+  const shift = estimateRange && ci
+    ? ((ci.estimate - estimateRange[0]) / (estimateRange[1] - estimateRange[0])) * maxCIShift
+    : undefined;
   return (
     <div class="run-entry">
       <span class="run-name">{entry.runName}</span>
       {ci
-        ? <BootstrapCIMount ci={ci} label={entry.value} />
+        ? <BootstrapCIMount ci={ci} label={entry.value} shift={shift} />
         : <span class="run-value">{entry.value}</span>}
     </div>
   );
@@ -289,7 +298,9 @@ function CIPlotMount({ ci, compact }: { ci: DifferenceCI; compact?: boolean }) {
 }
 
 /** Lazy-imports CIPlot and renders a bootstrap distribution sparkline inline. */
-function BootstrapCIMount({ ci, label }: { ci: BootstrapCIData; label?: string }) {
+function BootstrapCIMount({ ci, label, shift }: {
+  ci: BootstrapCIData; label?: string; shift?: number;
+}) {
   const ref = useRef<HTMLDivElement>(null);
   useEffect(() => {
     import("../plots/CIPlot.ts").then(({ createDistributionPlot }) => {
@@ -302,7 +313,22 @@ function BootstrapCIMount({ ci, label }: { ci: BootstrapCIData; label?: string }
       ref.current.appendChild(createDistributionPlot(ci.histogram, ci.ci, ci.estimate, opts));
     });
   }, [ci, label]);
-  return <div class="ci-plot-inline" ref={ref} />;
+  const style = shift != null ? { marginLeft: `${Math.round(shift)}px` } : undefined;
+  return <div class="ci-plot-inline" style={style} ref={ref} />;
+}
+
+/** Compute min/max bootstrap estimates across a section for proportional positioning */
+function sectionEstimateRange(section: ViewerSection): [number, number] | undefined {
+  let min = Infinity, max = -Infinity, count = 0;
+  for (const row of section.rows)
+    for (const entry of row.entries)
+      if (entry.bootstrapCI) {
+        const est = entry.bootstrapCI.estimate;
+        if (est < min) min = est;
+        if (est > max) max = est;
+        count++;
+      }
+  return count >= 2 && max > min ? [min, max] : undefined;
 }
 
 function formatCount(n: number): string {

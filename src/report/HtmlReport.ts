@@ -329,15 +329,21 @@ function buildEntry(
   const display = col.toDisplay
     ? (v: number) => col.toDisplay!(v, metadata)
     : (v: number) => v;
-  const fmt = (v: number) => {
-    const d = display(v);
-    return (col.formatter ? col.formatter(d) : String(d)) ?? String(d);
-  };
-  const ciLabels = [fmt(result.ci[0]), fmt(result.ci[1])] as [string, string];
+  const fmt = (v: number) =>
+    (col.formatter ? col.formatter(v) : String(v)) ?? String(v);
+
+  // Transform bootstrap data to display domain so histogram x-axis matches labels
+  const binned = binBootstrapResult(result);
+  const estimate = display(binned.estimate);
+  const dLo = display(binned.ci[0]), dHi = display(binned.ci[1]);
+  const ci = (dLo <= dHi ? [dLo, dHi] : [dHi, dLo]) as [number, number];
+  const histogram = binned.histogram.map(b => ({ x: display(b.x), count: b.count }));
+  const ciLabels = [fmt(ci[0]), fmt(ci[1])] as [string, string];
+
   return {
     runName,
     value,
-    bootstrapCI: { ...binBootstrapResult(result), ciLabels },
+    bootstrapCI: { estimate, ci, histogram, ciLabels },
   };
 }
 
