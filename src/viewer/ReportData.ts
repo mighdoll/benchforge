@@ -8,6 +8,7 @@ export interface ReportData {
     timestamp: string;
     bencherVersion: string;
     cliArgs?: Record<string, unknown>;
+    cliDefaults?: Record<string, unknown>;
     gcTrackingEnabled?: boolean;
     currentVersion?: GitVersion;
     baselineVersion?: GitVersion;

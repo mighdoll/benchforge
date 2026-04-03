@@ -61,6 +61,13 @@ const cliOptions = {
   "chrome-args":    { type: "string",  array: true, requiresArg: true, describe: "extra Chromium flags" },
 } as const;
 
+/** Default values for all CLI options (shared with viewer for display filtering). */
+export const cliDefaults: Record<string, unknown> = Object.fromEntries(
+  Object.entries(cliOptions)
+    .filter(([, opt]) => "default" in opt)
+    .map(([key, opt]) => [key, (opt as Record<string, unknown>).default]),
+);
+
 const optionGroups = {
   "Benchmark:": [
     "duration",

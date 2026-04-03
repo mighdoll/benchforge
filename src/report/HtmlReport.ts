@@ -1,3 +1,4 @@
+import { cliDefaults } from "../cli/CliArgs.ts";
 import type { CoverageData } from "../profiling/node/CoverageTypes.ts";
 import {
   filterSites,
@@ -63,6 +64,7 @@ export function prepareHtmlData(
       timestamp: new Date().toISOString(),
       bencherVersion: process.env.npm_package_version || "unknown",
       cliArgs,
+      cliDefaults,
       gcTrackingEnabled: cliArgs?.["gc-stats"] === true,
       currentVersion,
       baselineVersion,
@@ -335,9 +337,13 @@ function buildEntry(
   // Transform bootstrap data to display domain so histogram x-axis matches labels
   const binned = binBootstrapResult(result);
   const estimate = display(binned.estimate);
-  const dLo = display(binned.ci[0]), dHi = display(binned.ci[1]);
+  const dLo = display(binned.ci[0]);
+  const dHi = display(binned.ci[1]);
   const ci = (dLo <= dHi ? [dLo, dHi] : [dHi, dLo]) as [number, number];
-  const histogram = binned.histogram.map(b => ({ x: display(b.x), count: b.count }));
+  const histogram = binned.histogram.map(b => ({
+    x: display(b.x),
+    count: b.count,
+  }));
   const ciLabels = [fmt(ci[0]), fmt(ci[1])] as [string, string];
 
   return {

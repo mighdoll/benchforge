@@ -15,25 +15,6 @@ import type {
 import { formatPct } from "../plots/PlotTypes.ts";
 import { activeTabId, provider, reportData } from "../State.ts";
 
-/** CLI args that match defaults — omit from display */
-const defaultArgs: Record<string, unknown> = {
-  duration: 0.642,
-  warmup: 0,
-  worker: true,
-  batches: 1,
-  "pause-interval": 0,
-  "pause-duration": 100,
-  "min-time": 1,
-  convergence: 95,
-  "alloc-interval": 32768,
-  "equiv-margin": 2,
-  "alloc-depth": 64,
-  "alloc-rows": 20,
-  "alloc-stack": 3,
-  "time-interval": 1000,
-  editor: "vscode",
-  timeout: 60,
-};
 /** Internal/display-only args to always hide */
 const skipArgs = new Set(["_", "$0", "view", "file"]);
 
@@ -86,6 +67,7 @@ function benchforgeLabel(): string {
 
 function ReportHeader({ metadata }: { metadata: Record<string, unknown> }) {
   const args = metadata.cliArgs as Record<string, unknown> | undefined;
+  const defaults = metadata.cliDefaults as Record<string, unknown> | undefined;
   const cur = metadata.currentVersion as GitVersion | undefined;
   const base = metadata.baselineVersion as GitVersion | undefined;
   const versionParts: string[] = [];
@@ -94,7 +76,7 @@ function ReportHeader({ metadata }: { metadata: Record<string, unknown> }) {
 
   return (
     <div class="report-header">
-      <div class="cli-args">{formatCliArgs(args)}</div>
+      <div class="cli-args">{formatCliArgs(args, defaults)}</div>
       <div class="header-right">
         <div class="metadata">{new Date().toLocaleString()}</div>
         <div class="metadata benchforge-version">{benchforgeLabel()}</div>
@@ -338,12 +320,15 @@ function formatCount(n: number): string {
 }
 
 /** Format CLI args for display, filtering out defaults, internal keys, and camelCase aliases. */
-function formatCliArgs(args?: Record<string, unknown>): string {
+function formatCliArgs(
+  args?: Record<string, unknown>,
+  defaults?: Record<string, unknown>,
+): string {
   if (!args) return "benchforge";
   const flags = Object.entries(args)
     .filter(([key, value]) => {
       if (skipArgs.has(key) || value === undefined || value === false) return false;
-      if (defaultArgs[key] === value) return false;
+      if (defaults?.[key] === value) return false;
       if (!key.includes("-") && key !== key.toLowerCase()) return false;
       if (key === "convergence" && !args.adaptive) return false;
       return true;
