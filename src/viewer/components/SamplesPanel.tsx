@@ -202,6 +202,9 @@ function TimeSeriesPlot({ flat, index, visibility }: TimeSeriesPlotProps) {
           timeSeries, allGcEvents, allPausePoints, heapSeries, baselineHeapSeries, visibility,
         ),
       );
+    }).catch(err => {
+      console.error("Time series plot failed:", err);
+      if (ref.current) ref.current.innerHTML = `<div class="loading">${err.message}</div>`;
     });
   }, [flat, visibility]);
   return (
@@ -221,6 +224,9 @@ function HistogramPlot({ benchmarks, flat, index }: PlotProps) {
       if (!ref.current) return;
       ref.current.innerHTML = "";
       ref.current.appendChild(createHistogramKde(flat.allSamples, names));
+    }).catch(err => {
+      console.error("Histogram plot failed:", err);
+      if (ref.current) ref.current.innerHTML = `<div class="loading">${err.message}</div>`;
     });
   }, [flat, benchmarks]);
   return (
