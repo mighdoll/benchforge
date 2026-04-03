@@ -54,8 +54,8 @@ export function prepareHtmlData(
   groups: ReportGroup[],
   options: PrepareHtmlOptions,
 ): ReportData {
-  const { cliArgs, currentVersion, baselineVersion } = options;
-  const { equivMargin, noBatchTrim } = options;
+  const { cliArgs, currentVersion, baselineVersion, equivMargin, noBatchTrim } =
+    options;
   const comparison: ComparisonOptions = { equivMargin, noBatchTrim };
   const sections = options.sections ?? defaultSections(groups, cliArgs);
   return {
@@ -96,13 +96,14 @@ function prepareGroupData(
   const baseline = baseData
     ? { ...baseData, comparisonCI: undefined }
     : undefined;
+  const lowBatches = hasLowBatchCount(baseM, group.reports[0]?.measuredResults);
   const ctx: GroupContext = {
     baseM,
     baseMeta: base?.metadata,
     primaryCol: findPrimaryColumn(sections),
     sections,
     comparison,
-    lowBatches: hasLowBatchCount(baseM, group.reports[0]?.measuredResults),
+    lowBatches,
   };
 
   return {
@@ -121,17 +122,14 @@ function prepareReportEntry(
   ctx: GroupContext,
 ): BenchmarkEntry {
   const m = report.measuredResults;
-  const ci = annotateCI(
-    computeDiffCI(
-      ctx.baseM,
-      m,
-      ctx.primaryCol,
-      report.metadata,
-      ctx.comparison,
-    ),
-    ctx.primaryCol?.title,
-    ctx.lowBatches,
+  const diffCI = computeDiffCI(
+    ctx.baseM,
+    m,
+    ctx.primaryCol,
+    report.metadata,
+    ctx.comparison,
   );
+  const ci = annotateCI(diffCI, ctx.primaryCol?.title, ctx.lowBatches);
   const sections = ctx.sections
     ? buildViewerSections(
         ctx.sections,
@@ -272,23 +270,25 @@ function buildColumnRow(
     };
   }
 
-  const curEntry = buildEntry(
-    ctx.current.name,
-    format(curRaw),
-    col,
-    ctx.current,
-    ctx.currentMeta,
-  );
-  const entries: ViewerEntry[] = [curEntry];
-  if (ctx.baseline && baseRaw !== undefined) {
-    const baseEntry = buildEntry(
-      "baseline",
-      format(baseRaw),
+  const entries: ViewerEntry[] = [
+    buildEntry(
+      ctx.current.name,
+      format(curRaw),
       col,
-      ctx.baseline,
-      ctx.baselineMeta,
+      ctx.current,
+      ctx.currentMeta,
+    ),
+  ];
+  if (ctx.baseline && baseRaw !== undefined) {
+    entries.push(
+      buildEntry(
+        "baseline",
+        format(baseRaw),
+        col,
+        ctx.baseline,
+        ctx.baselineMeta,
+      ),
     );
-    entries.push(baseEntry);
   }
   return {
     label: col.title,
@@ -302,14 +302,15 @@ function buildComparisonCI(
   col: ReportColumn<Record<string, unknown>>,
   ctx: RowContext,
 ) {
+  const diffCI = computeDiffCI(
+    ctx.baseline,
+    ctx.current,
+    col,
+    ctx.currentMeta,
+    ctx.comparison,
+  );
   return annotateCI(
-    computeDiffCI(
-      ctx.baseline,
-      ctx.current,
-      col,
-      ctx.currentMeta,
-      ctx.comparison,
-    ),
+    diffCI,
     col.title,
     hasLowBatchCount(ctx.baseline, ctx.current),
   );
@@ -336,7 +337,6 @@ function buildEntry(
 
   // Transform bootstrap data to display domain so histogram x-axis matches labels
   const binned = binBootstrapResult(result);
-  const estimate = display(binned.estimate);
   const dLo = display(binned.ci[0]);
   const dHi = display(binned.ci[1]);
   const ci = (dLo <= dHi ? [dLo, dHi] : [dHi, dLo]) as [number, number];
@@ -344,12 +344,16 @@ function buildEntry(
     x: display(b.x),
     count: b.count,
   }));
-  const ciLabels = [fmt(ci[0]), fmt(ci[1])] as [string, string];
 
   return {
     runName,
     value,
-    bootstrapCI: { estimate, ci, histogram, ciLabels },
+    bootstrapCI: {
+      estimate: display(binned.estimate),
+      ci,
+      histogram,
+      ciLabels: [fmt(ci[0]), fmt(ci[1])],
+    },
   };
 }
 

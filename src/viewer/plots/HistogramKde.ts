@@ -15,9 +15,8 @@ export function createHistogramKde(
   allSamples: Sample[],
   benchmarkNames: string[],
 ): SVGSVGElement | HTMLElement {
-  const { unitSuffix, convertValue, formatValue } = getTimeUnit(
-    allSamples.map(d => d.value),
-  );
+  const values = allSamples.map(d => d.value);
+  const { unitSuffix, convertValue, formatValue } = getTimeUnit(values);
   const converted = allSamples.map(d => ({
     ...d,
     value: convertValue(d.value),

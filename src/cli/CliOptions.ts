@@ -88,13 +88,19 @@ function createAdaptiveOptions(args: DefaultCliArgs): RunnerOptions {
 
 /** Runner/matrix options shared across all CLI modes. */
 function cliCommonOptions(args: DefaultCliArgs) {
-  const { warmup } = args;
+  const { warmup, settle } = args;
   const { "gc-force": gcForce, "gc-stats": gcStats } = args;
-  const { "trace-opt": traceOpt, settle } = args;
-  const { "pause-first": pauseFirst, "pause-interval": pauseInterval } = args;
-  const { "pause-duration": pauseDuration } = args;
-  const { "alloc-interval": allocInterval, "alloc-depth": allocDepth } = args;
-  const { "time-interval": timeInterval, "call-counts": callCounts } = args;
+  const { "trace-opt": traceOpt, "call-counts": callCounts } = args;
+  const {
+    "pause-first": pauseFirst,
+    "pause-interval": pauseInterval,
+    "pause-duration": pauseDuration,
+  } = args;
+  const {
+    "alloc-interval": allocInterval,
+    "alloc-depth": allocDepth,
+    "time-interval": timeInterval,
+  } = args;
   return {
     gcForce,
     warmup,

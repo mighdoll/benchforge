@@ -111,13 +111,11 @@ function rejectedIndices(b: PreparedBenchmark): Set<number> | undefined {
   const offsets = b.batchOffsets;
   if (!offsets || offsets.length < 4) return undefined;
 
-  const blocks = splitByOffsets(b.samples, offsets);
-  const means = blocks.map(s => average(s));
-  const minIqr = percentile(means, 0.5) * 0.02;
-  const [lo, hi] = tukeyFences(means, 3, minIqr);
+  const means = splitByOffsets(b.samples, offsets).map(s => average(s));
+  const [lo, hi] = tukeyFences(means, 3, percentile(means, 0.5) * 0.02);
 
   const rejected = new Set<number>();
-  for (let bi = 0; bi < blocks.length; bi++) {
+  for (let bi = 0; bi < means.length; bi++) {
     if (means[bi] < lo || means[bi] > hi) {
       const start = offsets[bi];
       const end = bi + 1 < offsets.length ? offsets[bi + 1] : b.samples.length;

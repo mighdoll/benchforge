@@ -129,8 +129,8 @@ async function collectSamples<T>(
   }
   const warmupSamples = config.skipWarmup ? [] : await runWarmup(config);
   const heapBefore = process.memoryUsage().heapUsed;
-  const loop = await runSampleLoop(config);
-  const { samples, heapSamples, timestamps, optStatuses, pausePoints } = loop;
+  const { samples, heapSamples, timestamps, optStatuses, pausePoints } =
+    await runSampleLoop(config);
   if (samples.length === 0) {
     throw new Error(
       `No samples collected for benchmark: ${config.benchmark.name}`,
@@ -138,11 +138,12 @@ async function collectSamples<T>(
   }
   const heapDelta = process.memoryUsage().heapUsed - heapBefore;
   const heapGrowth = Math.max(0, heapDelta) / 1024 / samples.length;
-  const optStatus = config.traceOpt
+  const tracing = config.traceOpt;
+  const optStatus = tracing
     ? analyzeOptStatus(samples, optStatuses)
     : undefined;
   const optSamples =
-    config.traceOpt && optStatuses.length > 0 ? optStatuses : undefined;
+    tracing && optStatuses.length > 0 ? optStatuses : undefined;
   return {
     samples,
     warmupSamples,
@@ -160,17 +161,9 @@ function buildMeasuredResults(
   name: string,
   collected: CollectResult,
 ): MeasuredResults {
-  const {
-    samples,
-    warmupSamples,
-    heapSamples,
-    timestamps,
-    optStatus,
-    optSamples,
-    pausePoints,
-  } = collected;
+  const { samples, warmupSamples, heapSamples, timestamps } = collected;
+  const { optStatus, optSamples, pausePoints, heapGrowth } = collected;
   const time = computeStats(samples);
-  const heapGrowth = collected.heapGrowth;
   const heapSize = { avg: heapGrowth, min: heapGrowth, max: heapGrowth };
   return {
     name,
@@ -327,11 +320,12 @@ function createSampleArrays(
   trackHeap: boolean,
   trackOpt: boolean,
 ): SampleArrays {
+  const arr = (use: boolean) => (use ? new Array<number>(n) : []);
   return {
     samples: new Array<number>(n),
     timestamps: new Array<number>(n),
-    heapSamples: trackHeap ? new Array<number>(n) : [],
-    optStatuses: trackOpt ? new Array<number>(n) : [],
+    heapSamples: arr(trackHeap),
+    optStatuses: arr(trackOpt),
     pausePoints: [],
   };
 }

@@ -100,18 +100,16 @@ function verticalBarMark(pos: LegendPos, color: string): any {
   const { legendX, y, xRange, yRange } = pos;
   const hw = xRange * 0.006;
   const hh = yRange * 0.025;
-  return Plot.rect(
-    [{ x1: legendX - hw, x2: legendX + hw, y1: y - hh, y2: y + hh }],
-    {
-      x1: "x1",
-      x2: "x2",
-      y1: "y1",
-      y2: "y2",
-      fill: color,
-      fillOpacity: 0.6,
-      clip: false,
-    },
-  );
+  const data = [{ x1: legendX - hw, x2: legendX + hw, y1: y - hh, y2: y + hh }];
+  return Plot.rect(data, {
+    x1: "x1",
+    x2: "x2",
+    y1: "y1",
+    y2: "y2",
+    fill: color,
+    fillOpacity: 0.6,
+    clip: false,
+  });
 }
 
 function verticalLineMark(
@@ -135,18 +133,16 @@ function rectMark(pos: LegendPos, color: string): any {
   const { legendX, y, xRange, yRange } = pos;
   const hw = xRange * 0.015;
   const hh = yRange * 0.02;
-  return Plot.rect(
-    [{ x1: legendX - hw, x2: legendX + hw, y1: y - hh, y2: y + hh }],
-    {
-      x1: "x1",
-      x2: "x2",
-      y1: "y1",
-      y2: "y2",
-      fill: color,
-      fillOpacity: 0.3,
-      stroke: color,
-      strokeWidth: 1,
-      clip: false,
-    },
-  );
+  const data = [{ x1: legendX - hw, x2: legendX + hw, y1: y - hh, y2: y + hh }];
+  return Plot.rect(data, {
+    x1: "x1",
+    x2: "x2",
+    y1: "y1",
+    y2: "y2",
+    fill: color,
+    fillOpacity: 0.3,
+    stroke: color,
+    strokeWidth: 1,
+    clip: false,
+  });
 }

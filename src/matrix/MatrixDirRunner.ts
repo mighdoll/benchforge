@@ -62,15 +62,16 @@ async function createDirContext<T>(
     : [];
   const { casesModule, caseIds } = await resolveCases(matrix, options);
   const runnerOpts = buildRunnerOptions(options);
+  const { batches = 1, warmupBatch = false, useWorker = true } = options;
   return {
     matrix,
     casesModule,
     baselineIds,
     caseIds,
     runnerOpts,
-    batches: options.batches ?? 1,
-    warmupBatch: options.warmupBatch ?? false,
-    useWorker: options.useWorker ?? true,
+    batches,
+    warmupBatch,
+    useWorker,
   };
 }
 
@@ -147,9 +148,12 @@ async function runCaseBatched<T>(
   const runBase = baselineArgs
     ? async () => (await runMatrixVariant(baselineArgs))[0]
     : undefined;
-  const {
-    results: [current],
-    baseline,
-  } = await runBatched([runCurrent], runBase, ctx.batches, ctx.warmupBatch);
-  return { measured: current, baseline };
+  const batched = await runBatched(
+    [runCurrent],
+    runBase,
+    ctx.batches,
+    ctx.warmupBatch,
+  );
+  const { baseline } = batched;
+  return { measured: batched.results[0], baseline };
 }

@@ -245,7 +245,7 @@ function prepareBlocks(
   options: DiffBootstrapOptions,
   fn: (s: number[]) => number,
 ) {
-  const noTrim = options.noBatchTrim;
+  const { noBatchTrim: noTrim } = options;
   const sideA = prepareSide(a, options.blocks, fn, noTrim);
   const sideB = prepareSide(b, options.blocksB ?? options.blocks, fn, noTrim);
   if (!sideA && !sideB) return {};

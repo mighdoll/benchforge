@@ -75,17 +75,17 @@ function prepareSeriesData(
       ? prepareHeapData(baselineHeapSeries, heapScale)
       : [];
   const showRejected = visibility.rejected && ctx.hasRejected;
-  const legendItems = buildLegendItems(
-    ctx.hasWarmup,
-    gcEvents.length,
-    pausePoints.length,
-    heapData.length > 0,
-    baselineHeapData.length > 0,
-    showRejected,
-    ctx.optTiers,
-    ctx.benchmarks,
-    ctx.baselineNames,
-  );
+  const legendItems = buildLegendItems({
+    hasWarmup: ctx.hasWarmup,
+    gcCount: gcEvents.length,
+    pauseCount: pausePoints.length,
+    hasHeap: heapData.length > 0,
+    hasBaselineHeap: baselineHeapData.length > 0,
+    hasRejected: showRejected,
+    optTiers: ctx.optTiers,
+    benchmarks: ctx.benchmarks,
+    baselineNames: ctx.baselineNames,
+  });
   return { heapScale, heapData, baselineHeapData, showRejected, legendItems };
 }
 
@@ -134,16 +134,7 @@ export function createSampleTimeSeries(
       tickFormat: ctx.formatValue,
     },
     color: { legend: false, scheme: "observable10" },
-    marks: buildMarks(
-      ctx,
-      series.heapData,
-      series.baselineHeapData,
-      series.heapScale,
-      gcEvents,
-      pausePoints,
-      series.legendItems,
-      series.showRejected,
-    ),
+    marks: buildMarks({ ctx, ...series, gcEvents, pausePoints }),
   });
 }
 
@@ -151,9 +142,8 @@ export function createSampleTimeSeries(
 function buildPlotContext(timeSeries: TimeSeriesPoint[]): PlotContext {
   const benchmarks = [...new Set(timeSeries.map(d => d.benchmark))];
   const sampleData = buildSampleData(timeSeries);
-  const { unitSuffix, convertValue, formatValue } = getTimeUnit(
-    sampleData.map(d => d.value),
-  );
+  const values = sampleData.map(d => d.value);
+  const { unitSuffix, convertValue, formatValue } = getTimeUnit(values);
   const convertedData = sampleData.map(d => ({
     ...d,
     displayValue: convertValue(d.value),
@@ -161,19 +151,19 @@ function buildPlotContext(timeSeries: TimeSeriesPoint[]): PlotContext {
   const { yMin, yMax } = computeYRange(convertedData.map(d => d.displayValue));
   let xMin = d3.min(convertedData, d => d.sample)!;
   let xMax = d3.max(convertedData, d => d.sample)!;
-  if (xMin === xMax) { xMin -= 0.5; xMax += 0.5; }
+  if (xMin === xMax) {
+    xMin -= 0.5;
+    xMax += 0.5;
+  }
   const hasWarmup = convertedData.some(d => d.isWarmup);
   const hasRejected = convertedData.some(d => d.isRejected);
   const baselineNames = new Set(
     convertedData.filter(d => d.isBaseline).map(d => d.benchmark),
   );
-  const optTiers = [
-    ...new Set(
-      convertedData
-        .filter(d => d.optTier && !d.isWarmup)
-        .map(d => d.optTier as string),
-    ),
-  ];
+  const tierSet = convertedData
+    .filter(d => d.optTier && !d.isWarmup)
+    .map(d => d.optTier as string);
+  const optTiers = [...new Set(tierSet)];
   return {
     convertedData,
     xMin,
@@ -227,18 +217,22 @@ function prepareHeapData(heapSeries: HeapPoint[], hs: HeapScale) {
   );
 }
 
+interface LegendParams {
+  hasWarmup: boolean;
+  gcCount: number;
+  pauseCount: number;
+  hasHeap: boolean;
+  hasBaselineHeap: boolean;
+  hasRejected: boolean;
+  optTiers: string[];
+  benchmarks: string[];
+  baselineNames: Set<string>;
+}
+
 /** Assemble legend entries based on which data series are present */
-function buildLegendItems(
-  hasWarmup: boolean,
-  gcCount: number,
-  pauseCount: number,
-  hasHeap: boolean,
-  hasBaselineHeap: boolean,
-  hasRejected: boolean,
-  optTiers: string[],
-  benchmarks: string[],
-  baselineNames: Set<string>,
-): LegendItem[] {
+function buildLegendItems(p: LegendParams): LegendItem[] {
+  const { hasWarmup, gcCount, pauseCount, hasHeap, hasBaselineHeap } = p;
+  const { hasRejected, optTiers, benchmarks, baselineNames } = p;
   const items: LegendItem[] = [];
   if (hasWarmup)
     items.push({ color: "#dc3545", label: "warmup", style: "hollow-dot" });
@@ -285,17 +279,21 @@ function buildLegendItems(
   return items;
 }
 
+interface MarkParams {
+  ctx: PlotContext;
+  heapData: ReturnType<typeof prepareHeapData>;
+  baselineHeapData: ReturnType<typeof prepareHeapData>;
+  heapScale: HeapScale | undefined;
+  gcEvents: FlatGcEvent[];
+  pausePoints: FlatPausePoint[];
+  legendItems: LegendItem[];
+  showRejected: boolean;
+}
+
 /** Build the marks array for the time series plot */
-function buildMarks(
-  ctx: PlotContext,
-  heapData: ReturnType<typeof prepareHeapData>,
-  baselineHeapData: ReturnType<typeof prepareHeapData>,
-  heapScale: HeapScale | undefined,
-  gcEvents: FlatGcEvent[],
-  pausePoints: FlatPausePoint[],
-  legendItems: LegendItem[],
-  showRejected: boolean,
-): Plot.Markish[] {
+function buildMarks(p: MarkParams): Plot.Markish[] {
+  const { ctx, heapData, baselineHeapData, heapScale } = p;
+  const { gcEvents, pausePoints, legendItems, showRejected } = p;
   const warmupRule = ctx.hasWarmup
     ? [
         Plot.ruleX([0], {
@@ -305,7 +303,12 @@ function buildMarks(
         }),
       ]
     : [];
-  const bounds = { xMin: ctx.xMin, xMax: ctx.xMax, yMin: ctx.yMin, yMax: ctx.yMax };
+  const bounds = {
+    xMin: ctx.xMin,
+    xMax: ctx.xMax,
+    yMin: ctx.yMin,
+    yMax: ctx.yMax,
+  };
   return [
     ...heapMarks(baselineHeapData, ctx.yMin, "#fcd34d"),
     ...heapMarks(heapData, ctx.yMin, "#93c5fd"),
@@ -404,9 +407,8 @@ function heapAxisMarks(
     fill: "#333",
     clip: false,
   };
-  const mbLabel = [
-    { x: labelX, y: hs.yMin + hs.heapRangeBytes * hs.scale * 0.5, text: "MB" },
-  ];
+  const mbY = hs.yMin + hs.heapRangeBytes * hs.scale * 0.5;
+  const mbLabel = [{ x: labelX, y: mbY, text: "MB" }];
   return [
     Plot.text(tickData, { ...textOpts, text: "label" }),
     Plot.text(mbLabel, { ...textOpts, text: "text" }),
@@ -541,10 +543,8 @@ function sampleDotMarks(ctx: PlotContext, showRejected: boolean): any[] {
       ? `Iteration ${d.sample}: ${fmtVal(d)} [${d.optTier}]`
       : `Iteration ${d.sample}: ${fmtVal(d)}`;
   const xy = { x: "sample" as const, y: "displayValue" as const, r: 3 };
-  const { warmup, baseline, measured, rejected } = partitionSamples(
-    ctx.convertedData,
-    showRejected,
-  );
+  const parts = partitionSamples(ctx.convertedData, showRejected);
+  const { warmup, baseline, measured, rejected } = parts;
   return [
     Plot.dot(warmup, {
       ...xy,

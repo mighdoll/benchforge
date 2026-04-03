@@ -125,12 +125,13 @@ async function runBrowserBatches(
   args: DefaultCliArgs,
 ): Promise<{ lastRaw: BrowserProfileResult; results: ReportGroup[] }> {
   const launchChrome = await loadChromeLauncher();
-  const chrome = await launchChrome({
+  const launchOpts = {
     headless: args.headless,
     chromePath: args.chrome,
     chromeProfile: args["chrome-profile"],
     args: params.chromeArgs,
-  });
+  };
+  const chrome = await launchChrome(launchOpts);
 
   const baselineUrl = args["baseline-url"];
   const warmupBatch = args["warmup-batch"] ?? false;
@@ -143,37 +144,38 @@ async function runBrowserBatches(
     };
     const runBaseline = baselineUrl
       ? async () => {
-          const bName = nameFromUrl(baselineUrl);
           const raw = await profileBrowser({
             ...params,
             chrome,
             url: baselineUrl,
           });
           lastRaw ??= raw;
-          return toBrowserMeasured(bName, raw);
+          return toBrowserMeasured(nameFromUrl(baselineUrl), raw);
         }
       : undefined;
 
     const batches = Math.max(args.batches, 2);
+    const batched = await runBatched(
+      [runCurrent],
+      runBaseline,
+      batches,
+      warmupBatch,
+    );
     const {
       results: [current],
       baseline,
-    } = await runBatched([runCurrent], runBaseline, batches, warmupBatch);
+    } = batched;
 
     const baselineReport =
       baseline && baselineUrl
         ? { name: nameFromUrl(baselineUrl), measuredResults: baseline }
         : undefined;
-    return {
-      lastRaw: lastRaw!,
-      results: [
-        {
-          name,
-          reports: [{ name, measuredResults: current }],
-          baseline: baselineReport,
-        },
-      ],
+    const group = {
+      name,
+      reports: [{ name, measuredResults: current }],
+      baseline: baselineReport,
     };
+    return { lastRaw: lastRaw!, results: [group] };
   } finally {
     await chrome.close();
   }
@@ -388,13 +390,11 @@ function printBrowserReport(
     ...(showTime ? [runsSection] : []),
   ];
   if (sections.length > 0) console.log(reportResults(results, sections));
-  if (result.heapProfile) {
-    const opts = {
+  if (result.heapProfile)
+    printHeapReports(results, {
       ...cliHeapReportOptions(args),
       isUserCode: isBrowserUserCode,
-    };
-    printHeapReports(results, opts);
-  }
+    });
 }
 
 /** Convert browser profile result to MeasuredResults. */

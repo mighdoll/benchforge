@@ -66,10 +66,10 @@ export function getTimeUnit(values: number[]): TimeUnit {
   let sum = 0;
   for (const v of values) sum += v;
   const avg = sum / values.length;
-  const fmt0 = (d: number) =>
-    d.toLocaleString("en-US", { maximumFractionDigits: 0 });
-  const fmt1 = (d: number) =>
-    d.toLocaleString("en-US", { maximumFractionDigits: 1 });
+  const locale = (digits: number) => (d: number) =>
+    d.toLocaleString("en-US", { maximumFractionDigits: digits });
+  const fmt0 = locale(0);
+  const fmt1 = locale(1);
   if (avg < 0.001)
     return {
       unitSuffix: "ns",

@@ -49,17 +49,17 @@ export async function startViewerServer(
   const handler = createRequestHandler(options, sourceCache, assets);
   const server = createServer(handler);
 
-  const { server: srv, port: actualPort } = await tryListen(server, port);
-  const url = `http://localhost:${actualPort}`;
+  const bound = await tryListen(server, port);
+  const url = `http://localhost:${bound.port}`;
   if (options.open !== false && !process.env.BENCHFORGE_NO_OPEN)
     await open(url);
   console.log(`Viewer: ${url}`);
 
   const close = () => {
-    srv.closeAllConnections();
-    srv.close();
+    bound.server.closeAllConnections();
+    bound.server.close();
   };
-  return { server: srv, port: actualPort, close };
+  return { server: bound.server, port: bound.port, close };
 }
 
 /** Open a .benchforge archive in the viewer. */

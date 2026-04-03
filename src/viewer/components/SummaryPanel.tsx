@@ -150,7 +150,6 @@ function alignRunColumns(panel: HTMLElement): void {
 
 function StatRow({ row, estimateRange }: { row: ViewerRow; estimateRange?: [number, number] }) {
   if (row.shared) {
-    const entry = row.entries[0];
     return (
       <div class="stat-row">
         <div class="row-header">
@@ -158,7 +157,7 @@ function StatRow({ row, estimateRange }: { row: ViewerRow; estimateRange?: [numb
         </div>
         <div class="run-entry">
           <span class="run-name" />
-          <span class="run-value">{entry?.value}</span>
+          <span class="run-value">{row.entries[0]?.value}</span>
         </div>
       </div>
     );
@@ -182,9 +181,8 @@ const maxCIShift = 80;
 
 function RunEntry({ entry, estimateRange }: { entry: ViewerEntry; estimateRange?: [number, number] }) {
   const ci = entry.bootstrapCI;
-  const shift = estimateRange && ci
-    ? ((ci.estimate - estimateRange[0]) / (estimateRange[1] - estimateRange[0])) * maxCIShift
-    : undefined;
+  const [lo, hi] = estimateRange ?? [0, 0];
+  const shift = ci && hi > lo ? ((ci.estimate - lo) / (hi - lo)) * maxCIShift : undefined;
   return (
     <div class="run-entry">
       <span class="run-name">{entry.runName}</span>

@@ -109,11 +109,12 @@ function drawTitles(
     svg.appendChild(
       text(margin.left, 14, opts.title, "start", "13", "currentColor", "600"),
     );
-  if (opts.pointLabel)
+  if (opts.pointLabel) {
+    const labelY = margin.top - 6;
     svg.appendChild(
       text(
         pointX,
-        margin.top - 6,
+        labelY,
         opts.pointLabel,
         "middle",
         "15",
@@ -121,6 +122,7 @@ function drawTitles(
         "700",
       ),
     );
+  }
 }
 
 /** Create an SVG diagonal hatch pattern definition */
@@ -159,10 +161,8 @@ function drawMarginZone(
   const patternId = ensureHatchPattern(svg);
   const bandH = plot.h / 3;
   const bandY = margin.top + (plot.h - bandH) / 2;
-  const zone = rect(x1, bandY, x2 - x1, bandH, {
-    fill: `url(#${patternId})`,
-    strokeWidth: "1.5",
-  });
+  const fill = `url(#${patternId})`;
+  const zone = rect(x1, bandY, x2 - x1, bandH, { fill, strokeWidth: "1.5" });
   zone.classList.add("margin-zone");
   svg.appendChild(zone);
 }
@@ -179,9 +179,11 @@ function drawReferenceLine(
   const { margin, plot } = layout;
   if (zeroX < margin.left || zeroX > layout.width - margin.right) return;
 
-  const attrs = { stroke: "#000", strokeWidth: "1" };
   svg.appendChild(
-    line(zeroX, margin.top - 4, zeroX, margin.top + plot.h + 4, attrs),
+    line(zeroX, margin.top - 4, zeroX, margin.top + plot.h + 4, {
+      stroke: "#000",
+      strokeWidth: "1",
+    }),
   );
 }
 

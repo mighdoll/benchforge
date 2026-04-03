@@ -68,21 +68,23 @@ export async function runBenchmark<T = unknown>({
 export async function runMatrixVariant(
   params: RunMatrixVariantParams,
 ): Promise<MeasuredResults[]> {
-  const { variantId, caseId, runner, options, useWorker = true } = params;
+  const { variantDir, variantId, caseId, runner, options } = params;
+  const { caseData, casesModule, useWorker = true } = params;
   const name = `${variantId}/${caseId}`;
 
   if (!useWorker) return runMatrixVariantDirect(params, name);
 
+  const spec = { name, fn: () => {} };
   const message: RunMessage = {
     type: "run",
-    spec: { name, fn: () => {} },
+    spec,
     runnerName: runner,
     options,
-    variantDir: params.variantDir,
+    variantDir,
     variantId,
     caseId,
-    caseData: params.caseData,
-    casesModule: params.casesModule,
+    caseData,
+    casesModule,
   };
   return runWorkerWithMessage(name, options, message);
 }
@@ -184,8 +186,9 @@ function runWorkerWithMessage(
     worker.on("message", (msg: ResultMessage | ErrorMessage) => {
       killWorker();
       if (msg.type === "result") {
-        const elapsed = getElapsed(startTime).toFixed(1);
-        logTiming(`Total worker time for ${name}: ${elapsed}ms`);
+        logTiming(
+          `Total worker time for ${name}: ${getElapsed(startTime).toFixed(1)}ms`,
+        );
         const { results, heapProfile, timeProfile, coverage } = msg;
         attachProfilingData(
           results,

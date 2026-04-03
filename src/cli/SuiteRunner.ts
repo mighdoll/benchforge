@@ -43,14 +43,15 @@ export async function runBenchmarks(
   const options = cliToRunnerOptions(args);
   const filtered = filterBenchmarks(suite, filter);
 
-  return runSuite({
+  const params = {
     suite: filtered,
-    runner: "basic",
+    runner: "basic" as const,
     options,
     useWorker,
     batches,
     warmupBatch,
-  });
+  };
+  return runSuite(params);
 }
 
 /** Execute all groups in a suite sequentially. */
@@ -140,12 +141,8 @@ async function runMultipleBatches(
   const runners = benchmarks.map(run);
   const baselineFn = baseline ? run(baseline) : undefined;
 
-  const { results, baseline: merged } = await runBatched(
-    runners,
-    baselineFn,
-    batches,
-    warmupBatch,
-  );
+  const batched = await runBatched(runners, baselineFn, batches, warmupBatch);
+  const { results, baseline: merged } = batched;
 
   const reports = benchmarks.map((b, i) => ({
     name: b.name,
