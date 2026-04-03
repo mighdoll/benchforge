@@ -150,7 +150,7 @@ function hasLowBatchCount(
   const batchCount = (m?: MeasuredResults) => m?.batchOffsets?.length ?? 0;
   const baseN = batchCount(baseline);
   const curN = batchCount(current);
-  if (baseN === 0 && curN === 0) return false; // not batched
+  if (baseN === 0 || curN === 0) return false; // not batched or no comparison
   return baseN < minBatches || curN < minBatches;
 }
 
