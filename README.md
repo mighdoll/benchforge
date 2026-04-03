@@ -333,58 +333,10 @@ p50: 0.15ms, p99: 0.27ms
 
 ### Equivalence Testing
 
-When comparing against a baseline, benchforge needs to distinguish three cases:
-the code got faster, it got slower, or nothing meaningful changed.
-
-Traditional CI-based testing only asks "does the confidence interval exclude zero?"
-This can detect differences but can never confirm equivalence — with enough samples,
-even trivial noise (ASLR, scheduler jitter) can push the CI away from zero,
-leaving the result stuck at **Inconclusive** even when comparing identical code.
-
-Benchforge uses an **equivalence margin** (`--equiv-margin`, default 2%) to resolve this.
-The margin defines the smallest difference that matters. The CI is compared against
-both zero and the margin to produce four verdicts:
-
-```
-         -margin       0       +margin
-            |          |          |
-    [---]   |          |          |        ==> FASTER  (CI excludes zero, beyond margin)
-            |          |          | [---]  ==> SLOWER  (CI excludes zero, beyond margin)
-            |   [----------]     |        ==> EQUIVALENT (CI within margin -- proven trivial)
-            |      [--]          |        ==> EQUIVALENT (excludes zero, but within margin)
-   [------------]  |             |        ==> INCONCLUSIVE (CI extends past margin, need more data)
-```
-
-- **Equivalent**: the entire CI fits within the margin. The difference is provably smaller
-  than what matters, whether or not it's statistically significant.
-- **Faster / Slower**: the CI excludes zero and extends beyond the margin. A real,
-  meaningful change was detected.
-- **Inconclusive**: the CI extends past the margin but doesn't clearly exclude zero.
-  More batches would narrow the CI and resolve it.
-
-The default margin of 2% is reasonable for most benchmarks. For higher precision,
-calibrate the margin to your specific benchmark's noise floor:
-
-**Calibration:** Run a self-comparison where baseline and current are identical code.
-Any observed difference is pure measurement noise. The CI bounds tell you the noise floor.
-
-```bash
-# 1. Run identical code against itself with enough batches
-benchforge my-bench.ts --baseline --batches 50
-
-# 2. Check the CI in the viewer or text output, e.g.:
-#      +0.3% [-1.8%, +2.4%]
-#    The max absolute CI bound (2.4%) is the noise floor.
-#    Round up to the nearest integer for the margin.
-
-# 3. Use the calibrated margin for future comparisons
-benchforge my-bench.ts --baseline --batches 50 --equiv-margin 3
-```
-
-The noise floor varies per benchmark -- fast microbenchmarks may have < 1% noise,
-while slow macro benchmarks with GC pressure may have 3-5%. Calibrate each benchmark
-you care about separately. Use `--equiv-margin 0` to disable equivalence testing
-and fall back to the traditional CI-excludes-zero approach.
+Benchforge uses an equivalence margin (`--equiv-margin`, default 2%) to distinguish
+meaningful changes from noise. See [Statistics.md](Statistics.md#equivalence-margin)
+for the full explanation of how this works, including the four verdicts
+(faster/slower/equivalent/inconclusive) and how to calibrate the margin for your benchmarks.
 
 ## Warmup and Batching
 
@@ -400,7 +352,7 @@ With `--batches 10 --duration 2`, benchforge runs 10 alternating rounds of basel
 
 **Warmup batch**: The first batch typically runs slower due to OS-level effects (page cache, CPU cache, memory allocator warmup). Since this affects both baseline and current but adds noise to the comparison, batch 0 is automatically dropped. Use `--warmup-batch` to include it.
 
-For reliable comparisons, use 8+ batches. Fewer batches produce wider confidence intervals since the block bootstrap has fewer independent observations to work with.
+For reliable comparisons, use 40+ batches. Fewer batches produce wider confidence intervals since the block bootstrap has fewer independent observations to work with. Benchforge warns when a comparison has fewer than 20 batches.
 
 ### Two Kinds of Warmup
 

@@ -1,100 +1,179 @@
 # Statistical Methods in Benchforge
 
-## Overview
+## The Problem: Noisy Measurements
 
-Benchforge uses robust statistics designed for JavaScript performance data, which exhibits:
-- Right-skewed distributions (occasional slow iterations from GC/OS interrupts)
-- Non-stationarity (JIT warmup, memory pressure changes)
-- Multimodality (normal vs GC-affected iterations)
+Benchmark data has two kinds of variability that look similar but need
+opposite treatment:
 
-## Active Features
+**Intermittent signals** -- GC pauses, JIT tier transitions, memory pressure.
+These are real costs your code pays. A function that allocates more triggers
+more GC, and that overhead is part of its true cost. These should be captured.
 
-These are shown in default output or conditionally with flags.
+**Intermittent noise** -- other applications waking up, OS scheduling jitter,
+thermal throttling, background updates. These have nothing to do with the code
+under test. These should be rejected.
 
-### Percentiles (`StatisticalUtils.ts`)
-Nearest-rank method for p25, p50 (median), p75, p95, p99, p999:
-```typescript
-function percentile(values: number[], p: number): number {
-  const sorted = [...values].sort((a, b) => a - b);
-  const index = Math.ceil(sorted.length * p) - 1;
-  return sorted[Math.max(0, index)];
-}
+No single statistic handles both. Averaging captures GC but also captures
+laptop noise. Median filters noise but also hides GC. Benchforge addresses
+this at two levels: batches reject environmental noise from comparisons,
+while multiple statistics reveal the full picture of a single benchmark.
+
+## Batched Execution
+
+Batches are independent runs of baseline and current, interleaved across time.
+With `--batches 10`, benchforge runs 10 rounds, alternating which goes first:
+
 ```
-Terminal reports show p50 and p99. The viewer and JSON export include p50, p75, p99, p999.
+batch 0: baseline, current     (dropped -- warmup)
+batch 1: current, baseline
+batch 2: baseline, current
+batch 3: current, baseline
+...
+```
 
-### Bootstrap Difference CI (`bootstrapDifferenceCI`)
-Shown in terminal and HTML reports when a baseline is present.
+**Alternating order** cancels systematic bias. Without it, the second benchmark
+always benefits from warmer CPU caches and memory state. Reversing the order on
+odd batches distributes this advantage evenly.
 
-**Algorithm:**
-1. For each of 10,000 iterations:
-   - Resample baseline with replacement → compute median_B
-   - Resample current with replacement → compute median_C
-   - Store: `(median_C - median_B) / median_B × 100`
-2. CI = [2.5th percentile, 97.5th percentile] of differences
+**Warmup batch**: Batch 0 is dropped by default. The first batch pays one-time
+OS costs (page cache population, CPU cache priming, memory allocator warmup)
+that don't reflect steady-state performance. Use `--warmup-batch` to include it.
 
-**Output:**
-- `percent`: Observed % difference
-- `ci`: 95% confidence interval on the difference
-- `direction`: "faster" | "slower" | "uncertain" (based on whether CI excludes zero)
+Each batch runs for the full `--duration` independently. Total measurement time
+is duration x batches.
 
-**Display format:** `+2.5% [-1.2%, +6.1%]` (colored green/red/gray)
+## Value Estimates
 
-### Why CI Instead of P-values
-The CI approach is more informative for benchmarks:
-- Shows magnitude AND significance (if CI excludes zero → significant)
-- Users care about "how much faster" not just "is it different"
-- A tiny change can be "significant" with enough samples but not actionable
+When looking at a single benchmark (no baseline comparison), multiple statistics
+together tell the full story.
 
-Note: `PermutationTest.ts` contains an unused permutation test implementation
-that computes p-values instead of CIs, kept for potential future use.
+**Median (p50)** is the typical iteration cost. It's robust to GC spikes and
+noise -- it tells you how fast your algorithm runs *between* disruptions. This
+is the "clean" speed of your code.
 
-## Internal-Only Statistics
+**Mean** is the amortized cost including everything -- GC pauses, JIT
+compilation, the lot. It reflects the actual wall-clock throughput: total time
+divided by iterations.
 
-These are computed but not displayed to users. They exist for internal use
-by the adaptive sampling algorithm or as building blocks for other stats.
+**When median and mean diverge**, that's informative. A large gap means GC or
+other intermittent costs are significant. If a code change makes mean worse
+while median stays flat, you likely increased allocation pressure -- a real
+regression that median alone would hide.
 
-- **MAD** (Median Absolute Deviation): Robust alternative to standard deviation
-- **CV** (Coefficient of Variation): σ/μ for relative variability
-- **Standard Deviation**: Uses Bessel's correction (n-1 denominator)
-- **Outlier Detection**: Tukey's IQR method (Q1 - 1.5×IQR, Q3 + 1.5×IQR)
-- **Outlier Impact**: Proportion of excess time in outliers (`excess_time / total_time`), used by adaptive convergence detection
+**Tail percentiles** (p90, p99) show worst-case iteration behavior. High p99
+relative to median indicates occasional expensive iterations, often from GC
+pauses or JIT recompilation.
 
-## Experimental: Adaptive Sampling (`AdaptiveWrapper.ts`)
+Point estimates are computed from all pooled samples across batches.
 
-Gated behind the `--adaptive` flag. The algorithm is still being tuned.
+## Comparison Statistics
 
-### Convergence Detection
-Compares two sliding windows of samples to detect stability.
+When comparing against a baseline, the question changes from "how fast is this?"
+to "did it get faster or slower, and by how much?"
 
-**Window sizes** (scaled to execution time):
-| Execution time | Window size |
-|----------------|-------------|
-| <10μs          | 200 samples |
-| <100μs         | 100 samples |
-| <1ms           | 50 samples  |
-| <10ms          | 30 samples  |
-| >10ms          | 20 samples  |
+### Block Bootstrap
 
-**Stability metrics:**
-1. **Median drift**: `|median_recent - median_previous| / median_previous`
-2. **Outlier impact drift**: Change in proportion of time spent in outliers
+Individual samples within a batch are correlated -- they share the same thermal
+state, memory layout, and background load. Treating each sample as independent
+would understate the true uncertainty. Instead, batches are the unit of
+independence.
 
-**Convergence criteria:**
-- Both drifts < 5% → converged (100% confidence)
-- Otherwise → confidence based on how close to threshold
+The block bootstrap works as follows:
 
-### Timing Parameters
-- `minTime`: 1000ms (minimum run time before early termination)
-- `maxTime`: 10000ms (hard limit)
-- `targetConfidence`: 95% (stop early if reached after minTime)
-- `fallbackThreshold`: 80% (accept if reached after minTime)
+1. Compute the mean of each batch independently (for both baseline and current)
+2. Tukey-trim the batch means: remove batches whose means fall outside
+   3x IQR fences. This is where environmental noise gets rejected -- if a
+   browser update ran during batch 7, that batch's mean is an outlier and gets
+   dropped.
+3. For each of 10,000 bootstrap iterations:
+   - Resample baseline batch means (with replacement)
+   - Resample current batch means (with replacement)
+   - Compute the percentage difference between their averages
+4. The 2.5th and 97.5th percentiles of this distribution form the 95%
+   confidence interval.
 
-## Key Files
+The point estimate (observed % difference) uses the pooled median across all
+samples, not the batch means. This gives the most precise single number. The
+CI width comes from the batch-level resampling, reflecting between-batch
+environmental variance.
 
-| File | Purpose |
-|------|---------|
-| `StatisticalUtils.ts` | Core stats: percentiles, MAD, CV, bootstrap CI |
-| `AdaptiveWrapper.ts` | Adaptive sampling with convergence detection |
-| `PermutationTest.ts` | Unused permutation test (p-values) |
-| `BenchmarkReport.ts` | Terminal table with Δ% CI column |
-| `HtmlReport.ts` | Prepares data for HTML reports |
+### Equivalence Margin
+
+A confidence interval answers "what range of differences is plausible?" but
+doesn't directly answer "is this change meaningful?" The equivalence margin
+bridges that gap.
+
+Traditional CI testing asks: does the CI exclude zero? But with enough batches,
+even trivial noise (ASLR, scheduler jitter) can push the CI away from zero.
+The result gets stuck at "slower" or "faster" when comparing identical code --
+the test detects real differences but can never confirm equivalence.
+
+The equivalence margin (`--equiv-margin`, default 2%) defines the smallest
+difference that matters. The CI is compared against both zero and the margin:
+
+```
+         -margin       0       +margin
+            |          |          |
+    [---]   |          |          |        ==> FASTER  (beyond margin)
+            |          |          | [---]  ==> SLOWER  (beyond margin)
+            |   [----------]     |        ==> EQUIVALENT (CI within margin)
+            |      [--]          |        ==> EQUIVALENT (excludes zero, but trivial)
+   [------------]  |             |        ==> INCONCLUSIVE (need more data)
+```
+
+**Equivalent** means the entire CI fits within the margin. The difference is
+provably smaller than what matters, whether or not it's statistically
+significant.
+
+**Faster / Slower** means the CI excludes zero and extends beyond the margin.
+A real, meaningful change.
+
+**Inconclusive** means the CI is too wide to decide. More batches would narrow
+it.
+
+#### Calibrating the Margin
+
+The default 2% margin is reasonable for most benchmarks, but the noise floor
+varies. Fast microbenchmarks may have < 1% noise; slow benchmarks with GC
+pressure may have 3-5%.
+
+To calibrate, run a self-comparison where baseline and current are identical:
+
+```bash
+# Run identical code against itself
+benchforge my-bench.ts --baseline --batches 50
+
+# Check the CI -- e.g. +0.3% [-1.8%, +2.4%]
+# The max absolute bound (2.4%) is your noise floor.
+# Round up for the margin.
+benchforge my-bench.ts --baseline --batches 50 --equiv-margin 3
+```
+
+Use `--equiv-margin 0` to disable equivalence testing and fall back to the
+simple CI-excludes-zero approach.
+
+### Batch Count
+
+The block bootstrap resamples batch means, so the number of batches directly
+determines CI quality. With too few batches, CIs are wide and unstable.
+
+Benchforge warns when a comparison has fewer than 20 batches and disables the
+direction indicator. For reliable comparisons, use 40+ batches. More batches
+always narrow the CI further -- the only cost is wall-clock time.
+
+## Reading the Results
+
+Results are displayed as: `+2.5% [-1.2%, +6.1%]`
+
+- The first number is the observed percentage difference (positive = slower)
+- The bracketed range is the 95% confidence interval
+- Color indicates direction: green for faster, red for slower, gray for
+  uncertain
+
+**"Uncertain" or "Inconclusive"** means the CI is too wide to decide. The fix
+is more batches -- each additional batch is another independent observation that
+narrows the interval. Aim for 40+ batches for reliable results.
+
+**Median and mean tell different stories?** Check whether GC overhead changed.
+If mean regressed but median didn't, allocation patterns likely shifted. Both
+numbers matter -- median for algorithmic cost, mean for real-world throughput.

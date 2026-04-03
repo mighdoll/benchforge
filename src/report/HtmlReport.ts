@@ -69,7 +69,7 @@ export function prepareHtmlData(
   };
 }
 
-const minBatches = 8;
+const minBatches = 20;
 
 /** Context shared across reports in a group */
 interface GroupContext {
