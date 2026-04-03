@@ -107,13 +107,17 @@ export function printHeapReports(
     const sites = flattenProfile(resolved);
     const userSites = filterSites(sites, options.isUserCode);
     const agg = aggregateSites(options.userOnly ? userSites : sites);
+    const totalAll = resolved.totalBytes;
     const totalUserCode = userSites.reduce((sum, s) => sum + s.bytes, 0);
-    const extra = {
-      totalAll: resolved.totalBytes,
-      totalUserCode,
-      sampleCount: resolved.sortedSamples?.length,
-    };
-    console.log(formatHeapReport(agg, { ...options, ...extra }));
+    const sampleCount = resolved.sortedSamples?.length;
+    console.log(
+      formatHeapReport(agg, {
+        ...options,
+        totalAll,
+        totalUserCode,
+        sampleCount,
+      }),
+    );
     if (options.raw) {
       console.log(dim(`\n─── Raw samples: ${report.name} ───`));
       console.log(formatRawSamples(resolved));
@@ -163,8 +167,8 @@ function mergeMatrixDefaults(
 ): MatrixReportOptions {
   const merged: MatrixReportOptions = { ...opts };
   if (!merged.sections?.length) {
-    const hasOpt =
-      args["trace-opt"] && hasField(matrixToReportGroups(results), "optStatus");
+    const groups = matrixToReportGroups(results);
+    const hasOpt = args["trace-opt"] && hasField(groups, "optStatus");
     merged.sections = buildReportSections(
       args.adaptive,
       args["gc-stats"],

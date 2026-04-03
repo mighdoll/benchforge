@@ -60,7 +60,13 @@ export function createDistributionPlot(
   if (!histogram?.length) return svg;
 
   const { fill, stroke } = colors[opts.direction];
-  const scales = buildScales(histogram, ci, layout, opts.includeZero, opts.equivMargin);
+  const scales = buildScales(
+    histogram,
+    ci,
+    layout,
+    opts.includeZero,
+    opts.equivMargin,
+  );
   const { margin, plot } = layout;
 
   drawTitles(svg, opts, margin, scales.x(pointEstimate));
@@ -132,14 +138,13 @@ function drawMarginZone(
   const zone = rect(x1, bandY, x2 - x1, bandH, { fill: "currentColor" });
   zone.classList.add("margin-zone");
   svg.appendChild(zone);
-  const y1 = margin.top;
-  const y2 = margin.top + plot.h;
+  const attrs = {
+    stroke: "currentColor",
+    strokeWidth: "1",
+    strokeDasharray: "3,3",
+  };
   for (const x of [x1, x2]) {
-    const l = line(x, y1, x, y2, {
-      stroke: "currentColor",
-      strokeWidth: "1",
-      strokeDasharray: "3,3",
-    });
+    const l = line(x, margin.top, x, margin.top + plot.h, attrs);
     l.classList.add("margin-line");
     svg.appendChild(l);
   }
@@ -157,10 +162,9 @@ function drawReferenceLine(
   const { margin, plot } = layout;
   const inRange = zeroX >= margin.left && zeroX <= layout.width - margin.right;
   if (inRange) {
-    const y1 = margin.top - 4;
-    const y2 = margin.top + plot.h + 4;
+    const attrs = { stroke: "#000", strokeWidth: "1" };
     svg.appendChild(
-      line(zeroX, y1, zeroX, y2, { stroke: "#000", strokeWidth: "1" }),
+      line(zeroX, margin.top - 4, zeroX, margin.top + plot.h + 4, attrs),
     );
   }
 }
@@ -188,9 +192,11 @@ function buildLayout(
   const margin = compact
     ? { top: 4, right: 6, bottom: 4, left: 6 }
     : { ...defaultMargin, top: hasPointLabel ? 30 : defaultMargin.top };
-  const w = width - margin.left - margin.right;
-  const h = height - margin.top - margin.bottom;
-  return { width, height, margin, plot: { w, h } };
+  const plot = {
+    w: width - margin.left - margin.right,
+    h: height - margin.top - margin.bottom,
+  };
+  return { width, height, margin, plot };
 }
 
 function createSvg(w: number, h: number): SVGSVGElement {

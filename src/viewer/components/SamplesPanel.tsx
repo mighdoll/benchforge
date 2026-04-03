@@ -136,43 +136,25 @@ interface ToggleProps {
   onToggle: (key: keyof SeriesVisibility) => void;
 }
 
+function TogglePill(
+  { label, active, onClick }: { label: string; active: boolean; onClick: () => void },
+) {
+  return (
+    <button class={`toggle-pill${active ? " active" : ""}`} onClick={onClick}>
+      {label}
+    </button>
+  );
+}
+
 function SeriesToggles(props: ToggleProps) {
   const { hasBaseline, hasHeap, hasBaselineHeap, hasRejected, visibility, onToggle } = props;
   if (!hasBaseline && !hasHeap && !hasRejected) return null;
   return (
     <div class="series-toggles">
-      {hasBaseline && (
-        <button
-          class={`toggle-pill${visibility.baseline ? " active" : ""}`}
-          onClick={() => onToggle("baseline")}
-        >
-          baseline
-        </button>
-      )}
-      {hasHeap && (
-        <button
-          class={`toggle-pill${visibility.heap ? " active" : ""}`}
-          onClick={() => onToggle("heap")}
-        >
-          heap
-        </button>
-      )}
-      {hasBaselineHeap && (
-        <button
-          class={`toggle-pill${visibility.baselineHeap ? " active" : ""}`}
-          onClick={() => onToggle("baselineHeap")}
-        >
-          heap (baseline)
-        </button>
-      )}
-      {hasRejected && (
-        <button
-          class={`toggle-pill${visibility.rejected ? " active" : ""}`}
-          onClick={() => onToggle("rejected")}
-        >
-          rejected
-        </button>
-      )}
+      {hasBaseline && <TogglePill label="baseline" active={visibility.baseline} onClick={() => onToggle("baseline")} />}
+      {hasHeap && <TogglePill label="heap" active={visibility.heap} onClick={() => onToggle("heap")} />}
+      {hasBaselineHeap && <TogglePill label="heap (baseline)" active={visibility.baselineHeap} onClick={() => onToggle("baselineHeap")} />}
+      {hasRejected && <TogglePill label="rejected" active={visibility.rejected} onClick={() => onToggle("rejected")} />}
     </div>
   );
 }

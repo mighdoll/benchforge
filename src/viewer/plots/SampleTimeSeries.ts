@@ -67,7 +67,12 @@ export function createSampleTimeSeries(
   pausePoints: FlatPausePoint[] = [],
   heapSeries: HeapPoint[] = [],
   baselineHeapSeries: HeapPoint[] = [],
-  visibility: SeriesVisibility = { baseline: true, heap: true, baselineHeap: false, rejected: true },
+  visibility: SeriesVisibility = {
+    baseline: true,
+    heap: true,
+    baselineHeap: false,
+    rejected: true,
+  },
 ): SVGSVGElement | HTMLElement {
   const filtered = visibility.baseline
     ? timeSeries
@@ -78,12 +83,12 @@ export function createSampleTimeSeries(
     ...(visibility.baselineHeap ? baselineHeapSeries : []),
   ];
   const heapScale = computeHeapScale(visibleHeap, ctx.yMin, ctx.yMax);
-  const heapData = heapScale && visibility.heap
-    ? prepareHeapData(heapSeries, heapScale)
-    : [];
-  const baselineHeapData = heapScale && visibility.baselineHeap
-    ? prepareHeapData(baselineHeapSeries, heapScale)
-    : [];
+  const heapData =
+    heapScale && visibility.heap ? prepareHeapData(heapSeries, heapScale) : [];
+  const baselineHeapData =
+    heapScale && visibility.baselineHeap
+      ? prepareHeapData(baselineHeapSeries, heapScale)
+      : [];
   const showRejected = visibility.rejected && ctx.hasRejected;
   const legendItems = buildLegendItems(
     ctx.hasWarmup,
@@ -121,7 +126,16 @@ export function createSampleTimeSeries(
       tickFormat: ctx.formatValue,
     },
     color: { legend: false, scheme: "observable10" },
-    marks: buildMarks(ctx, heapData, baselineHeapData, heapScale, gcEvents, pausePoints, legendItems, showRejected),
+    marks: buildMarks(
+      ctx,
+      heapData,
+      baselineHeapData,
+      heapScale,
+      gcEvents,
+      pausePoints,
+      legendItems,
+      showRejected,
+    ),
   });
 }
 
@@ -196,7 +210,12 @@ function prepareHeapData(heapSeries: HeapPoint[], hs: HeapScale) {
     y: hs.yMin + (d.value - hs.heapMinBytes) * hs.scale,
     heapMB: d.value / 1024 / 1024,
   }));
-  return lttb(mapped, 500, d => d.sample, d => d.y);
+  return lttb(
+    mapped,
+    500,
+    d => d.sample,
+    d => d.y,
+  );
 }
 
 /** Assemble legend entries based on which data series are present */
@@ -337,13 +356,12 @@ function getTimeUnit(values: number[]) {
 function computeYRange(values: number[]) {
   const dataMin = d3.min(values)!;
   const dataMax = d3.max(values)!;
-  const dataRange = dataMax - dataMin;
-  const padding = dataRange * 0.15;
-  let yMin = dataMin - padding;
-  const magnitude = 10 ** Math.floor(Math.log10(Math.abs(yMin)));
-  yMin = Math.floor(yMin / magnitude) * magnitude;
+  const range = dataMax - dataMin;
+  let yMin = dataMin - range * 0.15;
+  const mag = 10 ** Math.floor(Math.log10(Math.abs(yMin)));
+  yMin = Math.floor(yMin / mag) * mag;
   if (dataMin > 0 && yMin < 0) yMin = 0;
-  return { yMin, yMax: dataMax + dataRange * 0.05 };
+  return { yMin, yMax: dataMax + range * 0.05 };
 }
 
 /** Create area + tooltip marks for the heap usage overlay */
@@ -390,7 +408,11 @@ function heapAxisMarks(
   const maxMB = (hs.heapMinBytes + hs.heapRangeBytes) / 1024 / 1024;
   const ticks = d3.ticks(minMB, maxMB, 3);
   const fmtMB = (mb: number) =>
-    mb >= 100 ? `${mb.toFixed(0)}` : mb >= 10 ? `${mb.toFixed(1)}` : `${mb.toFixed(2)}`;
+    mb >= 100
+      ? `${mb.toFixed(0)}`
+      : mb >= 10
+        ? `${mb.toFixed(1)}`
+        : `${mb.toFixed(2)}`;
 
   const tickData = ticks.map(mb => ({
     x: tickX,
@@ -398,28 +420,20 @@ function heapAxisMarks(
     label: fmtMB(mb),
   }));
 
+  const textOpts = {
+    x: "x",
+    y: "y",
+    fontSize: 10,
+    textAnchor: "start" as const,
+    fill: "#333",
+    clip: false,
+  };
+  const mbLabel = [
+    { x: labelX, y: hs.yMin + hs.heapRangeBytes * hs.scale * 0.5, text: "MB" },
+  ];
   return [
-    Plot.text(tickData, {
-      x: "x",
-      y: "y",
-      text: "label",
-      fontSize: 10,
-      textAnchor: "start",
-      fill: "#333",
-      clip: false,
-    }),
-    Plot.text(
-      [{ x: labelX, y: hs.yMin + hs.heapRangeBytes * hs.scale * 0.5, text: "MB" }],
-      {
-        x: "x",
-        y: "y",
-        text: "text",
-        fontSize: 10,
-        textAnchor: "start",
-        fill: "#333",
-        clip: false,
-      },
-    ),
+    Plot.text(tickData, { ...textOpts, text: "label" }),
+    Plot.text(mbLabel, { ...textOpts, text: "text" }),
   ];
 }
 
@@ -483,8 +497,12 @@ function lttb<T>(
     const bStart = Math.floor(i * bucketSize) + 1;
     const bEnd = Math.floor((i + 1) * bucketSize) + 1;
     const nStart = bEnd;
-    const nEnd = Math.min(Math.floor((i + 2) * bucketSize) + 1, data.length - 1);
-    let avgX = 0, avgY = 0;
+    const nEnd = Math.min(
+      Math.floor((i + 2) * bucketSize) + 1,
+      data.length - 1,
+    );
+    let avgX = 0;
+    let avgY = 0;
     for (let j = nStart; j < nEnd; j++) {
       avgX += getX(data[j]);
       avgY += getY(data[j]);
@@ -493,14 +511,18 @@ function lttb<T>(
     avgX /= cnt;
     avgY /= cnt;
     const prev = result[result.length - 1];
-    const px = getX(prev), py = getY(prev);
-    let maxArea = -1, maxIdx = bStart;
+    const px = getX(prev);
+    const py = getY(prev);
+    let maxArea = -1;
+    let maxIdx = bStart;
     for (let j = bStart; j < bEnd; j++) {
       const area = Math.abs(
-        (px - avgX) * (getY(data[j]) - py) -
-        (px - getX(data[j])) * (avgY - py),
+        (px - avgX) * (getY(data[j]) - py) - (px - getX(data[j])) * (avgY - py),
       );
-      if (area > maxArea) { maxArea = area; maxIdx = j; }
+      if (area > maxArea) {
+        maxArea = area;
+        maxIdx = j;
+      }
     }
     result.push(data[maxIdx]);
   }
@@ -510,7 +532,12 @@ function lttb<T>(
 
 /** Downsample if array exceeds maxDots, preserving visual features */
 function ds(arr: SampleData[]): SampleData[] {
-  return lttb(arr, maxDots, d => d.sample, d => d.displayValue);
+  return lttb(
+    arr,
+    maxDots,
+    d => d.sample,
+    d => d.displayValue,
+  );
 }
 
 /** Create dot marks for warmup, baseline, and measured samples with opt tier colors */
@@ -522,60 +549,51 @@ function sampleDotMarks(ctx: PlotContext, showRejected: boolean): any[] {
     d.optTier
       ? `Iteration ${d.sample}: ${fmtVal(d)} [${d.optTier}]`
       : `Iteration ${d.sample}: ${fmtVal(d)}`;
+  const xy = { x: "sample" as const, y: "displayValue" as const, r: 3 };
+  const warmup = ds(convertedData.filter(d => d.isWarmup));
+  const baseline = ds(
+    convertedData.filter(d => d.isBaseline && !d.isWarmup && !d.isRejected),
+  );
+  const measured = ds(
+    convertedData.filter(d => !d.isBaseline && !d.isWarmup && !d.isRejected),
+  );
+  const rejected = showRejected
+    ? convertedData.filter(d => d.isRejected && !d.isWarmup)
+    : [];
   return [
-    Plot.dot(
-      ds(convertedData.filter(d => d.isWarmup)),
-      {
-        x: "sample",
-        y: "displayValue",
-        stroke: "#dc3545",
-        fill: "none",
-        strokeWidth: 1.5,
-        r: 3,
-        opacity: 0.7,
-        title: (d: SampleData) => `Warmup ${d.sample}: ${fmtVal(d)}`,
-      },
-    ),
-    Plot.dot(
-      ds(convertedData.filter(d => d.isBaseline && !d.isWarmup && !d.isRejected)),
-      {
-        x: "sample",
-        y: "displayValue",
-        stroke: "#ffa500",
-        fill: "none",
-        strokeWidth: 2,
-        r: 3,
-        opacity: 0.8,
-        title: tipTitle,
-      },
-    ),
-    Plot.dot(
-      ds(convertedData.filter(d => !d.isBaseline && !d.isWarmup && !d.isRejected)),
-      {
-        x: "sample",
-        y: "displayValue",
-        fill: (d: SampleData) =>
-          (d.optTier && optTierColors[d.optTier]) || "#4682b4",
-        r: 3,
-        opacity: 0.8,
-        title: tipTitle,
-      },
-    ),
-    ...(showRejected
+    Plot.dot(warmup, {
+      ...xy,
+      stroke: "#dc3545",
+      fill: "none",
+      strokeWidth: 1.5,
+      opacity: 0.7,
+      title: (d: SampleData) => `Warmup ${d.sample}: ${fmtVal(d)}`,
+    }),
+    Plot.dot(baseline, {
+      ...xy,
+      stroke: "#ffa500",
+      fill: "none",
+      strokeWidth: 2,
+      opacity: 0.8,
+      title: tipTitle,
+    }),
+    Plot.dot(measured, {
+      ...xy,
+      opacity: 0.8,
+      title: tipTitle,
+      fill: (d: SampleData) =>
+        (d.optTier && optTierColors[d.optTier]) || "#4682b4",
+    }),
+    ...(rejected.length
       ? [
-          Plot.dot(
-            convertedData.filter(d => d.isRejected && !d.isWarmup),
-            {
-              x: "sample",
-              y: "displayValue",
-              stroke: "#999",
-              fill: "none",
-              strokeWidth: 1,
-              r: 3,
-              opacity: 0.3,
-              title: (d: SampleData) => `Rejected ${tipTitle(d)}`,
-            },
-          ),
+          Plot.dot(rejected, {
+            ...xy,
+            stroke: "#999",
+            fill: "none",
+            strokeWidth: 1,
+            opacity: 0.3,
+            title: (d: SampleData) => `Rejected ${tipTitle(d)}`,
+          }),
         ]
       : []),
   ];

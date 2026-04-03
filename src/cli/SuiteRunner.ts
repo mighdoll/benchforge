@@ -139,11 +139,12 @@ async function runMultipleBatches(
   const benchmarkBatches = new Map<string, MeasuredResults[]>();
 
   for (let i = 0; i < batches; i++) {
+    const reverse = i % 2 === 1;
     await runBatchIteration(
       benchmarks,
       baseline,
       batchParams,
-      i % 2 === 1,
+      reverse,
       baselineBatches,
       benchmarkBatches,
     );
@@ -157,13 +158,14 @@ async function runMultipleBatches(
     }
   }
 
+  const { metadata } = runParams;
   return mergeBatchResults(
     name,
     benchmarks,
     baseline,
     baselineBatches,
     benchmarkBatches,
-    runParams.metadata,
+    metadata,
   );
 }
 

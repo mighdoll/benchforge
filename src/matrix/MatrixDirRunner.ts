@@ -60,17 +60,15 @@ async function createDirContext<T>(
     ? await discoverVariants(matrix.baselineDir)
     : [];
   const { casesModule, caseIds } = await resolveCases(matrix, options);
-  const batches = options.batches ?? 1;
   const runnerOpts = buildRunnerOptions(options);
-  const warmupBatch = options.warmupBatch ?? false;
   return {
     matrix,
     casesModule,
     baselineIds,
     caseIds,
     runnerOpts,
-    batches,
-    warmupBatch,
+    batches: options.batches ?? 1,
+    warmupBatch: options.warmupBatch ?? false,
   };
 }
 
@@ -97,7 +95,7 @@ async function runDirVariantCases<T>(
 
   for (const caseId of caseIds) {
     const caseData = matrix.cases && !matrix.casesModule ? caseId : undefined;
-    const variantArgs = {
+    const variantArgs: VariantArgs = {
       variantDir: matrix.variantDir!,
       variantId,
       caseId,

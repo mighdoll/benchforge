@@ -15,10 +15,11 @@ export function createHistogramKde(
   allSamples: Sample[],
   benchmarkNames: string[],
 ): SVGSVGElement | HTMLElement {
-  const bars = buildBarData(allSamples, benchmarkNames);
-  const { barData, binMin, binMax, yMax } = bars;
+  const { barData, binMin, binMax, yMax } = buildBarData(
+    allSamples,
+    benchmarkNames,
+  );
   const { colorMap, legendItems } = buildColorData(benchmarkNames);
-  const xMax = binMax;
 
   return Plot.plot({
     marginTop: 24,
@@ -31,7 +32,7 @@ export function createHistogramKde(
     x: {
       label: "Time (ms)",
       labelAnchor: "center",
-      domain: [binMin, xMax],
+      domain: [binMin, binMax],
       labelOffset: 45,
       tickFormat: (d: number) => d.toFixed(1),
       ticks: 5,
@@ -54,7 +55,7 @@ export function createHistogramKde(
         title: (d: Bar) => `${d.benchmark}: ${d.count}`,
       }),
       Plot.ruleY([0]),
-      ...buildLegend({ xMin: binMin, xMax, yMax }, legendItems),
+      ...buildLegend({ xMin: binMin, xMax: binMax, yMax }, legendItems),
     ],
   });
 }
@@ -105,11 +106,10 @@ function buildBarData(allSamples: Sample[], benchmarkNames: string[]) {
 /** Map benchmark names to colors and legend items using Observable 10 palette */
 function buildColorData(benchmarkNames: string[]) {
   const scheme = (d3 as any).schemeObservable10;
-  const colorMap = new Map(
-    benchmarkNames.map((name, i) => [name, scheme[i % 10]]),
-  );
+  const color = (i: number) => scheme[i % 10];
+  const colorMap = new Map(benchmarkNames.map((name, i) => [name, color(i)]));
   const legendItems: LegendItem[] = benchmarkNames.map((name, i) => ({
-    color: scheme[i % 10],
+    color: color(i),
     label: name,
     style: "vertical-bar",
   }));

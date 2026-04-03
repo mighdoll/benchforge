@@ -45,7 +45,10 @@ export type ReportColumn<T> = AnyColumn<T> & {
   /** Compute this stat from raw timing samples for bootstrap CI (comparable columns only) */
   statFn?: (samples: number[], metadata?: Record<string, unknown>) => number;
   /** Convert a timing-domain value to display domain (e.g., ms to lines/sec) */
-  toDisplay?: (timingValue: number, metadata?: Record<string, unknown>) => number;
+  toDisplay?: (
+    timingValue: number,
+    metadata?: Record<string, unknown>,
+  ) => number;
 };
 
 /** Maps benchmark results to table columns */
@@ -92,8 +95,8 @@ export function findPrimaryColumn(
   sections?: ResultsMapper[],
 ): ReportColumn<Record<string, unknown>> | undefined {
   if (!sections) return undefined;
-  const allColumns = sections.flatMap(s => s.columns().flatMap(g => g.columns));
-  return allColumns.find(c => c.comparable && c.statFn) as
+  const cols = sections.flatMap(s => s.columns().flatMap(g => g.columns));
+  return cols.find(c => c.comparable && c.statFn) as
     | ReportColumn<Record<string, unknown>>
     | undefined;
 }

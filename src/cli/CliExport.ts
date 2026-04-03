@@ -50,23 +50,19 @@ type FrameContainer = {
 
 /** Export reports (JSON, Perfetto, archive, viewer) based on CLI args. */
 export async function exportReports(options: ExportOptions): Promise<void> {
-  const {
-    results,
-    args,
-    suiteName,
-    sections,
-    currentVersion,
-    baselineVersion,
-  } = options;
+  const { results, args, suiteName } = options;
+  const { sections, currentVersion, baselineVersion } = options;
 
   const needsReportData = args.view || args.archive != null;
+  const equivMargin = args["equiv-margin"];
+  const noBatchTrim = args["no-batch-trim"];
   const htmlOpts = {
     cliArgs: args,
     sections,
     currentVersion,
     baselineVersion,
-    equivMargin: args["equiv-margin"],
-    noBatchTrim: args["no-batch-trim"],
+    equivMargin,
+    noBatchTrim,
   };
   const reportData = needsReportData
     ? prepareHtmlData(results, htmlOpts)
@@ -80,12 +76,13 @@ export async function exportReports(options: ExportOptions): Promise<void> {
   const timeData = timeFile ? JSON.stringify(timeFile) : undefined;
 
   if (args.archive != null) {
+    const outputPath = args.archive || undefined;
     await archiveBenchmark({
       groups: results,
       reportData,
       timeProfileData: timeData,
       coverageData,
-      outputPath: args.archive || undefined,
+      outputPath,
     });
   }
   if (args.view) {
@@ -142,9 +139,8 @@ async function annotateCoverage(
   const coverage = mergeCoverage(results);
   if (!coverage) return undefined;
 
-  const sources = await collectSources(
-    coverage.scripts.map(s => ({ file: s.url })),
-  );
+  const files = coverage.scripts.map(s => ({ file: s.url }));
+  const sources = await collectSources(files);
   const covMap = buildCoverageMap(coverage, sources);
   if (profileFile) annotateFramesWithCounts(profileFile.shared.frames, covMap);
   if (timeFile) annotateFramesWithCounts(timeFile.shared.frames, covMap);

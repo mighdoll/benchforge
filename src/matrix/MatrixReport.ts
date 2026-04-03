@@ -160,15 +160,21 @@ function buildSectionTable(
   const rows: Row[] = caseResults.flatMap(({ variant, cr }) => {
     const vals = extractSectionValues(cr.measured, sections, cr.metadata);
     const row: Row = { name: truncate(variant.id, 25), ...vals };
-    if (cr.baseline)
+    if (cr.baseline) {
       row.diffCI = computeDiffCI(
-        cr.baseline, cr.measured, primaryCol, cr.metadata, options.comparison,
+        cr.baseline,
+        cr.measured,
+        primaryCol,
+        cr.metadata,
+        options.comparison,
       );
-    const out: Row[] = [row];
-    if (cr.baseline && !shared) {
-      const baseVals = extractSectionValues(cr.baseline, sections, cr.metadata);
-      out.push({ name: " \u21B3 baseline", ...baseVals });
     }
+    const out: Row[] = [row];
+    if (cr.baseline && !shared)
+      out.push({
+        name: " \u21B3 baseline",
+        ...extractSectionValues(cr.baseline, sections, cr.metadata),
+      });
     return out;
   });
 
@@ -197,10 +203,14 @@ function buildCaseRows(
     const out: MatrixReportRow[] = [
       buildRow(variant.id, cr, extraColumns, comparison),
     ];
-    if (cr.baseline && !shared) {
-      const baseCr = { ...cr, measured: cr.baseline, baseline: undefined };
-      out.push(buildRow(" \u21B3 baseline", baseCr, extraColumns));
-    }
+    if (cr.baseline && !shared)
+      out.push(
+        buildRow(
+          " \u21B3 baseline",
+          { ...cr, measured: cr.baseline, baseline: undefined },
+          extraColumns,
+        ),
+      );
     return out;
   });
 
@@ -227,10 +237,9 @@ function buildColumns(
     formatter: formatDiffWithCI,
   };
   const timeCol = { key: "time" as K, title: "time", formatter: timeMs };
-  const timeCols = [timeCol, ...(hasBaseline ? [diffCol] : [])];
   return [
     nameCol,
-    { columns: timeCols },
+    { columns: [timeCol, ...(hasBaseline ? [diffCol] : [])] },
     ...extraColumnGroups(options?.extraColumns),
   ];
 }
@@ -243,14 +252,19 @@ function buildRow(
   comparison?: ComparisonOptions,
 ): MatrixReportRow {
   const { measured, baseline } = caseResult;
-  const { samples } = measured;
   const row: MatrixReportRow = {
     name: truncate(name, 25),
-    time: measured.time?.avg ?? average(samples),
-    samples: samples.length,
+    time: measured.time?.avg ?? average(measured.samples),
+    samples: measured.samples.length,
   };
   if (baseline)
-    row.diffCI = computeDiffCI(baseline, measured, undefined, undefined, comparison);
+    row.diffCI = computeDiffCI(
+      baseline,
+      measured,
+      undefined,
+      undefined,
+      comparison,
+    );
   if (extraColumns)
     for (const col of extraColumns) row[col.key] = col.extract(caseResult);
   return row;

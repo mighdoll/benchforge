@@ -255,17 +255,15 @@ function CoveragePanel({ entry }: { entry: BenchmarkEntry }) {
   );
 }
 
+const directionLabels: Record<string, string> = {
+  faster: "Faster", slower: "Slower", uncertain: "Inconclusive", equivalent: "Equivalent",
+};
+
 function ComparisonBadge({ ci, compact }: { ci: DifferenceCI; compact?: boolean }) {
-  const labels: Record<string, string> = {
-    faster: "Faster",
-    slower: "Slower",
-    uncertain: "Inconclusive",
-    equivalent: "Equivalent",
-  };
   return (
     <span class="comparison-badge">
       <span class={`badge badge-${ci.direction}`}>
-        {compact ? formatPct(ci.percent) : labels[ci.direction]}
+        {compact ? formatPct(ci.percent) : directionLabels[ci.direction]}
       </span>
       {ci.histogram && <CIPlotMount ci={ci} compact={compact} />}
     </span>
@@ -278,11 +276,9 @@ function CIPlotMount({ ci, compact }: { ci: DifferenceCI; compact?: boolean }) {
     import("../plots/CIPlot.ts").then(({ createCIPlot }) => {
       if (!ref.current) return;
       ref.current.innerHTML = "";
-      const args = reportData.value?.metadata.cliArgs as Record<string, unknown> | undefined;
-      const equivMargin = (args?.["equiv-margin"] as number) || undefined;
-      const opts = compact
-        ? { width: 200, height: 70, title: "", equivMargin }
-        : { equivMargin };
+      const cliArgs = reportData.value?.metadata.cliArgs as Record<string, unknown> | undefined;
+      const equivMargin = (cliArgs?.["equiv-margin"] as number) || undefined;
+      const opts = compact ? { width: 200, height: 70, title: "", equivMargin } : { equivMargin };
       ref.current.appendChild(createCIPlot(ci, opts));
     });
   }, [ci, compact]);

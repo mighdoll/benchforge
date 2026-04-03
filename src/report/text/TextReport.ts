@@ -51,13 +51,8 @@ export function reportResults<S extends ReadonlyArray<ResultsMapper<any>>>(
   const results = groups.map(g =>
     resultGroupValues(g, sections, primaryCol, options),
   );
-  return buildTable(
-    createColumnGroups(
-      sections,
-      results.some(g => g.baseline),
-    ),
-    results,
-  );
+  const hasBaseline = results.some(g => g.baseline);
+  return buildTable(createColumnGroups(sections, hasBaseline), results);
 }
 
 /** Extract stats from all sections into typed row objects for each report */

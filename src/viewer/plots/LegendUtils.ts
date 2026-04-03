@@ -67,8 +67,7 @@ function symbolMark(pos: LegendPos, item: LegendItem): any {
 }
 
 function textMark(pos: LegendPos, label: string): any {
-  const data = [{ x: pos.textX, y: pos.y, text: label }];
-  return Plot.text(data, {
+  return Plot.text([{ x: pos.textX, y: pos.y, text: label }], {
     x: "x",
     y: "y",
     text: "text",
@@ -84,27 +83,34 @@ function dotMark(x: number, y: number, color: string, filled: boolean): any {
     [{ x, y }],
     filled
       ? { x: "x", y: "y", fill: color, r: 4, clip: false }
-      : { x: "x", y: "y", stroke: color, fill: "none", strokeWidth: 1.5, r: 4, clip: false },
+      : {
+          x: "x",
+          y: "y",
+          stroke: color,
+          fill: "none",
+          strokeWidth: 1.5,
+          r: 4,
+          clip: false,
+        },
   );
 }
 
 function verticalBarMark(pos: LegendPos, color: string): any {
   const { legendX, y, xRange, yMax } = pos;
-  const w = xRange * 0.012;
-  const h = yMax * 0.05;
-  const x1 = legendX - w / 2;
-  const x2 = legendX + w / 2;
-  const y1 = y - h / 2;
-  const y2 = y + h / 2;
-  return Plot.rect([{ x1, x2, y1, y2 }], {
-    x1: "x1",
-    x2: "x2",
-    y1: "y1",
-    y2: "y2",
-    fill: color,
-    fillOpacity: 0.6,
-    clip: false,
-  });
+  const hw = xRange * 0.006;
+  const hh = yMax * 0.025;
+  return Plot.rect(
+    [{ x1: legendX - hw, x2: legendX + hw, y1: y - hh, y2: y + hh }],
+    {
+      x1: "x1",
+      x2: "x2",
+      y1: "y1",
+      y2: "y2",
+      fill: color,
+      fillOpacity: 0.6,
+      clip: false,
+    },
+  );
 }
 
 function verticalLineMark(
@@ -113,9 +119,10 @@ function verticalLineMark(
   strokeDash?: string,
 ): any {
   const { legendX, y, yMax } = pos;
+  const half = yMax * 0.025;
   return Plot.ruleX([legendX], {
-    y1: y - yMax * 0.025,
-    y2: y + yMax * 0.025,
+    y1: y - half,
+    y2: y + half,
     stroke: color,
     strokeWidth: 2,
     strokeDasharray: strokeDash,
@@ -126,19 +133,19 @@ function verticalLineMark(
 function rectMark(pos: LegendPos, color: string): any {
   const { legendX, y, xRange, yMax } = pos;
   const hw = xRange * 0.015;
-  const x1 = legendX - hw;
-  const x2 = legendX + hw;
-  const y1 = y - yMax * 0.02;
-  const y2 = y + yMax * 0.02;
-  return Plot.rect([{ x1, x2, y1, y2 }], {
-    x1: "x1",
-    x2: "x2",
-    y1: "y1",
-    y2: "y2",
-    fill: color,
-    fillOpacity: 0.3,
-    stroke: color,
-    strokeWidth: 1,
-    clip: false,
-  });
+  const hh = yMax * 0.02;
+  return Plot.rect(
+    [{ x1: legendX - hw, x2: legendX + hw, y1: y - hh, y2: y + hh }],
+    {
+      x1: "x1",
+      x2: "x2",
+      y1: "y1",
+      y2: "y2",
+      fill: color,
+      fillOpacity: 0.3,
+      stroke: color,
+      strokeWidth: 1,
+      clip: false,
+    },
+  );
 }

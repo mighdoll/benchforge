@@ -6,7 +6,11 @@ import { runBenchLoop } from "./BenchLoop.ts";
 import { collectTracing, startGcTracing } from "./BrowserCDP.ts";
 import { type CdpClient, connectCdp } from "./CdpClient.ts";
 import { type CdpPage, createCdpPage } from "./CdpPage.ts";
-import { type ChromeInstance, createTab, launchChrome } from "./ChromeLauncher.ts";
+import {
+  type ChromeInstance,
+  createTab,
+  launchChrome,
+} from "./ChromeLauncher.ts";
 import { setupLapMode } from "./LapMode.ts";
 import { runPageLoad } from "./PageLoadMode.ts";
 
@@ -63,14 +67,13 @@ export async function profileBrowser(
 ): Promise<BrowserProfileResult> {
   const { headless = false, chromePath, chromeProfile } = params;
   const owned = !params.chrome;
-  const chrome =
-    params.chrome ??
-    (await launchChrome({
-      headless,
-      chromePath,
-      chromeProfile,
-      args: params.chromeArgs,
-    }));
+  const launchArgs = {
+    headless,
+    chromePath,
+    chromeProfile,
+    args: params.chromeArgs,
+  };
+  const chrome = params.chrome ?? (await launchChrome(launchArgs));
   try {
     const pageWsUrl = await createTab(chrome.port);
     const cdp = await connectCdp(pageWsUrl);
@@ -88,20 +91,17 @@ async function runProfile(
   cdp: CdpClient,
   params: BrowserProfileParams,
 ): Promise<BrowserProfileResult> {
-  const wantGc = params.gcStats;
   const samplingInterval = params.allocOptions?.samplingInterval ?? 32768;
-
   const pageErrors: string[] = [];
   page.onPageError(msg => pageErrors.push(msg));
 
-  const traceEvents = wantGc ? await startGcTracing(cdp) : [];
-
+  const traceEvents = params.gcStats ? await startGcTracing(cdp) : [];
   const ctx = { page, cdp, params, samplingInterval };
   const result = params.pageLoad
     ? await runPageLoad(ctx)
     : await runBenchOrLap(ctx, pageErrors);
 
-  if (wantGc)
+  if (params.gcStats)
     return { ...result, gcStats: await collectTracing(cdp, traceEvents) };
   return result;
 }

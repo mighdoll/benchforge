@@ -20,31 +20,16 @@ export function TabBar() {
 
   return (
     <div class="tab-bar">
-      <TabButton id="tab-summary" tabId="summary" disabled={!config.hasReport}>
+      <TabButton tabId="summary" disabled={!config.hasReport}>
         Summary
       </TabButton>
-      <TabButton
-        id="tab-samples"
-        tabId="samples"
-        disabled={!samplesEnabled}
-        onActivate={() => {
-          samplesLoaded.value = true;
-        }}
-      >
+      <TabButton tabId="samples" disabled={!samplesEnabled} onActivate={() => (samplesLoaded.value = true)}>
         Iterations
       </TabButton>
-      <TabButton
-        id="tab-flamechart"
-        tabId="flamechart"
-        disabled={!config.hasProfile}
-      >
+      <TabButton tabId="flamechart" disabled={!config.hasProfile}>
         Allocation
       </TabButton>
-      <TabButton
-        id="tab-time-flamechart"
-        tabId="time-flamechart"
-        disabled={!config.hasTimeProfile}
-      >
+      <TabButton tabId="time-flamechart" disabled={!config.hasTimeProfile}>
         Timing
       </TabButton>
 
@@ -60,20 +45,19 @@ export function TabBar() {
 }
 
 interface TabButtonProps {
-  id: string;
   tabId: string;
   disabled: boolean;
   onActivate?: () => void;
   children: preact.ComponentChildren;
 }
 
-function TabButton({ id, tabId, disabled, onActivate, children }: TabButtonProps) {
+function TabButton({ tabId, disabled, onActivate, children }: TabButtonProps) {
   const active = activeTabId.value === tabId;
   return (
     <button
       class={`tab${active ? " active" : ""}`}
       data-tab={tabId}
-      id={id}
+      id={`tab-${tabId}`}
       disabled={disabled}
       onClick={() => {
         activeTabId.value = tabId;
@@ -124,13 +108,12 @@ function ArchiveButton({ provider: dataProvider }: { provider: DataProvider }) {
     setArchiving(true);
     try {
       const { blob, filename } = await dataProvider.createArchive();
-      const link = document.createElement("a");
-      link.href = URL.createObjectURL(blob);
-      link.download = filename;
+      const url = URL.createObjectURL(blob);
+      const link = Object.assign(document.createElement("a"), { href: url, download: filename });
       document.body.appendChild(link);
       link.click();
       link.remove();
-      URL.revokeObjectURL(link.href);
+      URL.revokeObjectURL(url);
     } catch (err) {
       console.error("Archive failed:", err);
     } finally {

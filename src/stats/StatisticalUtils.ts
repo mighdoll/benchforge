@@ -63,13 +63,13 @@ const bootstrapSamples = 10000;
 
 /** Swap direction labels for higher-is-better metrics (positive = faster) */
 export function swapDirection(ci: DifferenceCI): DifferenceCI {
-  const swapped: Record<CIDirection, CIDirection> = {
+  const swap: Record<CIDirection, CIDirection> = {
     faster: "slower",
     slower: "faster",
     uncertain: "uncertain",
     equivalent: "equivalent",
   };
-  return { ...ci, direction: swapped[ci.direction] };
+  return { ...ci, direction: swap[ci.direction] };
 }
 
 /** Negate percent and CI for "higher is better" metrics (e.g., throughput) */
@@ -188,7 +188,9 @@ export function tukeyFences(
 function tukeyKeep(values: number[]): number[] {
   if (values.length < 4) return values.map((_, i) => i);
   const [lo, hi] = tukeyFences(values);
-  return values.map((v, i) => (v >= lo && v <= hi ? i : -1)).filter(i => i >= 0);
+  return values
+    .map((v, i) => (v >= lo && v <= hi ? i : -1))
+    .filter(i => i >= 0);
 }
 
 /** @return samples split into blocks by offset boundaries */
@@ -239,8 +241,9 @@ function prepareBlocks(
   options: DiffBootstrapOptions,
   fn: (s: number[]) => number,
 ) {
-  const sideA = prepareSide(a, options.blocks, fn, options.noBatchTrim);
-  const sideB = prepareSide(b, options.blocksB ?? options.blocks, fn, options.noBatchTrim);
+  const noTrim = options.noBatchTrim;
+  const sideA = prepareSide(a, options.blocks, fn, noTrim);
+  const sideB = prepareSide(b, options.blocksB ?? options.blocks, fn, noTrim);
   if (!sideA && !sideB) return {};
   return {
     blockValsA: sideA?.blockVals,

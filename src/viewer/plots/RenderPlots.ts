@@ -36,10 +36,7 @@ export function prepareBenchmarks(
   const baseline: PreparedBenchmark[] = base
     ? [{ ...base, name: baseName, isBaseline: true }]
     : [];
-  const current = group.benchmarks.map(b => ({
-    ...b,
-    isBaseline: false,
-  }));
+  const current = group.benchmarks.map(b => ({ ...b, isBaseline: false }));
   return [...baseline, ...current];
 }
 
@@ -72,7 +69,8 @@ function flattenBenchmark(b: PreparedBenchmark, out: FlattenedData): void {
   const endTimes = cumulativeSum(b.samples);
   b.samples.forEach((value, i) => {
     const isRejected = rejected?.has(i) || undefined;
-    if (!isRejected) out.allSamples.push({ benchmark: name, value, iteration: i });
+    if (!isRejected)
+      out.allSamples.push({ benchmark: name, value, iteration: i });
     out.timeSeries.push({
       benchmark: name,
       iteration: i,
@@ -148,13 +146,14 @@ export function filterToBatch(
     const offsets = b.batchOffsets;
     if (!offsets?.length) continue;
     const start = offsets[batchIndex];
-    const end = batchIndex + 1 < offsets.length
-      ? offsets[batchIndex + 1]
-      : b.samples.length;
+    const end =
+      batchIndex + 1 < offsets.length
+        ? offsets[batchIndex + 1]
+        : b.samples.length;
     ranges.set(b.name, [start, end]);
   }
 
-  const inRange = (name: string, iter: number) => {
+  const inBatch = (name: string, iter: number) => {
     const r = ranges.get(name);
     return r ? iter >= r[0] && iter < r[1] : true;
   };
@@ -162,22 +161,24 @@ export function filterToBatch(
     const r = ranges.get(name);
     return r ? iter - r[0] : iter;
   };
+  const sliceIter = <T extends { benchmark: string; iteration: number }>(
+    arr: T[],
+  ) =>
+    arr
+      .filter(d => inBatch(d.benchmark, d.iteration))
+      .map(d => ({ ...d, iteration: reindex(d.benchmark, d.iteration) }));
 
   return {
-    allSamples: flat.allSamples
-      .filter(d => inRange(d.benchmark, d.iteration))
-      .map(d => ({ ...d, iteration: reindex(d.benchmark, d.iteration) })),
-    timeSeries: flat.timeSeries
-      .filter(d => !d.isWarmup && inRange(d.benchmark, d.iteration))
-      .map(d => ({ ...d, iteration: reindex(d.benchmark, d.iteration) })),
-    heapSeries: flat.heapSeries
-      .filter(d => inRange(d.benchmark, d.iteration))
-      .map(d => ({ ...d, iteration: reindex(d.benchmark, d.iteration) })),
-    baselineHeapSeries: flat.baselineHeapSeries
-      .filter(d => inRange(d.benchmark, d.iteration))
-      .map(d => ({ ...d, iteration: reindex(d.benchmark, d.iteration) })),
-    allGcEvents: flat.allGcEvents.filter(d => inRange(d.benchmark, d.sampleIndex)),
-    allPausePoints: flat.allPausePoints.filter(d => inRange(d.benchmark, d.sampleIndex)),
+    allSamples: sliceIter(flat.allSamples),
+    timeSeries: sliceIter(flat.timeSeries.filter(d => !d.isWarmup)),
+    heapSeries: sliceIter(flat.heapSeries),
+    baselineHeapSeries: sliceIter(flat.baselineHeapSeries),
+    allGcEvents: flat.allGcEvents.filter(d =>
+      inBatch(d.benchmark, d.sampleIndex),
+    ),
+    allPausePoints: flat.allPausePoints.filter(d =>
+      inBatch(d.benchmark, d.sampleIndex),
+    ),
   };
 }
 

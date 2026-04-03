@@ -54,10 +54,8 @@ export function prepareHtmlData(
   options: PrepareHtmlOptions,
 ): ReportData {
   const { cliArgs, currentVersion, baselineVersion } = options;
-  const comparison: ComparisonOptions = {
-    equivMargin: options.equivMargin,
-    noBatchTrim: options.noBatchTrim,
-  };
+  const { equivMargin, noBatchTrim } = options;
+  const comparison: ComparisonOptions = { equivMargin, noBatchTrim };
   const sections = options.sections ?? defaultSections(groups, cliArgs);
   return {
     groups: groups.map(g => prepareGroupData(g, sections, comparison)),
@@ -121,13 +119,26 @@ function prepareReportEntry(
   ctx: GroupContext,
 ): BenchmarkEntry {
   const m = report.measuredResults;
-  const ci = computeDiffCI(ctx.baseM, m, ctx.primaryCol, report.metadata, ctx.comparison);
+  const ci = computeDiffCI(
+    ctx.baseM,
+    m,
+    ctx.primaryCol,
+    report.metadata,
+    ctx.comparison,
+  );
   if (ci) {
     if (ctx.lowBatches) ci.direction = "uncertain";
     if (ctx.primaryCol?.title) ci.label = `${ctx.primaryCol.title} Δ%`;
   }
   const sects = ctx.sections
-    ? buildViewerSections(ctx.sections, m, ctx.baseM, report.metadata, ctx.baseMeta, ctx.comparison)
+    ? buildViewerSections(
+        ctx.sections,
+        m,
+        ctx.baseM,
+        report.metadata,
+        ctx.baseMeta,
+        ctx.comparison,
+      )
     : undefined;
   return { ...prepareBenchmarkData(report), sections: sects, comparisonCI: ci };
 }
@@ -249,25 +260,24 @@ function buildColumnRow(
     };
   }
 
-  const entries: ViewerEntry[] = [
-    buildEntry(
-      ctx.current.name,
-      format(curRaw),
+  const curEntry = buildEntry(
+    ctx.current.name,
+    format(curRaw),
+    col,
+    ctx.current,
+    ctx.currentMeta,
+  );
+  const entries: ViewerEntry[] = [curEntry];
+  if (ctx.baseline && baseRaw !== undefined) {
+    const baseEntry = buildEntry(
+      "baseline",
+      format(baseRaw),
       col,
-      ctx.current,
-      ctx.currentMeta,
-    ),
-  ];
-  if (ctx.baseline && baseRaw !== undefined)
-    entries.push(
-      buildEntry(
-        "baseline",
-        format(baseRaw),
-        col,
-        ctx.baseline,
-        ctx.baselineMeta,
-      ),
+      ctx.baseline,
+      ctx.baselineMeta,
     );
+    entries.push(baseEntry);
+  }
   return {
     label: col.title,
     entries,
@@ -280,7 +290,13 @@ function buildComparisonCI(
   col: ReportColumn<Record<string, unknown>>,
   ctx: RowContext,
 ) {
-  const ci = computeDiffCI(ctx.baseline, ctx.current, col, ctx.currentMeta, ctx.comparison);
+  const ci = computeDiffCI(
+    ctx.baseline,
+    ctx.current,
+    col,
+    ctx.currentMeta,
+    ctx.comparison,
+  );
   if (ci) {
     if (hasLowBatchCount(ctx.baseline, ctx.current)) ci.direction = "uncertain";
     if (col.title) ci.label = `${col.title} Δ%`;
@@ -301,11 +317,13 @@ function buildEntry(
     return { runName, value };
   const fn = (s: number[]) => col.statFn!(s, metadata);
   const result = bootstrapStat(samples, fn, { blocks: measured?.batchOffsets });
-  const toDisplay = col.toDisplay
+  const display = col.toDisplay
     ? (v: number) => col.toDisplay!(v, metadata)
     : (v: number) => v;
-  const fmt = (v: number) =>
-    (col.formatter ? col.formatter(toDisplay(v)) : String(toDisplay(v))) ?? String(toDisplay(v));
+  const fmt = (v: number) => {
+    const d = display(v);
+    return (col.formatter ? col.formatter(d) : String(d)) ?? String(d);
+  };
   const ciLabels = [fmt(result.ci[0]), fmt(result.ci[1])] as [string, string];
   return {
     runName,
@@ -323,11 +341,12 @@ function summarizeHeap(profile: HeapProfile): HeapSummary {
 
 /** Compute coverage summary from V8 coverage data */
 function summarizeCoverage(coverage: CoverageData): CoverageSummary {
-  const calledFns = coverage.scripts
-    .flatMap(s => s.functions)
-    .filter(fn => fn.ranges.length > 0 && fn.ranges[0].count > 0);
-  const totalCalls = calledFns.reduce((sum, fn) => sum + fn.ranges[0].count, 0);
-  return { functionCount: calledFns.length, totalCalls };
+  const fns = coverage.scripts.flatMap(s => s.functions);
+  const called = fns.filter(
+    fn => fn.ranges.length > 0 && fn.ranges[0].count > 0,
+  );
+  const totalCalls = called.reduce((sum, fn) => sum + fn.ranges[0].count, 0);
+  return { functionCount: called.length, totalCalls };
 }
 
 /** Build default sections when caller doesn't provide custom ones */
