@@ -1,8 +1,8 @@
 import path from "node:path";
 import { afterAll, beforeAll, expect, test } from "vitest";
+import { profileBrowser } from "../profiling/browser/BrowserProfiler.ts";
 import type { ChromeInstance } from "../profiling/browser/ChromeLauncher.ts";
 import { launchChrome } from "../profiling/browser/ChromeLauncher.ts";
-import { profileBrowser } from "../profiling/browser/BrowserProfiler.ts";
 
 const examplesDir = path.resolve(import.meta.dirname!, "../../examples");
 
@@ -39,7 +39,12 @@ test("bench function mode (window.__bench)", { timeout: 30000 }, async () => {
 
 test("lap mode with N laps", { timeout: 30000 }, async () => {
   const url = `file://${examplesDir}/browser-lap/index.html`;
-  const result = await profileBrowser({ url, gcStats: true, headless: true, chrome });
+  const result = await profileBrowser({
+    url,
+    gcStats: true,
+    headless: true,
+    chrome,
+  });
 
   expect(result.samples).toBeDefined();
   expect(result.samples!).toHaveLength(100);
@@ -52,7 +57,12 @@ test("lap mode with N laps", { timeout: 30000 }, async () => {
 
 test("lap mode 0 laps with heap profiling", { timeout: 30000 }, async () => {
   const url = `file://${examplesDir}/browser-heap/index.html`;
-  const result = await profileBrowser({ url, alloc: true, headless: true, chrome });
+  const result = await profileBrowser({
+    url,
+    alloc: true,
+    headless: true,
+    chrome,
+  });
 
   expect(result.samples).toBeDefined();
   expect(result.samples!).toHaveLength(0);

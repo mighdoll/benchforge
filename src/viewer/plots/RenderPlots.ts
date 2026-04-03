@@ -138,7 +138,6 @@ export function filterToBatch(
   benchmarks: PreparedBenchmark[],
   batchIndex: number,
 ): FlattenedData {
-  // Build per-benchmark iteration ranges for this batch
   const ranges = new Map<string, [number, number]>();
   for (const b of benchmarks) {
     const offsets = b.batchOffsets;

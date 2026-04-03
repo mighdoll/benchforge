@@ -70,6 +70,7 @@ declare const __BENCHFORGE_GIT_HASH__: string;
 declare const __BENCHFORGE_GIT_DIRTY__: boolean;
 declare const __BENCHFORGE_BUILD_DATE__: string;
 
+/** Return a compile-time global if defined, otherwise the fallback (for dev/unbundled builds). */
 function safeGlobal<T>(v: T, fallback: T): T {
   return typeof v !== "undefined" ? v : fallback;
 }
@@ -270,6 +271,7 @@ function ComparisonBadge({ ci, compact }: { ci: DifferenceCI; compact?: boolean 
   );
 }
 
+/** Lazy-imports CIPlot and renders a confidence interval chart inline. */
 function CIPlotMount({ ci, compact }: { ci: DifferenceCI; compact?: boolean }) {
   const ref = useRef<HTMLDivElement>(null);
   useEffect(() => {
@@ -285,6 +287,7 @@ function CIPlotMount({ ci, compact }: { ci: DifferenceCI; compact?: boolean }) {
   return <div class="ci-plot-container" ref={ref} />;
 }
 
+/** Lazy-imports CIPlot and renders a bootstrap distribution sparkline inline. */
 function BootstrapCIMount({ ci, label }: { ci: BootstrapCIData; label?: string }) {
   const ref = useRef<HTMLDivElement>(null);
   useEffect(() => {
@@ -314,6 +317,7 @@ function formatCount(n: number): string {
   return n.toLocaleString();
 }
 
+/** Format CLI args for display, filtering out defaults, internal keys, and camelCase aliases. */
 function formatCliArgs(args?: Record<string, unknown>): string {
   if (!args) return "benchforge";
   const flags = Object.entries(args)
