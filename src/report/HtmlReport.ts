@@ -27,7 +27,7 @@ import {
   type ComparisonOptions,
   computeDiffCI,
   findPrimaryColumn,
-  groupReports,
+  hasField,
   type ReportColumn,
   type ReportGroup,
   type ResultsMapper,
@@ -395,9 +395,7 @@ function defaultSections(
   cliArgs?: Record<string, unknown>,
 ): ResultsMapper[] {
   const hasGc = cliArgs?.["gc-stats"] === true;
-  const hasOpt = groups.some(g =>
-    groupReports(g).some(r => r.measuredResults.optStatus !== undefined),
-  );
+  const hasOpt = hasField(groups, "optStatus");
   return [
     timeSection,
     hasGc ? gcStatsSection : undefined,

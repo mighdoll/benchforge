@@ -11,7 +11,7 @@ import {
 } from "../profiling/node/HeapSampleReport.ts";
 import { resolveProfile } from "../profiling/node/ResolvedProfile.ts";
 import type { ReportGroup, ResultsMapper } from "../report/BenchmarkReport.ts";
-import { groupReports } from "../report/BenchmarkReport.ts";
+import { groupReports, hasField } from "../report/BenchmarkReport.ts";
 import colors from "../report/Colors.ts";
 import {
   adaptiveSection,
@@ -23,7 +23,6 @@ import {
   totalTimeSection,
 } from "../report/StandardSections.ts";
 import { reportResults } from "../report/text/TextReport.ts";
-import type { MeasuredResults } from "../runners/MeasuredResults.ts";
 import type { DefaultCliArgs } from "./CliArgs.ts";
 import { cliComparisonOptions } from "./CliOptions.ts";
 
@@ -52,18 +51,6 @@ export function buildReportSections(
     ...(hasOptData ? [optSection] : []),
     runsSection,
   ];
-}
-
-/** True if any result has the specified field with a defined value. */
-export function hasField(
-  results: ReportGroup[],
-  field: keyof MeasuredResults,
-): boolean {
-  return results.some(group =>
-    groupReports(group).some(
-      ({ measuredResults }) => measuredResults[field] !== undefined,
-    ),
-  );
 }
 
 /** Log V8 optimization tier distribution and deoptimizations. */

@@ -112,6 +112,18 @@ export function isStatefulVariant<T, S>(
   return typeof v === "object" && "setup" in v && "run" in v;
 }
 
+/** Prepare a benchmark function from a variant, calling setup if stateful. */
+export async function prepareBenchFn<T>(
+  variant: Variant<T>,
+  data: T,
+): Promise<() => void> {
+  if (isStatefulVariant(variant)) {
+    const state = await variant.setup(data);
+    return () => variant.run(state);
+  }
+  return () => variant(data);
+}
+
 /** Run a BenchMatrix with inline variants or variantDir */
 export async function runMatrix<T>(
   matrix: BenchMatrix<T>,

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "preact/hooks";
+import { useMemo, useState } from "preact/hooks";
 import type { BenchmarkGroup, ReportData } from "../ReportData.ts";
 import {
   batchCount,
@@ -10,6 +10,7 @@ import {
 } from "../plots/RenderPlots.ts";
 import type { SeriesVisibility } from "../plots/SampleTimeSeries.ts";
 import { reportData, samplesLoaded } from "../State.ts";
+import { useLazyPlot } from "./LazyPlot.ts";
 
 /** True when at least one benchmark group has multiple samples (enough to plot). */
 export function hasSufficientSamples(data: ReportData): boolean {
@@ -191,23 +192,14 @@ interface TimeSeriesPlotProps extends PlotProps {
 
 /** Lazy-imports and renders a time-series chart for one benchmark group. */
 function TimeSeriesPlot({ flat, index, visibility }: TimeSeriesPlotProps) {
-  const ref = useRef<HTMLDivElement>(null);
-  useEffect(() => {
-    if (flat.timeSeries.length === 0) return;
-    import("../plots/SampleTimeSeries.ts").then(({ createSampleTimeSeries }) => {
-      if (!ref.current) return;
-      ref.current.innerHTML = "";
-      const { timeSeries, allGcEvents, allPausePoints, heapSeries, baselineHeapSeries } = flat;
-      ref.current.appendChild(
-        createSampleTimeSeries(
-          timeSeries, allGcEvents, allPausePoints, heapSeries, baselineHeapSeries, visibility,
-        ),
-      );
-    }).catch(err => {
-      console.error("Time series plot failed:", err);
-      if (ref.current) ref.current.innerHTML = `<div class="loading">${err.message}</div>`;
-    });
-  }, [flat, visibility]);
+  const ref = useLazyPlot(async () => {
+    if (flat.timeSeries.length === 0) return null;
+    const { createSampleTimeSeries } = await import("../plots/SampleTimeSeries.ts");
+    const { timeSeries, allGcEvents, allPausePoints, heapSeries, baselineHeapSeries } = flat;
+    return createSampleTimeSeries(
+      timeSeries, allGcEvents, allPausePoints, heapSeries, baselineHeapSeries, visibility,
+    );
+  }, [flat, visibility], "Time series plot");
   return (
     <div id={`sample-timeseries-${index}`} class="plot-area" ref={ref}>
       <div class="loading">Loading time series...</div>
@@ -217,19 +209,12 @@ function TimeSeriesPlot({ flat, index, visibility }: TimeSeriesPlotProps) {
 
 /** Lazy-imports and renders a histogram with KDE for one benchmark group. */
 function HistogramPlot({ benchmarks, flat, index }: PlotProps) {
-  const ref = useRef<HTMLDivElement>(null);
-  useEffect(() => {
-    if (flat.allSamples.length === 0) return;
-    const names = benchmarks.map(b => b.name);
-    import("../plots/HistogramKde.ts").then(({ createHistogramKde }) => {
-      if (!ref.current) return;
-      ref.current.innerHTML = "";
-      ref.current.appendChild(createHistogramKde(flat.allSamples, names));
-    }).catch(err => {
-      console.error("Histogram plot failed:", err);
-      if (ref.current) ref.current.innerHTML = `<div class="loading">${err.message}</div>`;
-    });
-  }, [flat, benchmarks]);
+  const names = benchmarks.map(b => b.name);
+  const ref = useLazyPlot(async () => {
+    if (flat.allSamples.length === 0) return null;
+    const { createHistogramKde } = await import("../plots/HistogramKde.ts");
+    return createHistogramKde(flat.allSamples, names);
+  }, [flat, benchmarks], "Histogram plot");
   return (
     <div id={`histogram-${index}`} class="plot-area" ref={ref}>
       <div class="loading">Loading histogram...</div>

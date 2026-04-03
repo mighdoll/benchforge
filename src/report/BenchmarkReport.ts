@@ -77,6 +77,18 @@ export function groupReports(group: ReportGroup): BenchmarkReport[] {
   return group.baseline ? [...group.reports, group.baseline] : group.reports;
 }
 
+/** True if any result in the groups has the specified field with a defined value */
+export function hasField(
+  groups: ReportGroup[],
+  field: keyof MeasuredResults,
+): boolean {
+  return groups.some(group =>
+    groupReports(group).some(
+      ({ measuredResults }) => measuredResults[field] !== undefined,
+    ),
+  );
+}
+
 /** @return true if the first comparable column in sections has higherIsBetter set */
 export function isHigherIsBetter(
   sections: ResultsMapper[] | ReportColumnGroup<any>[],

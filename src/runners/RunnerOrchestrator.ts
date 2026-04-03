@@ -1,7 +1,7 @@
 import { type ChildProcess, fork } from "node:child_process";
 import { existsSync } from "node:fs";
 import path from "node:path";
-import { isStatefulVariant } from "../matrix/BenchMatrix.ts";
+import { prepareBenchFn } from "../matrix/BenchMatrix.ts";
 import { loadCaseData, loadCasesModule } from "../matrix/CaseLoader.ts";
 import { loadVariant } from "../matrix/VariantLoader.ts";
 import type { CoverageData } from "../profiling/node/CoverageTypes.ts";
@@ -103,14 +103,7 @@ async function runMatrixVariantDirect(
   }
 
   const variant = await loadVariant(variantDir, variantId);
-  let fn: () => void;
-  if (isStatefulVariant(variant)) {
-    const state = await variant.setup(caseData);
-    fn = () => variant.run(state);
-  } else {
-    fn = () => variant(caseData);
-  }
-
+  const fn = await prepareBenchFn(variant, caseData);
   const benchRunner = await createBenchRunner(runner, options);
   return benchRunner.runBench({ name, fn }, options);
 }

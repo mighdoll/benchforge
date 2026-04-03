@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "preact/hooks";
+import { useLazyPlot } from "./LazyPlot.ts";
 import type { GitVersion } from "../../report/GitUtils.ts";
 import type { DifferenceCI } from "../../stats/StatisticalUtils.ts";
 import { formatRelativeTime } from "../DateFormat.ts";
@@ -266,17 +267,13 @@ function ComparisonBadge({ ci, compact }: { ci: DifferenceCI; compact?: boolean 
 
 /** Lazy-imports CIPlot and renders a confidence interval chart inline. */
 function CIPlotMount({ ci, compact }: { ci: DifferenceCI; compact?: boolean }) {
-  const ref = useRef<HTMLDivElement>(null);
-  useEffect(() => {
-    import("../plots/CIPlot.ts").then(({ createCIPlot }) => {
-      if (!ref.current) return;
-      ref.current.innerHTML = "";
-      const cliArgs = reportData.value?.metadata.cliArgs as Record<string, unknown> | undefined;
-      const equivMargin = (cliArgs?.["equiv-margin"] as number) || undefined;
-      const opts = compact ? { width: 200, height: 70, title: "", equivMargin } : { equivMargin };
-      ref.current.appendChild(createCIPlot(ci, opts));
-    });
-  }, [ci, compact]);
+  const ref = useLazyPlot(async () => {
+    const { createCIPlot } = await import("../plots/CIPlot.ts");
+    const cliArgs = reportData.value?.metadata.cliArgs as Record<string, unknown> | undefined;
+    const equivMargin = (cliArgs?.["equiv-margin"] as number) || undefined;
+    const opts = compact ? { width: 200, height: 70, title: "", equivMargin } : { equivMargin };
+    return createCIPlot(ci, opts);
+  }, [ci, compact], "CI plot");
   return <div class="ci-plot-container" ref={ref} />;
 }
 
@@ -284,18 +281,14 @@ function CIPlotMount({ ci, compact }: { ci: DifferenceCI; compact?: boolean }) {
 function BootstrapCIMount({ ci, label, shift }: {
   ci: BootstrapCIData; label?: string; shift?: number;
 }) {
-  const ref = useRef<HTMLDivElement>(null);
-  useEffect(() => {
-    import("../plots/CIPlot.ts").then(({ createDistributionPlot }) => {
-      if (!ref.current) return;
-      ref.current.innerHTML = "";
-      const opts = {
-        width: 240, height: 80, title: "", direction: "uncertain" as const,
-        ciLabels: ci.ciLabels, includeZero: false, smooth: true, pointLabel: label,
-      };
-      ref.current.appendChild(createDistributionPlot(ci.histogram, ci.ci, ci.estimate, opts));
-    });
-  }, [ci, label]);
+  const ref = useLazyPlot(async () => {
+    const { createDistributionPlot } = await import("../plots/CIPlot.ts");
+    const opts = {
+      width: 240, height: 80, title: "", direction: "uncertain" as const,
+      ciLabels: ci.ciLabels, includeZero: false, smooth: true, pointLabel: label,
+    };
+    return createDistributionPlot(ci.histogram, ci.ci, ci.estimate, opts);
+  }, [ci, label], "Bootstrap CI plot");
   const style = shift != null ? { marginLeft: `${Math.round(shift)}px` } : undefined;
   return <div class="ci-plot-inline" style={style} ref={ref} />;
 }

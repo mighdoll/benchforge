@@ -11,7 +11,7 @@ import type {
 import {
   applyBaselineVariant,
   buildRunnerOptions,
-  isStatefulVariant,
+  prepareBenchFn,
   resolveCases,
 } from "./BenchMatrix.ts";
 import { loadCaseData } from "./CaseLoader.ts";
@@ -66,13 +66,7 @@ async function runVariant<T>(params: {
   runnerOpts: RunnerOptions;
 }): Promise<MeasuredResults> {
   const { variant, data, variantId, runner, runnerOpts } = params;
-  let fn: () => void;
-  if (isStatefulVariant(variant)) {
-    const state = await variant.setup(data);
-    fn = () => variant.run(state);
-  } else {
-    fn = () => variant(data);
-  }
+  const fn = await prepareBenchFn(variant, data);
   const [result] = await runner.runBench({ name: variantId, fn }, runnerOpts);
   return result;
 }

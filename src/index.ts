@@ -6,7 +6,6 @@ export { cliToMatrixOptions } from "./cli/CliOptions.ts";
 export {
   defaultMatrixReport,
   defaultReport,
-  hasField,
   matrixToReportGroups,
   printHeapReports,
   reportOptStatus,
@@ -66,6 +65,7 @@ export type {
   ResultsMapper,
   UnknownRecord,
 } from "./report/BenchmarkReport.ts";
+export { hasField } from "./report/BenchmarkReport.ts";
 export {
   formatBytes,
   integer,
