@@ -53,24 +53,15 @@ export interface SeriesVisibility {
   rejected: boolean;
 }
 
-/** Create sample time series showing each sample in order */
-export function createSampleTimeSeries(
-  timeSeries: TimeSeriesPoint[],
-  gcEvents: FlatGcEvent[] = [],
-  pausePoints: FlatPausePoint[] = [],
-  heapSeries: HeapPoint[] = [],
-  baselineHeapSeries: HeapPoint[] = [],
-  visibility: SeriesVisibility = {
-    baseline: true,
-    heap: true,
-    baselineHeap: false,
-    rejected: true,
-  },
-): SVGSVGElement | HTMLElement {
-  const filtered = visibility.baseline
-    ? timeSeries
-    : timeSeries.filter(d => !d.isBaseline);
-  const ctx = buildPlotContext(filtered);
+/** Prepare heap, legend, and visibility state for the time series plot */
+function prepareSeriesData(
+  ctx: PlotContext,
+  heapSeries: HeapPoint[],
+  baselineHeapSeries: HeapPoint[],
+  visibility: SeriesVisibility,
+  gcEvents: FlatGcEvent[],
+  pausePoints: FlatPausePoint[],
+) {
   const visibleHeap = [
     ...(visibility.heap ? heapSeries : []),
     ...(visibility.baselineHeap ? baselineHeapSeries : []),
@@ -94,6 +85,35 @@ export function createSampleTimeSeries(
     ctx.benchmarks,
     ctx.baselineNames,
   );
+  return { heapScale, heapData, baselineHeapData, showRejected, legendItems };
+}
+
+/** Create sample time series showing each sample in order */
+export function createSampleTimeSeries(
+  timeSeries: TimeSeriesPoint[],
+  gcEvents: FlatGcEvent[] = [],
+  pausePoints: FlatPausePoint[] = [],
+  heapSeries: HeapPoint[] = [],
+  baselineHeapSeries: HeapPoint[] = [],
+  visibility: SeriesVisibility = {
+    baseline: true,
+    heap: true,
+    baselineHeap: false,
+    rejected: true,
+  },
+): SVGSVGElement | HTMLElement {
+  const filtered = visibility.baseline
+    ? timeSeries
+    : timeSeries.filter(d => !d.isBaseline);
+  const ctx = buildPlotContext(filtered);
+  const series = prepareSeriesData(
+    ctx,
+    heapSeries,
+    baselineHeapSeries,
+    visibility,
+    gcEvents,
+    pausePoints,
+  );
 
   return Plot.plot({
     ...plotLayout,
@@ -115,13 +135,13 @@ export function createSampleTimeSeries(
     color: { legend: false, scheme: "observable10" },
     marks: buildMarks(
       ctx,
-      heapData,
-      baselineHeapData,
-      heapScale,
+      series.heapData,
+      series.baselineHeapData,
+      series.heapScale,
       gcEvents,
       pausePoints,
-      legendItems,
-      showRejected,
+      series.legendItems,
+      series.showRejected,
     ),
   });
 }
@@ -527,9 +547,24 @@ function downsample(arr: SampleData[]): SampleData[] {
   );
 }
 
+/** Split samples into warmup, baseline, measured, and rejected groups */
+function partitionSamples(data: SampleData[], showRejected: boolean) {
+  const warmup = downsample(data.filter(d => d.isWarmup));
+  const baseline = downsample(
+    data.filter(d => d.isBaseline && !d.isWarmup && !d.isRejected),
+  );
+  const measured = downsample(
+    data.filter(d => !d.isBaseline && !d.isWarmup && !d.isRejected),
+  );
+  const rejected = showRejected
+    ? data.filter(d => d.isRejected && !d.isWarmup)
+    : [];
+  return { warmup, baseline, measured, rejected };
+}
+
 /** Create dot marks for warmup, baseline, and measured samples with opt tier colors */
 function sampleDotMarks(ctx: PlotContext, showRejected: boolean): any[] {
-  const { convertedData, unitSuffix, formatValue } = ctx;
+  const { unitSuffix, formatValue } = ctx;
   const fmtVal = (d: SampleData) =>
     `${formatValue(d.displayValue)}${unitSuffix}`;
   const tipTitle = (d: SampleData) =>
@@ -537,16 +572,10 @@ function sampleDotMarks(ctx: PlotContext, showRejected: boolean): any[] {
       ? `Iteration ${d.sample}: ${fmtVal(d)} [${d.optTier}]`
       : `Iteration ${d.sample}: ${fmtVal(d)}`;
   const xy = { x: "sample" as const, y: "displayValue" as const, r: 3 };
-  const warmup = downsample(convertedData.filter(d => d.isWarmup));
-  const baseline = downsample(
-    convertedData.filter(d => d.isBaseline && !d.isWarmup && !d.isRejected),
+  const { warmup, baseline, measured, rejected } = partitionSamples(
+    ctx.convertedData,
+    showRejected,
   );
-  const measured = downsample(
-    convertedData.filter(d => !d.isBaseline && !d.isWarmup && !d.isRejected),
-  );
-  const rejected = showRejected
-    ? convertedData.filter(d => d.isRejected && !d.isWarmup)
-    : [];
   return [
     Plot.dot(warmup, {
       ...xy,

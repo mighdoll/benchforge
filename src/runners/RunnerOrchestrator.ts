@@ -1,12 +1,12 @@
 import { type ChildProcess, fork } from "node:child_process";
 import { existsSync } from "node:fs";
 import path from "node:path";
-import type { CoverageData } from "../profiling/node/CoverageTypes.ts";
-import type { HeapProfile } from "../profiling/node/HeapSampler.ts";
-import type { TimeProfile } from "../profiling/node/TimeSampler.ts";
 import { isStatefulVariant } from "../matrix/BenchMatrix.ts";
 import { loadCaseData, loadCasesModule } from "../matrix/CaseLoader.ts";
 import { loadVariant } from "../matrix/VariantLoader.ts";
+import type { CoverageData } from "../profiling/node/CoverageTypes.ts";
+import type { HeapProfile } from "../profiling/node/HeapSampler.ts";
+import type { TimeProfile } from "../profiling/node/TimeSampler.ts";
 import type { BenchmarkFunction, BenchmarkSpec } from "./BenchmarkSpec.ts";
 import type { RunnerOptions } from "./BenchRunner.ts";
 import type { KnownRunner } from "./CreateRunner.ts";
