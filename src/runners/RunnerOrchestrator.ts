@@ -4,6 +4,9 @@ import path from "node:path";
 import type { CoverageData } from "../profiling/node/CoverageTypes.ts";
 import type { HeapProfile } from "../profiling/node/HeapSampler.ts";
 import type { TimeProfile } from "../profiling/node/TimeSampler.ts";
+import { isStatefulVariant } from "../matrix/BenchMatrix.ts";
+import { loadCaseData, loadCasesModule } from "../matrix/CaseLoader.ts";
+import { loadVariant } from "../matrix/VariantLoader.ts";
 import type { BenchmarkFunction, BenchmarkSpec } from "./BenchmarkSpec.ts";
 import type { RunnerOptions } from "./BenchRunner.ts";
 import type { KnownRunner } from "./CreateRunner.ts";
@@ -17,7 +20,7 @@ import type {
   RunMessage,
 } from "./WorkerScript.ts";
 
-/** Parameters for running a matrix variant in worker */
+/** Parameters for running a matrix variant */
 export interface RunMatrixVariantParams {
   variantDir: string;
   variantId: string;
@@ -26,6 +29,7 @@ export interface RunMatrixVariantParams {
   casesModule?: string;
   runner: KnownRunner;
   options: RunnerOptions;
+  useWorker?: boolean;
 }
 
 interface RunBenchmarkParams<T = unknown> {
@@ -60,12 +64,15 @@ export async function runBenchmark<T = unknown>({
   return runWorkerWithMessage(spec.name, options, msg);
 }
 
-/** Run a matrix variant benchmark in isolated worker process */
+/** Run a matrix variant benchmark, either directly or in a worker process */
 export async function runMatrixVariant(
   params: RunMatrixVariantParams,
 ): Promise<MeasuredResults[]> {
-  const { variantId, caseId, runner, options } = params;
+  const { variantId, caseId, runner, options, useWorker = true } = params;
   const name = `${variantId}/${caseId}`;
+
+  if (!useWorker) return runMatrixVariantDirect(params, name);
+
   const message: RunMessage = {
     type: "run",
     spec: { name, fn: () => {} },
@@ -78,6 +85,32 @@ export async function runMatrixVariant(
     casesModule: params.casesModule,
   };
   return runWorkerWithMessage(name, options, message);
+}
+
+/** Run matrix variant in-process (no worker isolation) */
+async function runMatrixVariantDirect(
+  params: RunMatrixVariantParams,
+  name: string,
+): Promise<MeasuredResults[]> {
+  const { variantDir, variantId, caseId, runner, options } = params;
+  let { caseData } = params;
+
+  if (params.casesModule && caseId) {
+    const casesModule = await loadCasesModule(params.casesModule);
+    caseData = (await loadCaseData(casesModule, caseId)).data;
+  }
+
+  const variant = await loadVariant(variantDir, variantId);
+  let fn: () => void;
+  if (isStatefulVariant(variant)) {
+    const state = await variant.setup(caseData);
+    fn = () => variant.run(state);
+  } else {
+    fn = () => variant(caseData);
+  }
+
+  const benchRunner = await createBenchRunner(runner, options);
+  return benchRunner.runBench({ name, fn }, options);
 }
 
 /** Resolve modulePath/exportName to a real function for non-worker mode */

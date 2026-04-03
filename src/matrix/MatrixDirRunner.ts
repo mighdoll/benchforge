@@ -29,6 +29,7 @@ interface DirMatrixContext<T> {
   runnerOpts: RunnerOptions;
   batches: number;
   warmupBatch: boolean;
+  useWorker: boolean;
 }
 
 /** Run matrix using variant files from a directory, each in a worker process */
@@ -69,6 +70,7 @@ async function createDirContext<T>(
     runnerOpts,
     batches: options.batches ?? 1,
     warmupBatch: options.warmupBatch ?? false,
+    useWorker: options.useWorker ?? true,
   };
 }
 
@@ -103,6 +105,7 @@ async function runDirVariantCases<T>(
       casesModule: matrix.casesModule,
       runner: "basic" as const,
       options: runnerOpts,
+      useWorker: ctx.useWorker,
     };
     const baselineArgs =
       matrix.baselineDir && ctx.baselineIds.includes(variantId)
