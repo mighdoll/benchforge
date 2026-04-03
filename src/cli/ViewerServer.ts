@@ -55,7 +55,11 @@ export async function startViewerServer(
     await open(url);
   console.log(`Viewer: ${url}`);
 
-  return { server: srv, port: actualPort, close: () => srv.close() };
+  const close = () => {
+    srv.closeAllConnections();
+    srv.close();
+  };
+  return { server: srv, port: actualPort, close };
 }
 
 /** Open a .benchforge archive in the viewer. */
@@ -93,7 +97,7 @@ export function optionalJson(v: unknown): string | undefined {
 export function waitForCtrlC(): Promise<void> {
   return new Promise(resolve => {
     console.log("\nPress Ctrl+C to exit");
-    process.on("SIGINT", () => {
+    process.once("SIGINT", () => {
       console.log();
       resolve();
     });
