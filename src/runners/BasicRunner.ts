@@ -186,7 +186,27 @@ function buildMeasuredResults(
   };
 }
 
-/** Run warmup iterations with gc + settle time for V8 optimization. Returns warmup timings. */
+/**
+ * Run warmup iterations with gc + settle time for V8 optimization. Returns warmup timings.
+ *
+ * V8 has 4 compilation tiers: Ignition (interpreter) ==> Sparkplug (baseline) ==>
+ * Maglev (mid-tier optimizer) ==> TurboFan (full optimizer). Tiering thresholds:
+ *   - Ignition ==> Sparkplug: 8 invocations
+ *   - Sparkplug ==> Maglev: 500 invocations
+ *   - Maglev ==> TurboFan: 6000 invocations
+ *
+ * Optimization compilation happens on background threads and requires idle time
+ * on the main thread to complete. Without sufficient warmup + settle time,
+ * benchmarks exhibit bimodal timing: slow Sparkplug samples (~30% slower) mixed
+ * with fast optimized samples.
+ *
+ * The warmup iterations trigger the optimization decision, then settle time
+ * provides idle time for background compilation to finish before measurement.
+ *
+ * @see https://v8.dev/blog/sparkplug
+ * @see https://v8.dev/blog/maglev
+ * @see https://v8.dev/blog/background-compilation
+ */
 async function runWarmup<T>(config: CollectParams<T>): Promise<number[]> {
   const gc = gcFunction();
   const samples = new Array<number>(config.warmup);
@@ -196,11 +216,6 @@ async function runWarmup<T>(config: CollectParams<T>): Promise<number[]> {
     samples[i] = performance.now() - start;
   }
   gc();
-  // Settle time: idle time for V8 background compilation to complete.
-  // V8 tiers (Ignition ==> Sparkplug ==> Maglev ==> TurboFan) compile on
-  // background threads. Without settle, benchmarks can show bimodal timing
-  // (~30% slower unoptimized samples mixed with optimized ones).
-  // Use --settle 200 (or higher) with --warmup to avoid this.
   if (config.settle) {
     await new Promise(r => setTimeout(r, config.settle));
     gc();
