@@ -94,21 +94,20 @@ async function runDirVariantCases<T>(
   const cases: CaseResult[] = [];
 
   for (const caseId of caseIds) {
-    const caseData = matrix.cases && !matrix.casesModule ? caseId : undefined;
+    const inlineCaseData = matrix.cases && !matrix.casesModule;
     const variantArgs: VariantArgs = {
       variantDir: matrix.variantDir!,
       variantId,
       caseId,
-      caseData,
+      caseData: inlineCaseData ? caseId : undefined,
       casesModule: matrix.casesModule,
       runner: "basic" as const,
       options: runnerOpts,
     };
-    const hasBaseline =
-      matrix.baselineDir && ctx.baselineIds.includes(variantId);
-    const baselineArgs = hasBaseline
-      ? { ...variantArgs, variantDir: matrix.baselineDir! }
-      : undefined;
+    const baselineArgs =
+      matrix.baselineDir && ctx.baselineIds.includes(variantId)
+        ? { ...variantArgs, variantDir: matrix.baselineDir! }
+        : undefined;
 
     const { metadata } = await loadCaseData(casesModule, caseId);
     const { measured, baseline } =

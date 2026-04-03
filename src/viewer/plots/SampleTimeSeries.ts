@@ -143,8 +143,9 @@ export function createSampleTimeSeries(
 function buildPlotContext(timeSeries: TimeSeriesPoint[]): PlotContext {
   const benchmarks = [...new Set(timeSeries.map(d => d.benchmark))];
   const sampleData = buildSampleData(timeSeries);
-  const units = getTimeUnit(sampleData.map(d => d.value));
-  const { unitSuffix, convertValue, formatValue } = units;
+  const { unitSuffix, convertValue, formatValue } = getTimeUnit(
+    sampleData.map(d => d.value),
+  );
   const convertedData = sampleData.map(d => ({
     ...d,
     displayValue: convertValue(d.value),
@@ -407,12 +408,11 @@ function heapAxisMarks(
   const minMB = hs.heapMinBytes / 1024 / 1024;
   const maxMB = (hs.heapMinBytes + hs.heapRangeBytes) / 1024 / 1024;
   const ticks = d3.ticks(minMB, maxMB, 3);
-  const fmtMB = (mb: number) =>
-    mb >= 100
-      ? `${mb.toFixed(0)}`
-      : mb >= 10
-        ? `${mb.toFixed(1)}`
-        : `${mb.toFixed(2)}`;
+  const fmtMB = (mb: number) => {
+    if (mb >= 100) return mb.toFixed(0);
+    if (mb >= 10) return mb.toFixed(1);
+    return mb.toFixed(2);
+  };
 
   const tickData = ticks.map(mb => ({
     x: tickX,
@@ -531,7 +531,7 @@ function lttb<T>(
 }
 
 /** Downsample if array exceeds maxDots, preserving visual features */
-function ds(arr: SampleData[]): SampleData[] {
+function downsample(arr: SampleData[]): SampleData[] {
   return lttb(
     arr,
     maxDots,
@@ -550,11 +550,11 @@ function sampleDotMarks(ctx: PlotContext, showRejected: boolean): any[] {
       ? `Iteration ${d.sample}: ${fmtVal(d)} [${d.optTier}]`
       : `Iteration ${d.sample}: ${fmtVal(d)}`;
   const xy = { x: "sample" as const, y: "displayValue" as const, r: 3 };
-  const warmup = ds(convertedData.filter(d => d.isWarmup));
-  const baseline = ds(
+  const warmup = downsample(convertedData.filter(d => d.isWarmup));
+  const baseline = downsample(
     convertedData.filter(d => d.isBaseline && !d.isWarmup && !d.isRejected),
   );
-  const measured = ds(
+  const measured = downsample(
     convertedData.filter(d => !d.isBaseline && !d.isWarmup && !d.isRejected),
   );
   const rejected = showRejected

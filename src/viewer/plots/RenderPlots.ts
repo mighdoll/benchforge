@@ -30,14 +30,13 @@ export function prepareBenchmarks(
   group: ReportData["groups"][0],
 ): PreparedBenchmark[] {
   const base = group.baseline;
-  const baseName = base?.name.endsWith("(baseline)")
-    ? base.name
-    : base?.name + " (baseline)";
-  const baseline: PreparedBenchmark[] = base
-    ? [{ ...base, name: baseName, isBaseline: true }]
-    : [];
   const current = group.benchmarks.map(b => ({ ...b, isBaseline: false }));
-  return [...baseline, ...current];
+  if (!base) return current;
+
+  const baseName = base.name.endsWith("(baseline)")
+    ? base.name
+    : base.name + " (baseline)";
+  return [{ ...base, name: baseName, isBaseline: true }, ...current];
 }
 
 /** Collect all sample data across benchmarks into flat arrays for plotting */
@@ -128,10 +127,9 @@ function rejectedIndices(b: PreparedBenchmark): Set<number> | undefined {
 
 /** @return batch count from the first benchmark with batchOffsets, or 0 */
 export function batchCount(benchmarks: PreparedBenchmark[]): number {
-  for (const b of benchmarks) {
-    if (b.batchOffsets?.length) return b.batchOffsets.length;
-  }
-  return 0;
+  return (
+    benchmarks.find(b => b.batchOffsets?.length)?.batchOffsets?.length ?? 0
+  );
 }
 
 /** Filter flattened data to a single batch, re-indexing iterations from 0 */

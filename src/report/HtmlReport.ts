@@ -126,11 +126,9 @@ function prepareReportEntry(
     report.metadata,
     ctx.comparison,
   );
-  if (ci) {
-    if (ctx.lowBatches) ci.direction = "uncertain";
-    if (ctx.primaryCol?.title) ci.label = `${ctx.primaryCol.title} Δ%`;
-  }
-  const sects = ctx.sections
+  if (ci && ctx.lowBatches) ci.direction = "uncertain";
+  if (ci && ctx.primaryCol?.title) ci.label = `${ctx.primaryCol.title} Δ%`;
+  const sections = ctx.sections
     ? buildViewerSections(
         ctx.sections,
         m,
@@ -140,7 +138,7 @@ function prepareReportEntry(
         ctx.comparison,
       )
     : undefined;
-  return { ...prepareBenchmarkData(report), sections: sects, comparisonCI: ci };
+  return { ...prepareBenchmarkData(report), sections, comparisonCI: ci };
 }
 
 /** @return true if batched but below the minimum for reliable block bootstrap */
@@ -297,10 +295,9 @@ function buildComparisonCI(
     ctx.currentMeta,
     ctx.comparison,
   );
-  if (ci) {
-    if (hasLowBatchCount(ctx.baseline, ctx.current)) ci.direction = "uncertain";
-    if (col.title) ci.label = `${col.title} Δ%`;
-  }
+  if (ci && hasLowBatchCount(ctx.baseline, ctx.current))
+    ci.direction = "uncertain";
+  if (ci && col.title) ci.label = `${col.title} Δ%`;
   return ci;
 }
 

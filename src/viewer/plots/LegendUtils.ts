@@ -35,11 +35,10 @@ export function buildLegend(bounds: LegendBounds, items: LegendItem[]): any[] {
   const textX = legendX + xRange * 0.03;
   const itemHeight = bounds.yMax * 0.07;
   const topY = bounds.yMax * 0.98;
-  const getY = (i: number) => topY - i * itemHeight;
 
   const pos = (i: number): LegendPos => ({
     legendX,
-    y: getY(i),
+    y: topY - i * itemHeight,
     textX,
     xRange,
     yMax: bounds.yMax,

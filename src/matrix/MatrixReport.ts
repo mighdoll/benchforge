@@ -155,7 +155,7 @@ function buildSectionTable(
 
   type Row = Record<string, unknown> & { name: string };
   const caseResults = collectCaseResults(results, caseId);
-  const shared = hasSharedBaseline(caseResults);
+  const shared = sharedBaseline(caseResults);
 
   const rows: Row[] = caseResults.flatMap(({ variant, cr }) => {
     const vals = extractSectionValues(cr.measured, sections, cr.metadata);
@@ -197,7 +197,7 @@ function buildCaseRows(
 ): MatrixReportRow[] {
   const { extraColumns, comparison } = options ?? {};
   const cases = collectCaseResults(results, caseId);
-  const shared = hasSharedBaseline(cases);
+  const shared = sharedBaseline(cases);
 
   const rows = cases.flatMap(({ variant, cr }) => {
     const out: MatrixReportRow[] = [
@@ -265,8 +265,7 @@ function buildRow(
       undefined,
       comparison,
     );
-  if (extraColumns)
-    for (const col of extraColumns) row[col.key] = col.extract(caseResult);
+  for (const col of extraColumns ?? []) row[col.key] = col.extract(caseResult);
   return row;
 }
 
@@ -303,8 +302,8 @@ function collectCaseResults(
   });
 }
 
-/** If all baselines are the same reference (baselineVariant mode), return it */
-function hasSharedBaseline(
+/** @return shared baseline if all variants reference the same one (baselineVariant mode) */
+function sharedBaseline(
   caseResults: VariantCase[],
 ): MeasuredResults | undefined {
   const baselines = caseResults.map(({ cr }) => cr.baseline).filter(Boolean);

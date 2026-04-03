@@ -37,18 +37,18 @@ const defaultArgs: Record<string, unknown> = {
 const skipArgs = new Set(["_", "$0", "view", "file"]);
 
 export function SummaryPanel() {
-  const p = provider.value!;
+  const dataProvider = provider.value!;
   const data = reportData.value;
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    p.fetchReportData()
-      .then(d => (reportData.value = d as ReportData))
+    dataProvider.fetchReportData()
+      .then(result => (reportData.value = result as ReportData))
       .catch(err => {
         console.error("Report load failed:", err);
         setError(String(err));
       });
-  }, [p]);
+  }, [dataProvider]);
 
   if (error)
     return <div class="empty-state"><p>Failed to load report data: {error}</p></div>;

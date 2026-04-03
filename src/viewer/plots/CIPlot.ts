@@ -160,13 +160,12 @@ function drawReferenceLine(
   if (!includeZero) return;
   const zeroX = scales.x(0);
   const { margin, plot } = layout;
-  const inRange = zeroX >= margin.left && zeroX <= layout.width - margin.right;
-  if (inRange) {
-    const attrs = { stroke: "#000", strokeWidth: "1" };
-    svg.appendChild(
-      line(zeroX, margin.top - 4, zeroX, margin.top + plot.h + 4, attrs),
-    );
-  }
+  if (zeroX < margin.left || zeroX > layout.width - margin.right) return;
+
+  const attrs = { stroke: "#000", strokeWidth: "1" };
+  svg.appendChild(
+    line(zeroX, margin.top - 4, zeroX, margin.top + plot.h + 4, attrs),
+  );
 }
 
 /** Convenience wrapper for DifferenceCI data */
@@ -350,10 +349,11 @@ function line(
   return el;
 }
 
+const toKebab = (k: string) => k.replace(/[A-Z]/g, c => "-" + c.toLowerCase());
+
 /** Set SVG attributes, converting camelCase keys to kebab-case */
 function setAttrs(el: SVGElement, attrs: Record<string, string>): void {
-  const kebab = (k: string) => k.replace(/[A-Z]/g, c => "-" + c.toLowerCase());
-  for (const [k, v] of Object.entries(attrs)) el.setAttribute(kebab(k), v);
+  for (const [k, v] of Object.entries(attrs)) el.setAttribute(toKebab(k), v);
 }
 
 /** Apply gaussian kernel smoothing to histogram bins */

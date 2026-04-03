@@ -54,15 +54,13 @@ export async function exportReports(options: ExportOptions): Promise<void> {
   const { sections, currentVersion, baselineVersion } = options;
 
   const needsReportData = args.view || args.archive != null;
-  const equivMargin = args["equiv-margin"];
-  const noBatchTrim = args["no-batch-trim"];
   const htmlOpts = {
     cliArgs: args,
     sections,
     currentVersion,
     baselineVersion,
-    equivMargin,
-    noBatchTrim,
+    equivMargin: args["equiv-margin"],
+    noBatchTrim: args["no-batch-trim"],
   };
   const reportData = needsReportData
     ? prepareHtmlData(results, htmlOpts)
@@ -168,7 +166,9 @@ async function openViewer(
 
 /** Export the first raw V8 TimeProfile to a JSON file. */
 function exportTimeProfile(results: ReportGroup[], path: string): void {
-  const profile = findTimeProfile(results);
+  const profile = results
+    .flatMap(g => groupReports(g))
+    .find(r => r.measuredResults.timeProfile)?.measuredResults.timeProfile;
   if (!profile) return void console.log("No time profiles to export.");
   writeFileSync(resolve(path), JSON.stringify(profile));
   console.log(`Time profile exported to: ${path}`);
@@ -182,13 +182,4 @@ function mergeCoverage(
     groupReports(group).flatMap(r => r.measuredResults.coverage?.scripts ?? []),
   );
   return scripts.length > 0 ? { scripts } : undefined;
-}
-
-/** Find the first raw V8 TimeProfile in results. */
-function findTimeProfile(
-  results: ReportGroup[],
-): import("../profiling/node/TimeSampler.ts").TimeProfile | undefined {
-  return results
-    .flatMap(g => groupReports(g))
-    .find(r => r.measuredResults.timeProfile)?.measuredResults.timeProfile;
 }
