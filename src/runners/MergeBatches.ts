@@ -14,17 +14,19 @@ export function mergeBatchResults(results: MeasuredResults[]): MeasuredResults {
   const allSamples = results.flatMap(r => r.samples);
   const time = computeStats(allSamples);
 
-  let offset = 0;
   const batchOffsets: number[] = [];
-  const pauses = results.flatMap(r => {
+  const pauses = [];
+  let offset = 0;
+  for (const r of results) {
     batchOffsets.push(offset);
-    const shifted = (r.pausePoints ?? []).map(p => ({
-      sampleIndex: p.sampleIndex + offset,
-      durationMs: p.durationMs,
-    }));
+    for (const p of r.pausePoints ?? []) {
+      pauses.push({
+        sampleIndex: p.sampleIndex + offset,
+        durationMs: p.durationMs,
+      });
+    }
     offset += r.samples.length;
-    return shifted;
-  });
+  }
 
   // last batch as base ==> new MeasuredResults fields get "take last"
   // semantics by default instead of silently disappearing
@@ -83,20 +85,11 @@ export async function runBatched(
 
   for (let i = 0; i < batches; i++) {
     const reverse = i % 2 === 1;
-    const runAll = async () => {
-      for (let j = 0; j < runners.length; j++)
-        runnerBatches[j].push(await runners[j]());
-    };
-    const runBase = async () => {
-      if (baseline) baselineBatches.push(await baseline());
-    };
-    if (reverse) {
-      await runAll();
-      await runBase();
-    } else {
-      await runBase();
-      await runAll();
-    }
+    // baseline runs before benchmarks on even batches, after on odd (alternation)
+    if (!reverse && baseline) baselineBatches.push(await baseline());
+    for (let j = 0; j < runners.length; j++)
+      runnerBatches[j].push(await runners[j]());
+    if (reverse && baseline) baselineBatches.push(await baseline());
   }
 
   if (!warmupBatch && batches > 1) {

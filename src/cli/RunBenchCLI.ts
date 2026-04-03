@@ -125,60 +125,71 @@ async function runBrowserBatches(
   args: DefaultCliArgs,
 ): Promise<{ lastRaw: BrowserProfileResult; results: ReportGroup[] }> {
   const launchChrome = await loadChromeLauncher();
-  const launchOpts = {
+  const chrome = await launchChrome({
     headless: args.headless,
     chromePath: args.chrome,
     chromeProfile: args["chrome-profile"],
     args: params.chromeArgs,
-  };
-  const chrome = await launchChrome(launchOpts);
+  });
 
-  const baselineUrl = args["baseline-url"];
-  const warmupBatch = args["warmup-batch"] ?? false;
-  let lastRaw: BrowserProfileResult | undefined;
   try {
-    const runCurrent = async () => {
-      const raw = await profileBrowser({ ...params, chrome });
-      lastRaw = raw;
-      return toBrowserMeasured(name, raw);
-    };
-    const runBaseline = baselineUrl
-      ? async () => {
-          const raw = await profileBrowser({
-            ...params,
-            chrome,
-            url: baselineUrl,
-          });
-          lastRaw ??= raw;
-          return toBrowserMeasured(nameFromUrl(baselineUrl), raw);
-        }
-      : undefined;
-
-    const batches = Math.max(args.batches, 2);
-    const batched = await runBatched(
-      [runCurrent],
-      runBaseline,
-      batches,
-      warmupBatch,
-    );
-    const {
-      results: [current],
-      baseline,
-    } = batched;
-
-    const baselineReport =
-      baseline && baselineUrl
-        ? { name: nameFromUrl(baselineUrl), measuredResults: baseline }
-        : undefined;
-    const group = {
-      name,
-      reports: [{ name, measuredResults: current }],
-      baseline: baselineReport,
-    };
-    return { lastRaw: lastRaw!, results: [group] };
+    return await runBatchedTabs(profileBrowser, params, name, args, chrome);
   } finally {
     await chrome.close();
   }
+}
+
+/** Execute batched browser tabs within an already-launched Chrome instance. */
+async function runBatchedTabs(
+  profileBrowser: Awaited<ReturnType<typeof loadBrowserProfiler>>,
+  params: ReturnType<typeof buildBrowserParams>,
+  name: string,
+  args: DefaultCliArgs,
+  chrome: any,
+): Promise<{ lastRaw: BrowserProfileResult; results: ReportGroup[] }> {
+  const baselineUrl = args["baseline-url"];
+  let lastRaw: BrowserProfileResult | undefined;
+
+  const runCurrent = async () => {
+    const raw = await profileBrowser({ ...params, chrome });
+    lastRaw = raw;
+    return toBrowserMeasured(name, raw);
+  };
+  const runBaseline = baselineUrl
+    ? async () => {
+        const raw = await profileBrowser({
+          ...params,
+          chrome,
+          url: baselineUrl,
+        });
+        lastRaw ??= raw;
+        return toBrowserMeasured(nameFromUrl(baselineUrl), raw);
+      }
+    : undefined;
+
+  const batches = Math.max(args.batches, 2);
+  const warmupBatch = args["warmup-batch"] ?? false;
+  const batched = await runBatched(
+    [runCurrent],
+    runBaseline,
+    batches,
+    warmupBatch,
+  );
+  const {
+    results: [current],
+    baseline,
+  } = batched;
+
+  const baselineReport =
+    baseline && baselineUrl
+      ? { name: nameFromUrl(baselineUrl), measuredResults: baseline }
+      : undefined;
+  const group = {
+    name,
+    reports: [{ name, measuredResults: current }],
+    baseline: baselineReport,
+  };
+  return { lastRaw: lastRaw!, results: [group] };
 }
 
 /** Dynamically import the browser profiler (lazy-loaded for non-browser benchmarks). */
@@ -383,13 +394,15 @@ function printBrowserReport(
 ): void {
   const hasTime = !!result.samples?.length || result.wallTimeMs != null;
   const showTime = hasTime && !result.navTiming;
-  const sections: ResultsMapper<any>[] = [
-    ...(result.navTiming ? [pageLoadSection] : []),
-    ...(showTime ? [timeSection] : []),
-    ...(result.gcStats ? [browserGcStatsSection] : []),
-    ...(showTime ? [runsSection] : []),
+  const sections: (ResultsMapper<any> | false)[] = [
+    !!result.navTiming && pageLoadSection,
+    showTime && timeSection,
+    !!result.gcStats && browserGcStatsSection,
+    showTime && runsSection,
   ];
-  if (sections.length > 0) console.log(reportResults(results, sections));
+  const activeSections = sections.filter(Boolean) as ResultsMapper<any>[];
+  if (activeSections.length > 0)
+    console.log(reportResults(results, activeSections));
   if (result.heapProfile)
     printHeapReports(results, {
       ...cliHeapReportOptions(args),

@@ -160,10 +160,11 @@ function buildPlotContext(timeSeries: TimeSeriesPoint[]): PlotContext {
   const baselineNames = new Set(
     convertedData.filter(d => d.isBaseline).map(d => d.benchmark),
   );
-  const tierSet = convertedData
-    .filter(d => d.optTier && !d.isWarmup)
-    .map(d => d.optTier as string);
-  const optTiers = [...new Set(tierSet)];
+  const optTiers = [
+    ...new Set(
+      convertedData.filter(d => d.optTier && !d.isWarmup).map(d => d.optTier!),
+    ),
+  ];
   return {
     convertedData,
     xMin,
@@ -252,31 +253,37 @@ function buildLegendItems(p: LegendParams): LegendItem[] {
   if (hasHeap) items.push({ color: "#93c5fd", label: "heap", style: "rect" });
   if (hasBaselineHeap)
     items.push({ color: "#fcd34d", label: "heap (baseline)", style: "rect" });
-  items.push(
-    ...optTiers.map(tier => ({
-      color: optTierColors[tier] || "#4682b4",
-      label: tier,
-      style: "filled-dot" as const,
-    })),
-  );
-  if (optTiers.length === 0) {
-    const sorted = [...benchmarks].sort(
-      (a, b) => Number(baselineNames.has(a)) - Number(baselineNames.has(b)),
-    );
-    items.push(
-      ...sorted.map(bm => {
-        const base = baselineNames.has(bm);
-        return {
-          color: base ? "#ffa500" : "#4682b4",
-          label: bm,
-          style: (base ? "hollow-dot" : "filled-dot") as LegendItem["style"],
-        };
-      }),
-    );
-  }
+  items.push(...seriesLegendItems(optTiers, benchmarks, baselineNames));
   if (hasRejected)
     items.push({ color: "#999", label: "rejected", style: "hollow-dot" });
   return items;
+}
+
+/** Legend items for benchmark series: opt tiers when present, otherwise benchmark names */
+function seriesLegendItems(
+  optTiers: string[],
+  benchmarks: string[],
+  baselineNames: Set<string>,
+): LegendItem[] {
+  if (optTiers.length > 0) {
+    return optTiers.map(tier => ({
+      color: optTierColors[tier] || "#4682b4",
+      label: tier,
+      style: "filled-dot" as const,
+    }));
+  }
+  // sort baselines last so current benchmarks appear first in legend
+  const sorted = [...benchmarks].sort(
+    (a, b) => Number(baselineNames.has(a)) - Number(baselineNames.has(b)),
+  );
+  return sorted.map(bm => {
+    const isBase = baselineNames.has(bm);
+    return {
+      color: isBase ? "#ffa500" : "#4682b4",
+      label: bm,
+      style: (isBase ? "hollow-dot" : "filled-dot") as LegendItem["style"],
+    };
+  });
 }
 
 interface MarkParams {
@@ -569,17 +576,25 @@ function sampleDotMarks(ctx: PlotContext, showRejected: boolean): any[] {
       fill: (d: SampleData) =>
         (d.optTier && optTierColors[d.optTier]) || "#4682b4",
     }),
-    ...(rejected.length
-      ? [
-          Plot.dot(rejected, {
-            ...xy,
-            stroke: "#999",
-            fill: "none",
-            strokeWidth: 1,
-            opacity: 0.3,
-            title: (d: SampleData) => `Rejected ${tipTitle(d)}`,
-          }),
-        ]
-      : []),
+    ...rejectedDotMark(rejected, xy, tipTitle),
+  ];
+}
+
+/** Rejected sample dots (greyed out, low opacity), or empty if none */
+function rejectedDotMark(
+  rejected: SampleData[],
+  xy: { x: "sample"; y: "displayValue"; r: number },
+  tipTitle: (d: SampleData) => string,
+): any[] {
+  if (!rejected.length) return [];
+  return [
+    Plot.dot(rejected, {
+      ...xy,
+      stroke: "#999",
+      fill: "none",
+      strokeWidth: 1,
+      opacity: 0.3,
+      title: (d: SampleData) => `Rejected ${tipTitle(d)}`,
+    }),
   ];
 }

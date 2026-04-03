@@ -11,7 +11,7 @@ import {
   createTab,
   launchChrome,
 } from "./ChromeLauncher.ts";
-import { setupLapMode } from "./LapMode.ts";
+import { type LapModeHandle, setupLapMode } from "./LapMode.ts";
 import { runPageLoad } from "./PageLoadMode.ts";
 
 /** Options for a browser benchmark run (profiling, GC, iteration limits). */
@@ -132,8 +132,7 @@ async function runBenchOrLap(
   );
 
   if (hasBench) {
-    lapMode.cancel();
-    lapMode.promise.catch(() => {}); // suppress unused rejection
+    dismissLapMode(lapMode);
     return runBenchLoop(ctx);
   }
 
@@ -148,9 +147,14 @@ async function runBenchOrLap(
   }
 
   // Naked page: no __bench, no __start() ==> measure page load timing
-  lapMode.cancel();
-  lapMode.promise.catch(() => {}); // suppress unused rejection
+  dismissLapMode(lapMode);
   return collectNavTiming(page);
+}
+
+/** Cancel lap mode and suppress its unused rejection. */
+function dismissLapMode(lapMode: LapModeHandle): void {
+  lapMode.cancel();
+  lapMode.promise.catch(() => {});
 }
 
 /** Read navigation timing from an already-loaded page. */

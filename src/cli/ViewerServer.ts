@@ -1,6 +1,6 @@
 import { readFile } from "node:fs/promises";
 import { createServer, type Server } from "node:http";
-import { dirname, join, resolve } from "node:path";
+import { basename, dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import open from "open";
 import sirv from "sirv";
@@ -109,8 +109,7 @@ export function waitForCtrlC(): Promise<void> {
  *  Dev: src/cli/ -> up 2. Dist: dist/ -> up 1. */
 function packageRoot(): string {
   const thisDir = dirname(fileURLToPath(import.meta.url));
-  const base = thisDir.split("/").pop() || "";
-  if (base === "cli") return join(thisDir, "../..");
+  if (basename(thisDir) === "cli") return join(thisDir, "../..");
   return join(thisDir, "..");
 }
 

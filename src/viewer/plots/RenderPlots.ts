@@ -59,14 +59,32 @@ export function flattenSamples(benchmarks: PreparedBenchmark[]): FlattenedData {
 /** Extract time series, heap, GC, and pause data from one benchmark */
 function flattenBenchmark(b: PreparedBenchmark, out: FlattenedData): void {
   const name = b.name;
+  flattenWarmup(b, name, out);
+  flattenSamplesAndHeap(b, name, out);
+  flattenGcEvents(b, name, out);
+  flattenPausePoints(b, name, out);
+}
+
+/** Add warmup samples with negative iteration indices */
+function flattenWarmup(
+  b: PreparedBenchmark,
+  name: string,
+  out: FlattenedData,
+): void {
   const warmupCount = b.warmupSamples?.length || 0;
   b.warmupSamples?.forEach((value, i) => {
     const iteration = i - warmupCount;
     out.timeSeries.push({ benchmark: name, iteration, value, isWarmup: true });
   });
+}
 
+/** Add main samples to timeSeries/allSamples and heap data */
+function flattenSamplesAndHeap(
+  b: PreparedBenchmark,
+  name: string,
+  out: FlattenedData,
+): void {
   const rejected = rejectedIndices(b);
-  const endTimes = cumulativeSum(b.samples);
   b.samples.forEach((value, i) => {
     const isRejected = rejected?.has(i) || undefined;
     if (!isRejected)
@@ -85,8 +103,17 @@ function flattenBenchmark(b: PreparedBenchmark, out: FlattenedData): void {
       target.push({ benchmark: name, iteration: i, value: b.heapSamples[i] });
     }
   });
+}
 
-  b.gcEvents?.forEach(gc => {
+/** Map GC events to sample indices using cumulative sample durations */
+function flattenGcEvents(
+  b: PreparedBenchmark,
+  name: string,
+  out: FlattenedData,
+): void {
+  if (!b.gcEvents?.length) return;
+  const endTimes = cumulativeSum(b.samples);
+  for (const gc of b.gcEvents) {
     const idx = endTimes.findIndex(t => t >= gc.offset);
     const sampleIndex = idx >= 0 ? idx : b.samples.length - 1;
     out.allGcEvents.push({
@@ -94,16 +121,23 @@ function flattenBenchmark(b: PreparedBenchmark, out: FlattenedData): void {
       sampleIndex,
       duration: gc.duration,
     });
-  });
-  if (b.pausePoints) {
-    out.allPausePoints.push(
-      ...b.pausePoints.map(p => ({
-        benchmark: name,
-        sampleIndex: p.sampleIndex,
-        durationMs: p.durationMs,
-      })),
-    );
   }
+}
+
+/** Add pause points with benchmark name */
+function flattenPausePoints(
+  b: PreparedBenchmark,
+  name: string,
+  out: FlattenedData,
+): void {
+  if (!b.pausePoints) return;
+  out.allPausePoints.push(
+    ...b.pausePoints.map(p => ({
+      benchmark: name,
+      sampleIndex: p.sampleIndex,
+      durationMs: p.durationMs,
+    })),
+  );
 }
 
 /** @return sample indices in Tukey-rejected batches, or undefined if none */

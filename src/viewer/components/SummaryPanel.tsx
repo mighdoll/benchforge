@@ -70,9 +70,10 @@ function ReportHeader({ metadata }: { metadata: Record<string, unknown> }) {
   const defaults = metadata.cliDefaults as Record<string, unknown> | undefined;
   const cur = metadata.currentVersion as GitVersion | undefined;
   const base = metadata.baselineVersion as GitVersion | undefined;
-  const versionParts: string[] = [];
-  if (cur) versionParts.push("Current: " + formatVersion(cur));
-  if (base) versionParts.push("Baseline: " + formatVersion(base));
+  const versionParts = [
+    cur && `Current: ${formatVersion(cur)}`,
+    base && `Baseline: ${formatVersion(base)}`,
+  ].filter(Boolean);
 
   return (
     <div class="report-header">
@@ -299,16 +300,14 @@ function BootstrapCIMount({ ci, label, shift }: {
 
 /** Compute min/max bootstrap estimates across a section for proportional positioning */
 function sectionEstimateRange(section: ViewerSection): [number, number] | undefined {
-  let min = Infinity, max = -Infinity, count = 0;
-  for (const row of section.rows)
-    for (const entry of row.entries)
-      if (entry.bootstrapCI) {
-        const est = entry.bootstrapCI.estimate;
-        if (est < min) min = est;
-        if (est > max) max = est;
-        count++;
-      }
-  return count >= 2 && max > min ? [min, max] : undefined;
+  const estimates = section.rows
+    .flatMap(row => row.entries)
+    .map(e => e.bootstrapCI?.estimate)
+    .filter((v): v is number => v != null);
+  if (estimates.length < 2) return undefined;
+  const min = Math.min(...estimates);
+  const max = Math.max(...estimates);
+  return max > min ? [min, max] : undefined;
 }
 
 function formatCount(n: number): string {

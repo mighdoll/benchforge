@@ -66,8 +66,6 @@ function buildBarData(allSamples: Sample[], benchmarkNames: string[]) {
   const binCount = 25;
   const step = (binMax - binMin) / binCount;
   const thresholds = d3.range(1, binCount).map(i => binMin + i * step);
-  const plotWidth = plotLayout.width;
-
   const bins = d3
     .bin<Sample, number>()
     .domain([binMin, binMax])
@@ -75,7 +73,7 @@ function buildBarData(allSamples: Sample[], benchmarkNames: string[]) {
     .value(d => d.value)(allSamples);
 
   const n = benchmarkNames.length;
-  const unitsPerPx = (binMax - binMin) / plotWidth;
+  const unitsPerPx = (binMax - binMin) / plotLayout.width;
   const groupGapPx = 8;
 
   const barData: Bar[] = bins.flatMap(bin => {

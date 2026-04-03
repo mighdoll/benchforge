@@ -185,24 +185,23 @@ function runWorkerWithMessage(
 
     worker.on("message", (msg: ResultMessage | ErrorMessage) => {
       killWorker();
-      if (msg.type === "result") {
-        logTiming(
-          `Total worker time for ${name}: ${getElapsed(startTime).toFixed(1)}ms`,
-        );
-        const { results, heapProfile, timeProfile, coverage } = msg;
-        attachProfilingData(
-          results,
-          gcEvents,
-          heapProfile,
-          timeProfile,
-          coverage,
-        );
-        resolve(results);
-      } else if (msg.type === "error") {
+      if (msg.type === "error") {
         const error = new Error(`Benchmark "${name}" failed: ${msg.error}`);
         if (msg.stack) error.stack = msg.stack;
-        reject(error);
+        return reject(error);
       }
+      logTiming(
+        `Total worker time for ${name}: ${getElapsed(startTime).toFixed(1)}ms`,
+      );
+      const { results, heapProfile, timeProfile, coverage } = msg;
+      attachProfilingData(
+        results,
+        gcEvents,
+        heapProfile,
+        timeProfile,
+        coverage,
+      );
+      resolve(results);
     });
     worker.on("error", (error: Error) => {
       killWorker();

@@ -32,19 +32,11 @@ type CollectResult = {
   samples: number[];
   warmupSamples: number[]; // timing of warmup iterations
   heapGrowth: number; // amortized KB per sample
-  heapSamples?: number[]; // heap size per sample (bytes)
-  timestamps?: number[]; // wall-clock μs per sample for Perfetto
+  heapSamples: number[]; // heap size per sample (bytes)
+  timestamps: number[]; // wall-clock μs per sample for Perfetto
   optStatus?: OptStatusInfo;
   optSamples?: number[]; // per-sample V8 opt status codes
   pausePoints: PausePoint[]; // where pauses occurred
-};
-
-type SampleLoopResult = {
-  samples: number[];
-  heapSamples?: number[];
-  timestamps?: number[];
-  optStatuses: number[];
-  pausePoints: PausePoint[];
 };
 
 type SampleArrays = {
@@ -138,12 +130,11 @@ async function collectSamples<T>(
   }
   const heapDelta = process.memoryUsage().heapUsed - heapBefore;
   const heapGrowth = Math.max(0, heapDelta) / 1024 / samples.length;
-  const tracing = config.traceOpt;
-  const optStatus = tracing
+  const optStatus = config.traceOpt
     ? analyzeOptStatus(samples, optStatuses)
     : undefined;
   const optSamples =
-    tracing && optStatuses.length > 0 ? optStatuses : undefined;
+    config.traceOpt && optStatuses.length > 0 ? optStatuses : undefined;
   return {
     samples,
     warmupSamples,
@@ -219,13 +210,13 @@ async function runWarmup<T>(config: CollectParams<T>): Promise<number[]> {
 /** Collect timing samples with optional periodic pauses for V8 background compilation. */
 async function runSampleLoop<T>(
   config: CollectParams<T>,
-): Promise<SampleLoopResult> {
+): Promise<SampleArrays> {
   const { maxTime, maxIterations, pauseFirst } = config;
   const { pauseInterval = 0, pauseDuration = 100 } = config;
-  const trackHeap = true;
   const getOptStatus = config.traceOpt ? createOptStatusGetter() : undefined;
+  const trackOpt = !!getOptStatus;
   const estimated = maxIterations || Math.ceil(maxTime / 0.1);
-  const arrays = createSampleArrays(estimated, trackHeap, !!getOptStatus);
+  const arrays = createSampleArrays(estimated, trackOpt);
 
   let count = 0;
   let elapsed = 0;
@@ -241,8 +232,7 @@ async function runSampleLoop<T>(
     const end = performance.now();
     arrays.samples[count] = end - start;
     arrays.timestamps[count] = Number(process.hrtime.bigint() / 1000n);
-    if (trackHeap)
-      arrays.heapSamples[count] = getHeapStatistics().used_heap_size;
+    arrays.heapSamples[count] = getHeapStatistics().used_heap_size;
     if (getOptStatus)
       arrays.optStatuses[count] = getOptStatus(config.benchmark.fn);
     count++;
@@ -259,10 +249,8 @@ async function runSampleLoop<T>(
     elapsed = performance.now() - loopStart - totalPauseTime;
   }
 
-  trimArrays(arrays, count, trackHeap, !!getOptStatus);
-  const { samples, timestamps, optStatuses, pausePoints } = arrays;
-  const heapSamples = trackHeap ? arrays.heapSamples : undefined;
-  return { samples, heapSamples, timestamps, optStatuses, pausePoints };
+  trimArrays(arrays, count, trackOpt);
+  return arrays;
 }
 
 /** Group samples by V8 optimization tier and count deoptimizations. */
@@ -315,17 +303,12 @@ function createOptStatusGetter(): ((fn: unknown) => number) | undefined {
 }
 
 /** Pre-allocate arrays to reduce GC pressure during measurement. */
-function createSampleArrays(
-  n: number,
-  trackHeap: boolean,
-  trackOpt: boolean,
-): SampleArrays {
-  const arr = (use: boolean) => (use ? new Array<number>(n) : []);
+function createSampleArrays(n: number, trackOpt: boolean): SampleArrays {
   return {
     samples: new Array<number>(n),
     timestamps: new Array<number>(n),
-    heapSamples: arr(trackHeap),
-    optStatuses: arr(trackOpt),
+    heapSamples: new Array<number>(n),
+    optStatuses: trackOpt ? new Array<number>(n) : [],
     pausePoints: [],
   };
 }
@@ -346,10 +329,11 @@ function shouldPause(
 function trimArrays(
   arrays: SampleArrays,
   count: number,
-  trackHeap: boolean,
   trackOpt: boolean,
 ): void {
-  arrays.samples.length = arrays.timestamps.length = count;
-  if (trackHeap) arrays.heapSamples.length = count;
+  arrays.samples.length =
+    arrays.timestamps.length =
+    arrays.heapSamples.length =
+      count;
   if (trackOpt) arrays.optStatuses.length = count;
 }

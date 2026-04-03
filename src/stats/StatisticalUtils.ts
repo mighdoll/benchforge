@@ -103,9 +103,7 @@ export function findOutliers(samples: number[]): {
   indices: number[];
 } {
   const [lo, hi] = tukeyFences(samples, outlierMultiplier);
-  const indices = samples
-    .map((v, i) => (v < lo || v > hi ? i : -1))
-    .filter(i => i >= 0);
+  const indices = samples.flatMap((v, i) => (v < lo || v > hi ? [i] : []));
   return { rate: indices.length / samples.length, indices };
 }
 
@@ -192,9 +190,7 @@ function tukeyKeep(values: number[]): number[] {
   if (values.length < 4) return values.map((_, i) => i);
   const minIqr = percentile(values, 0.5) * 0.02;
   const [lo, hi] = tukeyFences(values, 3, minIqr);
-  return values
-    .map((v, i) => (v >= lo && v <= hi ? i : -1))
-    .filter(i => i >= 0);
+  return values.flatMap((v, i) => (v >= lo && v <= hi ? [i] : []));
 }
 
 /** @return samples split into blocks by offset boundaries */

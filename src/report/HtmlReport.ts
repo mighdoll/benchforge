@@ -327,15 +327,34 @@ function buildEntry(
   const samples = measured?.samples;
   if (!col.comparable || !col.statFn || !samples || samples.length <= 1)
     return { runName, value };
+  return {
+    runName,
+    value,
+    bootstrapCI: buildBootstrapCI(
+      col,
+      samples,
+      measured?.batchOffsets,
+      metadata,
+    ),
+  };
+}
+
+/** Compute bootstrap CI in the column's display domain (e.g. lines/sec) */
+function buildBootstrapCI(
+  col: ReportColumn<Record<string, unknown>>,
+  samples: number[],
+  batchOffsets: number[] | undefined,
+  metadata?: UnknownRecord,
+) {
   const fn = (s: number[]) => col.statFn!(s, metadata);
-  const result = bootstrapStat(samples, fn, { blocks: measured?.batchOffsets });
+  const result = bootstrapStat(samples, fn, { blocks: batchOffsets });
   const display = col.toDisplay
     ? (v: number) => col.toDisplay!(v, metadata)
     : (v: number) => v;
   const fmt = (v: number) =>
     (col.formatter ? col.formatter(v) : String(v)) ?? String(v);
 
-  // Transform bootstrap data to display domain so histogram x-axis matches labels
+  // Transform to display domain so histogram x-axis matches labels
   const binned = binBootstrapResult(result);
   const dLo = display(binned.ci[0]);
   const dHi = display(binned.ci[1]);
@@ -346,14 +365,10 @@ function buildEntry(
   }));
 
   return {
-    runName,
-    value,
-    bootstrapCI: {
-      estimate: display(binned.estimate),
-      ci,
-      histogram,
-      ciLabels: [fmt(ci[0]), fmt(ci[1])],
-    },
+    estimate: display(binned.estimate),
+    ci,
+    histogram,
+    ciLabels: [fmt(ci[0]), fmt(ci[1])] as [string, string],
   };
 }
 
@@ -379,14 +394,14 @@ function defaultSections(
   groups: ReportGroup[],
   cliArgs?: Record<string, unknown>,
 ): ResultsMapper[] {
-  const gc = cliArgs?.["gc-stats"] === true;
-  const opt = groups.some(g =>
+  const hasGc = cliArgs?.["gc-stats"] === true;
+  const hasOpt = groups.some(g =>
     groupReports(g).some(r => r.measuredResults.optStatus !== undefined),
   );
   return [
     timeSection,
-    ...(gc ? [gcStatsSection] : []),
-    ...(opt ? [optSection] : []),
+    hasGc ? gcStatsSection : undefined,
+    hasOpt ? optSection : undefined,
     runsSection,
-  ];
+  ].filter((s): s is ResultsMapper => s !== undefined);
 }
