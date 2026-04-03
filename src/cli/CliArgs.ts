@@ -50,7 +50,7 @@ const cliOptions = {
   editor:           { type: "string",  default: "vscode", describe: "editor for source links: vscode, cursor, or custom://scheme" },
   inspect:          { type: "boolean", default: false, describe: "run once for external profiler attach" },
   "trace-opt":      { type: "boolean", default: false, describe: "trace V8 optimization tiers (requires --allow-natives-syntax)" },
-  "skip-settle":    { type: "boolean", default: false, describe: "skip post-warmup settle time (see V8 optimization cold start)" },
+  settle:           { type: "number",  default: 0, requiresArg: true, describe: "post-warmup settle time in ms for V8 background compilation (0 to skip)" },
   url:              { type: "string",  requiresArg: true, describe: "page URL for browser profiling (enables browser mode)" },
   "page-load":      { type: "boolean", default: false, describe: "passive page-load profiling (no __bench/__start needed)" },
   "wait-for":       { type: "string",  requiresArg: true, describe: "page-load completion: CSS selector, JS expression, 'load', or 'domcontentloaded'" },
@@ -109,7 +109,7 @@ const optionGroups = {
     "chrome-profile",
     "chrome-args",
   ],
-  "Advanced:": ["inspect", "trace-opt", "skip-settle"],
+  "Advanced:": ["inspect", "trace-opt", "settle"],
 } as const;
 
 const { url: _url, ...browserOnlyOptions } = cliOptions;

@@ -22,7 +22,7 @@ type CollectParams<T = unknown> = {
   params?: T;
   skipWarmup?: boolean;
   traceOpt?: boolean;
-  noSettle?: boolean;
+  settle?: number;
   pauseFirst?: number;
   pauseInterval?: number;
   pauseDuration?: number;
@@ -55,35 +55,12 @@ type SampleArrays = {
   pausePoints: PausePoint[];
 };
 
-/**
- * Wait time after gc() for V8 to stabilize (ms).
- *
- * V8 has 4 compilation tiers: Ignition (interpreter) -> Sparkplug (baseline) ->
- * Maglev (mid-tier optimizer) -> TurboFan (full optimizer). Tiering thresholds:
- *   - Ignition -> Sparkplug: 8 invocations
- *   - Sparkplug -> Maglev: 500 invocations
- *   - Maglev -> TurboFan: 6000 invocations
- *
- * Optimization compilation happens on background threads and requires idle time
- * on the main thread to complete. Without sufficient warmup + settle time,
- * benchmarks exhibit bimodal timing: slow Sparkplug samples (~30% slower) mixed
- * with fast optimized samples.
- *
- * The warmup iterations trigger the optimization decision, then gcSettleTime
- * provides idle time for background compilation to finish before measurement.
- *
- * @see https://v8.dev/blog/sparkplug
- * @see https://v8.dev/blog/maglev
- * @see https://v8.dev/blog/background-compilation
- */
-const gcSettleTime = 1000;
-
 const defaultCollectOptions = {
   maxTime: 5000,
   maxIterations: 1000000,
   warmup: 0,
   traceOpt: false,
-  noSettle: false,
+  settle: 0,
 };
 
 /**
@@ -219,8 +196,13 @@ async function runWarmup<T>(config: CollectParams<T>): Promise<number[]> {
     samples[i] = performance.now() - start;
   }
   gc();
-  if (!config.noSettle) {
-    await new Promise(r => setTimeout(r, gcSettleTime));
+  // Settle time: idle time for V8 background compilation to complete.
+  // V8 tiers (Ignition ==> Sparkplug ==> Maglev ==> TurboFan) compile on
+  // background threads. Without settle, benchmarks can show bimodal timing
+  // (~30% slower unoptimized samples mixed with optimized ones).
+  // Use --settle 200 (or higher) with --warmup to avoid this.
+  if (config.settle) {
+    await new Promise(r => setTimeout(r, config.settle));
     gc();
   }
   return samples;

@@ -31,8 +31,8 @@ export interface RunnerOptions {
   gcForce?: boolean;
   /** Trace V8 optimization tiers (requires --allow-natives-syntax) */
   traceOpt?: boolean;
-  /** Skip post-warmup settle time (default: false) */
-  noSettle?: boolean;
+  /** Post-warmup settle time in ms for V8 background compilation (0 to skip) */
+  settle?: number;
   /** Iterations before first pause (then pauseInterval applies) */
   pauseFirst?: number;
   /** Iterations between pauses for V8 optimization (0 to disable) */

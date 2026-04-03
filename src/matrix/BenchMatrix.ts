@@ -92,7 +92,7 @@ export interface RunMatrixOptions {
   filteredVariants?: string[];
   gcForce?: boolean;
   traceOpt?: boolean;
-  noSettle?: boolean;
+  settle?: number;
   pauseFirst?: number;
   pauseInterval?: number;
   pauseDuration?: number;

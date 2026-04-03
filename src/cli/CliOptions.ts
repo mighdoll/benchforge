@@ -90,7 +90,7 @@ function createAdaptiveOptions(args: DefaultCliArgs): RunnerOptions {
 function cliCommonOptions(args: DefaultCliArgs) {
   const { warmup } = args;
   const { "gc-force": gcForce, "gc-stats": gcStats } = args;
-  const { "trace-opt": traceOpt, "skip-settle": noSettle } = args;
+  const { "trace-opt": traceOpt, settle } = args;
   const { "pause-first": pauseFirst, "pause-interval": pauseInterval } = args;
   const { "pause-duration": pauseDuration } = args;
   const { "alloc-interval": allocInterval, "alloc-depth": allocDepth } = args;
@@ -99,7 +99,7 @@ function cliCommonOptions(args: DefaultCliArgs) {
     gcForce,
     warmup,
     traceOpt,
-    noSettle,
+    settle,
     pauseFirst,
     pauseInterval,
     pauseDuration,
