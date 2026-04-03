@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from "preact/hooks";
 import type { BenchmarkGroup, ReportData } from "../ReportData.ts";
 import {
+  batchCount,
+  filterToBatch,
   type FlattenedData,
   flattenSamples,
   type PreparedBenchmark,
@@ -52,11 +54,22 @@ function SamplesGroup({ group, index }: { group: BenchmarkGroup; index: number }
 
   const benchmarks = prepareBenchmarks(group);
   const flat = flattenSamples(benchmarks);
+  const numBatches = batchCount(benchmarks);
   const hasBaseline = !!group.baseline;
   const hasHeap = flat.heapSeries.length > 0;
   const hasBaselineHeap = flat.baselineHeapSeries.length > 0;
   const hasRejected = flat.timeSeries.some(d => d.isRejected);
-  const totalPoints = flat.timeSeries.length;
+
+  // batch === 0 means "All", 1..numBatches means specific batch
+  const [batch, setBatch] = useState(0);
+  const activeBatch = batch > numBatches ? 0 : batch;
+
+  const viewFlat = useMemo(
+    () => activeBatch > 0 ? filterToBatch(flat, benchmarks, activeBatch - 1) : flat,
+    [flat, benchmarks, activeBatch],
+  );
+
+  const totalPoints = viewFlat.timeSeries.length;
   const sampled = totalPoints > 1000;
 
   const [visibility, setVisibility] = useState<SeriesVisibility>({
@@ -82,17 +95,22 @@ function SamplesGroup({ group, index }: { group: BenchmarkGroup; index: number }
               ? `Sampled from ${totalPoints.toLocaleString()} iterations (showing ~1,000)`
               : "Execution time for each iteration in collection order"}
           </div>
-          <SeriesToggles
-            hasBaseline={hasBaseline}
-            hasHeap={hasHeap}
-            hasBaselineHeap={hasBaselineHeap}
-            hasRejected={hasRejected}
-            visibility={visibility}
-            onToggle={toggle}
-          />
+          <div class="plot-controls">
+            <SeriesToggles
+              hasBaseline={hasBaseline}
+              hasHeap={hasHeap}
+              hasBaselineHeap={hasBaselineHeap}
+              hasRejected={hasRejected}
+              visibility={visibility}
+              onToggle={toggle}
+            />
+            {numBatches > 1 && (
+              <BatchStepper batch={activeBatch} total={numBatches} onChange={setBatch} />
+            )}
+          </div>
           <TimeSeriesPlot
             benchmarks={benchmarks}
-            flat={flat}
+            flat={viewFlat}
             index={index}
             visibility={visibility}
           />
@@ -102,7 +120,7 @@ function SamplesGroup({ group, index }: { group: BenchmarkGroup; index: number }
           <div class="plot-description">
             Frequency distribution of execution times
           </div>
-          <HistogramPlot benchmarks={benchmarks} flat={flat} index={index} />
+          <HistogramPlot benchmarks={benchmarks} flat={viewFlat} index={index} />
         </div>
       </div>
     </div>
@@ -155,6 +173,25 @@ function SeriesToggles(props: ToggleProps) {
           rejected
         </button>
       )}
+    </div>
+  );
+}
+
+interface BatchStepperProps {
+  batch: number; // 0 = All
+  total: number;
+  onChange: (batch: number) => void;
+}
+
+function BatchStepper({ batch, total, onChange }: BatchStepperProps) {
+  const prev = () => onChange(batch <= 0 ? total : batch - 1);
+  const next = () => onChange(batch >= total ? 0 : batch + 1);
+  const label = batch === 0 ? "All" : `Batch ${batch} of ${total}`;
+  return (
+    <div class="batch-stepper">
+      <button class="batch-btn" onClick={prev}>&lsaquo;</button>
+      <span class="batch-label">{label}</span>
+      <button class="batch-btn" onClick={next}>&rsaquo;</button>
     </div>
   );
 }

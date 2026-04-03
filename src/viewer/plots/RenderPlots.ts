@@ -128,6 +128,59 @@ function rejectedIndices(b: PreparedBenchmark): Set<number> | undefined {
   return rejected.size > 0 ? rejected : undefined;
 }
 
+/** @return batch count from the first benchmark with batchOffsets, or 0 */
+export function batchCount(benchmarks: PreparedBenchmark[]): number {
+  for (const b of benchmarks) {
+    if (b.batchOffsets?.length) return b.batchOffsets.length;
+  }
+  return 0;
+}
+
+/** Filter flattened data to a single batch, re-indexing iterations from 0 */
+export function filterToBatch(
+  flat: FlattenedData,
+  benchmarks: PreparedBenchmark[],
+  batchIndex: number,
+): FlattenedData {
+  // Build per-benchmark iteration ranges for this batch
+  const ranges = new Map<string, [number, number]>();
+  for (const b of benchmarks) {
+    const offsets = b.batchOffsets;
+    if (!offsets?.length) continue;
+    const start = offsets[batchIndex];
+    const end = batchIndex + 1 < offsets.length
+      ? offsets[batchIndex + 1]
+      : b.samples.length;
+    ranges.set(b.name, [start, end]);
+  }
+
+  const inRange = (name: string, iter: number) => {
+    const r = ranges.get(name);
+    return r ? iter >= r[0] && iter < r[1] : true;
+  };
+  const reindex = (name: string, iter: number) => {
+    const r = ranges.get(name);
+    return r ? iter - r[0] : iter;
+  };
+
+  return {
+    allSamples: flat.allSamples
+      .filter(d => inRange(d.benchmark, d.iteration))
+      .map(d => ({ ...d, iteration: reindex(d.benchmark, d.iteration) })),
+    timeSeries: flat.timeSeries
+      .filter(d => !d.isWarmup && inRange(d.benchmark, d.iteration))
+      .map(d => ({ ...d, iteration: reindex(d.benchmark, d.iteration) })),
+    heapSeries: flat.heapSeries
+      .filter(d => inRange(d.benchmark, d.iteration))
+      .map(d => ({ ...d, iteration: reindex(d.benchmark, d.iteration) })),
+    baselineHeapSeries: flat.baselineHeapSeries
+      .filter(d => inRange(d.benchmark, d.iteration))
+      .map(d => ({ ...d, iteration: reindex(d.benchmark, d.iteration) })),
+    allGcEvents: flat.allGcEvents.filter(d => inRange(d.benchmark, d.sampleIndex)),
+    allPausePoints: flat.allPausePoints.filter(d => inRange(d.benchmark, d.sampleIndex)),
+  };
+}
+
 /** Running total array, used to map GC event offsets to sample indices */
 function cumulativeSum(arr: number[]): number[] {
   const result: number[] = [];

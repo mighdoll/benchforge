@@ -223,10 +223,16 @@
 .report-panel .plot-title { font-size: 18px; font-weight: 600; margin-bottom: 8px; color: #333; }
 .report-panel .plot-description { font-size: 14px; color: #666; margin-bottom: 15px; }
 
+.report-panel .plot-controls {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 10px;
+}
+
 .report-panel .series-toggles {
   display: flex;
   gap: 6px;
-  margin-bottom: 10px;
 }
 
 .report-panel .toggle-pill {
@@ -247,6 +253,38 @@
 }
 
 .report-panel .toggle-pill:hover { border-color: #999; }
+
+.report-panel .batch-stepper {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 12px;
+}
+
+.report-panel .batch-btn {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  border: 1px solid #ccc;
+  background: #f0f0f0;
+  color: #555;
+  cursor: pointer;
+  font-size: 14px;
+  line-height: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+}
+
+.report-panel .batch-btn:hover { border-color: #999; background: #e0e0e0; }
+
+.report-panel .batch-label {
+  min-width: 80px;
+  text-align: center;
+  color: #555;
+  font-variant-numeric: tabular-nums;
+}
 
 .report-panel .plot-area {
   display: flex;
@@ -313,6 +351,9 @@
   :root:not([data-theme="light"]) .report-panel .toggle-pill { background: #333; border-color: #555; color: #aaa; }
   :root:not([data-theme="light"]) .report-panel .toggle-pill.active { background: #4682b4; border-color: #4682b4; color: white; }
   :root:not([data-theme="light"]) .report-panel .toggle-pill:hover { border-color: #777; }
+  :root:not([data-theme="light"]) .report-panel .batch-btn { background: #333; border-color: #555; color: #aaa; }
+  :root:not([data-theme="light"]) .report-panel .batch-btn:hover { border-color: #777; background: #444; }
+  :root:not([data-theme="light"]) .report-panel .batch-label { color: #aaa; }
   :root:not([data-theme="light"]) .report-panel .plot-container { background: #252525; box-shadow: 0 2px 4px rgba(0,0,0,0.3); }
   :root:not([data-theme="light"]) .report-panel .plot-title { color: #ddd; }
   :root:not([data-theme="light"]) .report-panel .plot-description { color: #999; }
@@ -353,6 +394,9 @@
 :root[data-theme="dark"] .report-panel .toggle-pill { background: #333; border-color: #555; color: #aaa; }
 :root[data-theme="dark"] .report-panel .toggle-pill.active { background: #4682b4; border-color: #4682b4; color: white; }
 :root[data-theme="dark"] .report-panel .toggle-pill:hover { border-color: #777; }
+:root[data-theme="dark"] .report-panel .batch-btn { background: #333; border-color: #555; color: #aaa; }
+:root[data-theme="dark"] .report-panel .batch-btn:hover { border-color: #777; background: #444; }
+:root[data-theme="dark"] .report-panel .batch-label { color: #aaa; }
 :root[data-theme="dark"] .report-panel .plot-container { background: #252525; box-shadow: 0 2px 4px rgba(0,0,0,0.3); }
 :root[data-theme="dark"] .report-panel .plot-title { color: #ddd; }
 :root[data-theme="dark"] .report-panel .plot-description { color: #999; }
