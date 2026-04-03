@@ -254,7 +254,13 @@ function buildRow(
     samples: samples.length,
   };
   if (baseline)
-    row.diffCI = computeDiffCI(baseline, measured, undefined, undefined, equivMargin);
+    row.diffCI = computeDiffCI(
+      baseline,
+      measured,
+      undefined,
+      undefined,
+      equivMargin,
+    );
   if (extraColumns)
     for (const col of extraColumns) row[col.key] = col.extract(caseResult);
   return row;
