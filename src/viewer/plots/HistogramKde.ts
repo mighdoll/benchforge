@@ -18,12 +18,12 @@ export function createHistogramKde(
   const bars = buildBarData(allSamples, benchmarkNames);
   const { barData, binMin, binMax, yMax } = bars;
   const { colorMap, legendItems } = buildColorData(benchmarkNames);
-  const xMax = binMax + (binMax - binMin) * 0.45; // extend for legend
+  const xMax = binMax;
 
   return Plot.plot({
     marginTop: 24,
     marginLeft: 70,
-    marginRight: 10,
+    marginRight: 110,
     marginBottom: 60,
     width: 550,
     height: 300,

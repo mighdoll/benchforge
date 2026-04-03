@@ -28,12 +28,14 @@ interface LegendPos {
   yMax: number;
 }
 
-/** Build complete legend marks array */
+/** Build complete legend marks array, positioned in the right margin */
 export function buildLegend(bounds: LegendBounds, items: LegendItem[]): any[] {
   const xRange = bounds.xMax - bounds.xMin;
-  const legendX = bounds.xMin + xRange * 0.68;
-  const textX = legendX + xRange * 0.04;
-  const getY = (i: number) => bounds.yMax * 0.98 - i * (bounds.yMax * 0.08);
+  const legendX = bounds.xMax + xRange * 0.04;
+  const textX = legendX + xRange * 0.03;
+  const itemHeight = bounds.yMax * 0.07;
+  const topY = bounds.yMax * 0.98;
+  const getY = (i: number) => topY - i * itemHeight;
 
   const pos = (i: number): LegendPos => ({
     legendX,
@@ -42,32 +44,10 @@ export function buildLegend(bounds: LegendBounds, items: LegendItem[]): any[] {
     xRange,
     yMax: bounds.yMax,
   });
-  return [
-    legendBackground(bounds),
-    ...items.flatMap((item, i) => [
-      symbolMark(pos(i), item),
-      textMark(pos(i), item.label),
-    ]),
-  ];
-}
-
-/** Draw a semi-transparent white background behind the legend area */
-function legendBackground(bounds: LegendBounds): any {
-  const r = bounds.xMax - bounds.xMin;
-  const x1 = bounds.xMin + r * 0.65;
-  const x2 = bounds.xMin + r * 1.05;
-  const y1 = bounds.yMax * 0.65;
-  const y2 = bounds.yMax * 1.05;
-  return Plot.rect([{ x1, x2, y1, y2 }], {
-    x1: "x1",
-    x2: "x2",
-    y1: "y1",
-    y2: "y2",
-    fill: "white",
-    fillOpacity: 0.9,
-    stroke: "#ddd",
-    strokeWidth: 1,
-  });
+  return items.flatMap((item, i) => [
+    symbolMark(pos(i), item),
+    textMark(pos(i), item.label),
+  ]);
 }
 
 /** Dispatch to the appropriate mark builder for a legend item's symbol style */
@@ -95,6 +75,7 @@ function textMark(pos: LegendPos, label: string): any {
     fontSize: 11,
     textAnchor: "start",
     fill: "#333",
+    clip: false,
   });
 }
 
@@ -102,8 +83,8 @@ function dotMark(x: number, y: number, color: string, filled: boolean): any {
   return Plot.dot(
     [{ x, y }],
     filled
-      ? { x: "x", y: "y", fill: color, r: 4 }
-      : { x: "x", y: "y", stroke: color, fill: "none", strokeWidth: 1.5, r: 4 },
+      ? { x: "x", y: "y", fill: color, r: 4, clip: false }
+      : { x: "x", y: "y", stroke: color, fill: "none", strokeWidth: 1.5, r: 4, clip: false },
   );
 }
 
@@ -122,6 +103,7 @@ function verticalBarMark(pos: LegendPos, color: string): any {
     y2: "y2",
     fill: color,
     fillOpacity: 0.6,
+    clip: false,
   });
 }
 
@@ -137,6 +119,7 @@ function verticalLineMark(
     stroke: color,
     strokeWidth: 2,
     strokeDasharray: strokeDash,
+    clip: false,
   });
 }
 
@@ -155,5 +138,6 @@ function rectMark(pos: LegendPos, color: string): any {
     fillOpacity: 0.3,
     stroke: color,
     strokeWidth: 1,
+    clip: false,
   });
 }

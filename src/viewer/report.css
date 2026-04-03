@@ -223,6 +223,31 @@
 .report-panel .plot-title { font-size: 18px; font-weight: 600; margin-bottom: 8px; color: #333; }
 .report-panel .plot-description { font-size: 14px; color: #666; margin-bottom: 15px; }
 
+.report-panel .series-toggles {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 10px;
+}
+
+.report-panel .toggle-pill {
+  font-size: 12px;
+  padding: 2px 10px;
+  border-radius: 12px;
+  border: 1px solid #ccc;
+  background: #f0f0f0;
+  color: #666;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.report-panel .toggle-pill.active {
+  background: #4682b4;
+  border-color: #4682b4;
+  color: white;
+}
+
+.report-panel .toggle-pill:hover { border-color: #999; }
+
 .report-panel .plot-area {
   display: flex;
   justify-content: center;
@@ -285,6 +310,9 @@
   :root:not([data-theme="light"]) .report-panel .row-value,
   :root:not([data-theme="light"]) .report-panel .run-value { color: #ddd; }
   :root:not([data-theme="light"]) .report-panel .run-name { color: #777; }
+  :root:not([data-theme="light"]) .report-panel .toggle-pill { background: #333; border-color: #555; color: #aaa; }
+  :root:not([data-theme="light"]) .report-panel .toggle-pill.active { background: #4682b4; border-color: #4682b4; color: white; }
+  :root:not([data-theme="light"]) .report-panel .toggle-pill:hover { border-color: #777; }
   :root:not([data-theme="light"]) .report-panel .plot-container { background: #252525; box-shadow: 0 2px 4px rgba(0,0,0,0.3); }
   :root:not([data-theme="light"]) .report-panel .plot-title { color: #ddd; }
   :root:not([data-theme="light"]) .report-panel .plot-description { color: #999; }
@@ -322,6 +350,9 @@
 :root[data-theme="dark"] .report-panel .row-value,
 :root[data-theme="dark"] .report-panel .run-value { color: #ddd; }
 :root[data-theme="dark"] .report-panel .run-name { color: #777; }
+:root[data-theme="dark"] .report-panel .toggle-pill { background: #333; border-color: #555; color: #aaa; }
+:root[data-theme="dark"] .report-panel .toggle-pill.active { background: #4682b4; border-color: #4682b4; color: white; }
+:root[data-theme="dark"] .report-panel .toggle-pill:hover { border-color: #777; }
 :root[data-theme="dark"] .report-panel .plot-container { background: #252525; box-shadow: 0 2px 4px rgba(0,0,0,0.3); }
 :root[data-theme="dark"] .report-panel .plot-title { color: #ddd; }
 :root[data-theme="dark"] .report-panel .plot-description { color: #999; }

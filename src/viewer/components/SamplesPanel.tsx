@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "preact/hooks";
+import { useEffect, useMemo, useRef, useState } from "preact/hooks";
 import type { BenchmarkGroup, ReportData } from "../ReportData.ts";
 import {
   type FlattenedData,
@@ -6,6 +6,7 @@ import {
   type PreparedBenchmark,
   prepareBenchmarks,
 } from "../plots/RenderPlots.ts";
+import type { SeriesVisibility } from "../plots/SampleTimeSeries.ts";
 import { reportData, samplesLoaded } from "../State.ts";
 
 /** True when at least one benchmark group has multiple samples (enough to plot). */
@@ -51,6 +52,18 @@ function SamplesGroup({ group, index }: { group: BenchmarkGroup; index: number }
 
   const benchmarks = prepareBenchmarks(group);
   const flat = flattenSamples(benchmarks);
+  const hasBaseline = !!group.baseline;
+  const hasHeap = flat.heapSeries.length > 0;
+  const hasRejected = flat.timeSeries.some(d => d.isRejected);
+
+  const [visibility, setVisibility] = useState<SeriesVisibility>({
+    baseline: true,
+    heap: true,
+    rejected: true,
+  });
+
+  const toggle = (key: keyof SeriesVisibility) =>
+    setVisibility(v => ({ ...v, [key]: !v[key] }));
 
   return (
     <div>
@@ -59,11 +72,23 @@ function SamplesGroup({ group, index }: { group: BenchmarkGroup; index: number }
       </div>
       <div class="plot-grid">
         <div class="plot-container">
-          <div class="plot-title">Time per Sample</div>
+          <div class="plot-title">Time per Iteration</div>
           <div class="plot-description">
-            Execution time for each sample in collection order
+            Execution time for each iteration in collection order
           </div>
-          <TimeSeriesPlot benchmarks={benchmarks} flat={flat} index={index} />
+          <SeriesToggles
+            hasBaseline={hasBaseline}
+            hasHeap={hasHeap}
+            hasRejected={hasRejected}
+            visibility={visibility}
+            onToggle={toggle}
+          />
+          <TimeSeriesPlot
+            benchmarks={benchmarks}
+            flat={flat}
+            index={index}
+            visibility={visibility}
+          />
         </div>
         <div class="plot-container">
           <div class="plot-title">Time Distribution</div>
@@ -77,14 +102,58 @@ function SamplesGroup({ group, index }: { group: BenchmarkGroup; index: number }
   );
 }
 
+interface ToggleProps {
+  hasBaseline: boolean;
+  hasHeap: boolean;
+  hasRejected: boolean;
+  visibility: SeriesVisibility;
+  onToggle: (key: keyof SeriesVisibility) => void;
+}
+
+function SeriesToggles({ hasBaseline, hasHeap, hasRejected, visibility, onToggle }: ToggleProps) {
+  if (!hasBaseline && !hasHeap && !hasRejected) return null;
+  return (
+    <div class="series-toggles">
+      {hasBaseline && (
+        <button
+          class={`toggle-pill${visibility.baseline ? " active" : ""}`}
+          onClick={() => onToggle("baseline")}
+        >
+          baseline
+        </button>
+      )}
+      {hasHeap && (
+        <button
+          class={`toggle-pill${visibility.heap ? " active" : ""}`}
+          onClick={() => onToggle("heap")}
+        >
+          heap
+        </button>
+      )}
+      {hasRejected && (
+        <button
+          class={`toggle-pill${visibility.rejected ? " active" : ""}`}
+          onClick={() => onToggle("rejected")}
+        >
+          rejected
+        </button>
+      )}
+    </div>
+  );
+}
+
 interface PlotProps {
   benchmarks: PreparedBenchmark[];
   flat: FlattenedData;
   index: number;
 }
 
+interface TimeSeriesPlotProps extends PlotProps {
+  visibility: SeriesVisibility;
+}
+
 /** Lazy-imports and renders a time-series chart for one benchmark group. */
-function TimeSeriesPlot({ flat, index }: PlotProps) {
+function TimeSeriesPlot({ flat, index, visibility }: TimeSeriesPlotProps) {
   const ref = useRef<HTMLDivElement>(null);
   useEffect(() => {
     if (flat.timeSeries.length === 0) return;
@@ -92,9 +161,11 @@ function TimeSeriesPlot({ flat, index }: PlotProps) {
       if (!ref.current) return;
       ref.current.innerHTML = "";
       const { timeSeries, allGcEvents, allPausePoints, heapSeries } = flat;
-      ref.current.appendChild(createSampleTimeSeries(timeSeries, allGcEvents, allPausePoints, heapSeries));
+      ref.current.appendChild(
+        createSampleTimeSeries(timeSeries, allGcEvents, allPausePoints, heapSeries, visibility),
+      );
     });
-  }, [flat]);
+  }, [flat, visibility]);
   return (
     <div id={`sample-timeseries-${index}`} class="plot-area" ref={ref}>
       <div class="loading">Loading time series...</div>

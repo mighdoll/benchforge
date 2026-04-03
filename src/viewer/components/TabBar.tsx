@@ -31,7 +31,7 @@ export function TabBar() {
           samplesLoaded.value = true;
         }}
       >
-        Samples
+        Iterations
       </TabButton>
       <TabButton
         id="tab-flamechart"

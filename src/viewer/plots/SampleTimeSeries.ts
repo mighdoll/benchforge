@@ -15,6 +15,7 @@ interface SampleData {
   displayValue: number;
   isBaseline: boolean;
   isWarmup: boolean;
+  isRejected: boolean;
   optTier: string | null;
 }
 
@@ -28,6 +29,8 @@ interface PlotContext {
   formatValue: (d: number) => string;
   convertValue: (ms: number) => number;
   hasWarmup: boolean;
+  hasRejected: boolean;
+  baselineNames: Set<string>;
   optTiers: string[];
   benchmarks: string[];
 }
@@ -50,22 +53,37 @@ const optTierColors: Record<string, string> = {
   interpreted: "#dc3545",
 };
 
+export interface SeriesVisibility {
+  baseline: boolean;
+  heap: boolean;
+  rejected: boolean;
+}
+
 /** Create sample time series showing each sample in order */
 export function createSampleTimeSeries(
   timeSeries: TimeSeriesPoint[],
   gcEvents: FlatGcEvent[] = [],
   pausePoints: FlatPausePoint[] = [],
   heapSeries: HeapPoint[] = [],
+  visibility: SeriesVisibility = { baseline: true, heap: true, rejected: true },
 ): SVGSVGElement | HTMLElement {
-  const ctx = buildPlotContext(timeSeries);
-  const heapData = prepareHeapData(heapSeries, ctx.yMin, ctx.yMax);
+  const filtered = visibility.baseline
+    ? timeSeries
+    : timeSeries.filter(d => !d.isBaseline);
+  const ctx = buildPlotContext(filtered);
+  const heapData = visibility.heap
+    ? prepareHeapData(heapSeries, ctx.yMin, ctx.yMax)
+    : [];
+  const showRejected = visibility.rejected && ctx.hasRejected;
   const legendItems = buildLegendItems(
     ctx.hasWarmup,
     gcEvents.length,
     pausePoints.length,
     heapData.length > 0,
+    showRejected,
     ctx.optTiers,
     ctx.benchmarks,
+    ctx.baselineNames,
   );
 
   return Plot.plot({
@@ -77,7 +95,7 @@ export function createSampleTimeSeries(
     height: 300,
     style: { fontSize: "14px" },
     x: {
-      label: "Sample",
+      label: "Iteration",
       labelAnchor: "center",
       labelOffset: 45,
       grid: true,
@@ -92,7 +110,7 @@ export function createSampleTimeSeries(
       tickFormat: ctx.formatValue,
     },
     color: { legend: false, scheme: "observable10" },
-    marks: buildMarks(ctx, heapData, gcEvents, pausePoints, legendItems),
+    marks: buildMarks(ctx, heapData, gcEvents, pausePoints, legendItems, showRejected),
   });
 }
 
@@ -110,6 +128,10 @@ function buildPlotContext(timeSeries: TimeSeriesPoint[]): PlotContext {
   const xMin = d3.min(convertedData, d => d.sample)!;
   const xMax = d3.max(convertedData, d => d.sample)!;
   const hasWarmup = convertedData.some(d => d.isWarmup);
+  const hasRejected = convertedData.some(d => d.isRejected);
+  const baselineNames = new Set(
+    convertedData.filter(d => d.isBaseline).map(d => d.benchmark),
+  );
   const optTiers = [
     ...new Set(
       convertedData
@@ -127,6 +149,8 @@ function buildPlotContext(timeSeries: TimeSeriesPoint[]): PlotContext {
     formatValue,
     convertValue,
     hasWarmup,
+    hasRejected,
+    baselineNames,
     optTiers,
     benchmarks,
   };
@@ -138,11 +162,12 @@ function prepareHeapData(heapSeries: HeapPoint[], yMin: number, yMax: number) {
   const heapMin = d3.min(heapSeries, d => d.value)!;
   const heapRange = d3.max(heapSeries, d => d.value)! - heapMin || 1;
   const scale = ((yMax - yMin) * 0.25) / heapRange;
-  return heapSeries.map(d => ({
+  const mapped = heapSeries.map(d => ({
     sample: d.iteration,
     y: yMin + (d.value - heapMin) * scale,
     heapMB: d.value / 1024 / 1024,
   }));
+  return lttb(mapped, 500, d => d.sample, d => d.y);
 }
 
 /** Assemble legend entries based on which data series are present */
@@ -151,8 +176,10 @@ function buildLegendItems(
   gcCount: number,
   pauseCount: number,
   hasHeap: boolean,
+  hasRejected: boolean,
   optTiers: string[],
   benchmarks: string[],
+  baselineNames: Set<string>,
 ): LegendItem[] {
   const items: LegendItem[] = [];
   if (hasWarmup)
@@ -179,13 +206,12 @@ function buildLegendItems(
     })),
   );
   if (optTiers.length === 0) {
-    const isBase = (s: string) => s.includes("(baseline)");
     const sorted = [...benchmarks].sort(
-      (a, b) => Number(isBase(a)) - Number(isBase(b)),
+      (a, b) => Number(baselineNames.has(a)) - Number(baselineNames.has(b)),
     );
     items.push(
       ...sorted.map(bm => {
-        const base = isBase(bm);
+        const base = baselineNames.has(bm);
         return {
           color: base ? "#ffa500" : "#4682b4",
           label: bm,
@@ -194,6 +220,8 @@ function buildLegendItems(
       }),
     );
   }
+  if (hasRejected)
+    items.push({ color: "#999", label: "rejected", style: "hollow-dot" });
   return items;
 }
 
@@ -204,6 +232,7 @@ function buildMarks(
   gcEvents: FlatGcEvent[],
   pausePoints: FlatPausePoint[],
   legendItems: LegendItem[],
+  showRejected: boolean,
 ): Plot.Markish[] {
   const warmupRule = ctx.hasWarmup
     ? [
@@ -220,7 +249,7 @@ function buildMarks(
     ...warmupRule,
     gcMark(gcEvents, ctx.yMin, ctx.convertValue),
     ...pauseMarks(pausePoints, ctx.yMin, ctx.yMax),
-    ...sampleDotMarks(ctx),
+    ...sampleDotMarks(ctx, showRejected),
     Plot.ruleY([ctx.yMin], { stroke: "black", strokeWidth: 1 }),
     ...buildLegend(bounds, legendItems),
   ];
@@ -234,8 +263,9 @@ function buildSampleData(
     benchmark: d.benchmark,
     sample: d.iteration,
     value: d.value,
-    isBaseline: d.benchmark.includes("(baseline)"),
+    isBaseline: d.isBaseline || false,
     isWarmup: d.isWarmup || false,
+    isRejected: d.isRejected || false,
     optTier:
       d.optStatus !== undefined
         ? optStatusNames[d.optStatus] || "unknown"
@@ -352,18 +382,64 @@ function pauseMarks(
   );
 }
 
+const maxDots = 1000;
+
+/** LTTB downsampling: select n points that best preserve visual shape */
+function lttb<T>(
+  data: T[],
+  n: number,
+  getX: (d: T) => number,
+  getY: (d: T) => number,
+): T[] {
+  if (data.length <= n) return data;
+  const bucketSize = (data.length - 2) / (n - 2);
+  const result: T[] = [data[0]];
+  for (let i = 0; i < n - 2; i++) {
+    const bStart = Math.floor(i * bucketSize) + 1;
+    const bEnd = Math.floor((i + 1) * bucketSize) + 1;
+    const nStart = bEnd;
+    const nEnd = Math.min(Math.floor((i + 2) * bucketSize) + 1, data.length - 1);
+    let avgX = 0, avgY = 0;
+    for (let j = nStart; j < nEnd; j++) {
+      avgX += getX(data[j]);
+      avgY += getY(data[j]);
+    }
+    const cnt = nEnd - nStart || 1;
+    avgX /= cnt;
+    avgY /= cnt;
+    const prev = result[result.length - 1];
+    const px = getX(prev), py = getY(prev);
+    let maxArea = -1, maxIdx = bStart;
+    for (let j = bStart; j < bEnd; j++) {
+      const area = Math.abs(
+        (px - avgX) * (getY(data[j]) - py) -
+        (px - getX(data[j])) * (avgY - py),
+      );
+      if (area > maxArea) { maxArea = area; maxIdx = j; }
+    }
+    result.push(data[maxIdx]);
+  }
+  result.push(data[data.length - 1]);
+  return result;
+}
+
+/** Downsample if array exceeds maxDots, preserving visual features */
+function ds(arr: SampleData[]): SampleData[] {
+  return lttb(arr, maxDots, d => d.sample, d => d.displayValue);
+}
+
 /** Create dot marks for warmup, baseline, and measured samples with opt tier colors */
-function sampleDotMarks(ctx: PlotContext): any[] {
+function sampleDotMarks(ctx: PlotContext, showRejected: boolean): any[] {
   const { convertedData, unitSuffix, formatValue } = ctx;
   const fmtVal = (d: SampleData) =>
     `${formatValue(d.displayValue)}${unitSuffix}`;
   const tipTitle = (d: SampleData) =>
     d.optTier
-      ? `Sample ${d.sample}: ${fmtVal(d)} [${d.optTier}]`
-      : `Sample ${d.sample}: ${fmtVal(d)}`;
+      ? `Iteration ${d.sample}: ${fmtVal(d)} [${d.optTier}]`
+      : `Iteration ${d.sample}: ${fmtVal(d)}`;
   return [
     Plot.dot(
-      convertedData.filter(d => d.isWarmup),
+      ds(convertedData.filter(d => d.isWarmup)),
       {
         x: "sample",
         y: "displayValue",
@@ -376,7 +452,7 @@ function sampleDotMarks(ctx: PlotContext): any[] {
       },
     ),
     Plot.dot(
-      convertedData.filter(d => d.isBaseline && !d.isWarmup),
+      ds(convertedData.filter(d => d.isBaseline && !d.isWarmup && !d.isRejected)),
       {
         x: "sample",
         y: "displayValue",
@@ -389,7 +465,7 @@ function sampleDotMarks(ctx: PlotContext): any[] {
       },
     ),
     Plot.dot(
-      convertedData.filter(d => !d.isBaseline && !d.isWarmup),
+      ds(convertedData.filter(d => !d.isBaseline && !d.isWarmup && !d.isRejected)),
       {
         x: "sample",
         y: "displayValue",
@@ -400,5 +476,22 @@ function sampleDotMarks(ctx: PlotContext): any[] {
         title: tipTitle,
       },
     ),
+    ...(showRejected
+      ? [
+          Plot.dot(
+            convertedData.filter(d => d.isRejected && !d.isWarmup),
+            {
+              x: "sample",
+              y: "displayValue",
+              stroke: "#999",
+              fill: "none",
+              strokeWidth: 1,
+              r: 3,
+              opacity: 0.3,
+              title: (d: SampleData) => `Rejected ${tipTitle(d)}`,
+            },
+          ),
+        ]
+      : []),
   ];
 }

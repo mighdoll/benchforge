@@ -1,3 +1,8 @@
+import {
+  average,
+  splitByOffsets,
+  tukeyFences,
+} from "../../stats/StatisticalUtils.ts";
 import type { BenchmarkEntry, ReportData } from "../ReportData.ts";
 import type {
   FlatGcEvent,
@@ -24,8 +29,11 @@ export function prepareBenchmarks(
   group: ReportData["groups"][0],
 ): PreparedBenchmark[] {
   const base = group.baseline;
+  const baseName = base?.name.endsWith("(baseline)")
+    ? base.name
+    : base?.name + " (baseline)";
   const baseline: PreparedBenchmark[] = base
-    ? [{ ...base, name: base.name + " (baseline)", isBaseline: true }]
+    ? [{ ...base, name: baseName, isBaseline: true }]
     : [];
   const current = group.benchmarks.map(b => ({
     ...b,
@@ -66,9 +74,10 @@ function flattenBenchmark(b: PreparedBenchmark, out: FlattenedData): void {
       iteration: i,
       value,
       isWarmup: false,
+      isBaseline: b.isBaseline || undefined,
       optStatus: b.optSamples?.[i],
     });
-    if (b.heapSamples?.[i] !== undefined) {
+    if (!b.isBaseline && b.heapSamples?.[i] !== undefined) {
       out.heapSeries.push({
         benchmark: name,
         iteration: i,
@@ -76,6 +85,8 @@ function flattenBenchmark(b: PreparedBenchmark, out: FlattenedData): void {
       });
     }
   });
+
+  markRejectedBlocks(b, out.timeSeries);
 
   b.gcEvents?.forEach(gc => {
     const idx = endTimes.findIndex(t => t >= gc.offset);
@@ -94,6 +105,35 @@ function flattenBenchmark(b: PreparedBenchmark, out: FlattenedData): void {
         durationMs: p.durationMs,
       })),
     );
+  }
+}
+
+/** Flag timeSeries entries in Tukey-rejected blocks (3x IQR on block means) */
+function markRejectedBlocks(
+  b: PreparedBenchmark,
+  timeSeries: TimeSeriesPoint[],
+): void {
+  const offsets = b.batchOffsets;
+  if (!offsets || offsets.length < 4) return;
+
+  const blocks = splitByOffsets(b.samples, offsets);
+  const means = blocks.map(s => average(s));
+  const [lo, hi] = tukeyFences(means, 3);
+
+  const rejected = new Set<number>();
+  for (let bi = 0; bi < blocks.length; bi++) {
+    if (means[bi] < lo || means[bi] > hi) {
+      const start = offsets[bi];
+      const end = bi + 1 < offsets.length ? offsets[bi + 1] : b.samples.length;
+      for (let j = start; j < end; j++) rejected.add(j);
+    }
+  }
+  if (rejected.size === 0) return;
+
+  // Flag the entries we just added (last b.samples.length entries for this benchmark)
+  const startIdx = timeSeries.length - b.samples.length;
+  for (let i = 0; i < b.samples.length; i++) {
+    if (rejected.has(i)) timeSeries[startIdx + i].isRejected = true;
   }
 }
 
