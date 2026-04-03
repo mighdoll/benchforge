@@ -18,11 +18,7 @@ import {
 import { buildTable, type ColumnGroup } from "../report/text/TableReport.ts";
 import { sectionColumnGroups } from "../report/text/TextReport.ts";
 import type { MeasuredResults } from "../runners/MeasuredResults.ts";
-import {
-  average,
-  bootstrapDifferenceCI,
-  type DifferenceCI,
-} from "../stats/StatisticalUtils.ts";
+import { average, type DifferenceCI } from "../stats/StatisticalUtils.ts";
 import type {
   CaseResult,
   MatrixResults,
@@ -257,14 +253,8 @@ function buildRow(
     time: measured.time?.avg ?? average(samples),
     samples: samples.length,
   };
-  if (baseline) {
-    const opts = {
-      blocks: baseline.batchOffsets,
-      blocksB: measured.batchOffsets,
-      equivMargin,
-    };
-    row.diffCI = bootstrapDifferenceCI(baseline.samples, samples, opts);
-  }
+  if (baseline)
+    row.diffCI = computeDiffCI(baseline, measured, undefined, undefined, equivMargin);
   if (extraColumns)
     for (const col of extraColumns) row[col.key] = col.extract(caseResult);
   return row;
