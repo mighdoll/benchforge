@@ -19,8 +19,16 @@ Also:
 - **Worker isolation** — node benchmarks run in child processes by default.
 - **Browser support** — benchmark in Chromium via [Playwright + CDP](README-browser.md).
 
-## Visualize garbage generation by function
+## Timing Distributions
+<img width="326" height="363" alt="stats with distribution curves" src="https://github.com/user-attachments/assets/532702bd-faa1-4cb3-8b33-ad5409631427" />
+
+## Heap Allocation
+Explore memory _allocation_ per function: 
 <img width="4444" height="2706" alt="allocation view" src="https://github.com/user-attachments/assets/6d4e2dee-bb72-41ce-a71d-d036bebedb3d" />
+
+## Benchmark Iteration Time Series
+<img width="387" height="306" alt="time series" src="https://github.com/user-attachments/assets/f5676b64-7906-422b-aef3-4eedc325c422" />
+
 
 ## Installation
 
