@@ -146,11 +146,11 @@ function rejectedIndices(b: PreparedBenchmark): Set<number> | undefined {
   if (!offsets || offsets.length < 4) return undefined;
 
   const means = splitByOffsets(b.samples, offsets).map(s => average(s));
-  const [lo, hi] = tukeyFences(means, 3, percentile(means, 0.5) * 0.02);
+  const [, hi] = tukeyFences(means, 3, percentile(means, 0.5) * 0.02);
 
   const rejected = new Set<number>();
   for (let bi = 0; bi < means.length; bi++) {
-    if (means[bi] < lo || means[bi] > hi) {
+    if (means[bi] > hi) {
       const start = offsets[bi];
       const end = bi + 1 < offsets.length ? offsets[bi + 1] : b.samples.length;
       for (let j = start; j < end; j++) rejected.add(j);

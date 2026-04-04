@@ -213,16 +213,16 @@ function printTrimmedBlocks(
 
 /** Print trimming info for one side using 3x IQR fences. */
 function printSideTrim(label: string, means: number[]): void {
-  const [lo, hi] = tukeyFences(means, blockFenceMultiplier);
+  const [, hi] = tukeyFences(means, blockFenceMultiplier);
   const indices = means
-    .map((v, i) => (v < lo || v > hi ? i : -1))
+    .map((v, i) => (v > hi ? i : -1))
     .filter(i => i >= 0);
   if (indices.length === 0) {
     console.log(dim(`    ${label}: 0 trimmed`));
     return;
   }
   const vals = indices.map(i => timeMs(means[i]) ?? "?").join(", ");
-  const fence = `[${timeMs(lo)}, ${timeMs(hi)}]`;
+  const fence = `hi: ${timeMs(hi)}`;
   console.log(
     `    ${label}: ${yellow(`${indices.length} trimmed`)} (${vals})` +
       dim(`  fence: ${fence}`),

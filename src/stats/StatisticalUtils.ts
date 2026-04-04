@@ -188,13 +188,14 @@ export function tukeyFences(
   return [q1 - multiplier * iqr, q3 + multiplier * iqr];
 }
 
-/** @return indices of values within 3x IQR Tukey fences.
+/** @return indices of values below the upper 3x IQR Tukey fence.
+ *  Only trims slow outliers — fast batches reflect less environmental noise, not errors.
  *  Floors IQR at 2% of median to avoid over-trimming tightly clustered batch means. */
 function tukeyKeep(values: number[]): number[] {
   if (values.length < 4) return values.map((_, i) => i);
   const minIqr = percentile(values, 0.5) * 0.02;
-  const [lo, hi] = tukeyFences(values, 3, minIqr);
-  return values.flatMap((v, i) => (v >= lo && v <= hi ? [i] : []));
+  const [, hi] = tukeyFences(values, 3, minIqr);
+  return values.flatMap((v, i) => (v <= hi ? [i] : []));
 }
 
 /** @return samples split into blocks by offset boundaries */
