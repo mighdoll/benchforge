@@ -126,9 +126,13 @@ export function bootstrapStat(
   // With blocks: apply statFn per block (independent observations), then
   // resample those block-level values. This keeps CIs in the metric's native
   // domain (e.g. lines/sec) rather than raw time.
-  const blockVals = options.blocks
-    ? blockValues(samples, options.blocks, statFn)
-    : undefined;
+  // 1-sample blocks: statFn([x]) = x for any statFn, so block bootstrap
+  // degenerates to CI for the mean. Fall back to standard bootstrap.
+  const blocks = options.blocks;
+  const blockVals =
+    blocks && blocks.length < samples.length
+      ? blockValues(samples, blocks, statFn)
+      : undefined;
   const draw = blockVals
     ? () => average(createResample(blockVals))
     : () => statFn(createResample(samples));
@@ -272,12 +276,18 @@ export function bootstrapDifferenceCI(
   const currVal = fn(filteredB ?? b);
   const observedPct = ((currVal - baseVal) / baseVal) * 100;
 
-  const drawA = blockValsA
-    ? () => average(createResample(blockValsA))
-    : () => fn(createResample(a));
-  const drawB = blockValsB
-    ? () => average(createResample(blockValsB))
-    : () => fn(createResample(b));
+  // Fall back to standard bootstrap for sides with 1-sample blocks
+  // (block statFn degenerates to identity, giving CI for the mean).
+  const singleA = options.blocks?.length === a.length;
+  const singleB = (options.blocksB ?? options.blocks)?.length === b.length;
+  const drawA =
+    blockValsA && !singleA
+      ? () => average(createResample(blockValsA))
+      : () => fn(createResample(filteredA ?? a));
+  const drawB =
+    blockValsB && !singleB
+      ? () => average(createResample(blockValsB))
+      : () => fn(createResample(filteredB ?? b));
   const diffs = Array.from({ length: resamples }, () => {
     const valA = drawA();
     const valB = drawB();

@@ -66,6 +66,7 @@ export function createDistributionPlot(
     layout,
     opts.includeZero,
     opts.equivMargin,
+    pointEstimate,
   );
   const { margin, plot } = layout;
 
@@ -232,13 +233,15 @@ function buildScales(
   layout: Layout,
   includeZero: boolean,
   equivMargin?: number,
+  pointEstimate?: number,
 ): Scales {
   const { margin, plot } = layout;
   const xs = histogram.map(b => b.x);
   const extra = includeZero ? [0] : [];
   const marginBounds = equivMargin ? [-equivMargin, equivMargin] : [];
-  const xMin = Math.min(...xs, ci[0], ...extra, ...marginBounds);
-  const xMax = Math.max(...xs, ci[1], ...extra, ...marginBounds);
+  const ptBounds = pointEstimate != null ? [pointEstimate] : [];
+  const xMin = Math.min(...xs, ci[0], ...extra, ...marginBounds, ...ptBounds);
+  const xMax = Math.max(...xs, ci[1], ...extra, ...marginBounds, ...ptBounds);
   const yMax = Math.max(...histogram.map(b => b.count));
   const xRange = xMax - xMin || 1;
   return {
