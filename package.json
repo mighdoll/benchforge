@@ -1,8 +1,26 @@
 {
   "name": "benchforge",
   "version": "0.2.3",
+  "description": "GC aware benchmarking/profiling, with an interactive viewer. For Node and browser.",
+  "license": "MIT",
+  "keywords": [
+    "benchmark",
+    "performance",
+    "profiling",
+    "bootstrap",
+    "gc",
+    "v8"
+  ],
   "type": "module",
   "packageManager": "pnpm@10.28.1",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/mighdoll/benchforge.git"
+  },
+  "homepage": "https://github.com/mighdoll/benchforge#readme",
+  "bugs": {
+    "url": "https://github.com/mighdoll/benchforge/issues"
+  },
   "bin": "bin/benchforge",
   "files": [
     "bin",
