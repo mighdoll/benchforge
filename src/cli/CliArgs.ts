@@ -1,5 +1,6 @@
 import type { Argv, InferredOptionTypes } from "yargs";
 import yargs from "yargs";
+import pkg from "../../package.json" with { type: "json" };
 
 export type Configure<T> = (yargs: Argv) => Argv<T>;
 
@@ -146,6 +147,7 @@ export function browserCliArgs(yargsInstance: Argv): Argv<DefaultCliArgs> {
         });
       })
       .options(browserOnlyOptions)
+      .version(pkg.version)
       .help()
       .strict(),
   ) as Argv<DefaultCliArgs>;
@@ -162,6 +164,7 @@ export function defaultCliArgs(yargsInstance: Argv): Argv<DefaultCliArgs> {
         });
       })
       .options(cliOptions)
+      .version(pkg.version)
       .help()
       .strict(),
   ) as Argv<DefaultCliArgs>;
