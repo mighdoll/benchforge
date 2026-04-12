@@ -1,6 +1,6 @@
 {
   "name": "benchforge",
-  "version": "0.2.3",
+  "version": "0.2.4",
   "description": "GC aware benchmarking/profiling, with an interactive viewer. For Node and browser.",
   "license": "MIT",
   "keywords": [
