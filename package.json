@@ -2,6 +2,7 @@
   "name": "benchforge",
   "version": "0.2.1",
   "type": "module",
+  "packageManager": "pnpm@10.28.1",
   "bin": "bin/benchforge",
   "files": [
     "bin",
