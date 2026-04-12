@@ -1,26 +1,39 @@
 # Benchforge
 
-Traditional benchmarking tools either ignore GC or try to avoid it.
-Benchforge captures GC impact.
+Benchforge helps you make faster JavaScript programs with integrated tools for
+benchmarking and performance analysis in Node.js and Chrome, including features
+designed specifically for analyzing garbage-collected programs.
 
-Garbage collection makes benchmarks noisy — statistics like mean and max
-stabilize poorly when collection is intermittent. Most tools work around
-this by isolating microbenchmarks from GC, but that hides a key part of
-real-world performance. And heap snapshots are useful for finding leaks,
-but they can't show you where garbage is being generated.
+Garbage collection is intermittent and infrequent, which makes it harder to
+identify true performance issues. Typical perf tools isolate microbenchmarks
+from GC, but that hides a key part of real-world performance. Intermittent
+events also lead to statistically skewed measurement distributions. Perf tools
+that assume normal distributions and noise-free test runs can easily create
+misleading false-positive performance reports. Benchforge captures a truer
+picture of garbage-collected programs:
 
-- **Heap allocation profiling** — attribute allocations to call sites, including short-lived objects already collected by GC.
-- **GC-aware statistics** — bootstrap confidence intervals and baseline comparison that account for GC variance instead of hiding it.
-- **GC collection reports** — allocation rates, scavenge/full GC counts, promotion %, and pause times per iteration.
+- **GC-aware statistics** -- bootstrap confidence intervals account for GC
+  variance instead of hiding it.
+- **Heap allocation profiling** -- see which functions allocate the most,
+  including short-lived objects already collected.
+- **GC collection reports** -- allocation rates, scavenge/full GC counts,
+  promotion %, and pause times per iteration.
+- **Visualization** -- distribution plots, icicle charts for allocators, source
+  annotations with allocation and call count metrics.
+- **Archive** -- save traces and source code together to share with your team.
 
-Also:
-- **Zero-config CLI** — export a function, run `benchforge file.ts`.
-- **Multiple export formats** — HTML reports, allocation flame charts, Perfetto traces, JSON.
-- **Worker isolation** — node benchmarks run in child processes by default.
-- **Browser support** — benchmark in Chromium via [Playwright + CDP](README-browser.md).
+## Timing Distributions
+<img width="326" height="363" alt="stats with distribution curves" src="https://github.com/user-attachments/assets/532702bd-faa1-4cb3-8b33-ad5409631427" />
 
-## Visualize garbage generation by function
+## Heap Allocation
+Explore memory _allocation_ per function:
 <img width="4444" height="2706" alt="allocation view" src="https://github.com/user-attachments/assets/6d4e2dee-bb72-41ce-a71d-d036bebedb3d" />
+
+## Benchmark Iteration Time Series
+<img width="387" height="306" alt="time series" src="https://github.com/user-attachments/assets/f5676b64-7906-422b-aef3-4eedc325c422" />
+
+## Source Code Annotated with Performance Info
+<img width="1946" height="460" alt="src annotations" src="https://github.com/user-attachments/assets/102cc574-ecf3-4f5f-8143-d20ee7008a72" />
 
 ## Installation
 
@@ -30,9 +43,10 @@ npm install benchforge
 pnpm add benchforge
 ```
 
-## Quick Start
+## Quick Start: Node
 
-The simplest way to benchmark a function: export it as the default export and pass the file to `benchforge`.
+The simplest benchmark: export a default function and pass the file to
+`benchforge`.
 
 ```typescript
 // my-bench.ts
@@ -45,304 +59,92 @@ export default function (): string {
 benchforge my-bench.ts --gc-stats
 ```
 
-### BenchSuite Export
+For suites with multiple benchmarks, groups, and baseline comparison, see
+[Node.md](Node.md).
 
-For multiple benchmarks with groups, setup data, and baseline comparison, export a `BenchSuite`:
+## Quick Start: Browser
 
-```typescript
-// sorting.ts
-import type { BenchGroup, BenchSuite } from 'benchforge';
+`benchforge --url <page>` opens Chromium and runs your program.
 
-const sortingGroup: BenchGroup<number[]> = {
-  name: "Array Sorting (1000 numbers)",
-  setup: () => Array.from({ length: 1000 }, () => Math.random()),
-  baseline: { name: "native sort", fn: (arr) => [...arr].sort((a, b) => a - b) },
-  benchmarks: [
-    { name: "quicksort", fn: quickSort },
-    { name: "insertion sort", fn: insertionSort },
-  ],
+You can time any page without modification, and compare against a baseline.
+
+```bash
+benchforge --url http://localhost:5173 --baseline-url http://localhost:5174 \
+  --gc-stats --batches 20 --iterations 10 --headless
+```
+
+If you export your test function as `window.__bench`, benchforge can run
+multiple iterations in the same tab, which helps reveal the accumulated effect
+of heap allocation over time. Tests also run faster.
+
+```html
+<!-- bench function mode -->
+<script>
+window.__bench = () => {
+  const arr = Array.from({ length: 10000 }, () => Math.random());
+  arr.sort((a, b) => a - b);
 };
-
-const suite: BenchSuite = {
-  name: "Performance Tests",
-  groups: [sortingGroup],
-};
-
-export default suite;
+</script>
 ```
+
+See [Browser.md](Browser.md) for setup patterns, completion signals, and the CDP
+flow.
+
+## CLI Overview
+
+Core flags for common workflows. Run `benchforge --help` for the full list.
+
+| Flag | What it does |
+|------|-------------|
+| `--gc-stats` | GC allocation/collection stats |
+| `--alloc` | Heap allocation sampling attribution |
+| `--profile` | V8 CPU time sampling profiler |
+| `--call-counts` | Per-function execution counts |
+| `--stats <list>` | Timing columns to display (default: mean,p50,p99) |
+| `--view` | Open interactive viewer in browser |
+| `--archive [file]` | Archive profiles + sources to `.benchforge` file |
+| `--duration <sec>` | Duration per batch (default: 0.642s) |
+| `--iterations <n>` | Exact iterations (overrides --duration) |
+| `--batches <n>` | Interleaved batches for baseline comparison |
+| `--filter <pattern>` | Run only benchmarks matching regex/substring |
+| `--url <url>` | Benchmark a browser page |
+| `--baseline-url <url>` | A/B comparison in browser |
+| `--equiv-margin <pct>` | Equivalence margin (default: 2%) |
+
+See [Profiling.md](Profiling.md) for detailed profiling options and V8 flags.
+
+## Key Concepts
+
+### Batching
+
+When comparing against a baseline, use `--batches` to interleave runs and reduce
+ordering bias. Batch 0 is dropped by default (OS cache warmup). For reliable
+comparisons, use 40+ batches.
 
 ```bash
-benchforge sorting.ts --gc-stats
+benchforge sorting.ts --batches 40 --duration 2
 ```
 
-A `MatrixSuite` export (`.matrices`) is also recognized and runs via `matrixBenchExports`.
-
-See `examples/simple-cli.ts` for a complete runnable example.
-
-### Worker Mode with Module Imports
-
-For worker mode, benchmarks can reference module exports instead of inline functions. This is essential for proper isolation since functions can't be serialized across process boundaries.
-
-```typescript
-const group: BenchGroup = {
-  name: "Parser Benchmark",
-  setup: () => loadTestData(),
-  benchmarks: [{
-    name: "parse",
-    fn: () => {},  // placeholder - not used in worker mode
-    modulePath: new URL("./benchmarks.ts", import.meta.url).href,
-    exportName: "parse",
-    setupExportName: "setup",  // optional: called once, result passed to exportName fn
-  }],
-};
-```
-
-When `setupExportName` is provided, the worker:
-1. Imports the module
-2. Calls `setup(params)` once (where params comes from `BenchGroup.setup()`)
-3. Passes the setup result to each benchmark iteration
-
-This eliminates manual caching boilerplate in worker modules.
-
-## CLI Options
-
-### Basic Options
-- `--time <seconds>` - Benchmark duration per test (default: 0.642s)
-- `--iterations <count>` - Exact number of iterations (overrides --time)
-- `--filter <pattern>` - Run only benchmarks matching regex/substring
-- `--worker` / `--no-worker` - Run in isolated worker process (default: true)
-- `--profile` - Run once for profiling (single iteration, no warmup)
-- `--warmup <count>` - Warmup iterations before measurement (default: 0)
-- `--help` - Show all available options
-
-### Memory Profiling
-- `--gc-stats` - Collect GC allocation/collection stats via --trace-gc-nvp
-- `--heap-sample` - Heap sampling allocation attribution (includes garbage)
-- `--heap-interval <bytes>` - Sampling interval in bytes (default: 32768)
-- `--heap-depth <frames>` - Stack depth to capture (default: 64)
-- `--heap-rows <n>` - Number of top allocation sites to show (default: 20)
-
-### Output Options
-- `--view-report` - Open HTML report in browser
-- `--export-report <file>` - Export HTML report to file
-- `--export-json <file>` - Export benchmark data to JSON
-- `--export-perfetto <file>` - Export Perfetto trace file
-- `--view-alloc` - Open allocation profile in viewer
-- `--export-alloc <file>` - Export allocation profile (speedscope JSON format)
-
-## CLI Usage
-
-### Filter benchmarks by name
-
-```bash
-benchforge my-bench.ts --filter "concat"
-benchforge my-bench.ts --filter "^parse" --time 2
-```
-
-### Profiling with external debuggers
-
-Use `--profile` to run benchmarks once for attaching external profilers:
-
-```bash
-# Use with Chrome DevTools profiler
-node --inspect-brk $(which benchforge) my-bench.ts --profile
-
-# Use with other profiling tools
-node --prof $(which benchforge) my-bench.ts --profile
-```
-
-The `--profile` flag executes exactly one iteration with no warmup, making it ideal for debugging and performance profiling.
-
-### Key Concepts
-
-**Setup Functions**: Run once per group and provide shared data to all benchmarks in that group. The data returned by setup is automatically passed as the first parameter to benchmark functions that expect it.
-
-**Baseline Comparison**: When a baseline is specified, all benchmarks in the group show percentage differences (Δ%) compared to baseline. 
-
-## Output
-
-Results are displayed in a formatted table:
-
-```
-╔═════════════════╤═══════════════════════════════════════════╤═════════╗
-║                 │                   time                    │         ║
-║ name            │ mean  Δ% CI                    p50   p99  │ runs    ║
-╟─────────────────┼───────────────────────────────────────────┼─────────╢
-║ quicksort       │ 0.17  +5.5% [+4.7%, +6.2%]     0.15  0.63 │ 1,134   ║
-║ insertion sort  │ 0.24  +25.9% [+25.3%, +27.4%]  0.18  0.36 │ 807     ║
-║ --> native sort │ 0.16                           0.15  0.41 │ 1,210   ║
-╚═════════════════╧═══════════════════════════════════════════╧═════════╝
-```
-
-- **Δ% CI**: Percentage difference from baseline with bootstrap confidence interval
-
-### HTML
-
-The HTML report displays:
-- Histogram + KDE: Bar chart showing the distribution
-- Time Series: Sample values over iterations
-- Allocation Series: Per-sample heap allocation (requires `--heap-sample`)
-
-```bash
-# Open HTML report in browser
-benchforge my-bench.ts --view-report
-# Press Ctrl+C to exit when done viewing
-```
-
-### Perfetto Trace Export
-
-Export benchmark data as a Perfetto-compatible trace file for detailed analysis:
-
-```bash
-# Export trace file
-benchforge my-bench.ts --export-perfetto trace.json
-
-# With V8 GC events (automatically merged after exit)
-node --expose-gc --trace-events-enabled --trace-event-categories=v8,v8.gc \
-  benchforge my-bench.ts --export-perfetto trace.json
-```
-
-View the trace at https://ui.perfetto.dev by dragging the JSON file.
-
-The trace includes:
-- **Heap counter**: Continuous heap usage as a line graph
-- **Sample markers**: Each benchmark iteration with timing
-- **Pause markers**: V8 optimization pause points
-- **V8 GC events**: Automatically merged after process exit (when run with `--trace-events-enabled`)
-
-### Allocation Profile Export
-
-View heap allocation profiles as flame charts:
-
-```bash
-# Open allocation profile in viewer
-benchforge my-bench.ts --heap-sample --view-alloc
-
-# Export to file
-benchforge my-bench.ts --heap-sample --export-alloc profile.json
-```
-
-Each benchmark with a heap profile becomes a separate profile, with samples ordered temporally and weighted by allocation size in bytes.
-
-### GC Statistics
-
-Collect detailed garbage collection statistics via V8's `--trace-gc-nvp`:
-
-```bash
-# Collect GC allocation/collection stats (requires worker mode)
-benchforge my-bench.ts --gc-stats
-```
-
-Adds these columns to the output table:
-- **alloc/iter**: Bytes allocated per iteration
-- **scav**: Number of scavenge (minor) GCs
-- **full**: Number of full (mark-compact) GCs
-- **promo%**: Percentage of allocations promoted to old generation
-- **pause/iter**: GC pause time per iteration
-
-### Heap Sampling
-
-For allocation profiling including garbage (short-lived objects), use `--heap-sample` mode which uses Node's built-in inspector API:
-
-```bash
-# Basic heap sampling
-benchforge my-bench.ts --heap-sample --iterations 100
-
-# Smaller interval = more samples = better coverage of rare allocations
-benchforge my-bench.ts --heap-sample --heap-interval 4096 --iterations 100
-
-# Verbose output with clickable file:// paths
-benchforge my-bench.ts --heap-sample --heap-verbose
-
-# Control call stack display depth
-benchforge my-bench.ts --heap-sample --heap-stack 5
-```
-
-**CLI Options:**
-- `--heap-sample` - Enable heap sampling allocation attribution
-- `--heap-interval <bytes>` - Sampling interval in bytes (default: 32768)
-- `--heap-depth <frames>` - Maximum stack depth to capture (default: 64)
-- `--heap-rows <n>` - Number of top allocation sites to show (default: 20)
-- `--heap-stack <n>` - Call stack depth to display (default: 3)
-- `--heap-verbose` - Show full file:// paths with line numbers (cmd-clickable)
-- `--heap-raw` - Dump every raw heap sample (ordinal, size, stack)
-- `--heap-user-only` - Filter to user code only (hide node internals)
-
-**Output (default compact):**
-```
-─── Heap profile: bevy_env_map ───
-Heap allocation sites (top 20, garbage included):
-  13.62 MB  recursiveResolve <- flattenTreeImport <- bindAndTransform
-  12.36 MB  nextToken <- parseBlockStatements <- parseCompoundStatement
-   5.15 MB  coverWithText <- finishElem <- parseVarOrLet
-
-Total (all):       56.98 MB
-Total (user-code): 28.45 MB
-Samples: 1,842
-```
-
-**How V8 Heap Sampling Works:**
-
-V8's sampling profiler uses Poisson-distributed sampling. When an allocation occurs, V8 probabilistically decides whether to record it based on the sampling interval. Key points:
-
-1. **selfSize is scaled**: V8 doesn't report raw sampled bytes. It scales sample counts to estimate total allocations (`selfSize = size × count × scaleFactor`). This means changing `--heap-interval` affects sample count and overhead, but the estimated total converges to the same value.
-
-2. **Smaller intervals = better coverage**: With a smaller interval (e.g., 1024 vs 32768), you get more samples and discover more unique allocation sites, especially rare ones. The total estimate stays similar, but you see more of the distribution.
-
-3. **User-code only**: The report filters out Node.js internals (`node:`, `internal/`). "Total (user-code)" shows filtered allocations; "Total (all)" shows everything.
-
-4. **Measurement window**: Sampling covers benchmark module import + execution. Worker startup and framework init aren't captured (but do appear in `--gc-stats`).
-
-5. **Sites are stack-unique**: The same function appears multiple times with different callers. For example, `nextToken` may show up in several entries with different call stacks, each representing a distinct allocation pattern.
-
-**Limitations:**
-- **Function-level attribution only**: V8 reports the function where allocation occurred, not the specific line. The line:column shown is where the function is *defined*.
-- **Inlining shifts attribution**: V8 may inline a function into its caller, causing allocations to be reported against the caller instead. If attribution looks wrong, disable inlining to isolate: `node --js-flags='--no-turbo-inlining --no-maglev-inlining' benchforge ...` (or `--jitless` to disable JIT entirely, though this changes performance characteristics).
-- **Statistical sampling**: Results vary between runs. More iterations = more stable results.
-- **~50% filtered**: Node.js internals account for roughly half of allocations. Use "Total (all)" to see the full picture.
-
-**When to use which:**
-| Tool | Use When |
-|------|----------|
-| `--gc-stats` | Need total allocation/collection bytes, GC pause times |
-| `--heap-sample` | Need to identify which functions allocate the most |
-| Both | Cross-reference attribution with totals |
-
-## Requirements
-
-- Node.js 22.6+ (for native TypeScript support)
-- Use `--expose-gc --allow-natives-syntax` flags for garbage collection monitoring and V8 native functions
-
-## Adaptive Mode (Experimental)
-
-Adaptive mode (`--adaptive`) automatically adjusts iteration count until measurements stabilize. The algorithm is still being tuned — use `--help` for available options.
-
-## Interpreting Results
-
-### Baseline Comparison (Δ% CI)
-```
-0.17  +5.5% [+4.7%, +6.2%]
-```
-The benchmark is 5.5% slower than baseline, with a bootstrap confidence interval of [+4.7%, +6.2%].
-
-### Percentiles
-```
-p50: 0.15ms, p99: 0.27ms
-```
-50% of runs completed in ≤0.15ms and 99% in ≤0.27ms. Use percentiles when you care about consistency and tail latencies.
-
-## Understanding GC Time Measurements
-
-### GC Duration in Node.js Performance Hooks
-
-The `duration` field in GC PerformanceEntry records **stop-the-world pause time** - the time when JavaScript execution is actually blocked. This does NOT include:
-
-1. **Concurrent GC work** done in parallel threads (concurrent marking, sweeping)
-2. **Performance degradation** from CPU contention and cache effects
-3. **Total GC overhead** including preparation and cleanup
-
-### Key Findings
-
-1. **Multiple GC Events**: A single `gc()` call can trigger multiple GC events that are recorded separately
-2. **Incremental GC**: V8 breaks up GC work into smaller increments to reduce pause times
-3. **Duration < Impact**: The recorded duration is often much less than the actual performance impact
+See [Statistics.md](Statistics.md) for the full explanation of batched
+execution, block bootstrap, and Tukey trimming.
+
+### Baseline Comparison
+
+When a group has a `baseline`, all benchmarks show Δ% with a bootstrap
+confidence interval. The result is classified as faster, slower, equivalent, or
+inconclusive based on the equivalence margin.
+
+See [Statistics.md](Statistics.md#equivalence-margin) for how the four verdicts
+work and how to calibrate the margin.
+
+## Further Reading
+
+- [Node.md](Node.md) -- Worker mode, module imports, custom metric sections,
+  external debugger attachment
+- [Browser.md](Browser.md) -- Bench function and page-load modes, completion
+  signals, CDP flow
+- [Profiling.md](Profiling.md) -- Allocation sampling, GC stats, V8 flags,
+  Perfetto export
+- [Statistics.md](Statistics.md) -- Column selection (`--stats`), bootstrap
+  methods, batching, equivalence testing
+- [README-tachometer.md](README-tachometer.md) -- Coming from tachometer

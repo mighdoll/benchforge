@@ -1,6 +1,6 @@
 {
   "name": "benchforge",
-  "version": "0.1.11",
+  "version": "0.2.0",
   "type": "module",
   "bin": "bin/benchforge",
   "files": [
@@ -9,21 +9,29 @@
     "src"
   ],
   "scripts": {
-    "build": "tsdown",
-    "build:plots": "tsdown --config tsdown.plots.config.ts",
-    "example:node": "bin/benchforge examples/simple-cli.ts --gc-stats --heap-sample --view-report",
-    "example:bench": "bin/benchforge --url file://$PWD/examples/browser-bench/index.html --gc-stats --heap-sample --view-report",
-    "example:heap": "node benchforge-browser/bin.mjs file://$PWD/examples/browser-heap/index.html --gc-stats --view-alloc",
-    "example:lap": "bin/benchforge --url file://$PWD/examples/browser-lap/index.html --gc-stats --heap-sample --view-report",
+    "build": "tsdown && vite build --config vite.viewer.config.ts",
+    "build:lib": "tsdown",
+    "build:viewer": "vite build --config vite.viewer.config.ts",
+    "deploy:viewer": "run-s build:viewer pages:viewer:deploy",
+    "dev:viewer": "vite --config vite.viewer.config.ts",
+    "example:node": "bin/benchforge examples/simple-cli.ts --gc-stats --alloc --batches 5 --iterations 100 --view",
+    "example:stats": "bin/benchforge examples/simple-cli.ts --stats mean,p50,p95,p99,max --batches 5 --iterations 200 --view",
+    "example:time": "bin/benchforge examples/simple-cli.ts --alloc --time-sample --batches 5 --iterations 100 --view --filter quicksort",
+    "example:bench": "bin/benchforge --url file://$PWD/examples/browser-bench/index.html --gc-stats --headless --alloc --view",
+    "example:counts": "bin/benchforge examples/simple-cli.ts --alloc --time-sample --call-counts --view --iterations 5",
+    "example:heap": "bin/benchforge --url file://$PWD/examples/browser-heap/index.html --gc-stats --headless --view",
+    "example:page-load": "bin/benchforge --url file://$PWD/examples/browser-page-load/index.html --headless --page-load --alloc --time-sample --call-counts --gc-stats --batches 2 --iterations 2 --view",
+    "pages:viewer:deploy": "pnpx wrangler pages deploy --project-name benchforge-viewer dist/viewer",
     "fix": "biome check --fix --unsafe --error-on-warnings",
     "lint": "biome check --error-on-warnings",
-    "prepublishOnly": "run-s lint build build:plots",
+    "prepublishOnly": "run-s lint build",
     "test": "pnpm --node-options=--expose-gc vitest --hideSkippedTests --exclude '**/*.e2e.test.ts'",
-    "test:e2e": "pnpm --node-options=--expose-gc vitest run '.e2e.'",
+    "test:e2e": "pnpm --node-options=--expose-gc vitest run '.e2e.' --exclude '**/*.static.e2e.*'",
+    "test:static:e2e": "pnpm --node-options=--expose-gc vitest run '.static.e2e.'",
     "test:once": "pnpm --node-options=--expose-gc vitest run --exclude '**/*.e2e.test.ts'",
-    "typecheck": "tsgo",
-    "prepush": "run-s fix typecheck test:once build build:plots",
-    "publish:all": "pnpm publish && pnpm --filter benchforge-browser publish"
+    "typecheck": "tsgo && tsgo -p src/viewer",
+    "prepush": "run-s fix typecheck test:once build test:e2e test:static:e2e",
+    "publish:all": "pnpm publish"
   },
   "publishConfig": {
     "bin": {
@@ -41,29 +49,28 @@
     }
   },
   "dependencies": {
-    "esbuild": "^0.27.3",
+    "esbuild": "^0.27.4",
     "open": "^11.0.0",
     "picocolors": "^1.1.1",
+    "sirv": "^3.0.2",
     "table": "^6.9.0",
     "yargs": "^18.0.0"
   },
-  "peerDependencies": {
-    "playwright": ">=1.40.0"
-  },
-  "peerDependenciesMeta": {
-    "playwright": {
-      "optional": true
-    }
-  },
   "devDependencies": {
-    "@biomejs/biome": "^2.4.4",
-    "@types/node": "^25.3.0",
+    "@biomejs/biome": "^2.4.9",
+    "@preact/signals": "^2.9.0",
+    "@observablehq/plot": "^0.6.17",
+    "@types/d3": "^7.4.3",
+    "@types/node": "^25.5.0",
     "@types/yargs": "^17.0.35",
-    "@typescript/native-preview": "7.0.0-dev.20260220.1",
+    "@typescript/native-preview": "7.0.0-dev.20260329.1",
+    "d3": "^7.9.0",
     "npm-run-all": "^4.1.5",
+    "preact": "^10.29.0",
     "playwright": "catalog:",
-    "tsdown": "0.20.3",
-    "vite": "^7.3.1",
-    "vitest": "^4.0.18"
+    "shiki": "^4.0.2",
+    "tsdown": "0.21.7",
+    "vite": "^8.0.3",
+    "vitest": "^4.1.2"
   }
 }

@@ -1,14 +1,19 @@
 import { expect, test } from "vitest";
 import {
+  blockDifferenceCI,
+  sampleDifferenceCI,
+} from "../stats/BootstrapDifference.ts";
+import {
   average,
-  bootstrapDifferenceCI,
-  bootstrapMedian,
+  blockBootstrap,
   coefficientOfVariation,
   findOutliers,
+  median,
   medianAbsoluteDeviation,
   percentile,
+  sampleBootstrap,
   standardDeviation,
-} from "../StatisticalUtils.ts";
+} from "../stats/StatisticalUtils.ts";
 import { assertValid, getSampleData } from "./TestUtils.ts";
 
 test("calculates mean correctly", () => {
@@ -68,11 +73,21 @@ test("identifies outliers in mixed data", () => {
   expect(outliers.indices).toContain(51);
 });
 
-test("bootstrap estimates median with confidence intervals", () => {
+test("sampleBootstrap estimates median with CI", () => {
+  const stable = getSampleData(400, 450);
+  const result = sampleBootstrap(stable, median, { resamples: 1000 });
+  expect(result.ciLevel).toBe("sample");
+  expect(result.ci[0]).toBeLessThanOrEqual(result.estimate);
+  expect(result.ci[1]).toBeGreaterThanOrEqual(result.estimate);
+});
+
+test("blockBootstrap estimates median with confidence intervals", () => {
   const stable = getSampleData(400, 450);
   const actual = percentile(stable, 0.5);
-  const result = bootstrapMedian(stable, { resamples: 1000 });
+  const blocks = Array.from({ length: 5 }, (_, i) => i * 10);
+  const result = blockBootstrap(stable, blocks, median, { resamples: 1000 });
 
+  expect(result.ciLevel).toBe("block");
   expect(result.estimate).toBeCloseTo(actual, 1);
   expect(result.ci[0]).toBeLessThanOrEqual(result.estimate);
   expect(result.ci[1]).toBeGreaterThanOrEqual(result.estimate);
@@ -80,32 +95,53 @@ test("bootstrap estimates median with confidence intervals", () => {
   expect(result.samples).toHaveLength(1000);
 });
 
-test("bootstrapDifferenceCI detects improvement", () => {
+test("sampleDifferenceCI detects improvement", () => {
   const baseline = getSampleData(0, 100);
   const improved = baseline.map(v => v * 0.8);
-  const result = bootstrapDifferenceCI(baseline, improved, { resamples: 1000 });
+  const result = sampleDifferenceCI(baseline, improved, median, {
+    resamples: 1000,
+  });
+  expect(result.ciLevel).toBe("sample");
+  expect(result.percent).toBeCloseTo(-20, 0);
+});
 
+test("blockDifferenceCI detects improvement", () => {
+  const baseline = getSampleData(0, 100);
+  const improved = baseline.map(v => v * 0.8);
+  const blocks = Array.from({ length: 10 }, (_, i) => i * 10);
+  const result = blockDifferenceCI(baseline, blocks, improved, median, {
+    resamples: 1000,
+  });
+
+  expect(result.ciLevel).toBe("block");
   expect(result.percent).toBeCloseTo(-20, 0);
   expect(result.ci[1]).toBeLessThan(0);
   expect(result.direction).toBe("faster");
 });
 
-test("bootstrapDifferenceCI detects regression", () => {
+test("blockDifferenceCI detects regression", () => {
   const baseline = getSampleData(0, 100);
   const slower = baseline.map(v => v * 1.2);
-  const result = bootstrapDifferenceCI(baseline, slower, { resamples: 1000 });
+  const blocks = Array.from({ length: 10 }, (_, i) => i * 10);
+  const result = blockDifferenceCI(baseline, blocks, slower, median, {
+    resamples: 1000,
+  });
 
+  expect(result.ciLevel).toBe("block");
   expect(result.percent).toBeCloseTo(20, 0);
   expect(result.ci[0]).toBeGreaterThan(0);
   expect(result.direction).toBe("slower");
 });
 
-test("bootstrapDifferenceCI shows uncertainty for noise", () => {
+test("blockDifferenceCI shows uncertainty for noise", () => {
   const baseline = getSampleData(0, 100);
   const noisy = baseline.map(v => v + (Math.random() - 0.5) * 2);
-  const result = bootstrapDifferenceCI(baseline, noisy, { resamples: 1000 });
+  const blocks = Array.from({ length: 10 }, (_, i) => i * 10);
+  const result = blockDifferenceCI(baseline, blocks, noisy, median, {
+    resamples: 1000,
+  });
 
-  // CI should span zero for no real change
+  expect(result.ciLevel).toBe("block");
   expect(result.ci[0]).toBeLessThanOrEqual(0);
   expect(result.ci[1]).toBeGreaterThanOrEqual(0);
   expect(result.direction).toBe("uncertain");

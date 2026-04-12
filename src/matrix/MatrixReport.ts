@@ -1,106 +1,53 @@
-import type { CaseResult, MatrixResults } from "../BenchMatrix.ts";
-import { injectDiffColumns, type ResultsMapper } from "../BenchmarkReport.ts";
-import { totalProfileBytes } from "../heap-sample/HeapSampleReport.ts";
-import { type GcStatsInfo, gcStatsSection } from "../StandardSections.ts";
 import {
-  average,
-  bootstrapDifferenceCI,
-  type DifferenceCI,
-} from "../StatisticalUtils.ts";
-import {
-  duration,
-  formatBytes,
-  formatDiffWithCI,
-  truncate,
-} from "../table-util/Formatters.ts";
-import {
-  buildTable,
-  type ColumnGroup,
-  type ResultGroup,
-} from "../table-util/TableReport.ts";
+  type ComparisonOptions,
+  computeDiffCI,
+  extractSectionValues,
+  findPrimaryColumn,
+  type ReportSection,
+} from "../report/BenchmarkReport.ts";
+import { truncate } from "../report/Formatters.ts";
+import { runsSection, timeSection } from "../report/StandardSections.ts";
+import { buildTable } from "../report/text/TableReport.ts";
+import { sectionColumnGroups } from "../report/text/TextReport.ts";
+import type { MeasuredResults } from "../runners/MeasuredResults.ts";
+import type {
+  CaseResult,
+  MatrixResults,
+  VariantResult,
+} from "./BenchMatrix.ts";
 
-/** Custom column definition for extra computed metrics */
-export interface ExtraColumn {
-  key: string;
-  title: string;
-  groupTitle?: string; // optional column group header
-  extract: (caseResult: CaseResult) => unknown;
-  formatter?: (value: unknown) => string;
-}
-
-/** Options for matrix report generation */
+/** Options for {@link reportMatrixResults} */
 export interface MatrixReportOptions {
-  extraColumns?: ExtraColumn[];
-  sections?: ResultsMapper[]; // ResultsMapper sections (like BenchSuite)
-  variantTitle?: string; // custom title for the variant column (default: "variant")
+  /** ReportSection sections (default: [timeSection, runsSection]) */
+  sections?: ReportSection[];
+  /** Custom title for the variant column (default: "variant") */
+  variantTitle?: string;
+  /** Comparison options (equivalence margin, batch trimming) */
+  comparison?: ComparisonOptions;
 }
 
-/** Row data for matrix report table */
-interface MatrixReportRow extends Record<string, unknown> {
-  name: string;
-  time: number;
-  samples: number;
-  diffCI?: DifferenceCI;
+interface VariantCase {
+  variant: VariantResult;
+  cr: CaseResult;
 }
 
-/** GC statistics columns - derived from gcStatsSection for consistency */
-export const gcStatsColumns: ExtraColumn[] = gcStatsSection
-  .columns()[0]
-  .columns.map(col => ({
-    key: col.key as string,
-    title: col.title,
-    groupTitle: "GC",
-    extract: (r: CaseResult) =>
-      gcStatsSection.extract(r.measured)[col.key as keyof GcStatsInfo],
-    formatter: (v: unknown) => col.formatter?.(v) ?? "-",
-  }));
+type Row = Record<string, unknown> & { name: string };
 
-/** GC pause time column */
-export const gcPauseColumn: ExtraColumn = {
-  key: "gcPause",
-  title: "pause",
-  groupTitle: "GC",
-  extract: r => r.measured.gcStats?.gcPauseTime,
-  formatter: v => (v != null ? `${(v as number).toFixed(1)}ms` : "-"),
-};
+const defaultSections: ReportSection[] = [timeSection, runsSection];
 
-/** Heap sampling total bytes column */
-export const heapTotalColumn: ExtraColumn = {
-  key: "heapTotal",
-  title: "heap",
-  extract: r => {
-    const profile = r.measured.heapProfile;
-    if (!profile?.head) return undefined;
-    return totalProfileBytes(profile);
-  },
-  formatter: formatBytesOrDash,
-};
-
-/** Format matrix results as one table per case */
+/** Format matrix results as text, with one table per case */
 export function reportMatrixResults(
   results: MatrixResults,
   options?: MatrixReportOptions,
 ): string {
-  const tables = buildCaseTables(results, options);
-  const header = `Matrix: ${results.name}`;
-  return [header, ...tables].join("\n\n");
-}
+  if (results.variants.length === 0) return `Matrix: ${results.name}`;
 
-/** Format bytes with fallback to "-" for missing values */
-function formatBytesOrDash(value: unknown): string {
-  return formatBytes(value) ?? "-";
-}
-
-/** Build one table for each case showing all variants */
-function buildCaseTables(
-  results: MatrixResults,
-  options?: MatrixReportOptions,
-): string[] {
-  if (results.variants.length === 0) return [];
-
-  // Get all case IDs from first variant (all variants have same cases)
+  // all variants have the same cases
   const caseIds = results.variants[0].cases.map(c => c.caseId);
-  return caseIds.map(caseId => buildCaseTable(results, caseId, options));
+  const tables = caseIds.map(caseId =>
+    buildCaseTable(results, caseId, options),
+  );
+  return [`Matrix: ${results.name}`, ...tables].join("\n\n");
 }
 
 /** Build table for a single case showing all variants */
@@ -109,19 +56,45 @@ function buildCaseTable(
   caseId: string,
   options?: MatrixReportOptions,
 ): string {
-  const caseTitle = formatCaseTitle(results, caseId);
+  const title = formatCaseTitle(results, caseId);
+  const sections = options?.sections ?? defaultSections;
+  const variantTitle = options?.variantTitle ?? "variant";
+  const primaryCol = findPrimaryColumn(sections);
 
-  if (options?.sections?.length) {
-    return buildSectionTable(results, caseId, options, caseTitle);
-  }
+  const caseResults = collectCaseResults(results, caseId);
+  const shared = sharedBaseline(caseResults);
 
-  const rows = buildCaseRows(results, caseId, options?.extraColumns);
-  const hasBaseline = rows.some(r => r.diffCI);
-  const columns = buildColumns(hasBaseline, options);
+  const rows: Row[] = caseResults.flatMap(({ variant, cr }) => {
+    const vals = extractSectionValues(cr.measured, sections, cr.metadata);
+    const row: Row = { name: truncate(variant.id, 25), ...vals };
+    if (cr.baseline && primaryCol?.statKind) {
+      const { statKind, higherIsBetter } = primaryCol;
+      row.diffCI = computeDiffCI(
+        cr.baseline,
+        cr.measured,
+        statKind,
+        options?.comparison,
+        higherIsBetter,
+      );
+    }
+    const out: Row[] = [row];
+    if (cr.baseline && !shared)
+      out.push({
+        name: " \u21B3 baseline",
+        ...extractSectionValues(cr.baseline, sections, cr.metadata),
+      });
+    return out;
+  });
 
-  const resultGroup: ResultGroup<MatrixReportRow> = { results: rows };
-  const table = buildTable(columns, [resultGroup]);
-  return `${caseTitle}\n${table}`;
+  if (shared)
+    rows.push({
+      name: "=> baseline",
+      ...extractSectionValues(shared, sections),
+    });
+
+  const hasDiff = rows.some(r => r.diffCI);
+  const cols = sectionColumnGroups(sections, hasDiff, variantTitle);
+  return `${title}\n${buildTable(cols, [{ results: rows }])}`;
 }
 
 /** Format case title with metadata if available */
@@ -129,162 +102,29 @@ function formatCaseTitle(results: MatrixResults, caseId: string): string {
   const caseResult = results.variants[0]?.cases.find(c => c.caseId === caseId);
   const metadata = caseResult?.metadata;
 
-  if (metadata && Object.keys(metadata).length > 0) {
-    const metaParts = Object.entries(metadata)
-      .map(([k, v]) => `${v} ${k}`)
-      .join(", ");
-    return `${caseId} (${metaParts})`;
-  }
-  return caseId;
+  if (!metadata || Object.keys(metadata).length === 0) return caseId;
+  const meta = Object.entries(metadata)
+    .map(([k, v]) => `${v} ${k}`)
+    .join(", ");
+  return `${caseId} (${meta})`;
 }
 
-/** Build table using ResultsMapper sections */
-function buildSectionTable(
+/** Collect (variant, caseResult) pairs for a given caseId */
+function collectCaseResults(
   results: MatrixResults,
   caseId: string,
-  options: MatrixReportOptions,
-  caseTitle: string,
-): string {
-  const sections = options.sections!;
-  const variantTitle = options.variantTitle ?? "name";
-
-  const rows: Record<string, unknown>[] = [];
-  let hasBaseline = false;
-
-  for (const variant of results.variants) {
-    const caseResult = variant.cases.find(c => c.caseId === caseId);
-    if (!caseResult) continue;
-
-    const row: Record<string, unknown> = { name: truncate(variant.id, 25) };
-
-    for (const section of sections) {
-      Object.assign(
-        row,
-        section.extract(caseResult.measured, caseResult.metadata),
-      );
-    }
-
-    if (caseResult.baseline) {
-      hasBaseline = true;
-      const { samples: base } = caseResult.baseline;
-      row.diffCI = bootstrapDifferenceCI(base, caseResult.measured.samples);
-    }
-
-    rows.push(row);
-  }
-
-  const columnGroups = buildSectionColumns(sections, variantTitle, hasBaseline);
-  const resultGroup: ResultGroup<Record<string, unknown>> = { results: rows };
-  const table = buildTable(columnGroups, [resultGroup]);
-  return `${caseTitle}\n${table}`;
-}
-
-/** Build rows for all variants for a given case */
-function buildCaseRows(
-  results: MatrixResults,
-  caseId: string,
-  extraColumns?: ExtraColumn[],
-): MatrixReportRow[] {
+): VariantCase[] {
   return results.variants.flatMap(variant => {
-    const caseResult = variant.cases.find(c => c.caseId === caseId);
-    return caseResult ? [buildRow(variant.id, caseResult, extraColumns)] : [];
+    const cr = variant.cases.find(c => c.caseId === caseId);
+    return cr ? [{ variant, cr }] : [];
   });
 }
 
-/** Build column configuration */
-function buildColumns(
-  hasBaseline: boolean,
-  options?: MatrixReportOptions,
-): ColumnGroup<MatrixReportRow>[] {
-  const variantTitle = options?.variantTitle ?? "variant";
-  const nameCol: ColumnGroup<MatrixReportRow> = {
-    columns: [{ key: "name", title: variantTitle }],
-  };
-
-  const ciKey = "diffCI" as keyof MatrixReportRow;
-  const diffCol = { key: ciKey, title: "Δ% CI", formatter: formatDiff };
-  const timeCol: ColumnGroup<MatrixReportRow> = {
-    columns: [
-      { key: "time", title: "time", formatter: duration },
-      ...(hasBaseline ? [diffCol] : []),
-    ],
-  };
-
-  const groups: ColumnGroup<MatrixReportRow>[] = [nameCol, timeCol];
-
-  // Add extra columns, grouped by groupTitle
-  const extraColumns = options?.extraColumns;
-  if (extraColumns?.length) {
-    const byGroup = new Map<string | undefined, ExtraColumn[]>();
-    for (const col of extraColumns) {
-      const group = byGroup.get(col.groupTitle) ?? [];
-      group.push(col);
-      byGroup.set(col.groupTitle, group);
-    }
-    for (const [groupTitle, cols] of byGroup) {
-      groups.push({
-        groupTitle,
-        columns: cols.map(col => ({
-          key: col.key as keyof MatrixReportRow,
-          title: col.title,
-          formatter: col.formatter ?? String,
-        })),
-      });
-    }
-  }
-
-  return groups;
-}
-
-/** Build column groups from ResultsMapper sections */
-function buildSectionColumns(
-  sections: ResultsMapper[],
-  variantTitle: string,
-  hasBaseline: boolean,
-): ColumnGroup<Record<string, unknown>>[] {
-  const nameCol: ColumnGroup<Record<string, unknown>> = {
-    columns: [{ key: "name", title: variantTitle }],
-  };
-
-  const sectionColumns = sections.flatMap(s => s.columns());
-  const columnGroups = hasBaseline
-    ? injectDiffColumns(sectionColumns)
-    : (sectionColumns as ColumnGroup<Record<string, unknown>>[]);
-
-  return [nameCol, ...columnGroups];
-}
-
-/** Build a single row from case result */
-function buildRow(
-  variantId: string,
-  caseResult: CaseResult,
-  extraColumns?: ExtraColumn[],
-): MatrixReportRow {
-  const { measured, baseline } = caseResult;
-  const samples = measured.samples;
-  const time = measured.time?.avg ?? average(samples);
-
-  const row: MatrixReportRow = {
-    name: truncate(variantId, 25),
-    time,
-    samples: samples.length,
-  };
-
-  if (baseline) {
-    row.diffCI = bootstrapDifferenceCI(baseline.samples, samples);
-  }
-
-  if (extraColumns) {
-    for (const col of extraColumns) {
-      row[col.key] = col.extract(caseResult);
-    }
-  }
-
-  return row;
-}
-
-/** Format diff with CI, or "baseline" marker */
-function formatDiff(value: unknown): string | null {
-  if (!value) return null;
-  return formatDiffWithCI(value as DifferenceCI);
+/** @return shared baseline if all variants reference the same one (baselineVariant mode) */
+function sharedBaseline(
+  caseResults: VariantCase[],
+): MeasuredResults | undefined {
+  const baselines = caseResults.map(({ cr }) => cr.baseline).filter(Boolean);
+  if (baselines.length < 2) return undefined;
+  return baselines.every(b => b === baselines[0]) ? baselines[0] : undefined;
 }

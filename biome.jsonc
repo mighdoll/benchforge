@@ -6,7 +6,14 @@
   },
   "files": {
     "ignoreUnknown": false,
-    "includes": ["**/*.ts", "**/*.json", "**/biome.jsonc"]
+    "includes": [
+      "**/*.ts",
+      "**/*.json",
+      "**/*.html",
+      "**/biome.jsonc",
+      "!.claude",
+      "!vendor"
+    ]
   },
   "formatter": {
     "enabled": true,
@@ -50,6 +57,11 @@
         "noExplicitAny": "off",
         "noFocusedTests": "off"
       }
+    }
+  },
+  "html": {
+    "formatter": {
+      "enabled": true
     }
   },
   "javascript": {

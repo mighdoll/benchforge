@@ -1,11 +1,9 @@
-import { BasicRunner } from "./BasicRunner.ts";
 import type { BenchRunner } from "./BenchRunner.ts";
+import { TimingRunner } from "./TimingRunner.ts";
 
-export type KnownRunner = "basic";
+export type KnownRunner = "timing";
 
-/** @return benchmark runner */
-export async function createRunner(
-  _runnerName: KnownRunner,
-): Promise<BenchRunner> {
-  return new BasicRunner();
+/** Create a benchmark runner by name. */
+export async function createRunner(_name: KnownRunner): Promise<BenchRunner> {
+  return new TimingRunner();
 }

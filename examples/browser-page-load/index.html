@@ -1,0 +1,51 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <title>Page Load Example</title>
+  </head>
+  <body>
+    <div id="app"></div>
+    <script>
+    // Simulate a typical page load: fetch-like work, DOM manipulation, allocations.
+    // No __bench or __start/__done -- benchforge profiles this passively.
+
+    function makeItem(i) {
+      return { id: i, label: "item-" + i, value: Math.random() };
+    }
+
+    function buildItems(n) {
+      const items = [];
+      for (let i = 0; i < n; i++) items.push(makeItem(i));
+      return items;
+    }
+
+    function compareValue(a, b) {
+      return a.value - b.value;
+    }
+
+    function formatItem(item) {
+      return `${item.label}: ${item.value.toFixed(3)}`;
+    }
+
+    function renderItem(item, fragment) {
+      const div = document.createElement("div");
+      div.textContent = formatItem(item);
+      fragment.appendChild(div);
+    }
+
+    function renderItems(items, container) {
+      const fragment = document.createDocumentFragment();
+      for (const item of items) renderItem(item, fragment);
+      container.appendChild(fragment);
+    }
+
+    function main() {
+      const items = buildItems(2000);
+      items.sort(compareValue);
+      renderItems(items, document.getElementById("app"));
+    }
+
+    main();
+    </script>
+  </body>
+</html>

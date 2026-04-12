@@ -1,18 +1,18 @@
 import { expect, test } from "vitest";
-import {
-  type BenchmarkReport,
-  reportResults,
-  valuesForReports,
-} from "../BenchmarkReport.ts";
-import {
-  adaptiveSection,
-  gcSection,
-  timeSection,
-} from "../StandardSections.ts";
+import { parseCliArgs } from "../cli/CliArgs.ts";
+import { defaultReport } from "../cli/CliReport.ts";
+import type {
+  BenchmarkReport,
+  ReportSection,
+} from "../report/BenchmarkReport.ts";
+import { integer } from "../report/Formatters.ts";
+import { gcSection } from "../report/GcSections.ts";
+import { adaptiveSections, timeSection } from "../report/StandardSections.ts";
+import { reportResults, valuesForReports } from "../report/text/TextReport.ts";
 import { createBenchmarkReport, createMeasuredResults } from "./TestUtils.ts";
 
 test("combines time and gc sections into report", () => {
-  const sections = [timeSection, gcSection] as const;
+  const sections = [timeSection, gcSection];
   const report = createBenchmarkReport("test", [100, 150]);
   const rows = valuesForReports([report], sections);
 
@@ -59,6 +59,56 @@ test("generates diff columns for baseline comparison", () => {
   expect(table).toContain("Δ%");
 });
 
+test("defaultReport uses custom sections when provided", () => {
+  const locSection: ReportSection = {
+    title: "throughput",
+    columns: [
+      {
+        key: "locPerSec",
+        title: "lines/sec",
+        formatter: integer,
+        comparable: true,
+        higherIsBetter: true,
+        statKind: "mean",
+        toDisplay: (ms: number, meta?: Record<string, unknown>) => {
+          const lines = (meta?.linesOfCode ?? 0) as number;
+          return lines / (ms / 1000);
+        },
+      },
+      {
+        key: "lines",
+        title: "lines",
+        formatter: integer,
+        value: (_r, meta) => meta?.linesOfCode ?? 0,
+      },
+    ],
+  };
+
+  const report: BenchmarkReport = {
+    name: "parse",
+    measuredResults: createMeasuredResults([100, 150]),
+    metadata: { linesOfCode: 500 },
+  };
+  const groups = [{ name: "parser", reports: [report] }];
+  const args = parseCliArgs(["--duration", "0.1"]);
+
+  const output = defaultReport(groups, args, { sections: [locSection] });
+  expect(output).toContain("throughput");
+  expect(output).toContain("lines/sec");
+  expect(output).toContain("500");
+  // Custom sections replace defaults: the time section's "mean" header should not appear.
+  expect(output).not.toContain("| mean ");
+});
+
+test("defaultReport falls back to CLI defaults without opts", () => {
+  const report = createBenchmarkReport("plain", [100, 150]);
+  const groups = [{ name: "g", reports: [report] }];
+  const args = parseCliArgs(["--duration", "0.1"]);
+  const output = defaultReport(groups, args);
+  expect(output).toContain("mean");
+  expect(output).toContain("runs");
+});
+
 test("formats adaptive convergence statistics", () => {
   const reports: BenchmarkReport[] = [
     createBenchmarkReport("test-adaptive", [400, 500], {
@@ -69,13 +119,13 @@ test("formats adaptive convergence statistics", () => {
     }),
   ];
 
-  const rows = valuesForReports(reports, [adaptiveSection]);
+  const rows = valuesForReports(reports, adaptiveSections);
   expect(rows[0].convergence).toBe(95);
   expect(rows[1].convergence).toBe(65);
 
   const table = reportResults(
     [{ name: "adaptive", reports }],
-    [adaptiveSection],
+    adaptiveSections,
   );
   expect(table).toContain("95%");
   expect(table).toMatch(/65%/);

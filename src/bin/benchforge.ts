@@ -1,4 +1,4 @@
 #!/usr/bin/env node
-import { runDefaultBench } from "../index.ts";
+import { dispatchCli } from "../cli/RunBenchCLI.ts";
 
-await runDefaultBench();
+await dispatchCli();

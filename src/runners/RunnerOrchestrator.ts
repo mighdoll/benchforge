@@ -1,16 +1,19 @@
 import { type ChildProcess, fork } from "node:child_process";
 import { existsSync } from "node:fs";
 import path from "node:path";
-import type { BenchmarkSpec } from "../Benchmark.ts";
-import type { HeapProfile } from "../heap-sample/HeapSampler.ts";
-import type { MeasuredResults } from "../MeasuredResults.ts";
-import {
-  type AdaptiveOptions,
-  createAdaptiveWrapper,
-} from "./AdaptiveWrapper.ts";
+import type { CoverageData } from "../profiling/node/CoverageTypes.ts";
+import type { HeapProfile } from "../profiling/node/HeapSampler.ts";
+import type { TimeProfile } from "../profiling/node/TimeSampler.ts";
+import type { BenchmarkFunction, BenchmarkSpec } from "./BenchmarkSpec.ts";
 import type { RunnerOptions } from "./BenchRunner.ts";
-import { createRunner, type KnownRunner } from "./CreateRunner.ts";
+import type { KnownRunner } from "./CreateRunner.ts";
 import { aggregateGcStats, type GcEvent, parseGcLine } from "./GcStats.ts";
+import type { MeasuredResults } from "./MeasuredResults.ts";
+import {
+  createBenchRunner,
+  importBenchFn,
+  resolveVariantFn,
+} from "./RunnerUtils.ts";
 import { debugWorkerTiming, getElapsed, getPerfNow } from "./TimingUtils.ts";
 import type {
   ErrorMessage,
@@ -18,7 +21,7 @@ import type {
   RunMessage,
 } from "./WorkerScript.ts";
 
-/** Parameters for running a matrix variant in worker */
+/** Parameters for running a matrix variant */
 export interface RunMatrixVariantParams {
   variantDir: string;
   variantId: string;
@@ -27,19 +30,8 @@ export interface RunMatrixVariantParams {
   casesModule?: string;
   runner: KnownRunner;
   options: RunnerOptions;
+  useWorker?: boolean;
 }
-
-type WorkerParams<T = unknown> = {
-  spec: BenchmarkSpec<T>;
-  runner: KnownRunner;
-  options: RunnerOptions;
-  params?: T;
-};
-
-type WorkerHandlers = {
-  resolve: (results: MeasuredResults[], heapProfile?: HeapProfile) => void;
-  reject: (error: Error) => void;
-};
 
 interface RunBenchmarkParams<T = unknown> {
   spec: BenchmarkSpec<T>;
@@ -53,7 +45,7 @@ const logTiming = debugWorkerTiming
   ? (message: string) => console.log(`[RunnerOrchestrator] ${message}`)
   : () => {};
 
-/** Execute benchmarks directly or in worker process */
+/** Run a benchmark spec, optionally in an isolated worker process for profiling support. */
 export async function runBenchmark<T = unknown>({
   spec,
   runner,
@@ -62,41 +54,30 @@ export async function runBenchmark<T = unknown>({
   params,
 }: RunBenchmarkParams<T>): Promise<MeasuredResults[]> {
   if (!useWorker) {
-    const resolvedSpec = spec.modulePath
+    const resolved = spec.modulePath
       ? await resolveModuleSpec(spec, params)
       : { spec, params };
-
-    const base = await createRunner(runner);
-    const benchRunner = (options as any).adaptive
-      ? createAdaptiveWrapper(base, options as AdaptiveOptions)
-      : base;
-    return benchRunner.runBench(
-      resolvedSpec.spec,
-      options,
-      resolvedSpec.params,
-    );
+    const benchRunner = await createBenchRunner(runner, options);
+    return benchRunner.runBench(resolved.spec, options, resolved.params);
   }
 
-  return runInWorker({ spec, runner, options, params });
+  const msg = createRunMessage(spec, runner, options, params);
+  return runWorkerWithMessage(spec.name, options, msg);
 }
 
-/** Run a matrix variant benchmark in isolated worker process */
+/** Run a matrix variant benchmark, directly or in a worker. */
 export async function runMatrixVariant(
   params: RunMatrixVariantParams,
 ): Promise<MeasuredResults[]> {
-  const {
-    variantDir,
-    variantId,
-    caseId,
-    caseData,
-    casesModule,
-    runner,
-    options,
-  } = params;
+  const { variantId, caseId, runner, options, useWorker = true } = params;
   const name = `${variantId}/${caseId}`;
+
+  if (!useWorker) return runMatrixVariantDirect(params, name);
+
+  const { variantDir, caseData, casesModule } = params;
   const message: RunMessage = {
     type: "run",
-    spec: { name, fn: () => {} },
+    spec: { name } as BenchmarkSpec,
     runnerName: runner,
     options,
     variantDir,
@@ -113,67 +94,18 @@ async function resolveModuleSpec<T>(
   spec: BenchmarkSpec<T>,
   params: T | undefined,
 ): Promise<{ spec: BenchmarkSpec<T>; params: T | undefined }> {
-  const module = await import(spec.modulePath!);
-
-  const fn = spec.exportName
-    ? module[spec.exportName]
-    : module.default || module;
-
-  if (typeof fn !== "function") {
-    const name = spec.exportName || "default";
-    throw new Error(
-      `Export '${name}' from ${spec.modulePath} is not a function`,
-    );
-  }
-
-  let resolvedParams = params;
-  if (spec.setupExportName) {
-    const setupFn = module[spec.setupExportName];
-    if (typeof setupFn !== "function") {
-      const msg = `Setup export '${spec.setupExportName}' from ${spec.modulePath} is not a function`;
-      throw new Error(msg);
-    }
-    resolvedParams = await setupFn(params);
-  }
-
-  return { spec: { ...spec, fn }, params: resolvedParams };
+  const { modulePath, exportName, setupExportName } = spec;
+  const imported = await importBenchFn(
+    modulePath!,
+    exportName,
+    setupExportName,
+    params,
+  );
+  const fn = imported.fn as BenchmarkFunction<T>;
+  return { spec: { ...spec, fn }, params: imported.params as T | undefined };
 }
 
-/** Run benchmark in isolated worker process */
-async function runInWorker<T>(
-  workerParams: WorkerParams<T>,
-): Promise<MeasuredResults[]> {
-  const { spec, runner, options, params } = workerParams;
-  const msg = createRunMessage(spec, runner, options, params);
-  return runWorkerWithMessage(spec.name, options, msg);
-}
-
-/** Spawn worker, wire handlers, send message, return results */
-function runWorkerWithMessage(
-  name: string,
-  options: RunnerOptions,
-  message: RunMessage,
-): Promise<MeasuredResults[]> {
-  const startTime = getPerfNow();
-  const collectGcStats = options.gcStats ?? false;
-  logTiming(`Starting worker for ${name}`);
-
-  return new Promise((resolve, reject) => {
-    const { worker, createTime, gcEvents } =
-      createWorkerWithTiming(collectGcStats);
-    const handlers = createWorkerHandlers(
-      name,
-      startTime,
-      gcEvents,
-      resolve,
-      reject,
-    );
-    setupWorkerHandlers(worker, name, handlers);
-    sendWorkerMessage(worker, message, createTime);
-  });
-}
-
-/** Create message for worker execution */
+/** Serialize a BenchmarkSpec into a worker-safe message (modulePath or fnCode) */
 function createRunMessage<T>(
   spec: BenchmarkSpec<T>,
   runnerName: KnownRunner,
@@ -198,175 +130,127 @@ function createRunMessage<T>(
   return message;
 }
 
-/** Create worker process with timing logs */
-function createWorkerWithTiming(gcStats: boolean) {
-  const workerStart = getPerfNow();
-  const gcEvents: GcEvent[] = [];
-  const worker = createWorkerProcess(gcStats);
-  const createTime = getPerfNow();
-  if (gcStats && worker.stdout) setupGcCapture(worker, gcEvents);
-  logTiming(
-    `Worker process created in ${getElapsed(workerStart, createTime).toFixed(1)}ms`,
-  );
-  return { worker, createTime, gcEvents };
-}
-
-// Consider: --no-compilation-cache, --max-old-space-size=512, --no-lazy
-// for consistency (less realistic)
-
-/** @return handlers that attach GC stats and heap profile to results */
-function createWorkerHandlers(
-  specName: string,
-  startTime: number,
-  gcEvents: GcEvent[] | undefined,
-  resolve: (results: MeasuredResults[]) => void,
-  reject: (error: Error) => void,
-): WorkerHandlers {
-  return {
-    resolve: (results: MeasuredResults[], heapProfile?: HeapProfile) => {
-      logTiming(
-        `Total worker time for ${specName}: ${getElapsed(startTime).toFixed(1)}ms`,
-      );
-      if (gcEvents?.length) {
-        const gcStats = aggregateGcStats(gcEvents);
-        for (const r of results) r.gcStats = gcStats;
-      }
-      if (heapProfile) for (const r of results) r.heapProfile = heapProfile;
-      resolve(results);
-    },
-    reject,
-  };
-}
-
-/** Setup worker event handlers with cleanup */
-function setupWorkerHandlers(
-  worker: ReturnType<typeof createWorkerProcess>,
-  specName: string,
-  handlers: WorkerHandlers,
-) {
-  const { resolve, reject } = handlers;
-  const cleanup = createCleanup(worker, specName, reject);
-  worker.on(
-    "message",
-    createMessageHandler(specName, cleanup, resolve, reject),
-  );
-  worker.on("error", createErrorHandler(specName, cleanup, reject));
-  worker.on("exit", createExitHandler(specName, cleanup, reject));
-}
-
-/** Send message to worker with timing log */
-function sendWorkerMessage(
-  worker: ReturnType<typeof createWorkerProcess>,
+/** Run a benchmark in an isolated worker process with timeout and GC capture. */
+function runWorkerWithMessage(
+  name: string,
+  options: RunnerOptions,
   message: RunMessage,
-  createTime: number,
-): void {
-  const messageTime = getPerfNow();
-  worker.send(message);
-  logTiming(
-    `Message sent to worker in ${getElapsed(createTime, messageTime).toFixed(1)}ms`,
-  );
+): Promise<MeasuredResults[]> {
+  const startTime = getPerfNow();
+  const collectGcStats = options.gcStats ?? false;
+  logTiming(`Starting worker for ${name}`);
+
+  return new Promise((resolve, reject) => {
+    const gcEvents: GcEvent[] = [];
+    const worker = spawnWorkerProcess(collectGcStats);
+    if (collectGcStats && worker.stdout) setupGcCapture(worker, gcEvents);
+
+    const timeoutId = setTimeout(() => {
+      killWorker();
+      reject(new Error(`Benchmark "${name}" timed out after 60 seconds`));
+    }, 60000);
+
+    function killWorker() {
+      clearTimeout(timeoutId);
+      if (!worker.killed) worker.kill("SIGTERM");
+    }
+
+    worker.on("message", (msg: ResultMessage | ErrorMessage) => {
+      killWorker();
+      if (msg.type === "error") {
+        const error = new Error(`Benchmark "${name}" failed: ${msg.error}`);
+        if (msg.stack) error.stack = msg.stack;
+        return reject(error);
+      }
+      const elapsed = getElapsed(startTime).toFixed(1);
+      logTiming(`Total worker time for ${name}: ${elapsed}ms`);
+      const { results, heapProfile, timeProfile, coverage } = msg;
+      attachProfilingData(
+        results,
+        gcEvents,
+        heapProfile,
+        timeProfile,
+        coverage,
+      );
+      resolve(results);
+    });
+    worker.on("error", (error: Error) => {
+      killWorker();
+      const msg = `Worker process failed for "${name}": ${error.message}`;
+      reject(new Error(msg));
+    });
+    worker.on("exit", (code: number | null) => {
+      if (code !== 0 && code !== null) {
+        killWorker();
+        reject(new Error(`Worker exited with code ${code} for "${name}"`));
+      }
+    });
+
+    worker.send(message);
+  });
 }
 
-/** Create worker process with configuration */
-function createWorkerProcess(gcStats: boolean) {
+/** Run matrix variant in-process (no worker isolation) */
+async function runMatrixVariantDirect(
+  params: RunMatrixVariantParams,
+  name: string,
+): Promise<MeasuredResults[]> {
+  const { runner, options } = params;
+  const { fn } = await resolveVariantFn(params);
+  const benchRunner = await createBenchRunner(runner, options);
+  return benchRunner.runBench({ name, fn }, options);
+}
+
+/** Spawn worker process with V8 flags */
+function spawnWorkerProcess(gcStats: boolean) {
   const workerPath = resolveWorkerPath();
   const execArgv = ["--expose-gc", "--allow-natives-syntax"];
   if (gcStats) execArgv.push("--trace-gc-nvp");
 
+  const env = { ...process.env, NODE_OPTIONS: "" };
+  // silent mode captures stdout so we can parse --trace-gc-nvp output
   return fork(workerPath, [], {
     execArgv,
-    silent: gcStats, // Capture stdout/stderr when collecting GC stats
-    env: {
-      ...process.env,
-      NODE_OPTIONS: "",
-    },
+    silent: gcStats,
+    env,
+    serialization: "advanced",
   });
 }
 
-/** Capture and parse GC lines from stdout (V8's --trace-gc-nvp outputs to stdout) */
+/** Capture and parse GC lines from worker stdout (--trace-gc-nvp). */
 function setupGcCapture(worker: ChildProcess, gcEvents: GcEvent[]): void {
   let buffer = "";
   worker.stdout!.on("data", (data: Buffer) => {
     buffer += data.toString();
     const lines = buffer.split("\n");
-    buffer = lines.pop() || ""; // Keep incomplete line in buffer
+    buffer = lines.pop() || "";
     for (const line of lines) {
       const event = parseGcLine(line);
-      if (event) {
-        gcEvents.push(event);
-      } else if (line.trim()) {
-        // Forward non-GC stdout to console (worker status messages)
-        process.stdout.write(line + "\n");
-      }
+      if (event) gcEvents.push(event);
+      else if (line.trim()) process.stdout.write(line + "\n");
     }
   });
 }
 
-/** Create cleanup for timeout and termination */
-function createCleanup(
-  worker: ReturnType<typeof createWorkerProcess>,
-  specName: string,
-  reject: (error: Error) => void,
-) {
-  const timeoutId = setTimeout(() => {
-    cleanup();
-    reject(new Error(`Benchmark "${specName}" timed out after 60 seconds`));
-  }, 60000);
-  const cleanup = () => {
-    clearTimeout(timeoutId);
-    if (!worker.killed) worker.kill("SIGTERM");
+/** Attach profiling data collected by the worker to each result. */
+function attachProfilingData(
+  results: MeasuredResults[],
+  gcEvents: GcEvent[] | undefined,
+  heapProfile?: HeapProfile,
+  timeProfile?: TimeProfile,
+  coverage?: CoverageData,
+): void {
+  const gcStats = gcEvents?.length ? aggregateGcStats(gcEvents) : undefined;
+  const attach = <K extends keyof MeasuredResults>(
+    key: K,
+    value: MeasuredResults[K] | undefined,
+  ) => {
+    if (value) for (const r of results) r[key] = value;
   };
-  return cleanup;
-}
-
-/** Handle worker messages (results or errors) */
-function createMessageHandler(
-  specName: string,
-  cleanup: () => void,
-  resolve: (results: MeasuredResults[], heapProfile?: HeapProfile) => void,
-  reject: (error: Error) => void,
-) {
-  return (msg: ResultMessage | ErrorMessage) => {
-    cleanup();
-    if (msg.type === "result") {
-      resolve(msg.results, msg.heapProfile);
-    } else if (msg.type === "error") {
-      const error = new Error(`Benchmark "${specName}" failed: ${msg.error}`);
-      if (msg.stack) error.stack = msg.stack;
-      reject(error);
-    }
-  };
-}
-
-/** Handle worker process errors */
-function createErrorHandler(
-  specName: string,
-  cleanup: () => void,
-  reject: (error: Error) => void,
-) {
-  return (error: Error) => {
-    cleanup();
-    reject(
-      new Error(
-        `Worker process failed for benchmark "${specName}": ${error.message}`,
-      ),
-    );
-  };
-}
-
-/** Handle worker process exit */
-function createExitHandler(
-  specName: string,
-  cleanup: () => void,
-  reject: (error: Error) => void,
-) {
-  return (code: number | null, _signal: NodeJS.Signals | null) => {
-    if (code !== 0 && code !== null) {
-      cleanup();
-      const msg = `Worker exited with code ${code} for benchmark "${specName}"`;
-      reject(new Error(msg));
-    }
-  };
+  attach("gcStats", gcStats);
+  attach("heapProfile", heapProfile);
+  attach("timeProfile", timeProfile);
+  attach("coverage", coverage);
 }
 
 /** Resolve WorkerScript path for dev (.ts) or dist (.mjs) */

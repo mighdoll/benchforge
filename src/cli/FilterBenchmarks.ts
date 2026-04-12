@@ -1,6 +1,6 @@
-import type { BenchGroup, BenchSuite } from "../Benchmark.ts";
+import type { BenchSuite } from "../runners/BenchmarkSpec.ts";
 
-/** Filter benchmarks by name pattern */
+/** Filter suite benchmarks by name pattern (substring or regex). */
 export function filterBenchmarks(
   suite: BenchSuite,
   filter?: string,
@@ -20,49 +20,37 @@ export function filterBenchmarks(
           : undefined,
     }))
     .filter(group => !removeEmpty || group.benchmarks.length > 0);
-  validateFilteredSuite(groups, filter);
+  if (groups.every(g => g.benchmarks.length === 0)) {
+    throw new Error(`No benchmarks match filter: "${filter}"`);
+  }
   return { name: suite.name, groups };
 }
 
-/** Create regex from filter (literal unless regex-like) */
+/** Create regex from filter string. Uses literal prefix match unless the string looks like regex. */
 function createFilterRegex(filter: string): RegExp {
+  const isSlashed = filter.startsWith("/") && filter.endsWith("/");
   const looksLikeRegex =
-    (filter.startsWith("/") && filter.endsWith("/")) ||
-    filter.includes("*") ||
-    filter.includes("?") ||
-    filter.includes("[") ||
-    filter.includes("|") ||
+    isSlashed ||
+    /[*?[|]/.test(filter) ||
     filter.startsWith("^") ||
     filter.endsWith("$");
 
-  if (looksLikeRegex) {
-    const pattern =
-      filter.startsWith("/") && filter.endsWith("/")
-        ? filter.slice(1, -1)
-        : filter;
-    try {
-      return new RegExp(pattern, "i");
-    } catch {
-      return new RegExp(escapeRegex(filter), "i");
-    }
-  }
+  if (!looksLikeRegex) return new RegExp("^" + escapeRegex(filter), "i");
 
-  return new RegExp("^" + escapeRegex(filter), "i");
+  const pattern = isSlashed ? filter.slice(1, -1) : filter;
+  try {
+    return new RegExp(pattern, "i");
+  } catch {
+    return new RegExp(escapeRegex(filter), "i");
+  }
 }
 
-/** Strip case suffix like " [large]" from benchmark name for filtering */
+/** Strip case suffix like " [large]" from benchmark name for filtering. */
 function stripCaseSuffix(name: string): string {
   return name.replace(/ \[.*?\]$/, "");
 }
 
-/** Ensure at least one benchmark matches filter */
-function validateFilteredSuite(groups: BenchGroup[], filter?: string): void {
-  if (groups.every(g => g.benchmarks.length === 0)) {
-    throw new Error(`No benchmarks match filter: "${filter}"`);
-  }
-}
-
-/** Escape regex special characters */
+/** Escape special regex characters for literal matching. */
 function escapeRegex(str: string): string {
   return str.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }

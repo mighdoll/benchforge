@@ -1,15 +1,18 @@
 #!/usr/bin/env node
-import type { BenchmarkFunction, BenchmarkSpec } from "../Benchmark.ts";
-import type { HeapProfile } from "../heap-sample/HeapSampler.ts";
-import type { MeasuredResults } from "../MeasuredResults.ts";
-import { variantModuleUrl } from "../matrix/VariantLoader.ts";
+import type { Session } from "node:inspector/promises";
+import type { CoverageData } from "../profiling/node/CoverageTypes.ts";
+import type { HeapProfile } from "../profiling/node/HeapSampler.ts";
+import type { TimeProfile } from "../profiling/node/TimeSampler.ts";
+import type { BenchmarkFunction, BenchmarkSpec } from "./BenchmarkSpec.ts";
+import type { BenchRunner, RunnerOptions } from "./BenchRunner.ts";
+import type { KnownRunner } from "./CreateRunner.ts";
+import type { MeasuredResults } from "./MeasuredResults.ts";
 import {
-  type AdaptiveOptions,
-  createAdaptiveWrapper,
-} from "./AdaptiveWrapper.ts";
-import type { RunnerOptions } from "./BenchRunner.ts";
-import { createRunner, type KnownRunner } from "./CreateRunner.ts";
-import { debugWorkerTiming, getElapsed, getPerfNow } from "./TimingUtils.ts"; // 5 minutes
+  createBenchRunner,
+  importBenchFn,
+  resolveVariantFn,
+} from "./RunnerUtils.ts";
+import { debugWorkerTiming, getElapsed, getPerfNow } from "./TimingUtils.ts";
 
 /** Message sent to worker process to start a benchmark run. */
 export interface RunMessage {
@@ -17,27 +20,35 @@ export interface RunMessage {
   spec: BenchmarkSpec;
   runnerName: KnownRunner;
   options: RunnerOptions;
-  fnCode?: string; // Made optional - either fnCode or modulePath is required
-  modulePath?: string; // Path to module for dynamic import
-  exportName?: string; // Export name from module
-  setupExportName?: string; // Setup function export name - called once, result passed to fn
+  /** Serialized function body (mutually exclusive with modulePath) */
+  fnCode?: string;
+  modulePath?: string;
+  /** Defaults to default export */
+  exportName?: string;
+  /** Called once before benchmarking; result passed as params to fn */
+  setupExportName?: string;
   params?: unknown;
-  // Variant directory mode (BenchMatrix)
-  variantDir?: string; // Directory URL containing variant .ts files
-  variantId?: string; // Variant filename (without .ts)
-  caseData?: unknown; // Data to pass to variant
-  caseId?: string; // Case identifier
-  casesModule?: string; // URL to cases module (exports cases[] and loadCase())
+
+  /** Directory URL containing variant .ts files (BenchMatrix mode) */
+  variantDir?: string;
+  /** Variant filename without .ts extension */
+  variantId?: string;
+  caseData?: unknown;
+  caseId?: string;
+  /** Module URL exporting cases[] and loadCase() */
+  casesModule?: string;
 }
 
-/** Message returned from worker process with benchmark results. */
+/** Benchmark results returned from worker process. */
 export interface ResultMessage {
   type: "result";
   results: MeasuredResults[];
   heapProfile?: HeapProfile;
+  timeProfile?: TimeProfile;
+  coverage?: CoverageData;
 }
 
-/** Message returned from worker process when benchmark fails. */
+/** Error returned from worker process when benchmark fails. */
 export interface ErrorMessage {
   type: "error";
   error: string;
@@ -51,20 +62,25 @@ interface BenchmarkImportResult {
   params: unknown;
 }
 
+/** Profiling state accumulated during worker benchmark execution */
+interface ProfilingState {
+  heapProfile?: HeapProfile;
+  timeProfile?: TimeProfile;
+  coverage?: CoverageData;
+  /** Shared session so TimeSampler doesn't reset coverage counters */
+  profilerSession?: Session;
+}
+
 const workerStartTime = getPerfNow();
 const maxLifetime = 5 * 60 * 1000;
 
-/** Log timing with consistent format */
 const logTiming = debugWorkerTiming ? _logTiming : () => {};
 function _logTiming(operation: string, duration?: number) {
-  if (duration === undefined) {
-    console.log(`[Worker] ${operation}`);
-  } else {
-    console.log(`[Worker] ${operation} ${duration.toFixed(1)}ms`);
-  }
+  const suffix = duration !== undefined ? ` ${duration.toFixed(1)}ms` : "";
+  console.log(`[Worker] ${operation}${suffix}`);
 }
 
-/** Send message and exit with duration log */
+/** Send IPC message to parent then exit the worker process */
 function sendAndExit(msg: ResultMessage | ErrorMessage, exitCode: number) {
   process.send!(msg, undefined, undefined, (err: Error | null): void => {
     if (err) {
@@ -85,7 +101,12 @@ async function resolveBenchmarkFn(
     return importVariantModule(message);
   }
   if (message.modulePath) {
-    return importBenchmarkWithSetup(message);
+    const { modulePath, exportName, setupExportName, params } = message;
+    logTiming(
+      `Importing from ${modulePath}${exportName ? ` (${exportName})` : ""}`,
+    );
+    if (setupExportName) logTiming(`Calling setup: ${setupExportName}`);
+    return importBenchFn(modulePath, exportName, setupExportName, params);
   }
   return { fn: reconstructFunction(message.fnCode!), params: message.params };
 }
@@ -94,56 +115,16 @@ async function resolveBenchmarkFn(
 async function importVariantModule(
   message: RunMessage,
 ): Promise<BenchmarkImportResult> {
-  const { variantDir, variantId, caseId, casesModule } = message;
-  let { caseData } = message;
-  const moduleUrl = variantModuleUrl(variantDir!, variantId!);
+  const { variantDir, variantId } = message;
   logTiming(`Importing variant ${variantId} from ${variantDir}`);
-
-  if (casesModule && caseId) {
-    caseData = (await loadCaseFromModule(casesModule, caseId)).data;
-  }
-
-  const module = await import(moduleUrl);
-  const { setup, run } = module;
-
-  if (typeof run !== "function") {
-    throw new Error(`Variant '${variantId}' must export 'run' function`);
-  }
-
-  // Stateful variant: setup returns state, run receives state
-  if (typeof setup === "function") {
-    logTiming(`Calling setup for ${variantId}`);
-    const state = await setup(caseData);
-    return { fn: () => run(state), params: undefined };
-  }
-
-  // Stateless variant: run receives caseData directly
-  return { fn: () => run(caseData), params: undefined };
+  return resolveVariantFn({
+    ...message,
+    variantDir: variantDir!,
+    variantId: variantId!,
+  });
 }
 
-/** Import benchmark function and optionally run setup */
-async function importBenchmarkWithSetup(
-  message: RunMessage,
-): Promise<BenchmarkImportResult> {
-  const { modulePath, exportName, setupExportName, params } = message;
-  logTiming(
-    `Importing from ${modulePath}${exportName ? ` (${exportName})` : ""}`,
-  );
-  const module = await import(modulePath!);
-
-  const fn = getModuleExport(module, exportName, modulePath!);
-
-  if (setupExportName) {
-    logTiming(`Calling setup: ${setupExportName}`);
-    const setupFn = getModuleExport(module, setupExportName, modulePath!);
-    const setupResult = await setupFn(params);
-    return { fn, params: setupResult };
-  }
-
-  return { fn, params };
-}
-
-/** Reconstruct function from string code */
+/** Eval serialized function body back into a callable */
 function reconstructFunction(fnCode: string): BenchmarkFunction {
   // biome-ignore lint/security/noGlobalEval: Necessary for worker process isolation, code is from trusted source
   const fn = eval(`(${fnCode})`); // eslint-disable-line no-eval
@@ -153,46 +134,75 @@ function reconstructFunction(fnCode: string): BenchmarkFunction {
   return fn;
 }
 
-/** Load case data from a cases module */
-async function loadCaseFromModule(
-  casesModuleUrl: string,
-  caseId: string,
-): Promise<{ data: unknown; metadata?: Record<string, unknown> }> {
-  logTiming(`Loading case '${caseId}' from ${casesModuleUrl}`);
-  const module = await import(casesModuleUrl);
-  if (typeof module.loadCase === "function") {
-    return module.loadCase(caseId);
+/** Run benchmark with optional heap, time, and coverage profiling */
+async function runWithProfiling(
+  message: RunMessage,
+  runner: BenchRunner,
+): Promise<ResultMessage> {
+  const state: ProfilingState = {};
+  const runBench = buildProfilingChain(message, runner, state);
+
+  if (!message.options.callCounts) {
+    const results = await runBench();
+    return { type: "result", results, ...state };
   }
-  return { data: caseId };
+
+  const { withCoverageProfiling } = await import(
+    "../profiling/node/CoverageSampler.ts"
+  );
+  const r = await withCoverageProfiling(async session => {
+    state.profilerSession = session;
+    return runBench();
+  });
+  state.coverage = r.coverage;
+  return { type: "result", results: r.result, ...state };
 }
 
-/** Get named or default export from module */
-function getModuleExport(
-  module: any,
-  exportName: string | undefined,
-  modulePath: string,
-): BenchmarkFunction {
-  const fn = exportName ? module[exportName] : module.default || module;
-  if (typeof fn !== "function") {
-    const name = exportName || "default";
-    throw new Error(`Export '${name}' from ${modulePath} is not a function`);
-  }
-  return fn;
-}
+/** Build nested profiling wrappers: outer heap, inner time */
+function buildProfilingChain(
+  message: RunMessage,
+  runner: BenchRunner,
+  state: ProfilingState,
+): () => Promise<MeasuredResults[]> {
+  const { alloc, profile, profileInterval, allocInterval, allocDepth } =
+    message.options;
 
-/** Create error message from exception */
-function createErrorMessage(error: unknown): ErrorMessage {
-  return {
-    type: "error",
-    error: error instanceof Error ? error.message : String(error),
-    stack: error instanceof Error ? error.stack : undefined,
+  const run = async () => {
+    const { fn, params } = await resolveBenchmarkFn(message);
+    return runner.runBench({ ...message.spec, fn }, message.options, params);
   };
+
+  const runMaybeWithTime = profile
+    ? async () => {
+        const { withTimeProfiling } = await import(
+          "../profiling/node/TimeSampler.ts"
+        );
+        const opts = {
+          interval: profileInterval,
+          session: state.profilerSession,
+        };
+        const r = await withTimeProfiling(opts, run);
+        state.timeProfile = r.profile;
+        return r.result;
+      }
+    : run;
+
+  return alloc
+    ? async () => {
+        const { withHeapSampling } = await import(
+          "../profiling/node/HeapSampler.ts"
+        );
+        const heapOpts = {
+          samplingInterval: allocInterval,
+          stackDepth: allocDepth,
+        };
+        const r = await withHeapSampling(heapOpts, runMaybeWithTime);
+        state.heapProfile = r.profile;
+        return r.result;
+      }
+    : runMaybeWithTime;
 }
 
-/**
- * Worker process for isolated benchmark execution.
- * Uses eval() safely in isolated child process with trusted code.
- */
 process.on("message", async (message: RunMessage) => {
   if (message.type !== "run") return;
 
@@ -200,57 +210,31 @@ process.on("message", async (message: RunMessage) => {
 
   try {
     const start = getPerfNow();
-    const baseRunner = await createRunner(message.runnerName);
-
-    const runner = (message.options as any).adaptive
-      ? createAdaptiveWrapper(baseRunner, message.options as AdaptiveOptions)
-      : baseRunner;
-
+    const runner = await createBenchRunner(message.runnerName, message.options);
     logTiming("Runner created in", getElapsed(start));
 
     const benchStart = getPerfNow();
-
-    // Run with heap sampling if enabled (covers module import + execution)
-    if (message.options.heapSample) {
-      const { withHeapSampling } = await import(
-        "../heap-sample/HeapSampler.ts"
-      );
-      const heapOpts = {
-        samplingInterval: message.options.heapInterval,
-        stackDepth: message.options.heapDepth,
-      };
-      const { result: results, profile: heapProfile } = await withHeapSampling(
-        heapOpts,
-        async () => {
-          const { fn, params } = await resolveBenchmarkFn(message);
-          return runner.runBench(
-            { ...message.spec, fn },
-            message.options,
-            params,
-          );
-        },
-      );
-      logTiming("Benchmark execution took", getElapsed(benchStart));
-      sendAndExit({ type: "result", results, heapProfile }, 0);
-    } else {
-      const { fn, params } = await resolveBenchmarkFn(message);
-      const results = await runner.runBench(
-        { ...message.spec, fn },
-        message.options,
-        params,
-      );
-      logTiming("Benchmark execution took", getElapsed(benchStart));
-      sendAndExit({ type: "result", results }, 0);
-    }
+    const result = await runWithProfiling(message, runner);
+    logTiming("Benchmark execution took", getElapsed(benchStart));
+    sendAndExit(result, 0);
   } catch (error) {
-    sendAndExit(createErrorMessage(error), 1);
+    const err = error instanceof Error ? error : undefined;
+    sendAndExit(
+      {
+        type: "error",
+        error: err?.message ?? String(error),
+        stack: err?.stack,
+      },
+      1,
+    );
   }
 });
 
-// Exit after 5 minutes to prevent zombie processes
+// Prevent zombie processes
 setTimeout(() => {
   console.error("WorkerScript: Maximum lifetime exceeded, exiting");
   process.exit(1);
 }, maxLifetime);
 
+// Prevent stdin from keeping the worker process alive
 process.stdin.pause();

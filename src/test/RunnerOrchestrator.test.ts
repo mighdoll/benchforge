@@ -1,5 +1,5 @@
 import { expect, test } from "vitest";
-import type { BenchmarkSpec } from "../Benchmark.ts";
+import type { BenchmarkSpec } from "../runners/BenchmarkSpec.ts";
 import { runBenchmark } from "../runners/RunnerOrchestrator.ts";
 
 /** lightweight function for testing worker communication */
@@ -9,15 +9,15 @@ function simpleTestFunction(): number {
   return sum;
 }
 
-test("BasicRunner runs benchmark in worker mode", async () => {
+test("TimingRunner runs benchmark in worker mode", async () => {
   const spec: BenchmarkSpec = {
-    name: "basic-worker-test",
+    name: "timing-worker-test",
     fn: simpleTestFunction,
   };
 
   const results = await runBenchmark({
     spec,
-    runner: "basic",
+    runner: "timing",
     options: {
       maxTime: 5,
       maxIterations: 50,
@@ -28,7 +28,7 @@ test("BasicRunner runs benchmark in worker mode", async () => {
   expect(results).toHaveLength(1);
   const result = results[0];
 
-  expect(result.name).toBe("basic-worker-test");
+  expect(result.name).toBe("timing-worker-test");
   expect(result.samples.length).toBeGreaterThan(0);
   expect(result.samples.length).toBeLessThanOrEqual(500);
   expect(result.time.min).toBeGreaterThan(0);
@@ -38,15 +38,15 @@ test("BasicRunner runs benchmark in worker mode", async () => {
   expect(result.time.p99).toBeGreaterThan(0);
 });
 
-test("BasicRunner runs benchmark in non-worker mode", async () => {
+test("TimingRunner runs benchmark in non-worker mode", async () => {
   const spec: BenchmarkSpec = {
-    name: "basic-test",
+    name: "timing-test",
     fn: simpleTestFunction,
   };
 
   const results = await runBenchmark({
     spec,
-    runner: "basic",
+    runner: "timing",
     options: {
       maxTime: 5,
       maxIterations: 50,
@@ -57,12 +57,12 @@ test("BasicRunner runs benchmark in non-worker mode", async () => {
   expect(results).toHaveLength(1);
   const result = results[0];
 
-  expect(result.name).toBe("basic-test");
+  expect(result.name).toBe("timing-test");
   expect(result.samples.length).toBeGreaterThan(0);
   expect(result.time.p50).toBeGreaterThan(0);
 });
 
-test("BasicRunner with parameterized benchmark", async () => {
+test("TimingRunner with parameterized benchmark", async () => {
   const spec: BenchmarkSpec<number> = {
     name: "parameterized-test",
     fn: (n: number) => {
@@ -74,7 +74,7 @@ test("BasicRunner with parameterized benchmark", async () => {
 
   const results = await runBenchmark({
     spec,
-    runner: "basic",
+    runner: "timing",
     options: { maxTime: 5, maxIterations: 20 },
     useWorker: false,
     params: 100,
@@ -94,7 +94,7 @@ test("RunnerOrchestrator propagates errors from worker", async () => {
 
   const promise = runBenchmark({
     spec,
-    runner: "basic",
+    runner: "timing",
     options: { maxTime: 1, maxIterations: 1 },
     useWorker: true,
   });

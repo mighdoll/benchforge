@@ -2,8 +2,8 @@ import { expect, test } from "vitest";
 import {
   browserGcStats,
   parseGcTraceEvents,
-  type TraceEvent,
-} from "../browser/BrowserGcStats.ts";
+} from "../profiling/browser/BrowserGcStats.ts";
+import type { TraceEvent } from "../profiling/browser/ChromeTraceEvent.ts";
 
 test("parseGcTraceEvents parses MinorGC and MajorGC events", () => {
   const events: TraceEvent[] = [
@@ -11,6 +11,7 @@ test("parseGcTraceEvents parses MinorGC and MajorGC events", () => {
       cat: "v8.gc",
       name: "MinorGC",
       ph: "X",
+      ts: 0,
       dur: 500,
       args: { usedHeapSizeBefore: 10000, usedHeapSizeAfter: 8000 },
     },
@@ -18,6 +19,7 @@ test("parseGcTraceEvents parses MinorGC and MajorGC events", () => {
       cat: "v8.gc",
       name: "MajorGC",
       ph: "X",
+      ts: 0,
       dur: 12000,
       args: { usedHeapSizeBefore: 50000, usedHeapSizeAfter: 30000 },
     },
@@ -38,9 +40,9 @@ test("parseGcTraceEvents parses MinorGC and MajorGC events", () => {
 
 test("parseGcTraceEvents ignores non-complete and non-GC events", () => {
   const events: TraceEvent[] = [
-    { cat: "v8.gc", name: "MinorGC", ph: "B", dur: 500 }, // not complete
-    { cat: "v8", name: "V8.Execute", ph: "X", dur: 100 }, // not GC
-    { cat: "v8.gc", name: "MinorGC", ph: "X" }, // valid, missing dur/args
+    { cat: "v8.gc", name: "MinorGC", ph: "B", ts: 0, dur: 500 }, // not complete
+    { cat: "v8", name: "V8.Execute", ph: "X", ts: 0, dur: 100 }, // not GC
+    { cat: "v8.gc", name: "MinorGC", ph: "X", ts: 0 }, // valid, missing dur/args
   ];
   const parsed = parseGcTraceEvents(events);
   expect(parsed).toHaveLength(1);
@@ -53,6 +55,7 @@ test("browserGcStats aggregates trace events into GcStats", () => {
       cat: "v8.gc",
       name: "MinorGC",
       ph: "X",
+      ts: 0,
       dur: 300,
       args: { usedHeapSizeBefore: 5000, usedHeapSizeAfter: 3000 },
     },
@@ -60,6 +63,7 @@ test("browserGcStats aggregates trace events into GcStats", () => {
       cat: "v8.gc",
       name: "MinorGC",
       ph: "X",
+      ts: 0,
       dur: 200,
       args: { usedHeapSizeBefore: 6000, usedHeapSizeAfter: 4000 },
     },
@@ -67,6 +71,7 @@ test("browserGcStats aggregates trace events into GcStats", () => {
       cat: "v8.gc",
       name: "MajorGC",
       ph: "X",
+      ts: 0,
       dur: 8000,
       args: { usedHeapSizeBefore: 40000, usedHeapSizeAfter: 20000 },
     },

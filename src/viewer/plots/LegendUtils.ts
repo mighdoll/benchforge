@@ -1,0 +1,134 @@
+import * as Plot from "@observablehq/plot";
+
+/** Plot data bounds used to position the legend overlay */
+export interface LegendBounds {
+  xMin: number;
+  xMax: number;
+  yMin?: number;
+  yMax: number;
+}
+
+/** A single entry in the plot legend with color, label, and symbol style */
+export interface LegendItem {
+  color: string;
+  label: string;
+  style:
+    | "filled-dot"
+    | "hollow-dot"
+    | "vertical-bar"
+    | "vertical-line"
+    | "rect";
+  strokeDash?: string;
+}
+
+interface LegendPos {
+  legendX: number;
+  y: number;
+  textX: number;
+  xRange: number;
+  yRange: number;
+}
+
+const rectFields = { x1: "x1", x2: "x2", y1: "y1", y2: "y2" } as const;
+
+/** Build complete legend marks array, positioned in the right margin */
+export function buildLegend(bounds: LegendBounds, items: LegendItem[]): any[] {
+  const xRange = Math.max(bounds.xMax - bounds.xMin, bounds.xMax * 0.1 || 1);
+  const yRange = bounds.yMax - (bounds.yMin ?? 0);
+  const legendX = bounds.xMax + xRange * 0.04;
+  const textX = legendX + xRange * 0.03;
+  const itemHeight = yRange * 0.07;
+  const topY = bounds.yMax - yRange * 0.02;
+
+  const pos = (i: number): LegendPos => ({
+    legendX,
+    y: topY - i * itemHeight,
+    textX,
+    xRange,
+    yRange,
+  });
+  return items.flatMap((item, i) => [
+    symbolMark(pos(i), item),
+    textMark(pos(i), item.label),
+  ]);
+}
+
+function symbolMark(pos: LegendPos, item: LegendItem): any {
+  switch (item.style) {
+    case "filled-dot":
+      return dotMark(pos.legendX, pos.y, item.color, true);
+    case "hollow-dot":
+      return dotMark(pos.legendX, pos.y, item.color, false);
+    case "vertical-bar":
+      return verticalBarMark(pos, item.color);
+    case "vertical-line":
+      return verticalLineMark(pos, item.color, item.strokeDash);
+    case "rect":
+      return rectMark(pos, item.color);
+  }
+}
+
+function textMark(pos: LegendPos, label: string): any {
+  return Plot.text([{ x: pos.textX, y: pos.y, text: label }], {
+    x: "x",
+    y: "y",
+    text: "text",
+    fontSize: 11,
+    textAnchor: "start",
+    fill: "#333",
+    clip: false,
+  });
+}
+
+function dotMark(x: number, y: number, color: string, filled: boolean): any {
+  const base = { x: "x", y: "y", r: 4, clip: false };
+  const style = filled
+    ? { ...base, fill: color }
+    : { ...base, stroke: color, fill: "none", strokeWidth: 1.5 };
+  return Plot.dot([{ x, y }], style);
+}
+
+function verticalBarMark(pos: LegendPos, color: string): any {
+  const { legendX, y, xRange, yRange } = pos;
+  const hw = xRange * 0.006;
+  const hh = yRange * 0.025;
+  const data = [{ x1: legendX - hw, x2: legendX + hw, y1: y - hh, y2: y + hh }];
+  return Plot.rect(data, {
+    ...rectFields,
+    fill: color,
+    fillOpacity: 0.6,
+    clip: false,
+  });
+}
+
+function verticalLineMark(
+  pos: LegendPos,
+  color: string,
+  strokeDash?: string,
+): any {
+  const { legendX, y, yRange } = pos;
+  const half = yRange * 0.025;
+  return Plot.ruleX([legendX], {
+    y1: y - half,
+    y2: y + half,
+    stroke: color,
+    strokeWidth: 2,
+    strokeDasharray: strokeDash,
+    clip: false,
+  });
+}
+
+function rectMark(pos: LegendPos, color: string): any {
+  const { legendX, y, xRange, yRange } = pos;
+  const hw = xRange * 0.015;
+  const hh = yRange * 0.02;
+  const data = [{ x1: legendX - hw, x2: legendX + hw, y1: y - hh, y2: y + hh }];
+  return Plot.rect(data, {
+    ...rectFields,
+    fill: color,
+    fillOpacity: 0.3,
+    stroke: color,
+    strokeWidth: 1,
+    clip: false,
+  });
+}

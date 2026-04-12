@@ -1,4 +1,4 @@
-import type { BenchMatrix } from "../BenchMatrix.ts";
+import type { BenchMatrix } from "./BenchMatrix.ts";
 import { loadCasesModule } from "./CaseLoader.ts";
 import { discoverVariants } from "./VariantLoader.ts";
 
@@ -17,11 +17,8 @@ export interface FilteredMatrix<T = unknown> extends BenchMatrix<T> {
 /** Parse filter string: "case/variant", "case/", "/variant", or "case" */
 export function parseMatrixFilter(filter: string): MatrixFilter {
   if (filter.includes("/")) {
-    const [casePart, variantPart] = filter.split("/", 2);
-    return {
-      case: casePart || undefined,
-      variant: variantPart || undefined,
-    };
+    const [casePart, varPart] = filter.split("/", 2);
+    return { case: casePart || undefined, variant: varPart || undefined };
   }
   return { case: filter };
 }
@@ -36,68 +33,73 @@ export async function filterMatrix<T>(
   const caseList = await getFilteredCases(matrix, filter.case);
   const variantList = await getFilteredVariants(matrix, filter.variant);
 
-  const filteredCases =
-    caseList && matrix.filteredCases
-      ? caseList.filter(c => matrix.filteredCases!.includes(c))
-      : (caseList ?? matrix.filteredCases);
-
-  const filteredVariants =
-    variantList && matrix.filteredVariants
-      ? variantList.filter(v => matrix.filteredVariants!.includes(v))
-      : (variantList ?? matrix.filteredVariants);
+  const filteredCases = intersectFilters(caseList, matrix.filteredCases);
+  const filteredVariants = intersectFilters(
+    variantList,
+    matrix.filteredVariants,
+  );
 
   return { ...matrix, filteredCases, filteredVariants };
 }
 
-/** Get case IDs matching filter pattern */
+/** Collect all case IDs from either casesModule or inline cases */
+export async function resolveCaseIds<T>(
+  matrix: BenchMatrix<T>,
+): Promise<string[] | undefined> {
+  if (matrix.casesModule)
+    return (await loadCasesModule(matrix.casesModule)).cases;
+  return matrix.cases;
+}
+
+/** Collect all variant IDs from either inline variants or variantDir */
+export async function resolveVariantIds<T>(
+  matrix: BenchMatrix<T>,
+): Promise<string[]> {
+  if (matrix.variants) return Object.keys(matrix.variants);
+  if (matrix.variantDir) return discoverVariants(matrix.variantDir);
+  throw new Error("BenchMatrix requires 'variants' or 'variantDir'");
+}
+
+/** Return case IDs matching a substring pattern, or all if no pattern */
 async function getFilteredCases<T>(
   matrix: BenchMatrix<T>,
   casePattern?: string,
 ): Promise<string[] | undefined> {
   if (!casePattern) return undefined;
-
-  const caseIds = matrix.casesModule
-    ? (await loadCasesModule(matrix.casesModule)).cases
-    : matrix.cases;
+  const caseIds = await resolveCaseIds(matrix);
   if (!caseIds) return ["default"]; // implicit single case
-
-  const filtered = caseIds.filter(id => matchPattern(id, casePattern));
-  if (filtered.length === 0) {
-    throw new Error(`No cases match filter: "${casePattern}"`);
-  }
-  return filtered;
+  return filterByPattern(caseIds, casePattern, "cases");
 }
 
-/** Get variant IDs matching filter pattern */
+/** Return variant IDs matching a substring pattern, or all if no pattern */
 async function getFilteredVariants<T>(
   matrix: BenchMatrix<T>,
   variantPattern?: string,
 ): Promise<string[] | undefined> {
   if (!variantPattern) return undefined;
-
-  if (matrix.variants) {
-    const ids = Object.keys(matrix.variants).filter(id =>
-      matchPattern(id, variantPattern),
-    );
-    if (ids.length === 0) {
-      throw new Error(`No variants match filter: "${variantPattern}"`);
-    }
-    return ids;
-  }
-
-  if (matrix.variantDir) {
-    const allIds = await discoverVariants(matrix.variantDir);
-    const filtered = allIds.filter(id => matchPattern(id, variantPattern));
-    if (filtered.length === 0) {
-      throw new Error(`No variants match filter: "${variantPattern}"`);
-    }
-    return filtered;
-  }
-
-  throw new Error("BenchMatrix requires 'variants' or 'variantDir'");
+  const allIds = await resolveVariantIds(matrix);
+  return filterByPattern(allIds, variantPattern, "variants");
 }
 
-/** Match id against pattern (case-insensitive substring) */
+/** Intersect two optional filter lists: both present ==> intersection, otherwise the one that exists */
+function intersectFilters(a?: string[], b?: string[]): string[] | undefined {
+  if (a && b) return a.filter(v => b.includes(v));
+  return a ?? b;
+}
+
+/** Filter IDs by substring pattern, throwing if no matches */
+function filterByPattern(
+  ids: string[],
+  pattern: string,
+  label: string,
+): string[] {
+  const filtered = ids.filter(id => matchPattern(id, pattern));
+  if (filtered.length === 0)
+    throw new Error(`No ${label} match filter: "${pattern}"`);
+  return filtered;
+}
+
+/** Case-insensitive substring match */
 function matchPattern(id: string, pattern: string): boolean {
   return id.toLowerCase().includes(pattern.toLowerCase());
 }

@@ -12,15 +12,17 @@ export default defineConfig({
   dts: true,
   sourcemap: true,
   platform: "node",
-  external: [
-    "esbuild",
-    "open",
-    "picocolors",
-    "playwright",
-    "table",
-    "yargs",
-    "yargs/helpers",
-  ],
+  deps: {
+    neverBundle: [
+      "esbuild",
+      "open",
+      "picocolors",
+      "sirv",
+      "table",
+      "yargs",
+      "yargs/helpers",
+    ],
+  },
   checks: { eval: false },
   logLevel: "warn",
 });

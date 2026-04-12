@@ -1,0 +1,131 @@
+import { useState } from "preact/hooks";
+import type { DataProvider } from "../Providers.ts";
+import {
+  activeTabId,
+  defaultTabId,
+  provider,
+  reportData,
+  samplesLoaded,
+  sourceTabs,
+} from "../State.ts";
+import { hasSufficientSamples } from "./SamplesPanel.tsx";
+import { ThemeToggle } from "./ThemeToggle.tsx";
+
+/** Top navigation bar with fixed tabs, dynamic source tabs, theme toggle, and archive download. */
+export function TabBar() {
+  const dataProvider = provider.value!;
+  const { config } = dataProvider;
+  const data = reportData.value;
+  const samplesEnabled = !!data && hasSufficientSamples(data);
+
+  return (
+    <div class="tab-bar">
+      <TabButton tabId="summary" disabled={!config.hasReport}>
+        Summary
+      </TabButton>
+      <TabButton tabId="samples" disabled={!samplesEnabled} onActivate={() => (samplesLoaded.value = true)}>
+        Iterations
+      </TabButton>
+      <TabButton tabId="flamechart" disabled={!config.hasProfile}>
+        Allocation
+      </TabButton>
+      <TabButton tabId="time-flamechart" disabled={!config.hasTimeProfile}>
+        Timing
+      </TabButton>
+
+      {sourceTabs.value.map(st => (
+        <SourceTabBtn key={st.id} tabId={st.id} file={st.file} line={st.line} />
+      ))}
+
+      <div class="tab-spacer" />
+      <ThemeToggle />
+      <ArchiveButton provider={dataProvider} />
+    </div>
+  );
+}
+
+/** Fixed tab button that sets the active tab on click. */
+function TabButton({ tabId, disabled, onActivate, children }: {
+  tabId: string; disabled: boolean; onActivate?: () => void; children: preact.ComponentChildren;
+}) {
+  const active = activeTabId.value === tabId;
+  return (
+    <button
+      class={`tab${active ? " active" : ""}`}
+      data-tab={tabId}
+      id={`tab-${tabId}`}
+      disabled={disabled}
+      onClick={() => {
+        activeTabId.value = tabId;
+        onActivate?.();
+      }}
+    >
+      {children}
+    </button>
+  );
+}
+
+/** Source-file tab with close button; clicking the close span removes the tab instead of activating it. */
+function SourceTabBtn({ tabId, file, line }: { tabId: string; file: string; line: number }) {
+  const active = activeTabId.value === tabId;
+  const shortName = file.split("/").pop() || file;
+  const label = line ? `${shortName}:${line}` : shortName;
+
+  return (
+    <button
+      class={`tab${active ? " active" : ""}`}
+      data-tab={tabId}
+      onClick={(e: MouseEvent) => {
+        if ((e.target as HTMLElement).closest(".tab-close")) {
+          closeSourceTab(tabId);
+          return;
+        }
+        activeTabId.value = tabId;
+      }}
+    >
+      {label}{" "}
+      <span class="tab-close" title="Close">
+        &times;
+      </span>
+    </button>
+  );
+}
+
+/** Remove a source tab and fall back to the best available fixed tab. */
+function closeSourceTab(tabId: string): void {
+  sourceTabs.value = sourceTabs.value.filter(t => t.id !== tabId);
+  if (activeTabId.value === tabId) activeTabId.value = defaultTabId();
+}
+
+/** Download button that bundles all report data into a `.benchforge` archive. */
+function ArchiveButton({ provider: dataProvider }: { provider: DataProvider }) {
+  const [archiving, setArchiving] = useState(false);
+
+  async function downloadArchive(): Promise<void> {
+    setArchiving(true);
+    try {
+      const { blob, filename } = await dataProvider.createArchive();
+      const url = URL.createObjectURL(blob);
+      const link = Object.assign(document.createElement("a"), { href: url, download: filename });
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      console.error("Archive failed:", err);
+    } finally {
+      setArchiving(false);
+    }
+  }
+
+  return (
+    <button
+      class="tab archive-btn"
+      data-action="archive"
+      disabled={archiving}
+      onClick={downloadArchive}
+    >
+      {archiving ? "Archiving\u2026" : "Archive \u2193"}
+    </button>
+  );
+}

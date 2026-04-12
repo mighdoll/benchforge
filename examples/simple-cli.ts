@@ -1,13 +1,5 @@
 import type { BenchGroup, BenchSuite } from "../src/index.ts";
 
-const stringGroup: BenchGroup<void> = {
-  name: "String Operations",
-  benchmarks: [
-    { name: "plus", fn: () => "a" + "b" },
-    { name: "template", fn: () => `a${"b"}` },
-  ],
-};
-
 const sortingGroup: BenchGroup<number[]> = {
   name: "Array Sorting (1000 numbers)",
   setup: () => Array.from({ length: 1000 }, () => Math.random()),
@@ -20,7 +12,7 @@ const sortingGroup: BenchGroup<number[]> = {
 
 const suite: BenchSuite = {
   name: "Performance Tests",
-  groups: [stringGroup, sortingGroup],
+  groups: [sortingGroup],
 };
 
 export default suite;
