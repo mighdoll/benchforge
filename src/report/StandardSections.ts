@@ -2,7 +2,6 @@ import type {
   MeasuredResults,
   OptStatusInfo,
 } from "../runners/MeasuredResults.ts";
-import { isBootstrappable } from "../stats/StatisticalUtils.ts";
 import type { ReportSection } from "./BenchmarkReport.ts";
 import { formatConvergence, timeMs } from "./Formatters.ts";
 import { gcSections } from "./GcSections.ts";
@@ -111,7 +110,7 @@ export function buildTimeSection(stats = "mean,p50,p99"): ReportSection {
       key: s.key,
       title: s.title,
       formatter: timeMs,
-      comparable: isBootstrappable(s.statKind),
+      comparable: true,
       statKind: s.statKind,
     })),
   };

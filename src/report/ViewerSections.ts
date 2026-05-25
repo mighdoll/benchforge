@@ -234,7 +234,18 @@ function buildRow(
     );
     entries.push(baseEntry);
   }
-  return { label: col.title, entries, comparisonCI: cis?.diff };
+  const comparisonCI = cis?.diff ?? simpleDeltaCI(curRaw, baseRaw);
+  return { label: col.title, entries, comparisonCI };
+}
+
+/** @return a CI-less DifferenceCI for non-bootstrappable comparable columns
+ *  (e.g. min/max). Direction is "uncertain" since we have no significance
+ *  test; percent is just the displayed-value ratio. */
+function simpleDeltaCI(curRaw: unknown, baseRaw: unknown): DifferenceCI | undefined {
+  if (typeof curRaw !== "number" || typeof baseRaw !== "number") return undefined;
+  if (baseRaw === 0) return undefined;
+  const percent = ((curRaw - baseRaw) / baseRaw) * 100;
+  return { percent, ci: [percent, percent], direction: "uncertain" };
 }
 
 /** Compute difference CIs with annotation and higher-is-better flip */
