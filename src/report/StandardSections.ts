@@ -84,18 +84,16 @@ export const optSection: ReportSection = {
       key: "tiers",
       title: "tiers",
       formatter: v => (typeof v === "string" ? v : ""),
-      value: (r: MeasuredResults) => {
-        const opt = r.optStatus;
-        return opt ? formatTierSummary(opt) : undefined;
-      },
+      value: (r: MeasuredResults) =>
+        r.optStatus ? formatTierSummary(r.optStatus) : undefined,
     },
     {
       key: "deopt",
       title: "deopt",
       formatter: v => (typeof v === "number" ? String(v) : ""),
       value: (r: MeasuredResults) => {
-        const opt = r.optStatus;
-        return opt && opt.deoptCount > 0 ? opt.deoptCount : undefined;
+        const deoptCount = r.optStatus?.deoptCount;
+        return deoptCount && deoptCount > 0 ? deoptCount : undefined;
       },
     },
   ],
@@ -119,16 +117,16 @@ export function buildTimeSection(stats = "mean,p50,p99"): ReportSection {
 /** Format V8 tier distribution sorted by count (e.g. "turbofan:85% sparkplug:15%"). */
 export function formatTierSummary(
   opt: OptStatusInfo,
-  sep = ":",
-  glue = " ",
+  nameValueSep = ":",
+  entrySep = " ",
 ): string {
   const tiers = Object.entries(opt.byTier);
   const total = tiers.reduce((s, [, t]) => s + t.count, 0);
   const pct = (n: number) => `${((n / total) * 100).toFixed(0)}%`;
   return tiers
     .sort((a, b) => b[1].count - a[1].count)
-    .map(([name, t]) => `${name}${sep}${pct(t.count)}`)
-    .join(glue);
+    .map(([name, t]) => `${name}${nameValueSep}${pct(t.count)}`)
+    .join(entrySep);
 }
 
 /** @return default report sections from CLI flags (GC stats if enabled, plus run count). */
