@@ -3,6 +3,7 @@ import { diffCIs } from "../stats/BootstrapDifference.ts";
 import {
   computeStat,
   type DifferenceCI,
+  isBootstrappable,
   type StatKind,
 } from "../stats/StatisticalUtils.ts";
 
@@ -12,7 +13,9 @@ import type { AnyColumn } from "./text/TableReport.ts";
 export interface ComparisonOptions {
   /** Equivalence margin in percent (0 to disable) */
   equivMargin?: number;
-  /** Disable Tukey trimming of outlier batches */
+  /** Disable Tukey trimming of outlier batches. Trimming compares per-batch
+   *  means and drops slow-side outliers only; fast batches are kept since
+   *  they reflect less environmental noise rather than errors. */
   noBatchTrim?: boolean;
 }
 
@@ -55,11 +58,9 @@ export type ReportColumn = AnyColumn<Record<string, unknown>> & {
 
 export type UnknownRecord = Record<string, unknown>;
 
-/** Compute column values for a section from results + metadata.
- *  statKind columns: computeStat(statSamples, kind), then toDisplay.
- *  value columns: call the accessor directly.
- *  statSamples overrides the sample array used for statKind columns; defaults
- *  to results.samples. Pass trimmed samples here to get trimmed display values. */
+/** Compute column values for a section from results + metadata. Pass
+ *  statSamples to use a trimmed sample array for statKind columns
+ *  (defaults to results.samples). */
 export function computeColumnValues(
   section: ReportSection,
   results: MeasuredResults,
@@ -87,10 +88,10 @@ export function extractSectionValues(
   metadata?: UnknownRecord,
   statSamples?: number[],
 ): UnknownRecord {
-  const entries = sections.flatMap(s =>
-    Object.entries(computeColumnValues(s, measuredResults, metadata, statSamples)),
+  const perSection = sections.map(s =>
+    computeColumnValues(s, measuredResults, metadata, statSamples),
   );
-  return Object.fromEntries(entries);
+  return Object.assign({}, ...perSection);
 }
 
 /** All reports in a group, including the baseline if present */
@@ -112,18 +113,19 @@ export function hasField(
 
 /** @return true if the first comparable column in sections has higherIsBetter set */
 export function isHigherIsBetter(sections: ReportSection[]): boolean {
-  return (
-    sections.flatMap(s => s.columns).find(c => c.comparable)?.higherIsBetter ??
-    false
-  );
+  const cols = sections.flatMap(s => s.columns);
+  return cols.find(c => c.comparable)?.higherIsBetter ?? false;
 }
 
-/** @return the first comparable column with a statKind across all sections */
-export function findPrimaryColumn(
+/** @return the first column eligible to drive the comparison CI (comparable
+ *  with a bootstrappable statKind). Skips min/max so a `--stats max,mean` run
+ *  still gets a CI from mean rather than nothing from max. */
+export function findPrimaryCIColumn(
   sections?: ReportSection[],
 ): ReportColumn | undefined {
-  if (!sections) return undefined;
-  return sections.flatMap(s => s.columns).find(c => c.comparable && c.statKind);
+  return sections
+    ?.flatMap(s => s.columns)
+    .find(c => c.comparable && c.statKind && isBootstrappable(c.statKind));
 }
 
 /** Bootstrap difference CI for a column, using batch structure when available.

@@ -2,7 +2,7 @@ import {
   type ComparisonOptions,
   computeDiffCI,
   extractSectionValues,
-  findPrimaryColumn,
+  findPrimaryCIColumn,
   type ReportSection,
 } from "../report/BenchmarkReport.ts";
 import { truncate } from "../report/Formatters.ts";
@@ -60,7 +60,7 @@ function buildCaseTable(
   const title = formatCaseTitle(results, caseId);
   const sections = options?.sections ?? defaultSections;
   const variantTitle = options?.variantTitle ?? "variant";
-  const primaryCol = findPrimaryColumn(sections);
+  const primaryCol = findPrimaryCIColumn(sections);
 
   const caseResults = collectCaseResults(results, caseId);
   const shared = sharedBaseline(caseResults);

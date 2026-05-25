@@ -29,7 +29,9 @@ import {
 export type BlockDiffOptions = DiffOptions & {
   /** Block boundaries for the second sample array (defaults to blocksA) */
   blocksB?: number[];
-  /** Disable Tukey trimming of outlier batches */
+  /** Disable Tukey trimming of outlier batches. Trimming compares per-batch
+   *  means and drops slow-side outliers only; fast batches are kept since
+   *  they reflect less environmental noise rather than errors. */
   noBatchTrim?: boolean;
 };
 
@@ -176,7 +178,7 @@ export function diffCIs(
 /** @return block bootstrap CI for percentage difference between baseline (a) and current (b).
  *  Tukey-trims outlier batches, then resamples per-block statFn values. Requires 2+ blocks.
  *  Like {@link blockBootstrap}, the per-iteration readout is `mean(per-batch statFn)`,
- *  appropriate for linear statFns (mean) but not for percentiles — use
+ *  appropriate for linear statFns (mean) but not for percentiles; use
  *  {@link blockPoolDifferenceCI} for those. */
 export function blockDifferenceCI(
   a: number[],

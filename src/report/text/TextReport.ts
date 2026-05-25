@@ -1,16 +1,20 @@
+import type { DifferenceCI } from "../../stats/StatisticalUtils.ts";
+import {
+  isBootstrappable,
+  trimOutlierBatches,
+} from "../../stats/StatisticalUtils.ts";
 import {
   type BenchmarkReport,
   type ComparisonOptions,
   computeDiffCI,
   extractSectionValues,
-  findPrimaryColumn,
+  findPrimaryCIColumn,
   isHigherIsBetter,
   type ReportColumn,
   type ReportGroup,
   type ReportSection,
 } from "../BenchmarkReport.ts";
 import { formatDiffWithCI, truncate } from "../Formatters.ts";
-import { trimOutlierBatches } from "../../stats/StatisticalUtils.ts";
 import {
   buildTable,
   type ColumnGroup,
@@ -20,7 +24,7 @@ import {
 /** Options for text report rendering, including baseline comparison settings. */
 export interface TextReportOptions extends ComparisonOptions {}
 
-type Row = Record<string, unknown> & { name: string };
+type Row = Record<string, unknown> & { name: string; diffCI?: DifferenceCI };
 
 /** Build a formatted text table from benchmark groups, with baseline diff columns when present. */
 export function reportResults(
@@ -28,14 +32,14 @@ export function reportResults(
   sections: ReportSection[],
   options?: TextReportOptions,
 ): string {
-  const primary = findPrimaryColumn(sections);
+  const primary = findPrimaryCIColumn(sections);
   const results = groups.map(g =>
     resultGroupValues(g, sections, primary, options),
   );
   const hasBaseline = results.some(g => g.baseline);
   const table = buildTable(sectionColumnGroups(sections, hasBaseline), results);
   const hasSampleCI = results.some(g =>
-    g.results.some(r => r.diffCI && (r.diffCI as any).ciLevel === "sample"),
+    g.results.some(r => r.diffCI?.ciLevel === "sample"),
   );
   if (!hasSampleCI) return table;
   return (
@@ -68,16 +72,18 @@ export function injectDiffColumns(
   const fmt = (v: unknown) => formatDiffWithCI(v, higher);
   const ciCol = { title: "Δ% CI", key: "diffCI" as keyof Row, formatter: fmt };
 
-  let ciAdded = false;
+  const allColumns = groups.flatMap(g => g.columns);
+  const anchor = allColumns.find(c => {
+    const rc = c as ReportColumn;
+    return rc.comparable && rc.statKind && isBootstrappable(rc.statKind);
+  });
+  if (!anchor) return groups;
+
   return groups.map(group => ({
     groupTitle: group.groupTitle,
-    columns: group.columns.flatMap(col => {
-      if ((col as ReportColumn).comparable && !ciAdded) {
-        ciAdded = true;
-        return [col, ciCol];
-      }
-      return [col];
-    }),
+    columns: group.columns.flatMap(col =>
+      col === anchor ? [col, ciCol] : [col],
+    ),
   }));
 }
 
@@ -87,9 +93,7 @@ export function sectionColumnGroups(
   hasBaseline: boolean,
   nameTitle = "name",
 ): ColumnGroup<Row>[] {
-  const nameCol: ColumnGroup<Row> = {
-    columns: [{ key: "name" as keyof Row, title: nameTitle }],
-  };
+  const nameCol = { columns: [{ key: "name" as keyof Row, title: nameTitle }] };
   const groups: ColumnGroup<Row>[] = sections.map(s => ({
     groupTitle: s.title || undefined,
     columns: s.columns.map(c => ({
@@ -111,27 +115,45 @@ function resultGroupValues(
   options?: TextReportOptions,
 ): ResultGroup<Row> {
   const { reports, baseline } = group;
-  const baseM = baseline?.measuredResults;
+  const baseMeasured = baseline?.measuredResults;
   const { statKind } = primary ?? {};
   const noTrim = options?.noBatchTrim;
-  const baseSamples = baseM
-    ? trimOutlierBatches(baseM.samples, baseM.batchOffsets, noTrim).samples
+  const baseSamples = baseMeasured
+    ? trimOutlierBatches(
+        baseMeasured.samples,
+        baseMeasured.batchOffsets,
+        noTrim,
+      ).samples
     : undefined;
   const results = reports.map(r => {
-    const { measuredResults: m, metadata } = r;
+    const { measuredResults, metadata } = r;
     const diffCI = statKind
-      ? computeDiffCI(baseM, m, statKind, options)
+      ? computeDiffCI(baseMeasured, measuredResults, statKind, options)
       : undefined;
-    const curSamples = trimOutlierBatches(m.samples, m.batchOffsets, noTrim).samples;
-    const values = extractSectionValues(m, sections, metadata, curSamples);
+    const curSamples = trimOutlierBatches(
+      measuredResults.samples,
+      measuredResults.batchOffsets,
+      noTrim,
+    ).samples;
+    const values = extractSectionValues(
+      measuredResults,
+      sections,
+      metadata,
+      curSamples,
+    );
     return { name: truncate(r.name), ...values, ...(diffCI && { diffCI }) };
   });
   const baseRow =
     baseline &&
-    baseM &&
+    baseMeasured &&
     ({
       name: truncate(baseline.name),
-      ...extractSectionValues(baseM, sections, baseline.metadata, baseSamples),
+      ...extractSectionValues(
+        baseMeasured,
+        sections,
+        baseline.metadata,
+        baseSamples,
+      ),
     } as Row);
   return { results, baseline: baseRow };
 }

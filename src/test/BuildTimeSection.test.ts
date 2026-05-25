@@ -1,6 +1,9 @@
 import { expect, test } from "vitest";
 import type { BenchmarkReport } from "../report/BenchmarkReport.ts";
-import { computeColumnValues } from "../report/BenchmarkReport.ts";
+import {
+  computeColumnValues,
+  findPrimaryCIColumn,
+} from "../report/BenchmarkReport.ts";
 import { buildTimeSection } from "../report/StandardSections.ts";
 import { reportResults, valuesForReports } from "../report/text/TextReport.ts";
 import type { MeasuredResults } from "../runners/MeasuredResults.ts";
@@ -116,6 +119,41 @@ test("reportResults renders user-chosen columns as table headers", () => {
   const table = reportResults(groups, [buildTimeSection("p70,p95")]);
   expect(table).toContain("p70");
   expect(table).toContain("p95");
+});
+
+test("findPrimaryCIColumn skips non-bootstrappable stats", () => {
+  // max comes first textually but is non-bootstrappable; mean must win.
+  const section = buildTimeSection("max,mean");
+  expect(findPrimaryCIColumn([section])?.key).toBe("mean");
+});
+
+test("findPrimaryCIColumn returns undefined when no stat is bootstrappable", () => {
+  expect(findPrimaryCIColumn([buildTimeSection("max,min")])).toBeUndefined();
+});
+
+test("reportResults with --stats max,mean and baseline shows Δ% next to mean", () => {
+  const groups = [
+    {
+      name: "g",
+      reports: [report("bench", range(100))],
+      baseline: report(
+        "baseline",
+        range(100).map(x => x * 2),
+      ),
+    },
+  ];
+  const table = reportResults(groups, [buildTimeSection("max,mean")]);
+  // CI column header present (not empty/missing).
+  expect(table).toContain("Δ% CI");
+  // Δ% column sits between mean and the next column, not after max.
+  const lines = table.split("\n");
+  const header = lines.find(l => l.includes("max") && l.includes("mean"));
+  expect(header).toBeDefined();
+  const maxIdx = header!.indexOf("max");
+  const meanIdx = header!.indexOf("mean");
+  const ciIdx = header!.indexOf("Δ% CI");
+  expect(ciIdx).toBeGreaterThan(meanIdx);
+  expect(meanIdx).toBeGreaterThan(maxIdx);
 });
 
 test("valuesForReports extracts user-chosen keys", () => {
