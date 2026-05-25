@@ -14,9 +14,20 @@ import type {
   ViewerSection,
 } from "../ReportData.ts";
 import { formatPct } from "../plots/PlotTypes.ts";
-import { activeTabId, provider, reportData } from "../State.ts";
+import { activeTabId, provider, reportData, trimMode } from "../State.ts";
 
 const skipArgs = new Set(["_", "$0", "view", "file"]);
+
+declare const __BENCHFORGE_GIT_HASH__: string;
+declare const __BENCHFORGE_GIT_DIRTY__: boolean;
+declare const __BENCHFORGE_BUILD_DATE__: string;
+
+/** Proportional horizontal offset range for aligning bootstrap CI plots. */
+const maxCIShift = 80;
+
+const directionLabels: Record<string, string> = {
+  faster: "Faster", slower: "Slower", uncertain: "Inconclusive", equivalent: "Equivalent",
+};
 
 /** Main summary view: fetches report data, shows CLI args header and collapsible benchmark groups. */
 export function SummaryPanel() {
@@ -40,33 +51,23 @@ export function SummaryPanel() {
 
   return (
     <>
-      <ReportHeader metadata={data.metadata} />
-      {data.groups.map((group, i) => (
-        <CollapsibleGroup key={i} group={group} />
-      ))}
+      <ReportHeader data={data} />
+      <div class="report-body">
+        {hasRawView(data) && (
+          <div class="report-toolbar">
+            <TrimToggle />
+          </div>
+        )}
+        {data.groups.map((group, i) => (
+          <CollapsibleGroup key={i} group={group} />
+        ))}
+      </div>
     </>
   );
 }
 
-declare const __BENCHFORGE_GIT_HASH__: string;
-declare const __BENCHFORGE_GIT_DIRTY__: boolean;
-declare const __BENCHFORGE_BUILD_DATE__: string;
-
-/** Fallback for dev/unbundled builds where compile-time globals are absent. */
-function safeGlobal<T>(v: T, fallback: T): T {
-  return typeof v !== "undefined" ? v : fallback;
-}
-
-/** Assemble "benchforge <hash> <relative-date>" from compile-time globals. */
-function benchforgeLabel(): string {
-  const hash = safeGlobal(__BENCHFORGE_GIT_HASH__, "dev");
-  const dirty = safeGlobal(__BENCHFORGE_GIT_DIRTY__, false);
-  const date = safeGlobal(__BENCHFORGE_BUILD_DATE__, "");
-  const label = `benchforge ${hash}${dirty ? "*" : ""}`;
-  return date ? `${label} ${formatRelativeTime(date)}` : label;
-}
-
-function ReportHeader({ metadata }: { metadata: ReportData["metadata"] }) {
+function ReportHeader({ data }: { data: ReportData }) {
+  const { metadata } = data;
   const { cliArgs, cliDefaults, currentVersion, baselineVersion } = metadata;
   const versions = [
     currentVersion && `Current: ${formatVersion(currentVersion)}`,
@@ -87,13 +88,40 @@ function ReportHeader({ metadata }: { metadata: ReportData["metadata"] }) {
   );
 }
 
+/** True if any entry in the report carries an alternate (raw) view. */
+function hasRawView(data: ReportData): boolean {
+  return data.groups.some(g =>
+    g.benchmarks.some(b => !!b.rawSections) || !!g.baseline?.rawSections,
+  );
+}
+
+/** Single pill: when active, batches dominated by environmental noise
+ *  (other apps, OS scheduling, thermal throttling) are excluded from stats. */
+function TrimToggle() {
+  const active = trimMode.value === "trim";
+  const tip = active
+    ? "Rejecting batches with likely environmental noise (other apps, OS jitter). Click to include all samples."
+    : "Including all samples. Click to reject batches with likely environmental noise.";
+  return (
+    <button
+      type="button"
+      class={`toggle-pill${active ? " active" : ""}`}
+      title={tip}
+      aria-pressed={active}
+      onClick={() => (trimMode.value = active ? "raw" : "trim")}
+    >
+      Noise rejection
+    </button>
+  );
+}
+
 /** Expandable benchmark group with comparison badge and section panels. */
 function CollapsibleGroup({ group }: { group: BenchmarkGroup }) {
   const [open, setOpen] = useState(true);
   const current = group.benchmarks?.[0];
   if (!current) return <div class="error">No benchmark data for this group</div>;
 
-  const ci = current.comparisonCI;
+  const ci = activeView(current).comparisonCI;
   return (
     <div class="benchmark-group">
       <div class="group-header" onClick={() => setOpen(o => !o)}>
@@ -111,18 +139,103 @@ function CollapsibleGroup({ group }: { group: BenchmarkGroup }) {
   );
 }
 
+/** Format a git version as "hash (relative-date)", with dirty marker. */
+function formatVersion(v: GitVersion): string {
+  if (!v || v.hash === "unknown") return "unknown";
+  const hash = v.dirty ? v.hash + "*" : v.hash;
+  if (!v.date) return hash;
+  return `${hash} (${formatRelativeTime(v.date)})`;
+}
+
+/** Format CLI args for display, filtering out defaults, internal keys, and camelCase aliases. */
+function formatCliArgs(
+  args?: Record<string, unknown>,
+  defaults?: Record<string, unknown>,
+): string {
+  if (!args) return "benchforge";
+  const isDisplayable = (key: string, value: unknown): boolean => {
+    if (skipArgs.has(key) || value === undefined || value === false) return false;
+    if (defaults?.[key] === value) return false;
+    // skip camelCase aliases (yargs generates both kebab-case and camelCase)
+    if (!key.includes("-") && key !== key.toLowerCase()) return false;
+    if (key === "convergence" && !args.adaptive) return false;
+    return true;
+  };
+  const flags = Object.entries(args)
+    .filter(([key, value]) => isDisplayable(key, value))
+    .map(([key, value]) => (value === true ? `--${key}` : `--${key} ${value}`));
+  return ["benchforge", ...flags].join(" ");
+}
+
+/** Assemble "benchforge <hash> <relative-date>" from compile-time globals. */
+function benchforgeLabel(): string {
+  const hash = safeGlobal(__BENCHFORGE_GIT_HASH__, "dev");
+  const dirty = safeGlobal(__BENCHFORGE_GIT_DIRTY__, false);
+  const date = safeGlobal(__BENCHFORGE_BUILD_DATE__, "");
+  const label = `benchforge ${hash}${dirty ? "*" : ""}`;
+  return date ? `${label} ${formatRelativeTime(date)}` : label;
+}
+
+/** Pick the trimmed or raw view of an entry based on the current trimMode. */
+function activeView(entry: BenchmarkEntry): {
+  sections?: ViewerSection[];
+  comparisonCI?: DifferenceCI;
+} {
+  if (trimMode.value === "raw" && entry.rawSections)
+    return { sections: entry.rawSections, comparisonCI: entry.rawComparisonCI };
+  return { sections: entry.sections, comparisonCI: entry.comparisonCI };
+}
+
+function ComparisonBadge({ ci, compact }: { ci: DifferenceCI; compact?: boolean }) {
+  return (
+    <span class="comparison-badge">
+      <span class={`badge badge-${ci.direction}`}>
+        {compact ? formatPct(ci.percent) : directionLabels[ci.direction]}
+      </span>
+      {ci.histogram && <CIPlotMount ci={ci} compact={compact} />}
+    </span>
+  );
+}
+
 function GroupContent({ current }: { current: BenchmarkEntry }) {
   const ref = useRef<HTMLDivElement>(null);
+  const sections = activeView(current).sections;
   useEffect(() => {
     if (ref.current) alignRunColumns(ref.current);
   });
   return (
     <div class="panel-grid" ref={ref}>
-      {current.sections?.map((s, i) => <SectionPanel key={i} section={s} />)}
+      {sections?.map((s, i) => <SectionPanel key={i} section={s} />)}
       <HeapPanel entry={current} />
       <CoveragePanel entry={current} />
     </div>
   );
+}
+
+/** Fallback for dev/unbundled builds where compile-time globals are absent. */
+function safeGlobal<T>(v: T, fallback: T): T {
+  return typeof v !== "undefined" ? v : fallback;
+}
+
+/** Lazy-imports CIPlot and renders a confidence interval chart inline. */
+function CIPlotMount({ ci, compact }: { ci: DifferenceCI; compact?: boolean }) {
+  const ref = useLazyPlot(async () => {
+    const { createCIPlot } = await import("../plots/CIPlot.ts");
+    const equivMargin = (reportData.value?.metadata.cliArgs?.["equiv-margin"] as number) || undefined;
+    const opts = compact ? { width: 200, height: 70, title: "", equivMargin } : { equivMargin };
+    return createCIPlot(ci, opts);
+  }, [ci, compact], "CI plot");
+  return <div class="ci-plot-container" ref={ref} />;
+}
+
+/** Set CSS vars so run-name and run-value columns align across all sections. */
+function alignRunColumns(panel: HTMLElement): void {
+  const maxW = (sel: string) =>
+    Math.max(0, ...[...panel.querySelectorAll<HTMLElement>(sel)].map(el => el.scrollWidth));
+  const maxName = maxW(".run-name");
+  const maxValue = maxW(".run-value");
+  if (maxName) panel.style.setProperty("--run-name-width", `${maxName}px`);
+  if (maxValue) panel.style.setProperty("--run-value-width", `${maxValue}px`);
 }
 
 function SectionPanel({ section }: { section: ViewerSection }) {
@@ -138,70 +251,6 @@ function SectionPanel({ section }: { section: ViewerSection }) {
       <div class="panel-body">
         {section.rows.map((row, i) => <StatRow key={i} row={row} estimateRange={range} />)}
       </div>
-    </div>
-  );
-}
-
-/** Set CSS vars so run-name and run-value columns align across all sections. */
-function alignRunColumns(panel: HTMLElement): void {
-  const maxW = (sel: string) =>
-    Math.max(0, ...[...panel.querySelectorAll<HTMLElement>(sel)].map(el => el.scrollWidth));
-  const maxName = maxW(".run-name");
-  const maxValue = maxW(".run-value");
-  if (maxName) panel.style.setProperty("--run-name-width", `${maxName}px`);
-  if (maxValue) panel.style.setProperty("--run-value-width", `${maxValue}px`);
-}
-
-function StatRow({ row, estimateRange }: { row: ViewerRow; estimateRange?: [number, number] }) {
-  if (row.shared) {
-    return (
-      <div class="stat-row">
-        <div class="row-header">
-          <span class="row-label">{row.label}</span>
-        </div>
-        <div class="run-entry">
-          <span class="run-name" />
-          <span class="run-value">{row.entries[0]?.value}</span>
-        </div>
-      </div>
-    );
-  }
-
-  return (
-    <div class={`stat-row${row.primary ? " primary-row" : ""}`}>
-      <div class="row-header">
-        <span class="row-label">{row.label}</span>
-        {row.comparisonCI && <ComparisonBadge ci={row.comparisonCI} compact />}
-      </div>
-      {row.entries.map((entry, i) => (
-        <RunEntry key={i} entry={entry} estimateRange={estimateRange} />
-      ))}
-    </div>
-  );
-}
-
-/** Proportional horizontal offset range for aligning bootstrap CI plots. */
-const maxCIShift = 80;
-
-function RunEntry({ entry, estimateRange }: { entry: ViewerEntry; estimateRange?: [number, number] }) {
-  const ci = entry.bootstrapCI;
-  const [lo, hi] = estimateRange ?? [0, 0];
-  const shift = ci && hi > lo ? ((ci.estimate - lo) / (hi - lo)) * maxCIShift : undefined;
-  return (
-    <div class="run-entry">
-      <span class="run-name">{entry.runName}</span>
-      {ci
-        ? <BootstrapCIMount ci={ci} label={entry.value} shift={shift} />
-        : <span class="run-value">{entry.value}</span>}
-    </div>
-  );
-}
-
-function SharedStat({ label, value }: { label: string; value: string }) {
-  return (
-    <div class="stat-row shared-row">
-      <span class="row-label">{label}</span>
-      <span class="row-value">{value}</span>
     </div>
   );
 }
@@ -249,30 +298,66 @@ function CoveragePanel({ entry }: { entry: BenchmarkEntry }) {
   );
 }
 
-const directionLabels: Record<string, string> = {
-  faster: "Faster", slower: "Slower", uncertain: "Inconclusive", equivalent: "Equivalent",
-};
+/** Compute min/max bootstrap estimates across a section for proportional positioning */
+function sectionEstimateRange(section: ViewerSection): [number, number] | undefined {
+  const estimates = section.rows
+    .flatMap(row => row.entries)
+    .map(e => e.bootstrapCI?.estimate)
+    .filter((v): v is number => v != null);
+  if (estimates.length < 2) return undefined;
+  const min = Math.min(...estimates), max = Math.max(...estimates);
+  return max > min ? [min, max] : undefined;
+}
 
-function ComparisonBadge({ ci, compact }: { ci: DifferenceCI; compact?: boolean }) {
+function StatRow({ row, estimateRange }: { row: ViewerRow; estimateRange?: [number, number] }) {
+  if (row.shared) {
+    return (
+      <div class="stat-row">
+        <div class="row-header">
+          <span class="row-label">{row.label}</span>
+        </div>
+        <div class="run-entry">
+          <span class="run-name" />
+          <span class="run-value">{row.entries[0]?.value}</span>
+        </div>
+      </div>
+    );
+  }
+
   return (
-    <span class="comparison-badge">
-      <span class={`badge badge-${ci.direction}`}>
-        {compact ? formatPct(ci.percent) : directionLabels[ci.direction]}
-      </span>
-      {ci.histogram && <CIPlotMount ci={ci} compact={compact} />}
-    </span>
+    <div class={`stat-row${row.primary ? " primary-row" : ""}`}>
+      <div class="row-header">
+        <span class="row-label">{row.label}</span>
+        {row.comparisonCI && <ComparisonBadge ci={row.comparisonCI} compact />}
+      </div>
+      {row.entries.map((entry, i) => (
+        <RunEntry key={i} entry={entry} estimateRange={estimateRange} />
+      ))}
+    </div>
   );
 }
 
-/** Lazy-imports CIPlot and renders a confidence interval chart inline. */
-function CIPlotMount({ ci, compact }: { ci: DifferenceCI; compact?: boolean }) {
-  const ref = useLazyPlot(async () => {
-    const { createCIPlot } = await import("../plots/CIPlot.ts");
-    const equivMargin = (reportData.value?.metadata.cliArgs?.["equiv-margin"] as number) || undefined;
-    const opts = compact ? { width: 200, height: 70, title: "", equivMargin } : { equivMargin };
-    return createCIPlot(ci, opts);
-  }, [ci, compact], "CI plot");
-  return <div class="ci-plot-container" ref={ref} />;
+function SharedStat({ label, value }: { label: string; value: string }) {
+  return (
+    <div class="stat-row shared-row">
+      <span class="row-label">{label}</span>
+      <span class="row-value">{value}</span>
+    </div>
+  );
+}
+
+function RunEntry({ entry, estimateRange }: { entry: ViewerEntry; estimateRange?: [number, number] }) {
+  const ci = entry.bootstrapCI;
+  const [lo, hi] = estimateRange ?? [0, 0];
+  const shift = ci && hi > lo ? ((ci.estimate - lo) / (hi - lo)) * maxCIShift : undefined;
+  return (
+    <div class="run-entry">
+      <span class="run-name">{entry.runName}</span>
+      {ci
+        ? <BootstrapCIMount ci={ci} label={entry.value} shift={shift} />
+        : <span class="run-value">{entry.value}</span>}
+    </div>
+  );
 }
 
 /** Lazy-imports CIPlot and renders a bootstrap distribution sparkline inline. */
@@ -290,43 +375,4 @@ function BootstrapCIMount({ ci, label, shift }: {
   }, [ci, label], "Bootstrap CI plot");
   const style = shift != null ? { marginLeft: `${Math.round(shift)}px` } : undefined;
   return <div class="ci-plot-inline" style={style} ref={ref} />;
-}
-
-/** Compute min/max bootstrap estimates across a section for proportional positioning */
-function sectionEstimateRange(section: ViewerSection): [number, number] | undefined {
-  const estimates = section.rows
-    .flatMap(row => row.entries)
-    .map(e => e.bootstrapCI?.estimate)
-    .filter((v): v is number => v != null);
-  if (estimates.length < 2) return undefined;
-  const min = Math.min(...estimates), max = Math.max(...estimates);
-  return max > min ? [min, max] : undefined;
-}
-
-/** Format CLI args for display, filtering out defaults, internal keys, and camelCase aliases. */
-function formatCliArgs(
-  args?: Record<string, unknown>,
-  defaults?: Record<string, unknown>,
-): string {
-  if (!args) return "benchforge";
-  const isDisplayable = (key: string, value: unknown): boolean => {
-    if (skipArgs.has(key) || value === undefined || value === false) return false;
-    if (defaults?.[key] === value) return false;
-    // skip camelCase aliases (yargs generates both kebab-case and camelCase)
-    if (!key.includes("-") && key !== key.toLowerCase()) return false;
-    if (key === "convergence" && !args.adaptive) return false;
-    return true;
-  };
-  const flags = Object.entries(args)
-    .filter(([key, value]) => isDisplayable(key, value))
-    .map(([key, value]) => (value === true ? `--${key}` : `--${key} ${value}`));
-  return ["benchforge", ...flags].join(" ");
-}
-
-/** Format a git version as "hash (relative-date)", with dirty marker. */
-function formatVersion(v: GitVersion): string {
-  if (!v || v.hash === "unknown") return "unknown";
-  const hash = v.dirty ? v.hash + "*" : v.hash;
-  if (!v.date) return hash;
-  return `${hash} (${formatRelativeTime(v.date)})`;
 }

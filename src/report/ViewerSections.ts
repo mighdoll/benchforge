@@ -30,6 +30,16 @@ import {
   type UnknownRecord,
 } from "./BenchmarkReport.ts";
 
+/** Per-section reusable bootstrap results, indexed by stat-column order.
+ *  Supplying cur/base/diff causes buildCIMap to skip the matching bootstrap
+ *  call and reuse the provided result. Used to share computation between
+ *  trim and raw views when trimming is a no-op for a side. */
+export interface SectionCICache {
+  cur?: (BootstrapResult | undefined)[];
+  base?: (BootstrapResult | undefined)[];
+  diff?: (DifferenceCI | undefined)[];
+}
+
 /** Context for building viewer rows within a column group */
 interface RowContext {
   current: MeasuredResults;
@@ -96,27 +106,41 @@ export function annotateCI<T extends Annotatable | undefined>(
 
 /** Build ViewerSections from ReportSections, with bootstrap CIs for comparable
  *  columns. When base.comparison.noBatchTrim is false (default), display values
- *  and bootstrap CIs are computed from samples with slow-outlier batches removed. */
+ *  and bootstrap CIs are computed from samples with slow-outlier batches removed.
+ *  Returns per-section bootstrap caches so a second call (e.g. for the raw view)
+ *  can reuse results when its inputs are identical. Supply reuseCaches to skip
+ *  matching bootstrap work on the second call. */
 export function buildViewerSections(
   sections: ReportSection[],
   base: Omit<RowContext, "curVals" | "baseVals">,
-): ViewerSection[] {
+  reuseCaches?: SectionCICache[],
+): { sections: ViewerSection[]; caches: SectionCICache[] } {
   const { current, baseline, currentMeta, baselineMeta, comparison } = base;
   const noTrim = comparison?.noBatchTrim;
-  const curSamples = trimOutlierBatches(current.samples, current.batchOffsets, noTrim).samples;
-  const baseSamples = baseline
-    ? trimOutlierBatches(baseline.samples, baseline.batchOffsets, noTrim).samples
-    : undefined;
-  return sections.flatMap(section => {
-    const curVals = computeColumnValues(section, current, currentMeta, curSamples);
+  const trimmedSamples = (m: MeasuredResults) =>
+    trimOutlierBatches(m.samples, m.batchOffsets, noTrim).samples;
+  const curSamples = trimmedSamples(current);
+  const baseSamples = baseline ? trimmedSamples(baseline) : undefined;
+  const caches: SectionCICache[] = [];
+  const viewerSections: ViewerSection[] = [];
+  sections.forEach((section, i) => {
+    const curVals = computeColumnValues(
+      section,
+      current,
+      currentMeta,
+      curSamples,
+    );
     const baseVals = baseline
       ? computeColumnValues(section, baseline, baselineMeta, baseSamples)
       : undefined;
     const ctx: RowContext = { ...base, curVals, baseVals };
-    const rows = buildGroupRows(section.columns as ReportColumn[], ctx);
-    if (!rows.length) return [];
-    return [{ title: section.title, rows } satisfies ViewerSection];
+    const cache: SectionCICache = {};
+    const cols = section.columns as ReportColumn[];
+    const rows = buildGroupRows(cols, ctx, reuseCaches?.[i], cache);
+    caches[i] = cache;
+    if (rows.length) viewerSections.push({ title: section.title, rows });
   });
+  return { sections: viewerSections, caches };
 }
 
 function batchCount(m?: MeasuredResults): number {
@@ -137,8 +161,13 @@ function effectiveBatchCount(
 }
 
 /** Build ViewerRow[] for a column group, using shared resampling for statKind columns */
-function buildGroupRows(columns: ReportColumn[], ctx: RowContext): ViewerRow[] {
-  const ciMap = buildCIMap(columns, ctx);
+function buildGroupRows(
+  columns: ReportColumn[],
+  ctx: RowContext,
+  reuse?: SectionCICache,
+  populate?: SectionCICache,
+): ViewerRow[] {
+  const ciMap = buildCIMap(columns, ctx, reuse, populate);
   const rows: ViewerRow[] = [];
   for (const col of columns) {
     const key = (col.key ?? col.title) as string;
@@ -150,10 +179,15 @@ function buildGroupRows(columns: ReportColumn[], ctx: RowContext): ViewerRow[] {
   return rows;
 }
 
-/** Compute batched bootstrap CIs, returning a Map keyed by column key */
+/** Compute batched bootstrap CIs, returning a Map keyed by column key. When
+ *  reuse provides cur/base/diff arrays (aligned to the comparable+bootstrappable
+ *  column order), those entries are taken as-is and the bootstrap is skipped.
+ *  Computed results are written into populate so a caller can reuse them. */
 function buildCIMap(
   columns: ReportColumn[],
   ctx: RowContext,
+  reuse?: SectionCICache,
+  populate?: SectionCICache,
 ): Map<string, ColCIs> {
   const ciCols = columns.filter(
     c => c.comparable && c.statKind && isBootstrappable(c.statKind),
@@ -164,16 +198,24 @@ function buildCIMap(
 
   const curSamples = ctx.current.samples;
   const baseSamples = ctx.baseline?.samples;
-  const bootstrapOpts = { noTrim: ctx.comparison?.noBatchTrim };
+  const opts = { noTrim: ctx.comparison?.noBatchTrim };
+  const computeCIs = (s: number[], offsets?: number[]) =>
+    s.length > 1 ? bootstrapCIs(s, offsets, statKinds, opts) : undefined;
   const curResults =
-    curSamples?.length > 1
-      ? bootstrapCIs(curSamples, ctx.current.batchOffsets, statKinds, bootstrapOpts)
-      : undefined;
+    reuse?.cur ??
+    (curSamples ? computeCIs(curSamples, ctx.current.batchOffsets) : undefined);
   const baseResults =
-    baseSamples?.length && baseSamples.length > 1
-      ? bootstrapCIs(baseSamples, ctx.baseline!.batchOffsets, statKinds, bootstrapOpts)
-      : undefined;
-  const diffResults = buildDiffResults(ciCols, statKinds, ctx);
+    reuse?.base ??
+    (baseSamples
+      ? computeCIs(baseSamples, ctx.baseline!.batchOffsets)
+      : undefined);
+  const diffResults = reuse?.diff ?? buildDiffResults(ciCols, statKinds, ctx);
+
+  if (populate) {
+    populate.cur = curResults;
+    populate.base = baseResults;
+    populate.diff = diffResults;
+  }
 
   for (let i = 0; i < ciCols.length; i++) {
     const key = (ciCols[i].key ?? ciCols[i].title) as string;
@@ -191,7 +233,7 @@ function buildRow(
   col: ReportColumn,
   key: string,
   ctx: RowContext,
-  cis?: ColCIs,
+  colCIs?: ColCIs,
 ): ViewerRow | undefined {
   const curRaw = ctx.curVals[key];
   const baseRaw = ctx.baseVals?.[key];
@@ -218,7 +260,7 @@ function buildRow(
     ctx.current.name,
     format(curRaw),
     col,
-    cis?.cur,
+    colCIs?.cur,
     ctx.current.batchOffsets,
     ctx.currentMeta,
   );
@@ -228,24 +270,14 @@ function buildRow(
       "baseline",
       format(baseRaw),
       col,
-      cis?.base,
+      colCIs?.base,
       ctx.baseline.batchOffsets,
       ctx.baselineMeta,
     );
     entries.push(baseEntry);
   }
-  const comparisonCI = cis?.diff ?? simpleDeltaCI(curRaw, baseRaw);
+  const comparisonCI = colCIs?.diff ?? simpleDeltaCI(curRaw, baseRaw);
   return { label: col.title, entries, comparisonCI };
-}
-
-/** @return a CI-less DifferenceCI for non-bootstrappable comparable columns
- *  (e.g. min/max). Direction is "uncertain" since we have no significance
- *  test; percent is just the displayed-value ratio. */
-function simpleDeltaCI(curRaw: unknown, baseRaw: unknown): DifferenceCI | undefined {
-  if (typeof curRaw !== "number" || typeof baseRaw !== "number") return undefined;
-  if (baseRaw === 0) return undefined;
-  const percent = ((curRaw - baseRaw) / baseRaw) * 100;
-  return { percent, ci: [percent, percent], direction: "uncertain" };
 }
 
 /** Compute difference CIs with annotation and higher-is-better flip */
@@ -294,6 +326,20 @@ function buildEntry(
   if (!result) return { runName, value };
   const bootstrapCI = formatBootstrapCI(col, result, batchOffsets, metadata);
   return { runName, value, bootstrapCI };
+}
+
+/** @return a CI-less DifferenceCI for non-bootstrappable comparable columns
+ *  (e.g. min/max). Direction is "uncertain" since we have no significance
+ *  test; percent is just the displayed-value ratio. */
+function simpleDeltaCI(
+  curRaw: unknown,
+  baseRaw: unknown,
+): DifferenceCI | undefined {
+  if (typeof curRaw !== "number" || typeof baseRaw !== "number")
+    return undefined;
+  if (baseRaw === 0) return undefined;
+  const percent = ((curRaw - baseRaw) / baseRaw) * 100;
+  return { percent, ci: [percent, percent], direction: "uncertain" };
 }
 
 /** Format a BootstrapResult into display-domain BootstrapCIData */

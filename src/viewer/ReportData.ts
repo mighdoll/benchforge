@@ -33,7 +33,10 @@ export interface BenchmarkGroup {
   warnings?: string[];
 }
 
-/** One benchmark's raw data, statistics, and optional comparison results. */
+/** One benchmark's raw data, statistics, and optional comparison results.
+ *  sections / comparisonCI hold the trimmed (slow-outlier-removed) view.
+ *  rawSections / rawComparisonCI hold the untrimmed view, present when
+ *  trimming had any effect (otherwise the two views are identical). */
 export interface BenchmarkEntry {
   name: string;
   samples: number[];
@@ -48,9 +51,11 @@ export interface BenchmarkEntry {
   heapSize?: { min: number; max: number; avg: number };
   totalTime?: number;
   sections?: ViewerSection[];
+  rawSections?: ViewerSection[];
   coverageSummary?: CoverageSummary;
   heapSummary?: HeapSummary;
   comparisonCI?: DifferenceCI;
+  rawComparisonCI?: DifferenceCI;
 }
 
 /** Summary percentile statistics for a benchmark's samples. */
@@ -80,6 +85,7 @@ export interface ViewerRow {
   entries: ViewerEntry[];
   comparisonCI?: DifferenceCI;
   shared?: boolean;
+
   /** First comparable row with a statKind in the section. */
   primary?: boolean;
 }
@@ -96,10 +102,13 @@ export interface BootstrapCIData {
   estimate: number;
   ci: [number, number];
   histogram: HistogramBin[];
+
   /** Formatted CI bounds for display (e.g., ["0.12ms", "0.15ms"]) */
   ciLabels?: [string, string];
+
   /** Block-level (between-run) or sample-level (within-run) resampling */
   ciLevel?: CILevel;
+
   /** false when batch count is too low for reliable CI */
   ciReliable?: boolean;
 }

@@ -39,6 +39,8 @@
 .report-panel .metadata { color: #666; font-size: 12px; }
 .report-panel .benchforge-version { font-size: 10px; color: #999; }
 .report-panel .header-right { text-align: right; }
+.report-panel .report-body { position: relative; }
+.report-panel .report-toolbar { position: absolute; top: 0; right: 0; z-index: 2; }
 .report-panel .version-info { font-size: 12px; color: #666; margin-top: 6px; }
 
 /* --- Group --- */

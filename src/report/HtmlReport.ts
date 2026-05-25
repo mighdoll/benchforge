@@ -8,7 +8,10 @@ import {
 import type { HeapProfile } from "../profiling/node/HeapSampler.ts";
 import { resolveProfile } from "../profiling/node/ResolvedProfile.ts";
 import type { MeasuredResults } from "../runners/MeasuredResults.ts";
-import type { DifferenceCI } from "../stats/StatisticalUtils.ts";
+import {
+  type DifferenceCI,
+  trimOutlierBatches,
+} from "../stats/StatisticalUtils.ts";
 import type {
   BenchmarkEntry,
   BenchmarkGroup,
@@ -37,6 +40,7 @@ import {
   hasLowBatchCount,
   isSingleBatch,
   minBatches,
+  type SectionCICache,
 } from "./ViewerSections.ts";
 
 /** Options for prepareHtmlData: report sections, git versions, and CLI args */
@@ -156,14 +160,16 @@ function prepareBenchmarkData(report: {
   };
 }
 
+/** @return user-facing warning strings about CI reliability, or undefined if none apply */
 function buildWarnings(
   singleBatch: boolean,
   lowBatches: boolean,
 ): string[] | undefined {
   const parts: string[] = [];
-  const singleMsg =
-    "Confidence intervals may be too narrow (single batch). Use --batches for more accurate intervals.";
-  if (singleBatch) parts.push(singleMsg);
+  if (singleBatch)
+    parts.push(
+      "Confidence intervals may be too narrow (single batch). Use --batches for more accurate intervals.",
+    );
   if (lowBatches)
     parts.push(
       `Too few batches for reliable comparison (need ${minBatches}+).`,
@@ -171,25 +177,64 @@ function buildWarnings(
   return parts.length ? parts : undefined;
 }
 
-/** @return a single benchmark entry with sections and comparison CI */
+/** @return a single benchmark entry with both trimmed and raw section views.
+ *  When trimming was a no-op for a side, the raw view reuses the trimmed view's
+ *  per-side bootstrap result for that side. When it was a no-op for both sides,
+ *  the raw view is identical to the trimmed view and is omitted from the
+ *  entry, hiding the toggle in the UI. */
 function prepareReportEntry(
   report: BenchmarkReport,
   ctx: GroupContext,
 ): BenchmarkEntry {
   const m = report.measuredResults;
-  const sectionCtx = {
+  const baseCtx = {
     current: m,
     baseline: ctx.baseM,
     currentMeta: report.metadata,
     baselineMeta: ctx.baseMeta,
-    comparison: ctx.comparison,
   };
-  const sections = ctx.sections
-    ? buildViewerSections(ctx.sections, sectionCtx)
+  const trimmedView = ctx.sections
+    ? buildViewerSections(ctx.sections, {
+        ...baseCtx,
+        comparison: ctx.comparison,
+      })
     : undefined;
-  // Primary CI comes from the first primary row's comparisonCI (avoids duplicate bootstrap)
-  const comparisonCI = findPrimarySectionCI(sections);
-  return { ...prepareBenchmarkData(report), sections, comparisonCI };
+
+  const noTrim = ctx.comparison?.noBatchTrim === true;
+  const trimCount = (mr?: MeasuredResults) =>
+    !mr || noTrim
+      ? 0
+      : trimOutlierBatches(mr.samples, mr.batchOffsets).trimCount;
+  const curTrimCount = trimCount(m);
+  const baseTrimCount = trimCount(ctx.baseM);
+  const anyTrimmed = curTrimCount > 0 || baseTrimCount > 0;
+
+  let rawView:
+    | { sections: ViewerSection[]; caches: SectionCICache[] }
+    | undefined;
+  if (ctx.sections && anyTrimmed) {
+    const reuse: SectionCICache[] | undefined = trimmedView?.caches.map(c => ({
+      cur: curTrimCount === 0 ? c.cur : undefined,
+      base: baseTrimCount === 0 ? c.base : undefined,
+      // diff depends on both sides; only safe to reuse when neither was trimmed
+      diff: undefined,
+    }));
+    const rawCtx = {
+      ...baseCtx,
+      comparison: { ...ctx.comparison, noBatchTrim: true },
+    };
+    rawView = buildViewerSections(ctx.sections, rawCtx, reuse);
+  }
+
+  return {
+    ...prepareBenchmarkData(report),
+    sections: trimmedView?.sections,
+    rawSections: rawView?.sections,
+    comparisonCI: findPrimarySectionCI(trimmedView?.sections),
+    rawComparisonCI: rawView
+      ? findPrimarySectionCI(rawView.sections)
+      : undefined,
+  };
 }
 
 /** Compute heap allocation summary from profile */

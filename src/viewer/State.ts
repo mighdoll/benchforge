@@ -14,6 +14,10 @@ export interface SourceTabState {
 /** User color-scheme preference: follow OS, or force light/dark. */
 export type ThemePreference = "system" | "light" | "dark";
 
+/** Outlier-trim mode: "trim" removes slow-outlier batches from display+CIs;
+ *  "raw" uses every sample. Default is "trim". */
+export type TrimMode = "trim" | "raw";
+
 /** Active data source (server or archive). */
 export const provider = signal<DataProvider | null>(null);
 
@@ -31,6 +35,7 @@ export const urlError = signal<{ url: string; detail: string } | null>(null);
 
 /** Open source-code tabs. */
 export const sourceTabs = signal<SourceTabState[]>([]);
+export const trimMode = signal<TrimMode>("trim");
 
 const cookieTheme = document.cookie.match(/(?:^|; )theme=(light|dark)/);
 
