@@ -5,3 +5,4 @@ dist
 *.tsbuildinfo
 bench-report/
 clank/
+.pnpm-store

@@ -28,7 +28,7 @@
     "src"
   ],
   "scripts": {
-    "build": "tsdown && vite build --config vite.viewer.config.ts",
+    "build": "run-s build:lib build:viewer",
     "build:lib": "tsdown",
     "build:viewer": "vite build --config vite.viewer.config.ts",
     "deploy:viewer": "run-s build:viewer pages:viewer:deploy",
