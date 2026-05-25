@@ -109,11 +109,11 @@ function resultGroupValues(
 ): ResultGroup<Row> {
   const { reports, baseline } = group;
   const baseM = baseline?.measuredResults;
-  const { statKind, higherIsBetter } = primary ?? {};
+  const { statKind } = primary ?? {};
   const results = reports.map(r => {
     const { measuredResults: m, metadata } = r;
     const diffCI = statKind
-      ? computeDiffCI(baseM, m, statKind, options, higherIsBetter)
+      ? computeDiffCI(baseM, m, statKind, options)
       : undefined;
     const values = extractSectionValues(m, sections, metadata);
     return { name: truncate(r.name), ...values, ...(diffCI && { diffCI }) };

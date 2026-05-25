@@ -3,9 +3,7 @@ import { diffCIs } from "../stats/BootstrapDifference.ts";
 import {
   computeStat,
   type DifferenceCI,
-  flipCI,
   type StatKind,
-  swapDirection,
 } from "../stats/StatisticalUtils.ts";
 
 import type { AnyColumn } from "./text/TableReport.ts";
@@ -123,13 +121,14 @@ export function findPrimaryColumn(
   return sections.flatMap(s => s.columns).find(c => c.comparable && c.statKind);
 }
 
-/** Bootstrap difference CI for a column, using batch structure when available */
+/** Bootstrap difference CI for a column, using batch structure when available.
+ *  Always returns the raw (time-domain) CI; display orientation for
+ *  higherIsBetter columns is handled by formatDiffWithCI. */
 export function computeDiffCI(
   baseline: MeasuredResults | undefined,
   current: MeasuredResults,
   statKind: StatKind,
   comparison?: ComparisonOptions,
-  higherIsBetter?: boolean,
 ): DifferenceCI | undefined {
   if (!baseline?.samples?.length || !current.samples?.length) return undefined;
   const { equivMargin, noBatchTrim } = comparison ?? {};
@@ -141,6 +140,5 @@ export function computeDiffCI(
     [statKind],
     { equivMargin, noBatchTrim },
   );
-  if (!rawCIs[0]) return undefined;
-  return higherIsBetter ? swapDirection(flipCI(rawCIs[0])) : rawCIs[0];
+  return rawCIs[0];
 }

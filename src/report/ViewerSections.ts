@@ -11,7 +11,6 @@ import {
   flipCI,
   isBootstrappable,
   type StatKind,
-  swapDirection,
 } from "../stats/StatisticalUtils.ts";
 import type {
   BootstrapCIData,
@@ -232,7 +231,7 @@ function buildDiffResults(
   return rawCIs.map((ci, i) => {
     if (!ci) return undefined;
     const col = cols[i];
-    const adjusted = col.higherIsBetter ? swapDirection(flipCI(ci)) : ci;
+    const adjusted = col.higherIsBetter ? flipCI(ci) : ci;
     return annotateCI(adjusted, col.title, lowBatches);
   });
 }

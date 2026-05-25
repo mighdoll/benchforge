@@ -68,13 +68,11 @@ function buildCaseTable(
     const vals = extractSectionValues(cr.measured, sections, cr.metadata);
     const row: Row = { name: truncate(variant.id, 25), ...vals };
     if (cr.baseline && primaryCol?.statKind) {
-      const { statKind, higherIsBetter } = primaryCol;
       row.diffCI = computeDiffCI(
         cr.baseline,
         cr.measured,
-        statKind,
+        primaryCol.statKind,
         options?.comparison,
-        higherIsBetter,
       );
     }
     const out: Row[] = [row];
