@@ -103,28 +103,60 @@ removed. Only high outliers are trimmed.
 
 ## Block Bootstrap
 
-The target statistic (mean, median, p90, etc.) is computed per batch. Then for
-each of 10,000 bootstrap iterations, the batch statistics are resampled with
-replacement and averaged. The 2.5th and 97.5th percentiles of the 10,000
-averages form the 95% confidence interval.
+Each of 10,000 bootstrap iterations picks a random set of batches from the
+available batches (the same batch may be picked more than once), then
+reduces that set to a single value, the iteration's estimate of the
+statistic. The 2.5th and 97.5th percentiles of those 10,000 values form the
+95% confidence interval.
+
+The random pick is always a whole batch, never an individual sample within
+a batch. Bootstrap relies on its observations being independent of each
+other and drawn from the same distribution. Samples within a batch share
+thermal state, memory layout, and scheduler context, so they aren't
+independent; batches are. Picking whole batches preserves the independence
+bootstrap depends on.
 
 This applies to both single-benchmark CIs and baseline comparisons. For
-comparisons, each iteration resamples both sides independently and computes the
-percentage difference between their averages.
+comparisons, each iteration picks an independent random set of batches for
+the baseline and another for the current run, then computes the percentage
+difference between the two iteration values.
 
-Unlike traditional bootstrap which resamples individual samples, block bootstrap
-resamples at the batch level. When a little noise moves the benchmark results
-differently in different batches, we want to report that by widening the
-confidence interval appropriately.
+Traditional bootstrap picks individual samples at random; block bootstrap
+picks whole batches instead. When a little noise moves the benchmark
+results differently in different batches, we want to report that by
+widening the confidence interval appropriately.
 
-Imagine a background OS task slows several iterations in the batch by 10%. That
-might not be enough to trigger Tukey trimming, but it would increase our batch
-level variance. We want to widen our confidence interval to indicate the
-uncertainty.
+Imagine a background OS task slows several iterations in the batch by 10%.
+That might not be enough to trigger Tukey trimming, but it would increase our
+batch level variance. We want to widen our confidence interval to indicate
+the uncertainty.
 
 If we mixed results across all batches, we'd be overconfident, imagining that
-our iterations are more independent than they actually are. We might erroneously
-report to the user that their code is slower when in fact it was just noise.
+our iterations are more independent than they actually are. We might
+erroneously report to the user that their code is slower when in fact it was
+just noise.
+
+### What each iteration computes
+
+How each iteration reduces its selected batches to a single value depends
+on whether the statistic is linear in the samples:
+
+- **Mean**: each iteration takes `mean(per-batch mean)` over the selected
+  batches. With equal-size batches this equals `mean(pool)` exactly, so the
+  CI it builds is a valid uncertainty estimate for `mean(pool)`.
+
+- **Percentiles (p50, p90, p99, ...)**: `p50(pool)` is our best estimate
+  of the underlying p50, and we want the CI to bound how much that
+  estimate would shift if we'd drawn a different set of batches. So each
+  iteration pools its selected batches' samples and recomputes the
+  percentile on that pool, producing a fresh draw of the same quantity
+  we're estimating. The selection step is unchanged from the mean case;
+  we still pick whole batches at random and the same batch may be picked
+  more than once, with the samples inside a chosen batch traveling
+  together.
+
+`min` and `max` aren't bootstrapped; the displayed value is the
+single observed extreme.
 
 ## Batch Duration
 

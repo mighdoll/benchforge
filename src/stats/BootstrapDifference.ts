@@ -6,6 +6,7 @@ import type {
   StatKind,
 } from "./StatisticalUtils.ts";
 import {
+  allocPoolBuf,
   average,
   bootstrapSamples,
   computeInterval,
@@ -16,6 +17,7 @@ import {
   maxOf,
   minOf,
   percentile,
+  poolResampleStat,
   prepareBlocks,
   quickSelect,
   resampleInto,
@@ -107,7 +109,6 @@ export function multiSampleDifferenceCI(
   const ops = buildDiffOps(stats, subA.length, subB.length);
   const allDiffs = ops.map(() => new Array<number>(resamples));
 
-  // Point estimates from original data
   const baseVals = ops.map(op => op.pointEstimate(a));
   const currVals = ops.map(op => op.pointEstimate(b));
   const observedPcts = ops.map(
@@ -151,30 +152,32 @@ export function diffCIs(
   stats: StatKind[],
   options: BlockDiffOptions = {},
 ): (DifferenceCI | undefined)[] {
-  const bsStats = stats.filter(isBootstrappable);
-  if (bsStats.length === 0) return stats.map(() => undefined);
+  const supportedStats = stats.filter(isBootstrappable);
+  if (supportedStats.length === 0) return stats.map(() => undefined);
 
   const hasBlocks =
     (aOffsets?.length ?? 0) >= 2 && (bOffsets?.length ?? 0) >= 2;
-  const bsResults = hasBlocks
-    ? bsStats.map(s =>
-        blockDifferenceCI(a, aOffsets!, b, statKindToFn(s), {
-          ...options,
-          blocksB: bOffsets!,
-        }),
-      )
-    : multiSampleDifferenceCI(a, b, bsStats, options);
+  const results = hasBlocks
+    ? supportedStats.map(s => {
+        const fn = statKindToFn(s);
+        const diffOpts = { ...options, blocksB: bOffsets! };
+        return s === "mean"
+          ? blockDifferenceCI(a, aOffsets!, b, fn, diffOpts)
+          : blockPoolDifferenceCI(a, aOffsets!, b, fn, diffOpts);
+      })
+    : multiSampleDifferenceCI(a, b, supportedStats, options);
 
-  const results: (DifferenceCI | undefined)[] = new Array(stats.length);
-  let bi = 0;
-  for (let i = 0; i < stats.length; i++) {
-    results[i] = isBootstrappable(stats[i]) ? bsResults[bi++] : undefined;
-  }
-  return results;
+  let resultIdx = 0;
+  return stats.map(s =>
+    isBootstrappable(s) ? results[resultIdx++] : undefined,
+  );
 }
 
 /** @return block bootstrap CI for percentage difference between baseline (a) and current (b).
- *  Tukey-trims outlier batches, then resamples per-block statFn values. Requires 2+ blocks. */
+ *  Tukey-trims outlier batches, then resamples per-block statFn values. Requires 2+ blocks.
+ *  Like {@link blockBootstrap}, the per-iteration readout is `mean(per-batch statFn)`,
+ *  appropriate for linear statFns (mean) but not for percentiles — use
+ *  {@link blockPoolDifferenceCI} for those. */
 export function blockDifferenceCI(
   a: number[],
   blocksA: number[],
@@ -184,10 +187,10 @@ export function blockDifferenceCI(
 ): DifferenceCI {
   const { resamples = bootstrapSamples, confidence: conf = defaultConfidence } =
     options;
-  const bB = options.blocksB ?? blocksA;
+  const blocksB = options.blocksB ?? blocksA;
   const noTrim = options.noBatchTrim;
   const sideA = prepareBlocks(a, blocksA, statFn, noTrim);
-  const sideB = prepareBlocks(b, bB, statFn, noTrim);
+  const sideB = prepareBlocks(b, blocksB, statFn, noTrim);
 
   const baseVal = statFn(sideA.filtered);
   const currVal = statFn(sideB.filtered);
@@ -198,6 +201,47 @@ export function blockDifferenceCI(
   const diffs = Array.from({ length: resamples }, () => {
     const base = drawA();
     return ((drawB() - base) / base) * 100;
+  });
+  const ci = computeInterval(diffs, conf);
+  return {
+    percent: observedPct,
+    ci,
+    direction: classifyDirection(ci, observedPct, options.equivMargin),
+    histogram: binValues(diffs),
+    trimmed: [sideA.trimCount, sideB.trimCount],
+    ciLevel: "block",
+  };
+}
+
+/** @return block bootstrap CI for percentage difference between baseline (a) and
+ *  current (b) for non-linear stats. Each iteration resamples whole batches with
+ *  replacement on both sides, pools each side's samples, and computes
+ *  `((statFn(poolB) - statFn(poolA)) / statFn(poolA)) * 100`. The CI describes
+ *  the same quantity as the displayed point estimate. */
+export function blockPoolDifferenceCI(
+  a: number[],
+  blocksA: number[],
+  b: number[],
+  statFn: (s: number[]) => number,
+  options: BlockDiffOptions = {},
+): DifferenceCI {
+  const { resamples = bootstrapSamples, confidence: conf = defaultConfidence } =
+    options;
+  const blocksB = options.blocksB ?? blocksA;
+  const noTrim = options.noBatchTrim;
+  const sideA = prepareBlocks(a, blocksA, statFn, noTrim);
+  const sideB = prepareBlocks(b, blocksB, statFn, noTrim);
+
+  const baseVal = statFn(sideA.filtered);
+  const currVal = statFn(sideB.filtered);
+  const observedPct = ((currVal - baseVal) / baseVal) * 100;
+
+  const bufA = allocPoolBuf(sideA.keptSplits);
+  const bufB = allocPoolBuf(sideB.keptSplits);
+  const diffs = Array.from({ length: resamples }, () => {
+    const base = poolResampleStat(sideA.keptSplits, bufA, statFn);
+    const curr = poolResampleStat(sideB.keptSplits, bufB, statFn);
+    return ((curr - base) / base) * 100;
   });
   const ci = computeInterval(diffs, conf);
   return {
@@ -250,9 +294,13 @@ function binValues(values: number[], binCount = 30): HistogramBin[] {
 }
 
 /** Build diff operations: mean/min/max first (non-destructive), then percentiles ascending.
- *  Each side (A, B) gets its own quickSelect k values since sample sizes may differ. */
+ *  Each side (A, B) gets its own quickSelect k since sample sizes may differ. */
 function buildDiffOps(stats: StatKind[], nA: number, nB: number): DiffOp[] {
-  const uniform = (order: number, i: number, fn: (s: number[]) => number) => ({
+  const sameBothSides = (
+    order: number,
+    i: number,
+    fn: (s: number[]) => number,
+  ) => ({
     order,
     origIndex: i,
     execIndex: 0,
@@ -261,9 +309,9 @@ function buildDiffOps(stats: StatKind[], nA: number, nB: number): DiffOp[] {
     pointEstimate: fn,
   });
   const entries = stats.map((s, i) => {
-    if (s === "mean") return uniform(-3, i, average);
-    if (s === "min") return uniform(-2, i, minOf);
-    if (s === "max") return uniform(-1, i, maxOf);
+    if (s === "mean") return sameBothSides(-3, i, average);
+    if (s === "min") return sameBothSides(-2, i, minOf);
+    if (s === "max") return sameBothSides(-1, i, maxOf);
     const p = s.percentile;
     const kA = Math.max(0, Math.ceil(nA * p) - 1);
     const kB = Math.max(0, Math.ceil(nB * p) - 1);

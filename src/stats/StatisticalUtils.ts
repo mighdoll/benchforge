@@ -52,6 +52,12 @@ export interface DifferenceCI {
   subsampled?: number;
 }
 
+/** Bootstrap options that also accept batch-trim control. */
+export type BlockBootstrapOptions = BootstrapOptions & {
+  /** Disable Tukey trimming of outlier batches */
+  noTrim?: boolean;
+};
+
 /** Options for bootstrap resampling */
 type BootstrapOptions = {
   /** Number of bootstrap resamples (default: 10000) */
@@ -213,24 +219,25 @@ export function bootstrapCIs(
   samples: number[],
   batchOffsets: number[] | undefined,
   stats: StatKind[],
-  options?: BootstrapOptions,
+  options?: BlockBootstrapOptions,
 ): (BootstrapResult | undefined)[] {
-  const bsStats = stats.filter(isBootstrappable);
-  if (bsStats.length === 0) return stats.map(() => undefined);
+  const supportedStats = stats.filter(isBootstrappable);
+  if (supportedStats.length === 0) return stats.map(() => undefined);
 
   const hasBlocks = (batchOffsets?.length ?? 0) >= 2;
-  const bsResults = hasBlocks
-    ? bsStats.map(s =>
-        blockBootstrap(samples, batchOffsets!, statKindToFn(s), options),
-      )
-    : multiSampleBootstrap(samples, bsStats, options);
+  const results = hasBlocks
+    ? supportedStats.map(s => {
+        const fn = statKindToFn(s);
+        return s === "mean"
+          ? blockBootstrap(samples, batchOffsets!, fn, options)
+          : blockPoolBootstrap(samples, batchOffsets!, fn, options);
+      })
+    : multiSampleBootstrap(samples, supportedStats, options);
 
-  const results: (BootstrapResult | undefined)[] = new Array(stats.length);
-  let bi = 0;
-  for (let i = 0; i < stats.length; i++) {
-    results[i] = isBootstrappable(stats[i]) ? bsResults[bi++] : undefined;
-  }
-  return results;
+  let resultIdx = 0;
+  return stats.map(s =>
+    isBootstrappable(s) ? results[resultIdx++] : undefined,
+  );
 }
 
 /** Convert StatKind to a stat function */
@@ -242,17 +249,21 @@ export function statKindToFn(kind: StatKind): (s: number[]) => number {
   return (s: number[]) => percentile(s, p);
 }
 
-/** Block bootstrap CI: Tukey-trim outlier batches, then resample per-block
- *  statFn values as independent observations. Requires 2+ blocks. */
+/** Block bootstrap CI: optionally Tukey-trim outlier batches, then resample
+ *  per-block statFn values as independent observations. Requires 2+ blocks.
+ *  Per iteration the readout is `mean(per-batch statFn)` — correct for `mean`
+ *  (where `mean(per-batch means) == mean(pool)` for equal-size batches) but
+ *  *not* an estimator of `statFn(pool)` for non-linear statFns. Use
+ *  {@link blockPoolBootstrap} for percentiles. */
 export function blockBootstrap(
   samples: number[],
   blocks: number[],
   statFn: (s: number[]) => number,
-  options: BootstrapOptions = {},
+  options: BlockBootstrapOptions = {},
 ): BootstrapResult {
   const { resamples = bootstrapSamples, confidence: conf = defaultConfidence } =
     options;
-  const side = prepareBlocks(samples, blocks, statFn);
+  const side = prepareBlocks(samples, blocks, statFn, options.noTrim);
   const stats = Array.from({ length: resamples }, () =>
     average(createResample(side.blockVals)),
   );
@@ -262,6 +273,55 @@ export function blockBootstrap(
     samples: stats,
     ciLevel: "block",
   };
+}
+
+/** Block bootstrap CI for non-linear stats: resample whole batches with
+ *  replacement, pool their samples, then apply statFn to the pool. Per
+ *  iteration the readout is `statFn(pool)`, so the CI describes the same
+ *  quantity as the point estimate. Batch-level IID is preserved (samples
+ *  within a chosen batch travel together); only the readout differs from
+ *  {@link blockBootstrap}. Requires 2+ blocks. */
+export function blockPoolBootstrap(
+  samples: number[],
+  blocks: number[],
+  statFn: (s: number[]) => number,
+  options: BlockBootstrapOptions = {},
+): BootstrapResult {
+  const { resamples = bootstrapSamples, confidence: conf = defaultConfidence } =
+    options;
+  const side = prepareBlocks(samples, blocks, statFn, options.noTrim);
+  const buf = allocPoolBuf(side.keptSplits);
+  const stats = Array.from({ length: resamples }, () =>
+    poolResampleStat(side.keptSplits, buf, statFn),
+  );
+  return {
+    estimate: statFn(side.filtered),
+    ci: computeInterval(stats, conf),
+    samples: stats,
+    ciLevel: "block",
+  };
+}
+
+/** Allocate a worst-case buffer for pool-resample draws over `splits`. */
+export function allocPoolBuf(splits: number[][]): number[] {
+  let maxBlock = 0;
+  for (const b of splits) if (b.length > maxBlock) maxBlock = b.length;
+  return new Array<number>(splits.length * maxBlock);
+}
+
+/** One pool-resample draw: pick blocks with replacement, concat into buf, apply statFn. */
+export function poolResampleStat(
+  splits: number[][],
+  buf: number[],
+  statFn: (s: number[]) => number,
+): number {
+  const n = splits.length;
+  let pos = 0;
+  for (let i = 0; i < n; i++) {
+    const block = splits[Math.floor(Math.random() * n)];
+    for (let k = 0; k < block.length; k++) buf[pos++] = block[k];
+  }
+  return statFn(pos === buf.length ? buf : buf.slice(0, pos));
 }
 
 /** @return mean of values */
@@ -364,20 +424,49 @@ export function blockValues(
   return splitByOffsets(samples, offsets).map(fn);
 }
 
-/** Tukey-trim outlier blocks and compute per-block statistic for one side */
+/** Drop samples from batches whose per-batch mean is a slow-side Tukey outlier.
+ *  Pass-through (no copy, trimCount=0) when batches are absent or trimming is off. */
+export function trimOutlierBatches(
+  samples: number[],
+  offsets: number[] | undefined,
+  noTrim?: boolean,
+): { samples: number[]; trimCount: number } {
+  if (noTrim || !offsets || offsets.length < 2) {
+    return { samples, trimCount: 0 };
+  }
+  const splits = splitByOffsets(samples, offsets);
+  const means = splits.map(average);
+  const keep = tukeyKeep(means);
+  if (keep.length === splits.length) return { samples, trimCount: 0 };
+  return {
+    samples: keep.flatMap(i => splits[i]),
+    trimCount: means.length - keep.length,
+  };
+}
+
+/** Tukey-trim outlier blocks and compute per-block statistic for one side.
+ *  keptSplits exposes the per-batch sample arrays of the kept batches so callers
+ *  doing pool-resample bootstrap can reuse the trim work. */
 export function prepareBlocks(
   samples: number[],
   offsets: number[],
   fn: (s: number[]) => number,
   noTrim?: boolean,
-): { blockVals: number[]; filtered: number[]; trimCount: number } {
+): {
+  blockVals: number[];
+  filtered: number[];
+  trimCount: number;
+  keptSplits: number[][];
+} {
   const splits = splitByOffsets(samples, offsets);
   const means = splits.map(average);
   const keep = noTrim ? means.map((_, i) => i) : tukeyKeep(means);
+  const keptSplits = keep.map(i => splits[i]);
   return {
-    blockVals: keep.map(i => fn(splits[i])),
-    filtered: keep.flatMap(i => splits[i]),
+    blockVals: keptSplits.map(fn),
+    filtered: keptSplits.flat(),
     trimCount: means.length - keep.length,
+    keptSplits,
   };
 }
 
@@ -402,18 +491,22 @@ export function computeInterval(
 }
 
 /** Build stat operations in safe order: mean/min/max first (non-destructive),
- *  then percentiles ascending (use quickSelect which mutates buf) */
+ *  then percentiles ascending (quickSelect mutates buf). */
 function buildStatOps(stats: StatKind[], n: number): StatOp[] {
-  const simple = (order: number, i: number, fn: (s: number[]) => number) => ({
+  const nonDestructive = (
+    order: number,
+    i: number,
+    fn: (s: number[]) => number,
+  ) => ({
     order,
     compute: fn,
     pointEstimate: fn,
     origIndex: i,
   });
   const ops = stats.map((s, i): StatOp & { order: number } => {
-    if (s === "mean") return simple(-3, i, average);
-    if (s === "min") return simple(-2, i, minOf);
-    if (s === "max") return simple(-1, i, maxOf);
+    if (s === "mean") return nonDestructive(-3, i, average);
+    if (s === "min") return nonDestructive(-2, i, minOf);
+    if (s === "max") return nonDestructive(-1, i, maxOf);
     const p = s.percentile;
     const k = Math.max(0, Math.ceil(n * p) - 1);
     return {

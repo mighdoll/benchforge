@@ -1,11 +1,14 @@
 import { expect, test } from "vitest";
 import {
   blockDifferenceCI,
+  blockPoolDifferenceCI,
+  diffCIs,
   sampleDifferenceCI,
 } from "../stats/BootstrapDifference.ts";
 import {
   average,
   blockBootstrap,
+  blockPoolBootstrap,
   coefficientOfVariation,
   findOutliers,
   median,
@@ -145,4 +148,68 @@ test("blockDifferenceCI shows uncertainty for noise", () => {
   expect(result.ci[0]).toBeLessThanOrEqual(0);
   expect(result.ci[1]).toBeGreaterThanOrEqual(0);
   expect(result.direction).toBe("uncertain");
+});
+
+/** Build samples where per-batch p50s skew low but the pooled p50 sits high:
+ *  4 batches of 20 samples ~100, 1 batch of 20 samples ~50. Pool p50 ~= 100,
+ *  mean(per-batch p50) ~= 90. */
+function skewedBatchData(): { samples: number[]; blocks: number[] } {
+  const samples: number[] = [];
+  for (let i = 0; i < 4; i++) {
+    for (let k = 0; k < 20; k++) samples.push(100 + (k - 10) * 0.1);
+  }
+  for (let k = 0; k < 20; k++) samples.push(50 + (k - 10) * 0.1);
+  const blocks = [0, 20, 40, 60, 80];
+  return { samples, blocks };
+}
+
+test("blockPoolBootstrap CI brackets the pooled estimate", () => {
+  const { samples, blocks } = skewedBatchData();
+  const result = blockPoolBootstrap(samples, blocks, s => percentile(s, 0.5), {
+    resamples: 1000,
+  });
+  expect(result.ciLevel).toBe("block");
+  // Estimate is p50 of pool: 80 samples near 100, 20 near 50 -> p50 ~= 100
+  expect(result.estimate).toBeCloseTo(100, 0);
+  // CI brackets the estimate (the property blockBootstrap can violate for
+  // non-linear stats on skewed batch distributions).
+  expect(result.ci[0]).toBeLessThanOrEqual(result.estimate);
+  expect(result.ci[1]).toBeGreaterThanOrEqual(result.estimate);
+});
+
+test("blockPoolDifferenceCI detects scaled improvement", () => {
+  const baseline = getSampleData(0, 100);
+  const improved = baseline.map(v => v * 0.8);
+  const blocks = Array.from({ length: 10 }, (_, i) => i * 10);
+  const result = blockPoolDifferenceCI(baseline, blocks, improved, median, {
+    resamples: 1000,
+  });
+  expect(result.ciLevel).toBe("block");
+  expect(result.percent).toBeCloseTo(-20, 0);
+  expect(result.ci[1]).toBeLessThan(0);
+  expect(result.direction).toBe("faster");
+});
+
+test("diffCIs routes percentile through the pool variant", () => {
+  // Uniform data so both stats have a stable direction; the test's purpose is
+  // to verify the dispatch wiring and the bracket invariant on the p50 CI.
+  const base = getSampleData(0, 100);
+  const cur = base.map(v => v * 0.9);
+  const blocks = Array.from({ length: 10 }, (_, i) => i * 10);
+  const [meanCI, p50CI] = diffCIs(
+    base,
+    blocks,
+    cur,
+    blocks,
+    ["mean", { percentile: 0.5 }],
+    { resamples: 1000 },
+  );
+  expect(meanCI?.direction).toBe("faster");
+  expect(p50CI?.direction).toBe("faster");
+  // The p50 path used blockPoolDifferenceCI: its CI brackets the observed
+  // pooled-percentile diff (the property the pool variant fixes).
+  if (p50CI) {
+    expect(p50CI.ci[0]).toBeLessThanOrEqual(p50CI.percent);
+    expect(p50CI.ci[1]).toBeGreaterThanOrEqual(p50CI.percent);
+  }
 });
