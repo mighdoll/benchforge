@@ -12,6 +12,16 @@ export interface BatchProgress {
 
 type SamplesFn = (r: MeasuredResults) => number[] | undefined;
 
+/**
+ * V8's `Array.prototype.flatMap` caps at 2^26 = ~67M elements for fast arrays,
+ * and sort/percentile passes on large merged arrays push Node past its 4GB
+ * heap. Sub-microsecond benchmarks across many batches can produce 100M+
+ * samples and hit either limit. Cap the merged budget and subsample each
+ * batch proportionally if exceeded. The bootstrap CI already subsamples to
+ * 10K, so even an aggressive cap is statistically free.
+ */
+const maxMergedSamples = 5_000_000;
+
 /** Merge multiple batch results, concatenating samples and tracking batch boundaries. */
 export function mergeBatchResults(results: MeasuredResults[]): MeasuredResults {
   if (results.length === 0) {
@@ -19,13 +29,19 @@ export function mergeBatchResults(results: MeasuredResults[]): MeasuredResults {
   }
   if (results.length === 1) return { ...results[0], batchOffsets: [0] };
 
-  const allSamples = results.flatMap(r => r.samples);
+  const totalLen = results.reduce((sum, r) => sum + r.samples.length, 0);
+  const trimmed =
+    totalLen > maxMergedSamples
+      ? results.map(r => subsampleBatch(r, maxMergedSamples / totalLen))
+      : results;
+
+  const allSamples = trimmed.flatMap(r => r.samples);
   const time = computeStats(allSamples);
 
   const batchOffsets: number[] = [];
   const offsetPauses: MeasuredResults["pausePoints"] = [];
   let offset = 0;
-  for (const r of results) {
+  for (const r of trimmed) {
     batchOffsets.push(offset);
     for (const p of r.pausePoints ?? []) {
       const sampleIndex = p.sampleIndex + offset;
@@ -34,22 +50,54 @@ export function mergeBatchResults(results: MeasuredResults[]): MeasuredResults {
     offset += r.samples.length;
   }
 
+  const iterations = results.reduce(
+    (sum, r) => sum + (r.iterations ?? r.samples.length),
+    0,
+  );
+  const batchGcStats = results.flatMap(r =>
+    r.gcStats ? [r.gcStats] : (r.batchGcStats ?? []),
+  );
+
   // last batch as base ==> new MeasuredResults fields get "take last"
   // semantics by default instead of silently disappearing
   return {
-    ...results[results.length - 1],
-    name: results[0].name,
+    ...trimmed[trimmed.length - 1],
+    name: trimmed[0].name,
     samples: allSamples,
-    warmupSamples: concatOptional(results, r => r.warmupSamples),
-    allocationSamples: concatOptional(results, r => r.allocationSamples),
-    heapSamples: concatOptional(results, r => r.heapSamples),
-    optSamples: concatOptional(results, r => r.optSamples),
+    iterations,
+    warmupSamples: concatOptional(trimmed, r => r.warmupSamples),
+    allocationSamples: concatOptional(trimmed, r => r.allocationSamples),
+    heapSamples: concatOptional(trimmed, r => r.heapSamples),
+    optSamples: concatOptional(trimmed, r => r.optSamples),
     time,
-    startTime: results[0].startTime,
+    startTime: trimmed[0].startTime,
     totalTime: results.reduce((sum, r) => sum + (r.totalTime || 0), 0),
     pausePoints: offsetPauses.length ? offsetPauses : undefined,
     batchOffsets,
     gcStats: mergeGcStats(results),
+    batchGcStats: batchGcStats.length ? batchGcStats : undefined,
+  };
+}
+
+/** Systematically subsample parallel sample arrays in a batch by `factor`.
+ *  Stride sampling preserves time-order for time-series plots; the bootstrap
+ *  doesn't care about ordering, so this is unbiased for stats too. */
+function subsampleBatch(r: MeasuredResults, factor: number): MeasuredResults {
+  const stride = (arr: number[]): number[] => {
+    const targetLen = Math.max(1, Math.floor(arr.length * factor));
+    const step = arr.length / targetLen;
+    const out = new Array<number>(targetLen);
+    for (let i = 0; i < targetLen; i++) out[i] = arr[Math.floor(i * step)];
+    return out;
+  };
+  const opt = (arr: number[] | undefined) => (arr ? stride(arr) : undefined);
+  return {
+    ...r,
+    samples: stride(r.samples),
+    heapSamples: opt(r.heapSamples),
+    optSamples: opt(r.optSamples),
+    allocationSamples: opt(r.allocationSamples),
+    pausePoints: undefined, // sample indices no longer match after stride
   };
 }
 

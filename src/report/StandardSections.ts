@@ -19,7 +19,7 @@ export const runsSection: ReportSection = {
       key: "runs",
       title: "runs",
       formatter: v => String(v),
-      value: (r: MeasuredResults) => r.samples.length,
+      value: (r: MeasuredResults) => r.iterations ?? r.samples.length,
     },
   ],
 };

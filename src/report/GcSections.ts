@@ -63,6 +63,19 @@ export const gcStatsSection: ReportSection = {
       value: (r: MeasuredResults) => r.gcStats?.markCompacts,
     },
     {
+      key: "fullPerBatch",
+      title: "full/batch",
+      comparable: true,
+      formatter: v => (typeof v === "string" ? v : ""),
+      value: (r: MeasuredResults) => {
+        const counts = r.batchGcStats?.map(g => g.markCompacts ?? 0);
+        if (!counts?.length) return undefined;
+        const min = Math.min(...counts);
+        const max = Math.max(...counts);
+        return min === max ? `${min}` : `${min}..${max}`;
+      },
+    },
+    {
       key: "promoPercent",
       title: "promo%",
       formatter: percent,

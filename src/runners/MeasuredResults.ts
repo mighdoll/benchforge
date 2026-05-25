@@ -12,6 +12,14 @@ export interface MeasuredResults {
   /** Raw execution time samples for custom statistics */
   samples: number[];
 
+  /** Total iterations actually measured. Equals samples.length unless
+   *  MergeBatches subsampled to fit V8 array limits. */
+  iterations?: number;
+
+  /** Per-batch GC stats, preserved through merge so distribution (min/max/p50
+   *  full GCs per batch) can be inspected. Order matches batchOffsets. */
+  batchGcStats?: GcStats[];
+
   /** Warmup iteration timings (ms) - captured before gc/pause-warmup */
   warmupSamples?: number[];
 
