@@ -56,19 +56,23 @@ export type ReportColumn = AnyColumn<Record<string, unknown>> & {
 export type UnknownRecord = Record<string, unknown>;
 
 /** Compute column values for a section from results + metadata.
- *  statKind columns: computeStat(samples, kind), then toDisplay.
- *  value columns: call the accessor directly. */
+ *  statKind columns: computeStat(statSamples, kind), then toDisplay.
+ *  value columns: call the accessor directly.
+ *  statSamples overrides the sample array used for statKind columns; defaults
+ *  to results.samples. Pass trimmed samples here to get trimmed display values. */
 export function computeColumnValues(
   section: ReportSection,
   results: MeasuredResults,
   metadata?: UnknownRecord,
+  statSamples?: number[],
 ): UnknownRecord {
+  const samples = statSamples ?? results.samples;
   return Object.fromEntries(
     section.columns.map(col => {
       const key = col.key ?? col.title;
       if (col.value) return [key, col.value(results, metadata)];
       if (col.statKind) {
-        const raw = computeStat(results.samples, col.statKind);
+        const raw = computeStat(samples, col.statKind);
         return [key, col.toDisplay ? col.toDisplay(raw, metadata) : raw];
       }
       return [key, undefined];
@@ -81,9 +85,10 @@ export function extractSectionValues(
   measuredResults: MeasuredResults,
   sections: ReadonlyArray<ReportSection>,
   metadata?: UnknownRecord,
+  statSamples?: number[],
 ): UnknownRecord {
   const entries = sections.flatMap(s =>
-    Object.entries(computeColumnValues(s, measuredResults, metadata)),
+    Object.entries(computeColumnValues(s, measuredResults, metadata, statSamples)),
   );
   return Object.fromEntries(entries);
 }

@@ -10,6 +10,7 @@ import { runsSection, timeSection } from "../report/StandardSections.ts";
 import { buildTable } from "../report/text/TableReport.ts";
 import { sectionColumnGroups } from "../report/text/TextReport.ts";
 import type { MeasuredResults } from "../runners/MeasuredResults.ts";
+import { trimOutlierBatches } from "../stats/StatisticalUtils.ts";
 import type {
   CaseResult,
   MatrixResults,
@@ -64,8 +65,17 @@ function buildCaseTable(
   const caseResults = collectCaseResults(results, caseId);
   const shared = sharedBaseline(caseResults);
 
+  const noTrim = options?.comparison?.noBatchTrim;
+  const trimSamples = (m: MeasuredResults) =>
+    trimOutlierBatches(m.samples, m.batchOffsets, noTrim).samples;
+
   const rows: Row[] = caseResults.flatMap(({ variant, cr }) => {
-    const vals = extractSectionValues(cr.measured, sections, cr.metadata);
+    const vals = extractSectionValues(
+      cr.measured,
+      sections,
+      cr.metadata,
+      trimSamples(cr.measured),
+    );
     const row: Row = { name: truncate(variant.id, 25), ...vals };
     if (cr.baseline && primaryCol?.statKind) {
       row.diffCI = computeDiffCI(
@@ -79,7 +89,12 @@ function buildCaseTable(
     if (cr.baseline && !shared)
       out.push({
         name: " \u21B3 baseline",
-        ...extractSectionValues(cr.baseline, sections, cr.metadata),
+        ...extractSectionValues(
+          cr.baseline,
+          sections,
+          cr.metadata,
+          trimSamples(cr.baseline),
+        ),
       });
     return out;
   });
@@ -87,7 +102,7 @@ function buildCaseTable(
   if (shared)
     rows.push({
       name: "=> baseline",
-      ...extractSectionValues(shared, sections),
+      ...extractSectionValues(shared, sections, undefined, trimSamples(shared)),
     });
 
   const hasDiff = rows.some(r => r.diffCI);

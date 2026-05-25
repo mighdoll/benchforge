@@ -5,12 +5,16 @@ import {
   diffCIs,
 } from "../stats/BootstrapDifference.ts";
 import {
+  average,
   type BootstrapResult,
   bootstrapCIs,
   type DifferenceCI,
   flipCI,
   isBootstrappable,
   type StatKind,
+  splitByOffsets,
+  trimOutlierBatches,
+  tukeyKeep,
 } from "../stats/StatisticalUtils.ts";
 import type {
   BootstrapCIData,
@@ -53,13 +57,19 @@ interface Annotatable {
 
 export const minBatches = 20;
 
-/** @return true if comparing with fewer than minBatches on either side */
+/** @return true if comparing with fewer than minBatches on either side.
+ *  Counts post-trim batches when trimming is on (default), so the threshold
+ *  reflects the blocks actually fed to the bootstrap. */
 export function hasLowBatchCount(
   baseline: MeasuredResults | undefined,
   current: MeasuredResults | undefined,
+  noTrim?: boolean,
 ): boolean {
   if (!baseline) return false;
-  return batchCount(baseline) < minBatches || batchCount(current) < minBatches;
+  return (
+    effectiveBatchCount(baseline, noTrim) < minBatches ||
+    effectiveBatchCount(current, noTrim) < minBatches
+  );
 }
 
 /** @return true if either side has no real batch structure */
@@ -84,16 +94,23 @@ export function annotateCI<T extends Annotatable | undefined>(
   return ci;
 }
 
-/** Build ViewerSections from ReportSections, with bootstrap CIs for comparable columns */
+/** Build ViewerSections from ReportSections, with bootstrap CIs for comparable
+ *  columns. When base.comparison.noBatchTrim is false (default), display values
+ *  and bootstrap CIs are computed from samples with slow-outlier batches removed. */
 export function buildViewerSections(
   sections: ReportSection[],
   base: Omit<RowContext, "curVals" | "baseVals">,
 ): ViewerSection[] {
-  const { current, baseline, currentMeta, baselineMeta } = base;
+  const { current, baseline, currentMeta, baselineMeta, comparison } = base;
+  const noTrim = comparison?.noBatchTrim;
+  const curSamples = trimOutlierBatches(current.samples, current.batchOffsets, noTrim).samples;
+  const baseSamples = baseline
+    ? trimOutlierBatches(baseline.samples, baseline.batchOffsets, noTrim).samples
+    : undefined;
   return sections.flatMap(section => {
-    const curVals = computeColumnValues(section, current, currentMeta);
+    const curVals = computeColumnValues(section, current, currentMeta, curSamples);
     const baseVals = baseline
-      ? computeColumnValues(section, baseline, baselineMeta)
+      ? computeColumnValues(section, baseline, baselineMeta, baseSamples)
       : undefined;
     const ctx: RowContext = { ...base, curVals, baseVals };
     const rows = buildGroupRows(section.columns as ReportColumn[], ctx);
@@ -104,6 +121,19 @@ export function buildViewerSections(
 
 function batchCount(m?: MeasuredResults): number {
   return m?.batchOffsets?.length ?? 0;
+}
+
+/** @return number of batches that survive Tukey trimming (or raw count if
+ *  trimming is off / there are too few batches to split). */
+function effectiveBatchCount(
+  m: MeasuredResults | undefined,
+  noTrim?: boolean,
+): number {
+  const offsets = m?.batchOffsets;
+  if (!m || !offsets || offsets.length < 2) return offsets?.length ?? 0;
+  if (noTrim) return offsets.length;
+  const means = splitByOffsets(m.samples, offsets).map(average);
+  return tukeyKeep(means).length;
 }
 
 /** Build ViewerRow[] for a column group, using shared resampling for statKind columns */
@@ -134,13 +164,14 @@ function buildCIMap(
 
   const curSamples = ctx.current.samples;
   const baseSamples = ctx.baseline?.samples;
+  const bootstrapOpts = { noTrim: ctx.comparison?.noBatchTrim };
   const curResults =
     curSamples?.length > 1
-      ? bootstrapCIs(curSamples, ctx.current.batchOffsets, statKinds)
+      ? bootstrapCIs(curSamples, ctx.current.batchOffsets, statKinds, bootstrapOpts)
       : undefined;
   const baseResults =
     baseSamples?.length && baseSamples.length > 1
-      ? bootstrapCIs(baseSamples, ctx.baseline!.batchOffsets, statKinds)
+      ? bootstrapCIs(baseSamples, ctx.baseline!.batchOffsets, statKinds, bootstrapOpts)
       : undefined;
   const diffResults = buildDiffResults(ciCols, statKinds, ctx);
 
@@ -227,7 +258,11 @@ function buildDiffResults(
     stats,
     opts,
   );
-  const lowBatches = hasLowBatchCount(baseline, current);
+  const lowBatches = hasLowBatchCount(
+    baseline,
+    current,
+    comparison?.noBatchTrim,
+  );
   return rawCIs.map((ci, i) => {
     if (!ci) return undefined;
     const col = cols[i];

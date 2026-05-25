@@ -113,7 +113,7 @@ function prepareGroupData(
     : undefined;
   const curM = group.reports[0]?.measuredResults;
   const singleBatch = isSingleBatch(baseM, curM);
-  const lowBatches = hasLowBatchCount(baseM, curM);
+  const lowBatches = hasLowBatchCount(baseM, curM, comparison?.noBatchTrim);
   const baseMeta = base?.metadata;
   const ctx: GroupContext = {
     baseM,

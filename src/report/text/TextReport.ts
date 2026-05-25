@@ -10,6 +10,7 @@ import {
   type ReportSection,
 } from "../BenchmarkReport.ts";
 import { formatDiffWithCI, truncate } from "../Formatters.ts";
+import { trimOutlierBatches } from "../../stats/StatisticalUtils.ts";
 import {
   buildTable,
   type ColumnGroup,
@@ -100,7 +101,9 @@ export function sectionColumnGroups(
   return [nameCol, ...cols];
 }
 
-/** Extract section stats and bootstrap CI diffs for all reports in a group. */
+/** Extract section stats and bootstrap CI diffs for all reports in a group.
+ *  Display values come from the same sample set used by the comparison CI:
+ *  Tukey-trimmed when comparison trimming is on (default), raw otherwise. */
 function resultGroupValues(
   group: ReportGroup,
   sections: ReportSection[],
@@ -110,14 +113,25 @@ function resultGroupValues(
   const { reports, baseline } = group;
   const baseM = baseline?.measuredResults;
   const { statKind } = primary ?? {};
+  const noTrim = options?.noBatchTrim;
+  const baseSamples = baseM
+    ? trimOutlierBatches(baseM.samples, baseM.batchOffsets, noTrim).samples
+    : undefined;
   const results = reports.map(r => {
     const { measuredResults: m, metadata } = r;
     const diffCI = statKind
       ? computeDiffCI(baseM, m, statKind, options)
       : undefined;
-    const values = extractSectionValues(m, sections, metadata);
+    const curSamples = trimOutlierBatches(m.samples, m.batchOffsets, noTrim).samples;
+    const values = extractSectionValues(m, sections, metadata, curSamples);
     return { name: truncate(r.name), ...values, ...(diffCI && { diffCI }) };
   });
-  const baseRow = baseline && valuesForReports([baseline], sections)[0];
+  const baseRow =
+    baseline &&
+    baseM &&
+    ({
+      name: truncate(baseline.name),
+      ...extractSectionValues(baseM, sections, baseline.metadata, baseSamples),
+    } as Row);
   return { results, baseline: baseRow };
 }
