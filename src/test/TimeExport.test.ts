@@ -81,7 +81,7 @@ test("deduplicates shared frames", () => {
   const profile = mockProfile();
   const file = timeProfileToSpeedscope("test", profile);
 
-  // "main" and "compute" — only 2 unique frames
+  // "main" and "compute" (only 2 unique frames)
   expect(file.shared.frames).toHaveLength(2);
 });
 

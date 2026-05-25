@@ -42,8 +42,8 @@ benchforge sorting.ts --gc-stats
 ## Custom Metrics
 
 The built-in report columns (mean, p50, p99, runs, gc, ...) cover typical timing
-needs. For throughput metrics or domain-specific counts — "lines per second",
-"tokens parsed", "cost per request" — define a `ReportSection` and hand it to
+needs. For throughput metrics or domain-specific counts ("lines per second",
+"tokens parsed", "cost per request"), define a `ReportSection` and hand it to
 `benchExports`.
 
 A `ReportSection` is a plain object with a `title` and an array of `columns`.
@@ -104,7 +104,7 @@ await benchExports(suite, parseBenchArgs(), {
 });
 ```
 
-When `sections` is passed, it **replaces** the CLI-derived defaults — include
+When `sections` is passed, it **replaces** the CLI-derived defaults; include
 `timeSection`, `runsSection`, or `gcSections(args)` explicitly if you still want
 them. Built-in sections you can compose with your own: `timeSection`,
 `runsSection`, `totalTimeSection`, `adaptiveSections`, `optSection`, `gcSection`,
@@ -113,16 +113,16 @@ list).
 
 **Column options that matter for comparisons:**
 
-- `comparable` — adds a `Δ%` column after this one when a baseline is present.
-- `higherIsBetter` — for throughput metrics; flips the sign so a 2× faster
+- `comparable`: adds a `Δ%` column after this one when a baseline is present.
+- `higherIsBetter`: for throughput metrics; flips the sign so a 2x faster
   variant shows `+100%` instead of `-50%`.
-- `statKind` — which statistic to compute from raw timing samples (`"mean"`,
+- `statKind`: which statistic to compute from raw timing samples (`"mean"`,
   `"min"`, `"max"`, or `{ percentile: 0.5 }`). The bootstrap CI runs on these.
-- `toDisplay` — converts a timing-domain value to the **display domain** (ms →
+- `toDisplay`: converts a timing-domain value to the **display domain** (ms ==>
   lines/sec, etc.). Used only for rendering point estimates and CI bounds, not
   for the bootstrap itself. This split is what lets benchforge compute a
   statistically valid CI on ms samples while showing the user lines/sec.
-- `value` — accessor for non-sample data (metadata fields, run count, etc.).
+- `value`: accessor for non-sample data (metadata fields, run count, etc.).
   Columns with `value` don't participate in bootstrap.
 
 Matrix suites accept the same `sections` option via `matrixBenchExports` or

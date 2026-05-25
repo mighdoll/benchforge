@@ -78,9 +78,9 @@ test("annotateFramesWithCounts falls back to name-only for frames without file",
   const result = buildCoverageMap(coverage, { "file:///test.js": source });
 
   const frames = [
-    { name: "foo" }, // no file — should match by name
+    { name: "foo" }, // no file; should match by name
     { name: "bar" },
-    { name: "(anonymous)" }, // anonymous — should not match by name
+    { name: "(anonymous)" }, // anonymous; should not match by name
   ];
 
   annotateFramesWithCounts(frames, result);

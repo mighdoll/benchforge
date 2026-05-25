@@ -25,7 +25,7 @@ export function integer(x: unknown): string | null {
   return new Intl.NumberFormat("en-US").format(Math.round(x));
 }
 
-/** Format fraction as percentage (0.473 → 47.3%) */
+/** Format fraction as percentage (0.473 ==> 47.3%) */
 export function percent(fraction: unknown, precision = 1): string | null {
   if (typeof fraction !== "number") return null;
   return `${Math.abs(fraction * 100).toFixed(precision)}%`;

@@ -16,7 +16,7 @@ const casesVariantDirUrl = `${casesFixturesUrl}/variants/`;
 const variantsDirUrl = `file://${import.meta.dirname}/fixtures/variants/`;
 const baselineDirUrl = `file://${import.meta.dirname}/fixtures/baseline/`;
 
-/** Skip V8 settle time and cap maxTime — tests verify correctness, not perf. */
+/** Skip V8 settle time and cap maxTime; tests verify correctness, not perf. */
 const fast = { maxTime: 100 } as const;
 
 test("inline variants, no cases", async () => {

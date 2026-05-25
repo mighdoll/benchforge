@@ -1,4 +1,4 @@
-/* Report panel — benchmark results rendered by SummaryPanel */
+/* Report panel: benchmark results rendered by SummaryPanel */
 
 .report-panel {
   position: absolute;
@@ -338,7 +338,7 @@
   font-size: 13px;
 }
 
-/* --- Dark mode — system preference --- */
+/* --- Dark mode (system preference) --- */
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) .report-panel { background: #181818; }
   :root:not([data-theme="light"]) .report-panel .report-header { background: #252525; box-shadow: 0 2px 4px rgba(0,0,0,0.3); }
@@ -384,7 +384,7 @@
   :root:not([data-theme="light"]) .ci-region-strong.ci-equivalent { opacity: 0.25; }
 }
 
-/* --- Dark mode — user forced --- */
+/* --- Dark mode (user forced) --- */
 :root[data-theme="dark"] .report-panel { background: #181818; }
 :root[data-theme="dark"] .report-panel .report-header { background: #252525; box-shadow: 0 2px 4px rgba(0,0,0,0.3); }
 :root[data-theme="dark"] .report-panel .cli-args { color: #bbb; background: #333; }

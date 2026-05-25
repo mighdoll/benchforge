@@ -58,7 +58,7 @@ function parsePercentileToken(token: string, digits: string): StatSpec {
   }
   // 3+ digit tokens express sub-percentile precision (p999 = 99.9%,
   // p9999 = 99.99%). Require leading 9 so p100/p500 don't silently
-  // map to 10%/50% — use 2-digit p10/p50 for those.
+  // map to 10%/50%; use 2-digit p10/p50 for those.
   if (digits.length > 2 && digits[0] !== "9") {
     throw new Error(
       `invalid --stats token "${token}": percentiles with 3+ digits must start with 9 (e.g. p999, p9999); otherwise use 2-digit form (e.g. p50)`,

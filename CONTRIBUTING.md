@@ -22,7 +22,7 @@ src/
   report/      terminal tables, formatters, HTML data prep
   export/      JSON, Speedscope, Perfetto, .benchforge archive
   cli/         argument parsing, orchestration, filtering, viewer server
-  viewer/      Vite preact SPA — tabs, plots, source viewer (separate build)
+  viewer/      Vite preact SPA: tabs, plots, source viewer (separate build)
     plots/     client-side charts (excluded from tsconfig, uses DOM types)
 examples/      runnable benchmarks for Node and browser modes
 ```
@@ -63,10 +63,10 @@ Good starting points: new plot types, UI fixes.
 ### Alternate Runners
 
 The runner abstraction is the `BenchRunner` interface in
-`src/runners/BenchRunner.ts` — a single method:
+`src/runners/BenchRunner.ts`, a single method:
 
 ```ts
-runBench(benchmark, options, params?) → Promise<MeasuredResults[]>
+runBench(benchmark, options, params?) ==> Promise<MeasuredResults[]>
 ```
 
 Implement this interface and register it in `src/runners/CreateRunner.ts`. The

@@ -3,7 +3,7 @@
 Tachometer and benchforge share the same core idea: open fresh browser
 tabs, interleave A and B to cancel order effects, and compute a
 confidence interval on the difference. Benchforge adds a two-level
-structure — iterations grouped into batches — so it can detect and
+structure (iterations grouped into batches) so it can detect and
 discard noisy groups.
 
 ```bash

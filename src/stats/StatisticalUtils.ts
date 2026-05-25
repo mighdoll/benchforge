@@ -251,7 +251,7 @@ export function statKindToFn(kind: StatKind): (s: number[]) => number {
 
 /** Block bootstrap CI: optionally Tukey-trim outlier batches, then resample
  *  per-block statFn values as independent observations. Requires 2+ blocks.
- *  Per iteration the readout is `mean(per-batch statFn)` — correct for `mean`
+ *  Per iteration the readout is `mean(per-batch statFn)`, correct for `mean`
  *  (where `mean(per-batch means) == mean(pool)` for equal-size batches) but
  *  *not* an estimator of `statFn(pool)` for non-linear statFns. Use
  *  {@link blockPoolBootstrap} for percentiles. */
@@ -395,7 +395,7 @@ export function tukeyFences(
 }
 
 /** @return indices of values below the upper 3x IQR Tukey fence.
- *  Only trims slow outliers — fast batches reflect less environmental noise, not errors.
+ *  Only trims slow outliers (fast batches reflect less environmental noise, not errors).
  *  Floors IQR at 2% of median to avoid over-trimming tightly clustered batch means. */
 export function tukeyKeep(values: number[]): number[] {
   if (values.length < 4) return values.map((_, i) => i);
