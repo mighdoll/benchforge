@@ -1,25 +1,13 @@
-export type { Configure, DefaultCliArgs } from "./cli/CliArgs.ts";
-export { browserCliArgs, defaultCliArgs, parseCliArgs } from "./cli/CliArgs.ts";
+export type { DefaultCliArgs } from "./cli/CliArgs.ts";
 export type { ExportOptions, MatrixExportOptions } from "./cli/CliExport.ts";
-export { exportReports } from "./cli/CliExport.ts";
-export { cliToMatrixOptions } from "./cli/CliOptions.ts";
 export {
-  defaultMatrixReport,
-  defaultReport,
-  matrixToReportGroups,
-  printHeapReports,
-  reportOptStatus,
-} from "./cli/CliReport.ts";
-export {
-  benchExports,
+  type BenchBuildResult,
+  type BenchCliConfig,
+  type BuildResult,
   dispatchCli,
-  matrixBenchExports,
-  parseBenchArgs,
-  runDefaultBench,
-  runDefaultMatrixBench,
-  runMatrixSuite,
+  type MatrixBuildResult,
+  runBenchCli,
 } from "./cli/RunBenchCLI.ts";
-export { runBenchmarks } from "./cli/SuiteRunner.ts";
 export {
   buildSpeedscopeFile,
   exportSpeedscope,
@@ -45,7 +33,7 @@ export type {
   VariantFn,
   VariantResult,
 } from "./matrix/BenchMatrix.ts";
-export { isStatefulVariant, runMatrix } from "./matrix/BenchMatrix.ts";
+export { isStatefulVariant } from "./matrix/BenchMatrix.ts";
 export type { CasesModule } from "./matrix/CaseLoader.ts";
 export { loadCaseData, loadCasesModule } from "./matrix/CaseLoader.ts";
 export type { FilteredMatrix, MatrixFilter } from "./matrix/MatrixFilter.ts";

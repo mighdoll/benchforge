@@ -1,5 +1,6 @@
 import type { Argv, InferredOptionTypes } from "yargs";
 import yargs from "yargs";
+import { hideBin } from "yargs/helpers";
 import pkg from "../../package.json" with { type: "json" };
 
 export type Configure<T> = (yargs: Argv) => Argv<T>;
@@ -130,8 +131,8 @@ const { url: _url, ...browserOnlyOptions } = cliOptions;
 
 /** Parse command line arguments with optional custom yargs configuration. */
 export function parseCliArgs<T = DefaultCliArgs>(
-  args: string[],
   configure: Configure<T> = defaultCliArgs as Configure<T>,
+  args: string[] = hideBin(process.argv),
 ): T {
   return configure(yargs(args)).parseSync() as T;
 }

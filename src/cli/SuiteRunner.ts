@@ -32,7 +32,7 @@ type SuiteParams = {
 };
 
 /** Run a benchmark suite with CLI arguments. */
-export async function runBenchmarks(
+export async function runBench(
   suite: BenchSuite,
   args: DefaultCliArgs,
 ): Promise<ReportGroup[]> {

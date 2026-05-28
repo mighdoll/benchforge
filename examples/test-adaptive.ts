@@ -1,10 +1,5 @@
 #!/usr/bin/env -S node --expose-gc --allow-natives-syntax
-import {
-  type BenchSuite,
-  defaultReport,
-  parseBenchArgs,
-  runBenchmarks,
-} from "../src/index.ts";
+import { type BenchSuite, runBenchCli } from "../src/index.ts";
 
 const suite: BenchSuite = {
   name: "Adaptive Mode Test",
@@ -78,7 +73,4 @@ const suite: BenchSuite = {
   ],
 };
 
-const args = parseBenchArgs();
-const results = await runBenchmarks(suite, args);
-const report = defaultReport(results, args);
-console.log(report);
+await runBenchCli({ build: () => ({ suite }) });

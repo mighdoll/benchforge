@@ -1,7 +1,7 @@
 import type { Configure, DefaultCliArgs } from "../cli/CliArgs.ts";
 import { parseCliArgs } from "../cli/CliArgs.ts";
 import { defaultReport } from "../cli/CliReport.ts";
-import { runBenchmarks } from "../cli/SuiteRunner.ts";
+import { runBench } from "../cli/SuiteRunner.ts";
 import type { BenchmarkReport } from "../report/BenchmarkReport.ts";
 import type { BenchSuite } from "../runners/BenchmarkSpec.ts";
 import type { MeasuredResults } from "../runners/MeasuredResults.ts";
@@ -43,8 +43,8 @@ export async function runBenchCLITest<T = DefaultCliArgs>(
   configureArgs?: Configure<T>,
 ): Promise<string> {
   const argv = args.split(/\s+/).filter(arg => arg.length > 0);
-  const parsedArgs = parseCliArgs(argv, configureArgs) as T & DefaultCliArgs;
-  const results = await runBenchmarks(suite, parsedArgs);
+  const parsedArgs = parseCliArgs(configureArgs, argv) as T & DefaultCliArgs;
+  const results = await runBench(suite, parsedArgs);
   return defaultReport(results, parsedArgs);
 }
 

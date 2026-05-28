@@ -1,5 +1,5 @@
 import { expect } from "vitest";
-import { parseBenchArgs } from "../cli/RunBenchCLI.ts";
+import { parseCliArgs } from "../cli/CliArgs.ts";
 import type { BenchmarkReport } from "../report/BenchmarkReport.ts";
 import type { BenchSuite } from "../runners/BenchmarkSpec.ts";
 
@@ -53,7 +53,7 @@ const _gcSuite: BenchSuite = {
 };
 
 function _parseAdaptiveArgs() {
-  return parseBenchArgs((yargs: any) =>
+  return parseCliArgs((yargs: any) =>
     yargs
       .option("adaptive", { type: "boolean", default: true })
       .option("time", { type: "number", default: 0.1 })

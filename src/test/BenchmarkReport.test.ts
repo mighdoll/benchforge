@@ -90,7 +90,7 @@ test("defaultReport uses custom sections when provided", () => {
     metadata: { linesOfCode: 500 },
   };
   const groups = [{ name: "parser", reports: [report] }];
-  const args = parseCliArgs(["--duration", "0.1"]);
+  const args = parseCliArgs(undefined, ["--duration", "0.1"]);
 
   const output = defaultReport(groups, args, { sections: [locSection] });
   expect(output).toContain("throughput");
@@ -103,7 +103,7 @@ test("defaultReport uses custom sections when provided", () => {
 test("defaultReport falls back to CLI defaults without opts", () => {
   const report = createBenchmarkReport("plain", [100, 150]);
   const groups = [{ name: "g", reports: [report] }];
-  const args = parseCliArgs(["--duration", "0.1"]);
+  const args = parseCliArgs(undefined, ["--duration", "0.1"]);
   const output = defaultReport(groups, args);
   expect(output).toContain("mean");
   expect(output).toContain("runs");
