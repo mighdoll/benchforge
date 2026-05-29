@@ -39,6 +39,9 @@ export interface BenchmarkGroup {
  *  trimming had any effect (otherwise the two views are identical). */
 export interface BenchmarkEntry {
   name: string;
+  /** Per-benchmark metadata (e.g. linesOfCode) for display transforms and for
+   *  agents reading the archive without recomputing stats. */
+  metadata?: Record<string, unknown>;
   samples: number[];
   warmupSamples?: number[];
   allocationSamples?: number[];
@@ -88,6 +91,46 @@ export interface ViewerRow {
 
   /** First comparable row with a statKind in the section. */
   primary?: boolean;
+
+  /** Per-percentile diff distribution for the shift-function plot, present on
+   *  the primary row of a comparable section when a baseline exists. */
+  shiftFunction?: ShiftFunction;
+}
+
+/** Diff across the whole distribution: one entry per displayed percentile.
+ *  Computed from raw samples; percentiles are labeled in the displayed metric
+ *  (for higherIsBetter metrics this inverts vs the timing percentile). */
+export interface ShiftFunction {
+  /** Displayed metric label, e.g. "lines / sec" or "mean". */
+  metric: string;
+  /** Equivalence margin in percent, when set on the run (draws a +/- band). */
+  equivMargin?: number;
+  points: ShiftPercentile[];
+}
+
+/** One percentile's diff distribution plus per-run absolute distributions. */
+export interface ShiftPercentile {
+  /** Displayed-metric percentile in [0, 1] (e.g. 0.5 for the median). */
+  percentile: number;
+  /** Short label, e.g. "p50", "p99", "p0.1". */
+  label: string;
+  /** Diff CI in percent (direction respects higherIsBetter). */
+  diff: DifferenceCI;
+  /** Absolute distributions per run (current first, then baseline). */
+  runs: ShiftRun[];
+
+  /** false when too few tail samples/batches support a stable estimate. */
+  reliable: boolean;
+  /** Samples beyond this percentile (min across runs); drives reliability. */
+  tailCount: number;
+  /** Distinct batches contributing tail samples (min across runs). */
+  tailBatches: number;
+}
+
+/** A single run's absolute distribution at one percentile. */
+export interface ShiftRun {
+  runName: string;
+  bootstrapCI: BootstrapCIData;
 }
 
 /** A single run's value for a stat. */

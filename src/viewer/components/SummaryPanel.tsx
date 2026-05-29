@@ -9,6 +9,8 @@ import type {
   BenchmarkGroup,
   BootstrapCIData,
   ReportData,
+  ShiftFunction,
+  ShiftPercentile,
   ViewerEntry,
   ViewerRow,
   ViewerSection,
@@ -241,16 +243,107 @@ function alignRunColumns(panel: HTMLElement): void {
 function SectionPanel({ section }: { section: ViewerSection }) {
   if (!section.rows.length) return null;
   const range = useMemo(() => sectionEstimateRange(section), [section]);
+  const shift = section.rows.find(r => r.shiftFunction)?.shiftFunction;
   const titleEl = section.tabLink
     ? <a class="panel-title-link" onClick={() => (activeTabId.value = section.tabLink!)}>{section.title}</a>
     : <span>{section.title}</span>;
 
+  // The shift function summarizes the whole distribution across percentiles, so
+  // it supersedes the per-row inline CI sparklines; gate those off (inlineCI)
+  // and show plain values instead when a shift function is present.
   return (
     <div class="section-panel">
       <div class="panel-header">{titleEl}</div>
       <div class="panel-body">
-        {section.rows.map((row, i) => <StatRow key={i} row={row} estimateRange={range} />)}
+        {section.rows.map((row, i) => (
+          <StatRow key={i} row={row} estimateRange={range} inlineCI={!shift} />
+        ))}
       </div>
+      {shift && <ShiftPanel shift={shift} />}
+    </div>
+  );
+}
+
+/** Always-visible per-percentile shift function below the section's stat rows,
+ *  with a click-to-detail popup for any percentile. */
+function ShiftPanel({ shift }: { shift: ShiftFunction }) {
+  const [selected, setSelected] = useState<ShiftPercentile | null>(null);
+  const ref = useLazyPlot(async () => {
+    const { createShiftPlot } = await import("../plots/ShiftPlot.ts");
+    return createShiftPlot(shift, { onSelect: p => setSelected(p) });
+  }, [shift], "Shift plot");
+  return (
+    <div class="shift-panel">
+      <div class="shift-caption">
+        Δ% per percentile &middot; click a percentile for current vs baseline detail
+      </div>
+      <div class="shift-plot" ref={ref} />
+      {selected && (
+        <ShiftPopup
+          point={selected}
+          metric={shift.metric}
+          equivMargin={shift.equivMargin}
+          onClose={() => setSelected(null)}
+        />
+      )}
+    </div>
+  );
+}
+
+/** Modal detailing one percentile: the diff CI chart, then each run's absolute
+ *  distribution. */
+function ShiftPopup({ point, metric, equivMargin, onClose }: {
+  point: ShiftPercentile;
+  metric: string;
+  equivMargin?: number;
+  onClose: () => void;
+}) {
+  const unreliableNote = point.reliable
+    ? null
+    : <span class="shift-unreliable"> (unreliable, n={point.tailCount})</span>;
+  return (
+    <div class="shift-overlay" onClick={e => e.target === e.currentTarget && onClose()}>
+      <div class="shift-popup">
+        <span class="shift-close" onClick={onClose}>{"×"}</span>
+        <h3>{metric} &middot; {point.label}{unreliableNote}</h3>
+        <ShiftPopupDiff ci={point.diff} equivMargin={equivMargin} />
+        {point.runs.map((run, i) => (
+          <ShiftPopupAbsolute key={i} runName={run.runName} ci={run.bootstrapCI} />
+        ))}
+      </div>
+    </div>
+  );
+}
+
+/** The diff CI chart in the popup (reuses createCIPlot). */
+function ShiftPopupDiff({ ci, equivMargin }: { ci: DifferenceCI; equivMargin?: number }) {
+  const ref = useLazyPlot(async () => {
+    const { createCIPlot } = await import("../plots/CIPlot.ts");
+    return createCIPlot(ci, { width: 320, height: 90, title: "", equivMargin });
+  }, [ci], "Shift diff plot");
+  return (
+    <div class="shift-chart">
+      <div class="shift-chart-label">diff: {formatPct(ci.percent)} ({ci.direction})</div>
+      <div ref={ref} />
+    </div>
+  );
+}
+
+/** One run's absolute distribution in the popup (reuses createDistributionPlot). */
+function ShiftPopupAbsolute({ runName, ci }: { runName: string; ci: BootstrapCIData }) {
+  const ref = useLazyPlot(async () => {
+    const { createDistributionPlot } = await import("../plots/CIPlot.ts");
+    const opts = {
+      width: 320, height: 90, title: "", direction: "uncertain" as const,
+      ciLabels: ci.ciLabels, includeZero: false, smooth: true,
+      ciLevel: ci.ciLevel, ciReliable: ci.ciReliable,
+    };
+    return createDistributionPlot(ci.histogram, ci.ci, ci.estimate, opts);
+  }, [ci], "Shift absolute plot");
+  return (
+    <div class="shift-chart">
+      <div class="shift-chart-label">{runName}: {ci.ciLabels?.join(" .. ") ?? ""}</div>
+      <div ref={ref} />
     </div>
   );
 }
@@ -309,7 +402,10 @@ function sectionEstimateRange(section: ViewerSection): [number, number] | undefi
   return max > min ? [min, max] : undefined;
 }
 
-function StatRow({ row, estimateRange }: { row: ViewerRow; estimateRange?: [number, number] }) {
+function StatRow(
+  { row, estimateRange, inlineCI = true }:
+  { row: ViewerRow; estimateRange?: [number, number]; inlineCI?: boolean },
+) {
   if (row.shared) {
     return (
       <div class="stat-row">
@@ -331,7 +427,7 @@ function StatRow({ row, estimateRange }: { row: ViewerRow; estimateRange?: [numb
         {row.comparisonCI && <ComparisonBadge ci={row.comparisonCI} compact />}
       </div>
       {row.entries.map((entry, i) => (
-        <RunEntry key={i} entry={entry} estimateRange={estimateRange} />
+        <RunEntry key={i} entry={entry} estimateRange={estimateRange} inlineCI={inlineCI} />
       ))}
     </div>
   );
@@ -346,14 +442,17 @@ function SharedStat({ label, value }: { label: string; value: string }) {
   );
 }
 
-function RunEntry({ entry, estimateRange }: { entry: ViewerEntry; estimateRange?: [number, number] }) {
+function RunEntry(
+  { entry, estimateRange, inlineCI = true }:
+  { entry: ViewerEntry; estimateRange?: [number, number]; inlineCI?: boolean },
+) {
   const ci = entry.bootstrapCI;
   const [lo, hi] = estimateRange ?? [0, 0];
   const shift = ci && hi > lo ? ((ci.estimate - lo) / (hi - lo)) * maxCIShift : undefined;
   return (
     <div class="run-entry">
       <span class="run-name">{entry.runName}</span>
-      {ci
+      {ci && inlineCI
         ? <BootstrapCIMount ci={ci} label={entry.value} shift={shift} />
         : <span class="run-value">{entry.value}</span>}
     </div>

@@ -29,6 +29,7 @@ import {
   type ReportSection,
   type UnknownRecord,
 } from "./BenchmarkReport.ts";
+import { buildShiftFunction } from "./ShiftFunction.ts";
 
 /** Per-section reusable bootstrap results, indexed by stat-column order.
  *  Supplying cur/base/diff causes buildCIMap to skip the matching bootstrap
@@ -174,9 +175,30 @@ function buildGroupRows(
     const row = buildRow(col, key, ctx, ciMap.get(key));
     if (row) rows.push(row);
   }
-  const first = rows.find(r => r.entries.some(e => e.bootstrapCI));
-  if (first) first.primary = true;
+  attachPrimaryShiftFunction(columns, rows, ctx);
   return rows;
+}
+
+/** Mark the first row with a bootstrap CI as primary and attach its
+ *  shift-function data (per-percentile diff across the whole distribution). */
+function attachPrimaryShiftFunction(
+  columns: ReportColumn[],
+  rows: ViewerRow[],
+  ctx: RowContext,
+): void {
+  const primaryRow = rows.find(r => r.entries.some(e => e.bootstrapCI));
+  if (!primaryRow) return;
+  primaryRow.primary = true;
+  const col = columns.find(c => c.title === primaryRow.label);
+  if (!col) return;
+  primaryRow.shiftFunction = buildShiftFunction(
+    col,
+    ctx.current,
+    ctx.baseline,
+    ctx.currentMeta,
+    ctx.baselineMeta,
+    ctx.comparison,
+  );
 }
 
 /** Compute batched bootstrap CIs, returning a Map keyed by column key. When
@@ -343,7 +365,7 @@ function simpleDeltaCI(
 }
 
 /** Format a BootstrapResult into display-domain BootstrapCIData */
-function formatBootstrapCI(
+export function formatBootstrapCI(
   col: ReportColumn,
   result: BootstrapResult,
   batchOffsets: number[] | undefined,

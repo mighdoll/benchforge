@@ -3,7 +3,12 @@ import type {
   DifferenceCI,
   HistogramBin,
 } from "../../stats/StatisticalUtils.ts";
-import { formatPct } from "./PlotTypes.ts";
+import {
+  type Direction,
+  directionColors,
+  formatPct,
+  gaussianSmooth,
+} from "./PlotTypes.ts";
 import {
   createSvg,
   ensureHatchPattern,
@@ -19,7 +24,7 @@ export interface DistributionPlotOptions {
   height?: number;
   title?: string;
   smooth?: boolean;
-  direction?: "faster" | "slower" | "uncertain" | "equivalent";
+  direction?: Direction;
   /** Pre-formatted CI bound labels (overrides default formatPct) */
   ciLabels?: [string, string];
   /** Include zero in x scale (default true, set false for absolute-value plots) */
@@ -52,13 +57,6 @@ const defaultOpts = {
   includeZero: true,
 };
 
-const colors = {
-  faster: { fill: "#bbf7d0", stroke: "#22c55e" },
-  slower: { fill: "#fee2e2", stroke: "#ef4444" },
-  uncertain: { fill: "#dbeafe", stroke: "#3b82f6" },
-  equivalent: { fill: "#dcfce7", stroke: "#86efac" },
-};
-
 /** Create a small distribution plot showing histogram with CI shading */
 export function createDistributionPlot(
   histogram: HistogramBin[],
@@ -71,7 +69,7 @@ export function createDistributionPlot(
   const svg = createSvg(layout.width, layout.height);
   if (!histogram?.length) return svg;
 
-  const { fill, stroke } = colors[opts.direction];
+  const { fill, stroke } = directionColors[opts.direction];
   const { includeZero, equivMargin } = opts;
   const scales = buildScales(
     histogram,
@@ -296,18 +294,4 @@ function drawCILabels(
     svg.appendChild(text(loX, labelY, loLabel, "middle", "11"));
     svg.appendChild(text(hiX, labelY, hiLabel, "middle", "11"));
   }
-}
-
-/** Apply gaussian kernel smoothing to histogram bins */
-function gaussianSmooth(bins: HistogramBin[], sigma: number): HistogramBin[] {
-  return bins.map((bin, i) => {
-    let sum = 0;
-    let wt = 0;
-    for (let j = 0; j < bins.length; j++) {
-      const w = Math.exp(-((i - j) ** 2) / (2 * sigma ** 2));
-      sum += bins[j].count * w;
-      wt += w;
-    }
-    return { x: bin.x, count: sum / wt };
-  });
 }

@@ -141,9 +141,10 @@ function prepareBenchmarkData(report: {
   measuredResults: MeasuredResults;
   metadata?: UnknownRecord;
 }): Omit<BenchmarkEntry, "comparisonCI" | "sections"> {
-  const { measuredResults: m, name } = report;
+  const { measuredResults: m, name, metadata } = report;
   return {
     name,
+    metadata,
     samples: m.samples,
     warmupSamples: m.warmupSamples,
     allocationSamples: m.allocationSamples,

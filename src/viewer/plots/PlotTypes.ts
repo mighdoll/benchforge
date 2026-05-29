@@ -1,3 +1,5 @@
+import type { HistogramBin } from "../../stats/StatisticalUtils.ts";
+
 /** A single timing sample from a benchmark run */
 export interface Sample {
   benchmark: string;
@@ -60,6 +62,36 @@ export const plotLayout = {
 export function formatPct(v: number, precision = 1): string {
   const sign = v >= 0 ? "+" : "";
   return `${sign}${v.toFixed(precision)}%`;
+}
+
+export type Direction = "faster" | "slower" | "uncertain" | "equivalent";
+
+/** Fill/stroke palette keyed by comparison direction, shared across plots. */
+export const directionColors: Record<
+  Direction,
+  { fill: string; stroke: string }
+> = {
+  faster: { fill: "#bbf7d0", stroke: "#22c55e" },
+  slower: { fill: "#fee2e2", stroke: "#ef4444" },
+  uncertain: { fill: "#dbeafe", stroke: "#3b82f6" },
+  equivalent: { fill: "#dcfce7", stroke: "#86efac" },
+};
+
+/** Gaussian kernel smoothing over histogram bins (sigma in bin units). */
+export function gaussianSmooth(
+  bins: HistogramBin[],
+  sigma: number,
+): HistogramBin[] {
+  return bins.map((bin, i) => {
+    let weightedSum = 0;
+    let weightSum = 0;
+    for (let j = 0; j < bins.length; j++) {
+      const weight = Math.exp(-((i - j) ** 2) / (2 * sigma ** 2));
+      weightedSum += bins[j].count * weight;
+      weightSum += weight;
+    }
+    return { x: bin.x, count: weightedSum / weightSum };
+  });
 }
 
 /** Pick display unit (ns/us/ms) based on average value magnitude (in ms) */
