@@ -3,6 +3,7 @@ import type {
   CIDirection,
   DifferenceCI,
   HistogramBin,
+  PreparedBlocks,
   StatKind,
 } from "./StatisticalUtils.ts";
 import {
@@ -187,32 +188,14 @@ export function blockDifferenceCI(
   statFn: (s: number[]) => number,
   options: BlockDiffOptions = {},
 ): DifferenceCI {
-  const { resamples = bootstrapSamples, confidence: conf = defaultConfidence } =
-    options;
-  const blocksB = options.blocksB ?? blocksA;
-  const noTrim = options.noBatchTrim;
-  const sideA = prepareBlocks(a, blocksA, statFn, noTrim);
-  const sideB = prepareBlocks(b, blocksB, statFn, noTrim);
-
-  const baseVal = statFn(sideA.filtered);
-  const currVal = statFn(sideB.filtered);
-  const observedPct = ((currVal - baseVal) / baseVal) * 100;
-
-  const drawA = () => average(createResample(sideA.blockVals));
-  const drawB = () => average(createResample(sideB.blockVals));
-  const diffs = Array.from({ length: resamples }, () => {
-    const base = drawA();
-    return ((drawB() - base) / base) * 100;
-  });
-  const ci = computeInterval(diffs, conf);
-  return {
-    percent: observedPct,
-    ci,
-    direction: classifyDirection(ci, observedPct, options.equivMargin),
-    histogram: binValues(diffs),
-    trimmed: [sideA.trimCount, sideB.trimCount],
-    ciLevel: "block",
-  };
+  return blockDiffCI(
+    a,
+    blocksA,
+    b,
+    statFn,
+    options,
+    side => () => average(createResample(side.blockVals)),
+  );
 }
 
 /** @return block bootstrap CI for percentage difference between baseline (a) and
@@ -227,6 +210,23 @@ export function blockPoolDifferenceCI(
   statFn: (s: number[]) => number,
   options: BlockDiffOptions = {},
 ): DifferenceCI {
+  return blockDiffCI(a, blocksA, b, statFn, options, side => {
+    const buf = allocPoolBuf(side.keptSplits);
+    return () => poolResampleStat(side.keptSplits, buf, statFn);
+  });
+}
+
+/** Shared block difference-CI core: prepare/trim both sides, then resample the
+ *  percentage difference using per-side draw closures built by `makeDraw`.
+ *  `blockDifferenceCI` and `blockPoolDifferenceCI` differ only in that draw. */
+function blockDiffCI(
+  a: number[],
+  blocksA: number[],
+  b: number[],
+  statFn: (s: number[]) => number,
+  options: BlockDiffOptions,
+  makeDraw: (side: PreparedBlocks) => () => number,
+): DifferenceCI {
   const { resamples = bootstrapSamples, confidence: conf = defaultConfidence } =
     options;
   const blocksB = options.blocksB ?? blocksA;
@@ -238,12 +238,11 @@ export function blockPoolDifferenceCI(
   const currVal = statFn(sideB.filtered);
   const observedPct = ((currVal - baseVal) / baseVal) * 100;
 
-  const bufA = allocPoolBuf(sideA.keptSplits);
-  const bufB = allocPoolBuf(sideB.keptSplits);
+  const drawA = makeDraw(sideA);
+  const drawB = makeDraw(sideB);
   const diffs = Array.from({ length: resamples }, () => {
-    const base = poolResampleStat(sideA.keptSplits, bufA, statFn);
-    const curr = poolResampleStat(sideB.keptSplits, bufB, statFn);
-    return ((curr - base) / base) * 100;
+    const base = drawA();
+    return ((drawB() - base) / base) * 100;
   });
   const ci = computeInterval(diffs, conf);
   return {

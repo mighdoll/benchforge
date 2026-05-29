@@ -444,6 +444,15 @@ export function trimOutlierBatches(
   };
 }
 
+/** Trimmed-and-split blocks for one side: per-block stat values, the pooled
+ *  kept samples, how many batches were trimmed, and the per-batch arrays. */
+export type PreparedBlocks = {
+  blockVals: number[];
+  filtered: number[];
+  trimCount: number;
+  keptSplits: number[][];
+};
+
 /** Tukey-trim outlier blocks and compute per-block statistic for one side.
  *  keptSplits exposes the per-batch sample arrays of the kept batches so callers
  *  doing pool-resample bootstrap can reuse the trim work. */
@@ -452,12 +461,7 @@ export function prepareBlocks(
   offsets: number[],
   fn: (s: number[]) => number,
   noTrim?: boolean,
-): {
-  blockVals: number[];
-  filtered: number[];
-  trimCount: number;
-  keptSplits: number[][];
-} {
+): PreparedBlocks {
   const splits = splitByOffsets(samples, offsets);
   const means = splits.map(average);
   const keep = noTrim ? means.map((_, i) => i) : tukeyKeep(means);

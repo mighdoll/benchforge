@@ -21,7 +21,11 @@ import type { ReportSection } from "../report/BenchmarkReport.ts";
 import type { GitVersion } from "../report/GitUtils.ts";
 import type { BenchSuite } from "../runners/BenchmarkSpec.ts";
 import { browserBenchExports } from "./BrowserBench.ts";
-import { type DefaultCliArgs, defaultCliArgs, parseCliArgs } from "./CliArgs.ts";
+import {
+  type DefaultCliArgs,
+  defaultCliArgs,
+  parseCliArgs,
+} from "./CliArgs.ts";
 import { finishReports } from "./CliExport.ts";
 import { cliToMatrixOptions, validateArgs } from "./CliOptions.ts";
 import {
@@ -58,7 +62,8 @@ export interface BenchCliConfig<Extra = Record<string, never>> {
 export async function runBenchCli<Extra = Record<string, never>>(
   config: BenchCliConfig<Extra>,
 ): Promise<void> {
-  const configure = config.configure ?? (y => y as Argv<DefaultCliArgs & Extra>);
+  const configure =
+    config.configure ?? (y => y as Argv<DefaultCliArgs & Extra>);
   const args = parseCliArgs(y => configure(defaultCliArgs(y)));
   const result = await config.build(args);
   if (args.list) return listResult(result.suite);
