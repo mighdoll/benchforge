@@ -89,6 +89,10 @@ export interface RunMatrixOptions {
   batches?: number;
   /** Include first batch in results (normally dropped for OS cache warmup) */
   warmupBatch?: boolean;
+  /** Measure the noise floor (current-vs-current) instead of comparing variants */
+  calibrate?: boolean;
+  /** Number of self-comparison repetitions when calibrating */
+  calibrateRuns?: number;
   /** Run only these cases (from --filter) */
   filteredCases?: string[];
   /** Run only these variants (from --filter) */
@@ -208,6 +212,8 @@ export function buildRunnerOptions(opts: RunMatrixOptions): RunnerOptions {
     useWorker,
     batches,
     warmupBatch,
+    calibrate,
+    calibrateRuns,
     ...base
   } = opts;
   const { iterations, maxTime, warmup, ...rest } = base;

@@ -34,6 +34,8 @@ export function cliToMatrixOptions(args: DefaultCliArgs): RunMatrixOptions {
     useWorker: worker,
     batches,
     warmupBatch: args["warmup-batch"],
+    calibrate: args.calibrate,
+    calibrateRuns: args["calibrate-runs"],
     ...cliCommonOptions(args),
   };
 }

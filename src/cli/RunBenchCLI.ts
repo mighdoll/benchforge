@@ -8,6 +8,7 @@ import {
   runMatrix,
 } from "../matrix/BenchMatrix.ts";
 import { loadCasesModule } from "../matrix/CaseLoader.ts";
+import { runMatrixCalibration } from "../matrix/MatrixDirRunner.ts";
 import {
   type FilteredMatrix,
   filterMatrix,
@@ -21,6 +22,7 @@ import type { ReportSection } from "../report/BenchmarkReport.ts";
 import type { GitVersion } from "../report/GitUtils.ts";
 import type { BenchSuite } from "../runners/BenchmarkSpec.ts";
 import { browserBenchExports } from "./BrowserBench.ts";
+import { formatCalibration, reportCalibrateRun } from "./CalibrateRunner.ts";
 import {
   type DefaultCliArgs,
   defaultCliArgs,
@@ -156,6 +158,7 @@ async function runMatrixPipeline(
   m: MatrixBuildResult,
   args: DefaultCliArgs,
 ): Promise<void> {
+  if (args.calibrate) return runMatrixCalibratePipeline(m.suite, args);
   const results = await runFilteredMatrices(m.suite, args);
   const groups = matrixToReportGroups(results);
   console.log(
@@ -207,6 +210,33 @@ async function resolveFileResult(
     return { suite: { name, groups: [{ name, benchmarks: [bench] }] } };
   }
   return undefined;
+}
+
+/** Calibrate: measure the noise floor on one matrix/variant/case, print summary. */
+async function runMatrixCalibratePipeline(
+  suite: MatrixSuite,
+  args: DefaultCliArgs,
+): Promise<void> {
+  validateArgs(args);
+  const filter = args.filter ? parseMatrixFilter(args.filter) : undefined;
+  const options = cliToMatrixOptions(args);
+  const matrix = suite.matrices[0];
+  const filtered = await applyMatrixFilters(matrix, args.all, filter);
+  if (!filtered.variantDir)
+    throw new Error(
+      "--calibrate requires a directory-based matrix (variantDir)",
+    );
+
+  const result = await runMatrixCalibration(
+    filtered,
+    {
+      ...options,
+      filteredCases: filtered.filteredCases,
+      filteredVariants: filtered.filteredVariants,
+    },
+    reportCalibrateRun,
+  );
+  console.log(formatCalibration(result));
 }
 
 /** Run every matrix in a suite, applying default cases/variants or --filter. */

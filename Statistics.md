@@ -227,19 +227,39 @@ it.
 
 The default 2% margin is reasonable for most benchmarks, but the noise floor
 varies. Fast microbenchmarks may have < 1% noise; slow benchmarks with GC
-pressure may have 3-5%.
+pressure may have 3-5%. Since there's no inherent "smallest difference that
+matters" for raw speed, the margin should equal the noise floor: any difference
+below it is indistinguishable from measurement noise.
 
-To calibrate, run a self-comparison where baseline and current are identical:
+`--calibrate` measures that floor directly. It runs the current build against an
+identical copy of itself (a true-zero comparison), repeated many times, then
+prints a suggested `--equiv-margin`:
 
 ```bash
-# Run identical code against itself
-benchforge my-bench.ts --baseline --batches 50
+benchforge my-bench.ts --calibrate --batches 50 --duration 2
+# ... per-run table ...
+#   suggested --equiv-margin 0.5%
 
-# Check the CI -- e.g. +0.3% [-1.8%, +2.4%]
-# The max absolute bound (2.4%) is your noise floor.
-# Round up for the margin.
-benchforge my-bench.ts --baseline --batches 50 --equiv-margin 3
+# Copy the suggested value into real comparison runs:
+benchforge my-bench.ts --baseline --batches 50 --duration 2 --equiv-margin 0.5
 ```
+
+A single self-comparison CI is itself noisy, so calibrate repeats the run and
+reports two views of the floor: the **within-run CI half-width** (what the
+bootstrap claims) and the **between-run scatter** of the point estimates (what
+actually happens on repeat). The suggested margin is the larger of the two, so
+the self-comparison reads "equivalent" essentially every time. If the scatter
+exceeds the within-run CI, calibrate warns that the displayed CIs are
+overconfident -- run-to-run drift the bootstrap can't see from inside one run.
+
+For the suggested margin to apply to your real comparisons:
+
+- **Use the same `--batches` and `--duration`** you'll use for comparisons. CI
+  width scales roughly with `1/sqrt(batches)`, so a margin measured at one batch
+  count is wrong for another.
+- **Run on a quiet machine.** Quit other apps, pause background sync and
+  software updates, and avoid thermal throttling. Calibration measures
+  environmental noise, so a busy machine inflates the suggested margin.
 
 Use `--equiv-margin 0` to disable equivalence testing and fall back to the
 simple CI-excludes-zero approach.

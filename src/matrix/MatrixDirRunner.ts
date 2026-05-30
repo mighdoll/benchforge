@@ -1,4 +1,9 @@
 import type { RunnerOptions } from "../runners/BenchRunner.ts";
+import {
+  type CalibrationResult,
+  type RunProgress,
+  runCalibration,
+} from "../runners/Calibration.ts";
 import type { MeasuredResults } from "../runners/MeasuredResults.ts";
 import { runBatched } from "../runners/MergeBatches.ts";
 import { runMatrixVariant } from "../runners/RunnerOrchestrator.ts";
@@ -45,6 +50,42 @@ export async function runMatrixWithDir<T>(
   const ctx = await createDirContext(matrix, options);
   const variants = await runDirVariants(variantIds, ctx);
   return { name: matrix.name, variants };
+}
+
+/** Measure the harness noise floor for one variant/case (current vs current).
+ *  Uses the first filtered variant + case so calibration runs a single
+ *  representative benchmark rather than the whole matrix. */
+export async function runMatrixCalibration<T>(
+  matrix: BenchMatrix<T>,
+  options: RunMatrixOptions,
+  onRun?: (p: RunProgress, label: string) => void,
+): Promise<CalibrationResult> {
+  const allVariantIds = await discoverVariants(matrix.variantDir!);
+  const variantId = (options.filteredVariants ?? allVariantIds)[0];
+  if (!variantId) throw new Error(`No variants found in ${matrix.variantDir}`);
+
+  const ctx = await createDirContext(matrix, options);
+  const caseId = ctx.caseIds[0];
+  const label = `${variantId}/${caseId}`;
+  const variantArgs: VariantArgs = {
+    variantDir: matrix.variantDir!,
+    variantId,
+    caseId,
+    caseData: matrix.cases && !matrix.casesModule ? caseId : undefined,
+    casesModule: matrix.casesModule,
+    runner: "timing" as const,
+    options: ctx.runnerOpts,
+    useWorker: ctx.useWorker,
+  };
+  const current = async () => (await runMatrixVariant(variantArgs))[0];
+
+  return runCalibration({
+    current,
+    batches: ctx.batches,
+    runs: options.calibrateRuns ?? 15,
+    warmupBatch: ctx.warmupBatch,
+    onRun: onRun ? p => onRun(p, label) : undefined,
+  });
 }
 
 /** Create context for directory-based matrix execution */
