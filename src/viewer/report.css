@@ -89,6 +89,14 @@
 .report-panel .badge-slower { background: #fee2e2; color: #991b1b; }
 .report-panel .badge-uncertain { background: #dbeafe; color: #1e40af; }
 .report-panel .badge-equivalent { background: #f0fdf4; color: #166534; }
+
+/* Per-row comparison value: bold text, no colored chip (chip reserved for verdict) */
+.report-panel .comparison-plain {
+  font-size: 11px;
+  font-weight: 600;
+  color: #555;
+  white-space: nowrap;
+}
 .report-panel .batch-warnings { display: flex; flex-direction: column; gap: 0.3em; margin-left: 8px; }
 .report-panel .batch-warning { font-size: 11px; color: #92400e; }
 
@@ -374,6 +382,7 @@
   :root:not([data-theme="light"]) .report-panel .badge-slower { background: #991b1b; color: #fecaca; }
   :root:not([data-theme="light"]) .report-panel .badge-uncertain { background: #1e40af; color: #bfdbfe; }
   :root:not([data-theme="light"]) .report-panel .badge-equivalent { background: #166534; color: #bbf7d0; }
+  :root:not([data-theme="light"]) .report-panel .comparison-plain { color: #bbb; }
   :root:not([data-theme="light"]) .margin-hatch-stroke { opacity: 0.65; }
   :root:not([data-theme="light"]) .margin-zone { opacity: 0.65; }
   :root:not([data-theme="light"]) .ci-region { opacity: 0.2; }
@@ -419,6 +428,7 @@
 :root[data-theme="dark"] .report-panel .badge-slower { background: #991b1b; color: #fecaca; }
 :root[data-theme="dark"] .report-panel .badge-uncertain { background: #1e40af; color: #bfdbfe; }
 :root[data-theme="dark"] .report-panel .badge-equivalent { background: #166534; color: #bbf7d0; }
+:root[data-theme="dark"] .report-panel .comparison-plain { color: #bbb; }
 :root[data-theme="dark"] .margin-hatch-stroke { opacity: 0.4; }
 :root[data-theme="dark"] .margin-zone { opacity: 0.4; }
 :root[data-theme="dark"] .ci-region { opacity: 0.2; }

@@ -189,9 +189,12 @@ function activeView(entry: BenchmarkEntry): {
 }
 
 function ComparisonBadge({ ci, compact }: { ci: DifferenceCI; compact?: boolean }) {
+  // Colored chip is reserved for the main verdict; per-row (compact) comparisons
+  // render as plain bold text regardless of direction.
+  const cls = compact ? "comparison-plain" : `badge badge-${ci.direction}`;
   return (
     <span class="comparison-badge">
-      <span class={`badge badge-${ci.direction}`}>
+      <span class={cls}>
         {compact ? formatPct(ci.percent) : directionLabels[ci.direction]}
       </span>
       {ci.histogram && <CIPlotMount ci={ci} compact={compact} />}
@@ -309,7 +312,6 @@ function ShiftPopup({ point, metric, equivMargin, onClose }: {
         <div class="shift-popup-head">
           <h3>{metric} &middot; {point.label}{unreliableNote}</h3>
           <span class="shift-verdict">
-            <span class={`badge badge-${diff.direction}`}>{directionLabels[diff.direction]}</span>
             <b>{formatPct(diff.percent)}</b>
           </span>
         </div>
