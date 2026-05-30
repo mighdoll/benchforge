@@ -3,6 +3,22 @@ import type { ReportColumn } from "../report/BenchmarkReport.ts";
 import { buildShiftFunction } from "../report/ShiftFunction.ts";
 import type { MeasuredResults } from "../runners/MeasuredResults.ts";
 
+const timeCol: ReportColumn = {
+  key: "p50",
+  title: "p50",
+  comparable: true,
+  statKind: { percentile: 0.5 },
+};
+
+const locCol: ReportColumn = {
+  key: "locSec",
+  title: "lines / sec",
+  comparable: true,
+  higherIsBetter: true,
+  statKind: { percentile: 0.5 },
+  toDisplay: (ms: number) => 1000 / ms,
+};
+
 /** Build batched samples as a single global ramp across all batches, so each
  *  percentile's tail is genuinely sparse (good for reliability-gate tests).
  *  `shift` offsets every value, simulating a small uniform change. */
@@ -21,22 +37,6 @@ function batched(
   }
   return { name: "x", samples, batchOffsets } as MeasuredResults;
 }
-
-const timeCol: ReportColumn = {
-  key: "p50",
-  title: "p50",
-  comparable: true,
-  statKind: { percentile: 0.5 },
-};
-
-const locCol: ReportColumn = {
-  key: "locSec",
-  title: "lines / sec",
-  comparable: true,
-  higherIsBetter: true,
-  statKind: { percentile: 0.5 },
-  toDisplay: (ms: number) => 1000 / ms,
-};
 
 test("returns undefined without a baseline", () => {
   const sf = buildShiftFunction(

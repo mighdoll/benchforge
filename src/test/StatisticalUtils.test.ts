@@ -19,6 +19,19 @@ import {
 } from "../stats/StatisticalUtils.ts";
 import { assertValid, getSampleData } from "./TestUtils.ts";
 
+/** Build samples where per-batch p50s skew low but the pooled p50 sits high:
+ *  4 batches of 20 samples ~100, 1 batch of 20 samples ~50. Pool p50 ~= 100,
+ *  mean(per-batch p50) ~= 90. */
+function skewedBatchData(): { samples: number[]; blocks: number[] } {
+  const samples: number[] = [];
+  for (let i = 0; i < 4; i++) {
+    for (let k = 0; k < 20; k++) samples.push(100 + (k - 10) * 0.1);
+  }
+  for (let k = 0; k < 20; k++) samples.push(50 + (k - 10) * 0.1);
+  const blocks = [0, 20, 40, 60, 80];
+  return { samples, blocks };
+}
+
 test("calculates mean correctly", () => {
   const subset = getSampleData(0, 10);
   const expected = subset.reduce((a, b) => a + b, 0) / subset.length;
@@ -149,19 +162,6 @@ test("blockDifferenceCI shows uncertainty for noise", () => {
   expect(result.ci[1]).toBeGreaterThanOrEqual(0);
   expect(result.direction).toBe("uncertain");
 });
-
-/** Build samples where per-batch p50s skew low but the pooled p50 sits high:
- *  4 batches of 20 samples ~100, 1 batch of 20 samples ~50. Pool p50 ~= 100,
- *  mean(per-batch p50) ~= 90. */
-function skewedBatchData(): { samples: number[]; blocks: number[] } {
-  const samples: number[] = [];
-  for (let i = 0; i < 4; i++) {
-    for (let k = 0; k < 20; k++) samples.push(100 + (k - 10) * 0.1);
-  }
-  for (let k = 0; k < 20; k++) samples.push(50 + (k - 10) * 0.1);
-  const blocks = [0, 20, 40, 60, 80];
-  return { samples, blocks };
-}
 
 test("blockPoolBootstrap CI brackets the pooled estimate", () => {
   const { samples, blocks } = skewedBatchData();

@@ -58,6 +58,15 @@ export type BlockBootstrapOptions = BootstrapOptions & {
   noTrim?: boolean;
 };
 
+/** Trimmed-and-split blocks for one side: per-block stat values, the pooled
+ *  kept samples, how many batches were trimmed, and the per-batch arrays. */
+export type PreparedBlocks = {
+  blockVals: number[];
+  filtered: number[];
+  trimCount: number;
+  keptSplits: number[][];
+};
+
 /** Options for bootstrap resampling */
 type BootstrapOptions = {
   /** Number of bootstrap resamples (default: 10000) */
@@ -443,15 +452,6 @@ export function trimOutlierBatches(
     trimCount: means.length - keep.length,
   };
 }
-
-/** Trimmed-and-split blocks for one side: per-block stat values, the pooled
- *  kept samples, how many batches were trimmed, and the per-batch arrays. */
-export type PreparedBlocks = {
-  blockVals: number[];
-  filtered: number[];
-  trimCount: number;
-  keptSplits: number[][];
-};
 
 /** Tukey-trim outlier blocks and compute per-block statistic for one side.
  *  keptSplits exposes the per-batch sample arrays of the kept batches so callers

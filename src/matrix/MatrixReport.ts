@@ -36,12 +36,12 @@ interface VariantCase {
 
 type Row = Record<string, unknown> & { name: string };
 
-const defaultSections: ReportSection[] = [timeSection, runsSection];
-
 interface LabeledDiff {
   label: string;
   ci: DifferenceCI;
 }
+
+const defaultSections: ReportSection[] = [timeSection, runsSection];
 
 /** Format matrix results as text, with one table per case */
 export function reportMatrixResults(
@@ -59,56 +59,6 @@ export function reportMatrixResults(
   const summary = verdictSummary(diffs);
   if (summary) sections.push(summary);
   return sections.join("\n\n");
-}
-
-/** One-line verdict line. For a single comparison, includes name + Δ% inline.
- *  For multiple, tally + names of non-equivalent results. */
-function verdictSummary(diffs: LabeledDiff[]): string | undefined {
-  if (diffs.length === 0) return undefined;
-  if (diffs.length === 1) return singleVerdict(diffs[0]);
-  return multiVerdict(diffs);
-}
-
-function singleVerdict(d: LabeledDiff): string {
-  const { percent, ci, direction } = d.ci;
-  const [lo, hi] = ci;
-  const sign = (n: number) => (n >= 0 ? "+" : "");
-  const range = `${sign(percent)}${percent.toFixed(1)}% [${sign(lo)}${lo.toFixed(1)}%, ${sign(hi)}${hi.toFixed(1)}%]`;
-  return `Verdict: ${d.label} ${verdictWord(direction)} ${range} vs baseline`;
-}
-
-function multiVerdict(diffs: LabeledDiff[]): string {
-  const tally: Record<CIDirection, LabeledDiff[]> = {
-    faster: [],
-    slower: [],
-    equivalent: [],
-    uncertain: [],
-  };
-  for (const d of diffs) tally[d.ci.direction].push(d);
-  const { green, red, dim } = colors;
-  const parts = [
-    green(`${tally.faster.length} faster`),
-    red(`${tally.slower.length} slower`),
-    green(`${tally.equivalent.length} equivalent`),
-    dim(`${tally.uncertain.length} uncertain`),
-  ];
-  const head = `Verdicts (${diffs.length} vs baseline): ${parts.join(", ")}`;
-  const names = (xs: LabeledDiff[]) => xs.map(d => d.label).join(", ");
-  const detail: string[] = [];
-  if (tally.faster.length)
-    detail.push(green(`  faster: ${names(tally.faster)}`));
-  if (tally.slower.length) detail.push(red(`  slower: ${names(tally.slower)}`));
-  if (tally.uncertain.length)
-    detail.push(dim(`  uncertain: ${names(tally.uncertain)}`));
-  return [head, ...detail].join("\n");
-}
-
-function verdictWord(d: CIDirection): string {
-  const { green, red, dim } = colors;
-  if (d === "faster") return green("faster");
-  if (d === "slower") return red("slower");
-  if (d === "equivalent") return green("equivalent");
-  return dim("uncertain");
 }
 
 /** Build table for a single case showing all variants */
@@ -173,6 +123,14 @@ function buildCaseTable(
   return { table, diffs };
 }
 
+/** One-line verdict line. For a single comparison, includes name + Δ% inline.
+ *  For multiple, tally + names of non-equivalent results. */
+function verdictSummary(diffs: LabeledDiff[]): string | undefined {
+  if (diffs.length === 0) return undefined;
+  if (diffs.length === 1) return singleVerdict(diffs[0]);
+  return multiVerdict(diffs);
+}
+
 /** Format case title with metadata if available */
 function formatCaseTitle(results: MatrixResults, caseId: string): string {
   const caseResult = results.variants[0]?.cases.find(c => c.caseId === caseId);
@@ -205,4 +163,46 @@ function sharedBaseline(
     .filter(Boolean);
   if (baselines.length < 2) return undefined;
   return baselines.every(b => b === baselines[0]) ? baselines[0] : undefined;
+}
+
+function singleVerdict(d: LabeledDiff): string {
+  const { percent, ci, direction } = d.ci;
+  const [lo, hi] = ci;
+  const sign = (n: number) => (n >= 0 ? "+" : "");
+  const range = `${sign(percent)}${percent.toFixed(1)}% [${sign(lo)}${lo.toFixed(1)}%, ${sign(hi)}${hi.toFixed(1)}%]`;
+  return `Verdict: ${d.label} ${verdictWord(direction)} ${range} vs baseline`;
+}
+
+function multiVerdict(diffs: LabeledDiff[]): string {
+  const tally: Record<CIDirection, LabeledDiff[]> = {
+    faster: [],
+    slower: [],
+    equivalent: [],
+    uncertain: [],
+  };
+  for (const d of diffs) tally[d.ci.direction].push(d);
+  const { green, red, dim } = colors;
+  const parts = [
+    green(`${tally.faster.length} faster`),
+    red(`${tally.slower.length} slower`),
+    green(`${tally.equivalent.length} equivalent`),
+    dim(`${tally.uncertain.length} uncertain`),
+  ];
+  const head = `Verdicts (${diffs.length} vs baseline): ${parts.join(", ")}`;
+  const names = (xs: LabeledDiff[]) => xs.map(d => d.label).join(", ");
+  const detail: string[] = [];
+  if (tally.faster.length)
+    detail.push(green(`  faster: ${names(tally.faster)}`));
+  if (tally.slower.length) detail.push(red(`  slower: ${names(tally.slower)}`));
+  if (tally.uncertain.length)
+    detail.push(dim(`  uncertain: ${names(tally.uncertain)}`));
+  return [head, ...detail].join("\n");
+}
+
+function verdictWord(d: CIDirection): string {
+  const { green, red, dim } = colors;
+  if (d === "faster") return green("faster");
+  if (d === "slower") return red("slower");
+  if (d === "equivalent") return green("equivalent");
+  return dim("uncertain");
 }

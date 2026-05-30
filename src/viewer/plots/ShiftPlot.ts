@@ -17,12 +17,12 @@ export interface ShiftPlotOptions {
   onSelect?: (point: ShiftPercentile) => void;
 }
 
+type Scale = (v: number) => number;
+
 const weakColor = "#9ca3af";
 
 const defaults = { width: 760, height: 300 };
 const margin = { top: 14, right: 16, bottom: 34, left: 44 };
-
-type Scale = (v: number) => number;
 
 /** Per-percentile stroke: direction color when reliable, grey otherwise. */
 const strokeFor = (p: ShiftPercentile) =>
@@ -165,24 +165,6 @@ function drawYAxis(
   }
 }
 
-/** @return [min, max] of the diff-percent axis. */
-function axisSpan(
-  points: ShiftPercentile[],
-  equivMargin: number | undefined,
-): [number, number] {
-  let min = 0;
-  let max = 0;
-  if (equivMargin) {
-    min = -equivMargin;
-    max = equivMargin;
-  }
-  for (const p of points) {
-    if (p.diff.ci[0] < min) min = p.diff.ci[0];
-    if (p.diff.ci[1] > max) max = p.diff.ci[1];
-  }
-  return [min, max];
-}
-
 /** A vertical violin: the smoothed diff distribution mirrored around cx. */
 function drawViolin(
   svg: SVGSVGElement,
@@ -278,6 +260,24 @@ function drawPercentileLabel(
         weakColor,
       ),
     );
+}
+
+/** @return [min, max] of the diff-percent axis. */
+function axisSpan(
+  points: ShiftPercentile[],
+  equivMargin: number | undefined,
+): [number, number] {
+  let min = 0;
+  let max = 0;
+  if (equivMargin) {
+    min = -equivMargin;
+    max = equivMargin;
+  }
+  for (const p of points) {
+    if (p.diff.ci[0] < min) min = p.diff.ci[0];
+    if (p.diff.ci[1] > max) max = p.diff.ci[1];
+  }
+  return [min, max];
 }
 
 /** @return a "nice" axis step (1, 2, or 5 times a power of ten) near raw. */

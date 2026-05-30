@@ -47,6 +47,8 @@ export interface TimeUnit {
   formatValue: (d: number) => string;
 }
 
+export type Direction = "faster" | "slower" | "uncertain" | "equivalent";
+
 /** Shared Observable Plot layout: margins, dimensions, font size */
 export const plotLayout = {
   marginTop: 24,
@@ -58,14 +60,6 @@ export const plotLayout = {
   style: { fontSize: "14px" },
 } as const;
 
-/** Format a number as a signed percentage string (e.g. "+1.2%", "-3.4%") */
-export function formatPct(v: number, precision = 1): string {
-  const sign = v >= 0 ? "+" : "";
-  return `${sign}${v.toFixed(precision)}%`;
-}
-
-export type Direction = "faster" | "slower" | "uncertain" | "equivalent";
-
 /** Fill/stroke palette keyed by comparison direction, shared across plots. */
 export const directionColors: Record<
   Direction,
@@ -76,6 +70,12 @@ export const directionColors: Record<
   uncertain: { fill: "#dbeafe", stroke: "#3b82f6" },
   equivalent: { fill: "#dcfce7", stroke: "#86efac" },
 };
+
+/** Format a number as a signed percentage string (e.g. "+1.2%", "-3.4%") */
+export function formatPct(v: number, precision = 1): string {
+  const sign = v >= 0 ? "+" : "";
+  return `${sign}${v.toFixed(precision)}%`;
+}
 
 /** Gaussian kernel smoothing over histogram bins (sigma in bin units). */
 export function gaussianSmooth(

@@ -25,6 +25,19 @@ import {
   hasLowBatchCount,
 } from "./ViewerSections.ts";
 
+interface PointArgs {
+  p: number;
+  diff: DifferenceCI | undefined;
+  curResult: BootstrapResult | undefined;
+  baseResult: BootstrapResult | undefined;
+  col: ReportColumn;
+  current: MeasuredResults;
+  baseline: MeasuredResults;
+  currentMeta: UnknownRecord | undefined;
+  baselineMeta: UnknownRecord | undefined;
+  lowBatches: boolean;
+}
+
 /** Timing-domain percentiles sampled for the shift function: symmetric and
  *  log-spaced toward both tails (dense where regressions and noise live, sparse
  *  in the middle). Same set regardless of metric direction; for higherIsBetter
@@ -91,19 +104,6 @@ export function buildShiftFunction(
   // reverse of the timing percentile order; sort by displayed percentile.
   points.sort((a, b) => a.percentile - b.percentile);
   return { metric: col.title, equivMargin: comparison?.equivMargin, points };
-}
-
-interface PointArgs {
-  p: number;
-  diff: DifferenceCI | undefined;
-  curResult: BootstrapResult | undefined;
-  baseResult: BootstrapResult | undefined;
-  col: ReportColumn;
-  current: MeasuredResults;
-  baseline: MeasuredResults;
-  currentMeta: UnknownRecord | undefined;
-  baselineMeta: UnknownRecord | undefined;
-  lowBatches: boolean;
 }
 
 /** Build one shift-function point: flip + annotate the diff, format per-run

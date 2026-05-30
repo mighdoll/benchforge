@@ -90,6 +90,12 @@ export async function dispatchCli(): Promise<void> {
   throw new Error("Provide a benchmark file or --url for browser mode.");
 }
 
+/** Print available benchmarks for --list, dispatched by suite shape. */
+async function listResult(suite: BenchSuite | MatrixSuite): Promise<void> {
+  if ("matrices" in suite) await listMatrixSuite(suite);
+  else listSuite(suite);
+}
+
 /** Route a build result to the bench or matrix pipeline. */
 function dispatchResult(
   result: BuildResult,
@@ -99,22 +105,50 @@ function dispatchResult(
   return runBenchPipeline(result, args);
 }
 
-function isMatrixResult(result: BuildResult): result is MatrixBuildResult {
-  return "matrices" in result.suite;
+/** Require a file argument for a subcommand, exiting with usage on missing. */
+function requireFile(filePath: string | undefined, subcommand: string): string {
+  if (filePath) return filePath;
+  console.error(`Usage: benchforge ${subcommand} <file.benchforge>`);
+  process.exit(1);
 }
 
-/** Bench end-to-end: run, print report, finish exports. */
-async function runBenchPipeline(
-  b: BenchBuildResult,
+/** Import a file and run it as a benchmark based on what it exports. */
+async function runFileBench(
+  filePath: string,
   args: DefaultCliArgs,
 ): Promise<void> {
-  const groups = await runBench(b.suite, args);
-  console.log(
-    withStatus("computing report", () =>
-      defaultReport(groups, args, { sections: b.sections }),
-    ),
-  );
-  await finishReports(groups, args, { sections: b.sections });
+  const result = await resolveFileResult(filePath);
+  if (!result) return;
+  if (args.list) return listResult(result.suite);
+  await dispatchResult(result, args);
+}
+
+/** Print available cases and variants in a matrix suite. */
+async function listMatrixSuite(suite: MatrixSuite): Promise<void> {
+  for (const matrix of suite.matrices) {
+    console.log(matrix.name);
+    const caseIds = await resolveCaseIds(matrix);
+    if (caseIds) {
+      console.log("  cases:");
+      for (const id of caseIds) console.log(`    ${id}`);
+    }
+    const variantIds = await resolveVariantIds(matrix);
+    console.log("  variants:");
+    for (const id of variantIds) console.log(`    ${id}`);
+  }
+}
+
+/** Print available benchmarks in a bench suite. */
+function listSuite(suite: BenchSuite): void {
+  for (const group of suite.groups) {
+    console.log(group.name);
+    for (const bench of group.benchmarks) console.log(`  ${bench.name}`);
+    if (group.baseline) console.log(`  ${group.baseline.name} (baseline)`);
+  }
+}
+
+function isMatrixResult(result: BuildResult): result is MatrixBuildResult {
+  return "matrices" in result.suite;
 }
 
 /** Matrix end-to-end: filter, run, print report, finish exports. */
@@ -138,6 +172,41 @@ async function runMatrixPipeline(
     currentVersion: m.currentVersion,
     baselineVersion: m.baselineVersion,
   });
+}
+
+/** Bench end-to-end: run, print report, finish exports. */
+async function runBenchPipeline(
+  b: BenchBuildResult,
+  args: DefaultCliArgs,
+): Promise<void> {
+  const groups = await runBench(b.suite, args);
+  console.log(
+    withStatus("computing report", () =>
+      defaultReport(groups, args, { sections: b.sections }),
+    ),
+  );
+  await finishReports(groups, args, { sections: b.sections });
+}
+
+/** Load a benchmark file and shape its default export into a BuildResult. */
+async function resolveFileResult(
+  filePath: string,
+): Promise<BuildResult | undefined> {
+  const fileUrl = pathToFileURL(resolve(filePath)).href;
+  const { default: candidate } = await import(fileUrl);
+
+  if (candidate && Array.isArray(candidate.matrices)) {
+    return { suite: candidate as MatrixSuite };
+  }
+  if (candidate && Array.isArray(candidate.groups)) {
+    return { suite: candidate as BenchSuite };
+  }
+  if (typeof candidate === "function") {
+    const name = basename(filePath).replace(/\.[^.]+$/, "");
+    const bench = { name, fn: candidate };
+    return { suite: { name, groups: [{ name, benchmarks: [bench] }] } };
+  }
+  return undefined;
 }
 
 /** Run every matrix in a suite, applying default cases/variants or --filter. */
@@ -180,73 +249,4 @@ async function applyMatrixFilters(
     withDefaults = { ...matrix, filteredCases, filteredVariants };
   }
   return filter ? filterMatrix(withDefaults, filter) : withDefaults;
-}
-
-/** Print available benchmarks for --list, dispatched by suite shape. */
-async function listResult(suite: BenchSuite | MatrixSuite): Promise<void> {
-  if ("matrices" in suite) await listMatrixSuite(suite);
-  else listSuite(suite);
-}
-
-/** Print available benchmarks in a bench suite. */
-function listSuite(suite: BenchSuite): void {
-  for (const group of suite.groups) {
-    console.log(group.name);
-    for (const bench of group.benchmarks) console.log(`  ${bench.name}`);
-    if (group.baseline) console.log(`  ${group.baseline.name} (baseline)`);
-  }
-}
-
-/** Print available cases and variants in a matrix suite. */
-async function listMatrixSuite(suite: MatrixSuite): Promise<void> {
-  for (const matrix of suite.matrices) {
-    console.log(matrix.name);
-    const caseIds = await resolveCaseIds(matrix);
-    if (caseIds) {
-      console.log("  cases:");
-      for (const id of caseIds) console.log(`    ${id}`);
-    }
-    const variantIds = await resolveVariantIds(matrix);
-    console.log("  variants:");
-    for (const id of variantIds) console.log(`    ${id}`);
-  }
-}
-
-/** Import a file and run it as a benchmark based on what it exports. */
-async function runFileBench(
-  filePath: string,
-  args: DefaultCliArgs,
-): Promise<void> {
-  const result = await resolveFileResult(filePath);
-  if (!result) return;
-  if (args.list) return listResult(result.suite);
-  await dispatchResult(result, args);
-}
-
-/** Load a benchmark file and shape its default export into a BuildResult. */
-async function resolveFileResult(
-  filePath: string,
-): Promise<BuildResult | undefined> {
-  const fileUrl = pathToFileURL(resolve(filePath)).href;
-  const { default: candidate } = await import(fileUrl);
-
-  if (candidate && Array.isArray(candidate.matrices)) {
-    return { suite: candidate as MatrixSuite };
-  }
-  if (candidate && Array.isArray(candidate.groups)) {
-    return { suite: candidate as BenchSuite };
-  }
-  if (typeof candidate === "function") {
-    const name = basename(filePath).replace(/\.[^.]+$/, "");
-    const bench = { name, fn: candidate };
-    return { suite: { name, groups: [{ name, benchmarks: [bench] }] } };
-  }
-  return undefined;
-}
-
-/** Require a file argument for a subcommand, exiting with usage on missing. */
-function requireFile(filePath: string | undefined, subcommand: string): string {
-  if (filePath) return filePath;
-  console.error(`Usage: benchforge ${subcommand} <file.benchforge>`);
-  process.exit(1);
 }

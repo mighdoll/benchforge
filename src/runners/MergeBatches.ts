@@ -79,28 +79,6 @@ export function mergeBatchResults(results: MeasuredResults[]): MeasuredResults {
   };
 }
 
-/** Systematically subsample parallel sample arrays in a batch by `factor`.
- *  Stride sampling preserves time-order for time-series plots; the bootstrap
- *  doesn't care about ordering, so this is unbiased for stats too. */
-function subsampleBatch(r: MeasuredResults, factor: number): MeasuredResults {
-  const stride = (arr: number[]): number[] => {
-    const targetLen = Math.max(1, Math.floor(arr.length * factor));
-    const step = arr.length / targetLen;
-    const out = new Array<number>(targetLen);
-    for (let i = 0; i < targetLen; i++) out[i] = arr[Math.floor(i * step)];
-    return out;
-  };
-  const opt = (arr: number[] | undefined) => (arr ? stride(arr) : undefined);
-  return {
-    ...r,
-    samples: stride(r.samples),
-    heapSamples: opt(r.heapSamples),
-    optSamples: opt(r.optSamples),
-    allocationSamples: opt(r.allocationSamples),
-    pausePoints: undefined, // sample indices no longer match after stride
-  };
-}
-
 /** Sum GcStats across batches, or undefined if none collected. */
 export function mergeGcStats(
   results: { gcStats?: GcStats }[],
@@ -162,6 +140,28 @@ export async function runBatched(
     ? mergeBatchResults(baselineBatches)
     : undefined;
   return { results, baseline: mergedBaseline };
+}
+
+/** Systematically subsample parallel sample arrays in a batch by `factor`.
+ *  Stride sampling preserves time-order for time-series plots; the bootstrap
+ *  doesn't care about ordering, so this is unbiased for stats too. */
+function subsampleBatch(r: MeasuredResults, factor: number): MeasuredResults {
+  const stride = (arr: number[]): number[] => {
+    const targetLen = Math.max(1, Math.floor(arr.length * factor));
+    const step = arr.length / targetLen;
+    const out = new Array<number>(targetLen);
+    for (let i = 0; i < targetLen; i++) out[i] = arr[Math.floor(i * step)];
+    return out;
+  };
+  const opt = (arr: number[] | undefined) => (arr ? stride(arr) : undefined);
+  return {
+    ...r,
+    samples: stride(r.samples),
+    heapSamples: opt(r.heapSamples),
+    optSamples: opt(r.optSamples),
+    allocationSamples: opt(r.allocationSamples),
+    pausePoints: undefined, // sample indices no longer match after stride
+  };
 }
 
 /** Concat optional number arrays across batches. */

@@ -144,8 +144,38 @@ export function buildViewerSections(
   return { sections: viewerSections, caches };
 }
 
-function batchCount(m?: MeasuredResults): number {
-  return m?.batchOffsets?.length ?? 0;
+/** Format a BootstrapResult into display-domain BootstrapCIData */
+export function formatBootstrapCI(
+  col: ReportColumn,
+  result: BootstrapResult,
+  batchOffsets: number[] | undefined,
+  metadata?: UnknownRecord,
+): BootstrapCIData {
+  const toDisplay = col.toDisplay
+    ? (v: number) => col.toDisplay!(v, metadata)
+    : (v: number) => v;
+  const formatValue = (v: number) =>
+    (col.formatter ? col.formatter(v) : String(v)) ?? String(v);
+
+  const binned = binBootstrapResult(result);
+  const dLo = toDisplay(binned.ci[0]);
+  const dHi = toDisplay(binned.ci[1]);
+  const ci = (dLo <= dHi ? [dLo, dHi] : [dHi, dLo]) as [number, number];
+  const histogram = binned.histogram.map(b => ({
+    x: toDisplay(b.x),
+    count: b.count,
+  }));
+  const ciLabels = [formatValue(ci[0]), formatValue(ci[1])] as [string, string];
+  const nBatches = batchOffsets?.length ?? 0;
+  const ciReliable = result.ciLevel === "block" && nBatches >= minBatches;
+  return {
+    estimate: toDisplay(binned.estimate),
+    ci,
+    histogram,
+    ciLabels,
+    ciLevel: result.ciLevel,
+    ciReliable,
+  };
 }
 
 /** @return number of batches that survive Tukey trimming (or raw count if
@@ -159,6 +189,10 @@ function effectiveBatchCount(
   if (noTrim) return offsets.length;
   const means = splitByOffsets(m.samples, offsets).map(average);
   return tukeyKeep(means).length;
+}
+
+function batchCount(m?: MeasuredResults): number {
+  return m?.batchOffsets?.length ?? 0;
 }
 
 /** Build ViewerRow[] for a column group, using shared resampling for statKind columns */
@@ -177,28 +211,6 @@ function buildGroupRows(
   }
   attachPrimaryShiftFunction(columns, rows, ctx);
   return rows;
-}
-
-/** Mark the first row with a bootstrap CI as primary and attach its
- *  shift-function data (per-percentile diff across the whole distribution). */
-function attachPrimaryShiftFunction(
-  columns: ReportColumn[],
-  rows: ViewerRow[],
-  ctx: RowContext,
-): void {
-  const primaryRow = rows.find(r => r.entries.some(e => e.bootstrapCI));
-  if (!primaryRow) return;
-  primaryRow.primary = true;
-  const col = columns.find(c => c.title === primaryRow.label);
-  if (!col) return;
-  primaryRow.shiftFunction = buildShiftFunction(
-    col,
-    ctx.current,
-    ctx.baseline,
-    ctx.currentMeta,
-    ctx.baselineMeta,
-    ctx.comparison,
-  );
 }
 
 /** Compute batched bootstrap CIs, returning a Map keyed by column key. When
@@ -302,6 +314,28 @@ function buildRow(
   return { label: col.title, entries, comparisonCI };
 }
 
+/** Mark the first row with a bootstrap CI as primary and attach its
+ *  shift-function data (per-percentile diff across the whole distribution). */
+function attachPrimaryShiftFunction(
+  columns: ReportColumn[],
+  rows: ViewerRow[],
+  ctx: RowContext,
+): void {
+  const primaryRow = rows.find(r => r.entries.some(e => e.bootstrapCI));
+  if (!primaryRow) return;
+  primaryRow.primary = true;
+  const col = columns.find(c => c.title === primaryRow.label);
+  if (!col) return;
+  primaryRow.shiftFunction = buildShiftFunction(
+    col,
+    ctx.current,
+    ctx.baseline,
+    ctx.currentMeta,
+    ctx.baselineMeta,
+    ctx.comparison,
+  );
+}
+
 /** Compute difference CIs with annotation and higher-is-better flip */
 function buildDiffResults(
   cols: ReportColumn[],
@@ -362,38 +396,4 @@ function simpleDeltaCI(
   if (baseRaw === 0) return undefined;
   const percent = ((curRaw - baseRaw) / baseRaw) * 100;
   return { percent, ci: [percent, percent], direction: "uncertain" };
-}
-
-/** Format a BootstrapResult into display-domain BootstrapCIData */
-export function formatBootstrapCI(
-  col: ReportColumn,
-  result: BootstrapResult,
-  batchOffsets: number[] | undefined,
-  metadata?: UnknownRecord,
-): BootstrapCIData {
-  const toDisplay = col.toDisplay
-    ? (v: number) => col.toDisplay!(v, metadata)
-    : (v: number) => v;
-  const formatValue = (v: number) =>
-    (col.formatter ? col.formatter(v) : String(v)) ?? String(v);
-
-  const binned = binBootstrapResult(result);
-  const dLo = toDisplay(binned.ci[0]);
-  const dHi = toDisplay(binned.ci[1]);
-  const ci = (dLo <= dHi ? [dLo, dHi] : [dHi, dLo]) as [number, number];
-  const histogram = binned.histogram.map(b => ({
-    x: toDisplay(b.x),
-    count: b.count,
-  }));
-  const ciLabels = [formatValue(ci[0]), formatValue(ci[1])] as [string, string];
-  const nBatches = batchOffsets?.length ?? 0;
-  const ciReliable = result.ciLevel === "block" && nBatches >= minBatches;
-  return {
-    estimate: toDisplay(binned.estimate),
-    ci,
-    histogram,
-    ciLabels,
-    ciLevel: result.ciLevel,
-    ciReliable,
-  };
 }

@@ -15,6 +15,57 @@ let proc: ChildProcess;
 let port: number;
 let browser: Browser;
 
+beforeAll(async () => {
+  const args = [
+    examplePath,
+    "--view-serve",
+    "--alloc",
+    "--profile",
+    "--iterations",
+    "3",
+    "--warmup",
+    "0",
+  ];
+
+  proc = spawn(binPath, args, {
+    stdio: ["ignore", "pipe", "pipe"],
+  });
+
+  // Parse port from stdout line like "Viewer: http://localhost:3939"
+  const portP = new Promise<number>((resolve, reject) => {
+    let stdout = "";
+    proc.stdout!.on("data", (chunk: Buffer) => {
+      stdout += chunk.toString();
+      const match = stdout.match(/Viewer: http:\/\/localhost:(\d+)/);
+      if (match) resolve(Number(match[1]));
+    });
+    proc.on("error", reject);
+    proc.on("exit", code => {
+      if (!port)
+        reject(
+          new Error(
+            `Process exited (${code}) before viewer started.\nstdout: ${stdout}`,
+          ),
+        );
+    });
+    setTimeout(
+      () =>
+        reject(new Error(`Timed out waiting for viewer.\nstdout: ${stdout}`)),
+      60_000,
+    );
+  });
+
+  [port, browser] = await Promise.all([
+    portP,
+    chromium.launch({ headless: true }),
+  ]);
+}, 90_000);
+
+afterAll(async () => {
+  await browser?.close();
+  proc?.kill();
+});
+
 test("live viewer: summary tab shows stats", {
   timeout: 30_000,
 }, async () => {
@@ -105,55 +156,4 @@ test("live viewer: timing tab has speedscope content", {
   } finally {
     await page.close();
   }
-});
-
-beforeAll(async () => {
-  const args = [
-    examplePath,
-    "--view-serve",
-    "--alloc",
-    "--profile",
-    "--iterations",
-    "3",
-    "--warmup",
-    "0",
-  ];
-
-  proc = spawn(binPath, args, {
-    stdio: ["ignore", "pipe", "pipe"],
-  });
-
-  // Parse port from stdout line like "Viewer: http://localhost:3939"
-  const portP = new Promise<number>((resolve, reject) => {
-    let stdout = "";
-    proc.stdout!.on("data", (chunk: Buffer) => {
-      stdout += chunk.toString();
-      const match = stdout.match(/Viewer: http:\/\/localhost:(\d+)/);
-      if (match) resolve(Number(match[1]));
-    });
-    proc.on("error", reject);
-    proc.on("exit", code => {
-      if (!port)
-        reject(
-          new Error(
-            `Process exited (${code}) before viewer started.\nstdout: ${stdout}`,
-          ),
-        );
-    });
-    setTimeout(
-      () =>
-        reject(new Error(`Timed out waiting for viewer.\nstdout: ${stdout}`)),
-      60_000,
-    );
-  });
-
-  [port, browser] = await Promise.all([
-    portP,
-    chromium.launch({ headless: true }),
-  ]);
-}, 90_000);
-
-afterAll(async () => {
-  await browser?.close();
-  proc?.kill();
 });

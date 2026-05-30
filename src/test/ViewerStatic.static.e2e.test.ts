@@ -15,6 +15,32 @@ let server: Server;
 let port: number;
 let browser: Browser;
 
+beforeAll(async () => {
+  const assets = sirv(viewerDir, { single: true });
+  server = createServer((req, res) => {
+    assets(req, res, () => {
+      res.statusCode = 404;
+      res.end("Not found");
+    });
+  });
+  const portP = new Promise<number>((resolve, reject) => {
+    server.listen(0, "127.0.0.1", () => {
+      const addr = server.address();
+      if (typeof addr === "object" && addr) resolve(addr.port);
+      else reject(new Error("Failed to get server address"));
+    });
+  });
+  [port, browser] = await Promise.all([
+    portP,
+    chromium.launch({ headless: true }),
+  ]);
+});
+
+afterAll(async () => {
+  await browser?.close();
+  server?.close();
+});
+
 test("static viewer: drop zone appears on load", {
   timeout: 30_000,
 }, async () => {
@@ -108,30 +134,4 @@ test("static viewer: tab navigation after archive upload", {
     await page.close();
   }
   expect(consoleErrors).toEqual([]);
-});
-
-beforeAll(async () => {
-  const assets = sirv(viewerDir, { single: true });
-  server = createServer((req, res) => {
-    assets(req, res, () => {
-      res.statusCode = 404;
-      res.end("Not found");
-    });
-  });
-  const portP = new Promise<number>((resolve, reject) => {
-    server.listen(0, "127.0.0.1", () => {
-      const addr = server.address();
-      if (typeof addr === "object" && addr) resolve(addr.port);
-      else reject(new Error("Failed to get server address"));
-    });
-  });
-  [port, browser] = await Promise.all([
-    portP,
-    chromium.launch({ headless: true }),
-  ]);
-});
-
-afterAll(async () => {
-  await browser?.close();
-  server?.close();
 });

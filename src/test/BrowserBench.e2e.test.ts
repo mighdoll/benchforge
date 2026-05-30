@@ -10,6 +10,14 @@ const examplesDir = path.resolve(import.meta.dirname!, "../../examples");
 
 let chrome: ChromeInstance;
 
+beforeAll(async () => {
+  chrome = await launchChrome({ headless: true });
+}, 30_000);
+
+afterAll(async () => {
+  await chrome?.close();
+});
+
 test("bench function mode (window.__bench)", { timeout: 30000 }, async () => {
   const url = `file://${examplesDir}/browser-bench/index.html`;
   const result = await profileBrowser({
@@ -202,12 +210,4 @@ test("batched fresh tabs with baseline-url", { timeout: 60000 }, async () => {
   expect(current.batchOffsets).toEqual([0]); // single batch after warmup drop
   expect(baseline).toBeDefined();
   expect(baseline!.samples.length).toBeGreaterThan(0);
-});
-
-beforeAll(async () => {
-  chrome = await launchChrome({ headless: true });
-}, 30_000);
-
-afterAll(async () => {
-  await chrome?.close();
 });
