@@ -65,7 +65,12 @@ export function createDistributionPlot(
   options: DistributionPlotOptions = {},
 ): SVGSVGElement {
   const opts = { ...defaultOpts, ...options };
-  const layout = buildLayout(opts.width, opts.height, !!opts.pointLabel);
+  const layout = buildLayout(
+    opts.width,
+    opts.height,
+    !!opts.pointLabel,
+    !!opts.title,
+  );
   const svg = createSvg(layout.width, layout.height);
   if (!histogram?.length) return svg;
 
@@ -127,21 +132,32 @@ export function createCIPlot(
   });
 }
 
-/** Use minimal margins when the chart is too small for standard spacing. */
+/** Use minimal margins when the chart is too small for standard spacing.
+ *  The top band holds the title and/or point-label; with neither, collapse it
+ *  to a thin margin (just enough to clear the zero-line cap) so the chart isn't
+ *  preceded by dead space. */
 function buildLayout(
   width: number,
   height: number,
   hasPointLabel?: boolean,
+  hasTitle?: boolean,
 ): Layout {
   const compact = height < defaultMargin.top + defaultMargin.bottom + 10;
   const margin = compact
     ? { top: 4, right: 6, bottom: 4, left: 6 }
-    : { ...defaultMargin, top: hasPointLabel ? 30 : defaultMargin.top };
+    : { ...defaultMargin, top: layoutTop(hasPointLabel, hasTitle) };
   const plot = {
     w: width - margin.left - margin.right,
     h: height - margin.top - margin.bottom,
   };
   return { width, height, margin, plot };
+}
+
+/** Top margin: room for the point-label, else the title, else a thin band. */
+function layoutTop(hasPointLabel?: boolean, hasTitle?: boolean): number {
+  if (hasPointLabel) return 30;
+  if (hasTitle) return defaultMargin.top;
+  return 6;
 }
 
 function buildScales(

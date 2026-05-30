@@ -345,7 +345,7 @@ function ShiftPopupAbsolute({ runName, ci }: { runName: string; ci: BootstrapCID
   return (
     <div class="shift-chart">
       <div class="shift-chart-label">{runName}</div>
-      <div class="shift-chart-svg" ref={ref} />
+      <div ref={ref} />
     </div>
   );
 }
