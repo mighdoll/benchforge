@@ -1,9 +1,6 @@
 import colors from "../report/Colors.ts";
 import { formatSignedPercent } from "../report/Formatters.ts";
-import type {
-  CalibrationResult,
-  RunProgress,
-} from "../runners/Calibration.ts";
+import type { CalibrationResult, RunProgress } from "../runners/Calibration.ts";
 import type { CalibrationSummary } from "../stats/CalibrationSummary.ts";
 
 /** Format an unsigned percent magnitude, e.g. "1.85%". */
