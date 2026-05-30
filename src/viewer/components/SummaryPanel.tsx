@@ -311,9 +311,6 @@ function ShiftPopup({ point, metric, equivMargin, onClose }: {
         <span class="shift-close" onClick={onClose}>{"×"}</span>
         <div class="shift-popup-head">
           <h3>{metric} &middot; {point.label}{unreliableNote}</h3>
-          <span class="shift-verdict">
-            <b>{formatPct(diff.percent)}</b>
-          </span>
         </div>
         <ShiftPopupDiff ci={diff} equivMargin={equivMargin} />
         {point.runs.map((run, i) => (
@@ -324,11 +321,13 @@ function ShiftPopup({ point, metric, equivMargin, onClose }: {
   );
 }
 
-/** The diff CI chart in the popup (reuses createCIPlot). */
+/** The diff CI chart in the popup (reuses createCIPlot). The Δ% point estimate
+ *  is drawn as a bold label above the median line, not in the popup title. */
 function ShiftPopupDiff({ ci, equivMargin }: { ci: DifferenceCI; equivMargin?: number }) {
   const ref = useLazyPlot(async () => {
     const { createCIPlot } = await import("../plots/CIPlot.ts");
-    return createCIPlot(ci, { width: 320, height: 90, title: "", equivMargin });
+    const opts = { width: 320, height: 90, title: "", pointLabel: formatPct(ci.percent), equivMargin };
+    return createCIPlot(ci, opts);
   }, [ci], "Shift diff plot");
   return <div class="shift-chart" ref={ref} />;
 }
