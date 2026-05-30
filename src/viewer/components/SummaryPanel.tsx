@@ -11,6 +11,7 @@ import type {
   ReportData,
   ShiftFunction,
   ShiftPercentile,
+  ShiftRun,
   ViewerEntry,
   ViewerRow,
   ViewerSection,
@@ -302,6 +303,9 @@ function ShiftPopup({ point, metric, equivMargin, onClose }: {
   onClose: () => void;
 }) {
   const { diff } = point;
+  // Shared x-domain so the per-run absolute charts use one scale: equal pixel
+  // positions mean equal values, making medians and CIs comparable across runs.
+  const domain = runsDomain(point.runs);
   const unreliableNote = point.reliable
     ? null
     : <span class="shift-unreliable"> (unreliable, n={point.tailCount})</span>;
@@ -314,11 +318,19 @@ function ShiftPopup({ point, metric, equivMargin, onClose }: {
         </div>
         <ShiftPopupDiff ci={diff} equivMargin={equivMargin} />
         {point.runs.map((run, i) => (
-          <ShiftPopupAbsolute key={i} runName={run.runName} ci={run.bootstrapCI} />
+          <ShiftPopupAbsolute key={i} runName={run.runName} ci={run.bootstrapCI} domain={domain} />
         ))}
       </div>
     </div>
   );
+}
+
+/** Min/max x across every run's histogram bins and CI bounds, for a shared scale. */
+function runsDomain(runs: ShiftRun[]): [number, number] | undefined {
+  const xs = runs.flatMap(r => [...r.bootstrapCI.histogram.map(b => b.x), ...r.bootstrapCI.ci]);
+  if (xs.length < 2) return undefined;
+  const min = Math.min(...xs), max = Math.max(...xs);
+  return max > min ? [min, max] : undefined;
 }
 
 /** The diff CI chart in the popup (reuses createCIPlot). The Δ% point estimate
@@ -337,17 +349,21 @@ function ShiftPopupDiff({ ci, equivMargin }: { ci: DifferenceCI; equivMargin?: n
   );
 }
 
-/** One run's absolute distribution in the popup (reuses createDistributionPlot). */
-function ShiftPopupAbsolute({ runName, ci }: { runName: string; ci: BootstrapCIData }) {
+/** One run's absolute distribution in the popup (reuses createDistributionPlot).
+ *  `domain` shares the x-scale across runs so positions are comparable. */
+function ShiftPopupAbsolute(
+  { runName, ci, domain }:
+  { runName: string; ci: BootstrapCIData; domain?: [number, number] },
+) {
   const ref = useLazyPlot(async () => {
     const { createDistributionPlot } = await import("../plots/CIPlot.ts");
     const opts = {
       width: 320, height: 90, title: "", direction: "uncertain" as const,
       ciLabels: ci.ciLabels, includeZero: false, smooth: true, pointLabel: ci.estimateLabel,
-      ciLevel: ci.ciLevel, ciReliable: ci.ciReliable,
+      ciLevel: ci.ciLevel, ciReliable: ci.ciReliable, domain,
     };
     return createDistributionPlot(ci.histogram, ci.ci, ci.estimate, opts);
-  }, [ci], "Shift absolute plot");
+  }, [ci, domain], "Shift absolute plot");
   return (
     <div class="shift-chart">
       <div class="shift-chart-label">{runName}</div>

@@ -37,6 +37,9 @@ export interface DistributionPlotOptions {
   ciLevel?: CILevel;
   /** false ==> dashed border (insufficient batches for reliable CI) */
   ciReliable?: boolean;
+  /** Explicit x-domain [min, max] to share a scale across stacked charts;
+   *  defaults to this chart's own data extent. */
+  domain?: [number, number];
 }
 
 type Scales = { x: (v: number) => number; y: (v: number) => number };
@@ -75,7 +78,7 @@ export function createDistributionPlot(
   if (!histogram?.length) return svg;
 
   const { fill, stroke } = directionColors[opts.direction];
-  const { includeZero, equivMargin } = opts;
+  const { includeZero, equivMargin, domain } = opts;
   const scales = buildScales(
     histogram,
     ci,
@@ -83,6 +86,7 @@ export function createDistributionPlot(
     includeZero,
     equivMargin,
     pointEstimate,
+    domain,
   );
   const { margin, plot } = layout;
   const ptX = scales.x(pointEstimate);
@@ -167,14 +171,17 @@ function buildScales(
   includeZero: boolean,
   equivMargin?: number,
   pointEstimate?: number,
+  domain?: [number, number],
 ): Scales {
   const { margin, plot } = layout;
   const xs = histogram.map(b => b.x);
   const extra = includeZero ? [0] : [];
   const marginBounds = equivMargin ? [-equivMargin, equivMargin] : [];
   const ptBounds = pointEstimate != null ? [pointEstimate] : [];
-  const xMin = Math.min(...xs, ci[0], ...extra, ...marginBounds, ...ptBounds);
-  const xMax = Math.max(...xs, ci[1], ...extra, ...marginBounds, ...ptBounds);
+  const lo = domain ? [domain[0]] : [];
+  const hi = domain ? [domain[1]] : [];
+  const xMin = Math.min(...xs, ci[0], ...extra, ...marginBounds, ...ptBounds, ...lo);
+  const xMax = Math.max(...xs, ci[1], ...extra, ...marginBounds, ...ptBounds, ...hi);
   const yMax = Math.max(...histogram.map(b => b.count));
   const xRange = xMax - xMin || 1;
   return {
