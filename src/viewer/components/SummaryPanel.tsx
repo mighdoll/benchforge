@@ -337,7 +337,7 @@ function ShiftPopupAbsolute({ runName, ci }: { runName: string; ci: BootstrapCID
     const { createDistributionPlot } = await import("../plots/CIPlot.ts");
     const opts = {
       width: 320, height: 90, title: "", direction: "uncertain" as const,
-      ciLabels: ci.ciLabels, includeZero: false, smooth: true,
+      ciLabels: ci.ciLabels, includeZero: false, smooth: true, pointLabel: ci.estimateLabel,
       ciLevel: ci.ciLevel, ciReliable: ci.ciReliable,
     };
     return createDistributionPlot(ci.histogram, ci.ci, ci.estimate, opts);

@@ -172,10 +172,12 @@ export function formatBootstrapCI(
     count: b.count,
   }));
   const ciLabels = [formatValue(ci[0]), formatValue(ci[1])] as [string, string];
+  const estimate = toDisplay(binned.estimate);
   const nBatches = batchOffsets?.length ?? 0;
   const ciReliable = result.ciLevel === "block" && nBatches >= minBatches;
   return {
-    estimate: toDisplay(binned.estimate),
+    estimate,
+    estimateLabel: formatValue(estimate),
     ci,
     histogram,
     ciLabels,

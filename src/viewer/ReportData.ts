@@ -146,6 +146,9 @@ export interface BootstrapCIData {
   ci: [number, number];
   histogram: HistogramBin[];
 
+  /** Formatted point estimate for display (e.g. "381,729") */
+  estimateLabel?: string;
+
   /** Formatted CI bounds for display (e.g., ["0.12ms", "0.15ms"]) */
   ciLabels?: [string, string];
 
