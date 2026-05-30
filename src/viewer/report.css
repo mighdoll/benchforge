@@ -449,12 +449,12 @@
 .shift-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.25);
   display: flex; align-items: center; justify-content: center; z-index: 50; }
 .shift-popup { background: #fff; border: 1px solid #e0e0e0; border-radius: 10px;
-  padding: 16px 20px; box-shadow: 0 10px 40px rgba(0,0,0,0.2); min-width: 340px; }
+  padding: 16px 20px; box-shadow: 0 10px 40px rgba(0,0,0,0.2); min-width: 470px; }
 .shift-popup-head { display: flex; align-items: baseline; gap: 15px; margin-bottom: 8px; }
 .shift-popup-head h3 { margin: 0; font-size: 15px; color: #444; }
 .shift-close { float: right; cursor: pointer; color: #999; font-size: 20px; line-height: 1; }
-.shift-chart { margin: 12px 0 0; }
-.shift-chart-label { font-size: 13px; font-weight: 600; color: #555; }
+.shift-chart { display: flex; align-items: center; gap: 10px; margin: 12px 0 0; }
+.shift-chart-label { flex: 0 0 110px; font-size: 13px; font-weight: 600; color: #555; }
 .shift-unreliable { color: #999; font-weight: 400; }
 
 :root[data-theme="dark"] .report-panel .shift-panel { border-top-color: #3a3a3a; }

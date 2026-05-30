@@ -329,7 +329,12 @@ function ShiftPopupDiff({ ci, equivMargin }: { ci: DifferenceCI; equivMargin?: n
     const opts = { width: 320, height: 90, title: "", pointLabel: formatPct(ci.percent), equivMargin };
     return createCIPlot(ci, opts);
   }, [ci], "Shift diff plot");
-  return <div class="shift-chart" ref={ref} />;
+  return (
+    <div class="shift-chart">
+      <div class="shift-chart-label">difference</div>
+      <div ref={ref} />
+    </div>
+  );
 }
 
 /** One run's absolute distribution in the popup (reuses createDistributionPlot). */
