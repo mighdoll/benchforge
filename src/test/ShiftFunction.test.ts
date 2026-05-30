@@ -3,6 +3,8 @@ import type { ReportColumn } from "../report/BenchmarkReport.ts";
 import { buildShiftFunction } from "../report/ShiftFunction.ts";
 import type { MeasuredResults } from "../runners/MeasuredResults.ts";
 
+const section = "lines / sec";
+
 const timeCol: ReportColumn = {
   key: "p50",
   title: "p50",
@@ -41,6 +43,7 @@ function batched(
 test("returns undefined without a baseline", () => {
   const sf = buildShiftFunction(
     timeCol,
+    section,
     batched(30, 50),
     undefined,
     {},
@@ -53,6 +56,7 @@ test("returns undefined without a baseline", () => {
 test("produces one point per sampled percentile", () => {
   const sf = buildShiftFunction(
     timeCol,
+    section,
     batched(30, 50, 0.1),
     batched(30, 50),
     {},
@@ -61,12 +65,13 @@ test("produces one point per sampled percentile", () => {
   );
   expect(sf).toBeDefined();
   expect(sf!.points.length).toBe(9);
-  expect(sf!.metric).toBe("p50");
+  expect(sf!.metric).toBe(section);
 });
 
 test("points are sorted ascending by displayed percentile", () => {
   const sf = buildShiftFunction(
     timeCol,
+    section,
     batched(30, 50, 0.1),
     batched(30, 50),
     {},
@@ -82,6 +87,7 @@ test("higherIsBetter keeps absolute estimates monotonic across percentiles", () 
   // absolute throughput should still increase with displayed percentile.
   const sf = buildShiftFunction(
     locCol,
+    section,
     batched(30, 50, 0.1),
     batched(30, 50),
     {},
@@ -96,6 +102,7 @@ test("higherIsBetter keeps absolute estimates monotonic across percentiles", () 
 test("each point carries current and baseline absolute distributions", () => {
   const sf = buildShiftFunction(
     timeCol,
+    section,
     batched(30, 50, 0.1),
     batched(30, 50),
     {},
@@ -113,6 +120,7 @@ test("extreme tail percentiles are unreliable with too few samples", () => {
   // 30 x 5 = 150 samples: p1 has ~2 sparse-side samples => unreliable; p50 ok.
   const sf = buildShiftFunction(
     timeCol,
+    section,
     batched(30, 5, 0.1),
     batched(30, 5),
     {},
@@ -126,6 +134,7 @@ test("extreme tail percentiles are unreliable with too few samples", () => {
 test("equivMargin is recorded for the plot band", () => {
   const sf = buildShiftFunction(
     timeCol,
+    section,
     batched(30, 50, 0.1),
     batched(30, 50),
     {},
@@ -133,4 +142,36 @@ test("equivMargin is recorded for the plot band", () => {
     { equivMargin: 2 },
   )!;
   expect(sf.equivMargin).toBe(2);
+});
+
+/** Build batched samples where the last batch is a slow outlier (so trimming
+ *  by per-batch mean drops it). */
+function withSlowBatch(batches: number, perBatch: number): MeasuredResults {
+  const m = batched(batches, perBatch);
+  const lastStart = (batches - 1) * perBatch;
+  for (let i = lastStart; i < m.samples.length; i++) m.samples[i] += 100;
+  return m;
+}
+
+test("tail coverage counts only the batches the bootstrap kept", () => {
+  // The upper tail's support lives in the slow outlier batch. With trimming on
+  // (default) that batch is dropped, so the kept upper tail has fewer samples
+  // than the untrimmed view sees.
+  const cur = withSlowBatch(8, 50);
+  const base = withSlowBatch(8, 50);
+  const trimmed = buildShiftFunction(timeCol, section, cur, base, {}, {}, {})!;
+  const raw = buildShiftFunction(
+    timeCol,
+    section,
+    cur,
+    base,
+    {},
+    {},
+    {
+      noBatchTrim: true,
+    },
+  )!;
+  const p95Trim = trimmed.points.find(p => p.label === "p95")!;
+  const p95Raw = raw.points.find(p => p.label === "p95")!;
+  expect(p95Trim.tailCount).toBeLessThan(p95Raw.tailCount);
 });

@@ -137,7 +137,13 @@ export function buildViewerSections(
     const ctx: RowContext = { ...base, curVals, baseVals };
     const cache: SectionCICache = {};
     const cols = section.columns as ReportColumn[];
-    const rows = buildGroupRows(cols, ctx, reuseCaches?.[i], cache);
+    const rows = buildGroupRows(
+      cols,
+      ctx,
+      section.title,
+      reuseCaches?.[i],
+      cache,
+    );
     caches[i] = cache;
     if (rows.length) viewerSections.push({ title: section.title, rows });
   });
@@ -199,6 +205,7 @@ function batchCount(m?: MeasuredResults): number {
 function buildGroupRows(
   columns: ReportColumn[],
   ctx: RowContext,
+  sectionTitle: string,
   reuse?: SectionCICache,
   populate?: SectionCICache,
 ): ViewerRow[] {
@@ -209,7 +216,7 @@ function buildGroupRows(
     const row = buildRow(col, key, ctx, ciMap.get(key));
     if (row) rows.push(row);
   }
-  attachPrimaryShiftFunction(columns, rows, ctx);
+  attachPrimaryShiftFunction(columns, rows, ctx, sectionTitle);
   return rows;
 }
 
@@ -320,6 +327,7 @@ function attachPrimaryShiftFunction(
   columns: ReportColumn[],
   rows: ViewerRow[],
   ctx: RowContext,
+  sectionTitle: string,
 ): void {
   const primaryRow = rows.find(r => r.entries.some(e => e.bootstrapCI));
   if (!primaryRow) return;
@@ -328,6 +336,7 @@ function attachPrimaryShiftFunction(
   if (!col) return;
   primaryRow.shiftFunction = buildShiftFunction(
     col,
+    sectionTitle,
     ctx.current,
     ctx.baseline,
     ctx.currentMeta,

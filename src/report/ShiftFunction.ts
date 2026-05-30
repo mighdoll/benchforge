@@ -1,13 +1,14 @@
 import type { MeasuredResults } from "../runners/MeasuredResults.ts";
 import { diffCIs } from "../stats/BootstrapDifference.ts";
 import {
+  average,
   type BootstrapResult,
   bootstrapCIs,
   type DifferenceCI,
   flipCI,
   percentile,
+  prepareBlocks,
   type StatKind,
-  splitByOffsets,
 } from "../stats/StatisticalUtils.ts";
 import type {
   ShiftFunction,
@@ -36,6 +37,7 @@ interface PointArgs {
   currentMeta: UnknownRecord | undefined;
   baselineMeta: UnknownRecord | undefined;
   lowBatches: boolean;
+  noBatchTrim: boolean | undefined;
 }
 
 /** Timing-domain percentiles sampled for the shift function: symmetric and
@@ -56,6 +58,7 @@ const minTailBatches = 5;
  *  baseline or too little batch structure for a meaningful comparison. */
 export function buildShiftFunction(
   col: ReportColumn,
+  sectionTitle: string,
   current: MeasuredResults,
   baseline: MeasuredResults | undefined,
   currentMeta: UnknownRecord | undefined,
@@ -95,6 +98,7 @@ export function buildShiftFunction(
       currentMeta,
       baselineMeta,
       lowBatches,
+      noBatchTrim,
     });
     return point ? [point] : [];
   });
@@ -103,7 +107,7 @@ export function buildShiftFunction(
   // higherIsBetter metrics read low==>high in displayed percentile, which is the
   // reverse of the timing percentile order; sort by displayed percentile.
   points.sort((a, b) => a.percentile - b.percentile);
-  return { metric: col.title, equivMargin: comparison?.equivMargin, points };
+  return { metric: sectionTitle, equivMargin: comparison?.equivMargin, points };
 }
 
 /** Build one shift-function point: flip + annotate the diff, format per-run
@@ -115,7 +119,7 @@ function buildPoint(args: PointArgs): ShiftPercentile | undefined {
   const flipped = col.higherIsBetter ? flipCI(diff) : diff;
   const annotated = annotateCI(flipped, col.title, lowBatches);
 
-  const { current, baseline, currentMeta, baselineMeta } = args;
+  const { current, baseline, currentMeta, baselineMeta, noBatchTrim } = args;
   const runCI = (
     r: BootstrapResult,
     m: MeasuredResults,
@@ -132,8 +136,8 @@ function buildPoint(args: PointArgs): ShiftPercentile | undefined {
     },
   ];
 
-  const curCoverage = tailCoverage(current, p);
-  const baseCoverage = tailCoverage(baseline, p);
+  const curCoverage = tailCoverage(current, p, noBatchTrim);
+  const baseCoverage = tailCoverage(baseline, p, noBatchTrim);
   const tailCount = Math.min(curCoverage.count, baseCoverage.count);
   const tailBatches = Math.min(curCoverage.batches, baseCoverage.batches);
   const reliable =
@@ -156,18 +160,22 @@ function buildPoint(args: PointArgs): ShiftPercentile | undefined {
  *  how many distinct batches contribute them. The sparse side is whichever end
  *  is closer (lower tail for p<=0.5, upper tail for p>0.5); that count is what
  *  pins the quantile down, so an extreme percentile has a tiny count even with
- *  many samples. */
+ *  many samples. Counts only the batches the bootstrap kept (Tukey-trimmed by
+ *  per-batch mean unless noBatchTrim), so a trimmed-away slow tail cannot make
+ *  a percentile look better supported than the CI it gates. */
 function tailCoverage(
   m: MeasuredResults,
   p: number,
+  noBatchTrim: boolean | undefined,
 ): { count: number; batches: number } {
   const { samples, batchOffsets } = m;
-  const threshold = percentile(samples, p);
+  const blocks =
+    batchOffsets && batchOffsets.length >= 2
+      ? prepareBlocks(samples, batchOffsets, average, noBatchTrim).keptSplits
+      : [samples];
+  const threshold = percentile(blocks.flat(), p);
   const inTail =
     p > 0.5 ? (v: number) => v >= threshold : (v: number) => v <= threshold;
-  const blocks = batchOffsets
-    ? splitByOffsets(samples, batchOffsets)
-    : [samples];
   let count = 0;
   let batches = 0;
   for (const block of blocks) {

@@ -323,7 +323,12 @@ function ShiftPopupDiff({ ci, equivMargin }: { ci: DifferenceCI; equivMargin?: n
   }, [ci], "Shift diff plot");
   return (
     <div class="shift-chart">
-      <div class="shift-chart-label">diff: {formatPct(ci.percent)} ({ci.direction})</div>
+      <div class="shift-chart-label">
+        <span class="comparison-badge">
+          <span class={`badge badge-${ci.direction}`}>{directionLabels[ci.direction]}</span>
+        </span>{" "}
+        {formatPct(ci.percent)}
+      </div>
       <div ref={ref} />
     </div>
   );
@@ -342,7 +347,7 @@ function ShiftPopupAbsolute({ runName, ci }: { runName: string; ci: BootstrapCID
   }, [ci], "Shift absolute plot");
   return (
     <div class="shift-chart">
-      <div class="shift-chart-label">{runName}: {ci.ciLabels?.join(" .. ") ?? ""}</div>
+      <div class="shift-chart-label">{runName}</div>
       <div ref={ref} />
     </div>
   );
