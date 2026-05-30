@@ -301,8 +301,8 @@ function drawCILabels(
 ): void {
   if (layout.margin.bottom < 15) return;
   const labelY = layout.height - 4;
-  const loLabel = opts.ciLabels?.[0] ?? formatPct(ci[0], 0);
-  const hiLabel = opts.ciLabels?.[1] ?? formatPct(ci[1], 0);
+  const loLabel = opts.ciLabels?.[0] ?? formatPct(ci[0]);
+  const hiLabel = opts.ciLabels?.[1] ?? formatPct(ci[1]);
   const loX = scales.x(ci[0]);
   const hiX = scales.x(ci[1]);
   const minGap = Math.max(loLabel.length, hiLabel.length) * 6;
