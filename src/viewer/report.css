@@ -440,10 +440,14 @@
   display: flex; align-items: center; justify-content: center; z-index: 50; }
 .shift-popup { background: #fff; border: 1px solid #e0e0e0; border-radius: 10px;
   padding: 16px 20px; box-shadow: 0 10px 40px rgba(0,0,0,0.2); min-width: 340px; }
-.shift-popup h3 { margin: 0 0 8px; font-size: 15px; color: #444; }
+.shift-popup-head { display: flex; align-items: baseline; gap: 15px; margin-bottom: 8px; }
+.shift-popup-head h3 { margin: 0; font-size: 15px; color: #444; }
+.shift-verdict { display: inline-flex; align-items: baseline; gap: 6px; color: #555; }
 .shift-close { float: right; cursor: pointer; color: #999; font-size: 20px; line-height: 1; }
-.shift-chart { margin: 6px 0; }
-.shift-chart-label { font-size: 11px; color: #999; margin-bottom: 2px; }
+.shift-chart { margin: 12px 0 0; }
+.shift-chart-label { font-size: 13px; font-weight: 600; color: #555; }
+/* CIPlot SVG carries ~22px internal top margin; pull it up so the label hugs its chart */
+.shift-chart-svg { margin-top: -16px; }
 .shift-unreliable { color: #999; font-weight: 400; }
 
 :root[data-theme="dark"] .report-panel .shift-panel { border-top-color: #3a3a3a; }

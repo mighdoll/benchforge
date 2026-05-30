@@ -298,6 +298,7 @@ function ShiftPopup({ point, metric, equivMargin, onClose }: {
   equivMargin?: number;
   onClose: () => void;
 }) {
+  const { diff } = point;
   const unreliableNote = point.reliable
     ? null
     : <span class="shift-unreliable"> (unreliable, n={point.tailCount})</span>;
@@ -305,8 +306,14 @@ function ShiftPopup({ point, metric, equivMargin, onClose }: {
     <div class="shift-overlay" onClick={e => e.target === e.currentTarget && onClose()}>
       <div class="shift-popup">
         <span class="shift-close" onClick={onClose}>{"×"}</span>
-        <h3>{metric} &middot; {point.label}{unreliableNote}</h3>
-        <ShiftPopupDiff ci={point.diff} equivMargin={equivMargin} />
+        <div class="shift-popup-head">
+          <h3>{metric} &middot; {point.label}{unreliableNote}</h3>
+          <span class="shift-verdict">
+            <span class={`badge badge-${diff.direction}`}>{directionLabels[diff.direction]}</span>
+            <b>{formatPct(diff.percent)}</b>
+          </span>
+        </div>
+        <ShiftPopupDiff ci={diff} equivMargin={equivMargin} />
         {point.runs.map((run, i) => (
           <ShiftPopupAbsolute key={i} runName={run.runName} ci={run.bootstrapCI} />
         ))}
@@ -321,17 +328,7 @@ function ShiftPopupDiff({ ci, equivMargin }: { ci: DifferenceCI; equivMargin?: n
     const { createCIPlot } = await import("../plots/CIPlot.ts");
     return createCIPlot(ci, { width: 320, height: 90, title: "", equivMargin });
   }, [ci], "Shift diff plot");
-  return (
-    <div class="shift-chart">
-      <div class="shift-chart-label">
-        <span class="comparison-badge">
-          <span class={`badge badge-${ci.direction}`}>{directionLabels[ci.direction]}</span>
-        </span>{" "}
-        {formatPct(ci.percent)}
-      </div>
-      <div ref={ref} />
-    </div>
-  );
+  return <div class="shift-chart" ref={ref} />;
 }
 
 /** One run's absolute distribution in the popup (reuses createDistributionPlot). */
@@ -348,7 +345,7 @@ function ShiftPopupAbsolute({ runName, ci }: { runName: string; ci: BootstrapCID
   return (
     <div class="shift-chart">
       <div class="shift-chart-label">{runName}</div>
-      <div ref={ref} />
+      <div class="shift-chart-svg" ref={ref} />
     </div>
   );
 }
