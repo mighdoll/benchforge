@@ -145,7 +145,8 @@ export function buildViewerSections(
       cache,
     );
     caches[i] = cache;
-    if (rows.length) viewerSections.push({ title: section.title, rows });
+    if (rows.length)
+      viewerSections.push({ title: section.title, rows, layout: section.layout });
   });
   return { sections: viewerSections, caches };
 }

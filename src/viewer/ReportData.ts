@@ -80,6 +80,9 @@ export interface ViewerSection {
   title: string;
   tabLink?: string;
   rows: ViewerRow[];
+
+  /** Rendering layout hint; "matrix" packs scalar metrics into a dense table. */
+  layout?: "matrix";
 }
 
 /** A stat row with per-run values and optional comparison CI. */

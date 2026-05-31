@@ -470,3 +470,33 @@
   :root:not([data-theme="light"]) .shift-popup { background: #252525; border-color: #3a3a3a; }
   :root:not([data-theme="light"]) .shift-popup h3 { color: #ddd; }
 }
+
+/* --- Matrix section: dense table of scalar metrics (e.g. GC) --- */
+.report-panel .matrix {
+  display: grid;
+  /* label | a value per run | delta | flex spacer (absorbs slack on the right
+     so the table packs left instead of floating against the panel edge) */
+  grid-template-columns:
+    max-content repeat(var(--runs), minmax(56px, max-content)) max-content 1fr;
+  column-gap: 16px;
+  row-gap: 4px;
+  align-items: baseline;
+}
+
+.report-panel .matrix .m-head { font-size: 11px; color: #999; text-align: right; }
+.report-panel .matrix .m-label { font-size: 12px; font-weight: 600; color: #666; }
+
+.report-panel .matrix .m-val {
+  font-size: 14px;
+  font-weight: 600;
+  color: #333;
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+
+:root[data-theme="dark"] .report-panel .matrix .m-label { color: #999; }
+:root[data-theme="dark"] .report-panel .matrix .m-val { color: #ddd; }
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) .report-panel .matrix .m-label { color: #999; }
+  :root:not([data-theme="light"]) .report-panel .matrix .m-val { color: #ddd; }
+}

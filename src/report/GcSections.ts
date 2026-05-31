@@ -28,6 +28,7 @@ export const gcSection: ReportSection = {
 /** Report section: detailed GC stats from --trace-gc-nvp. */
 export const gcStatsSection: ReportSection = {
   title: "gc",
+  layout: "matrix",
   columns: [
     {
       key: "allocPerIter",

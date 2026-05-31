@@ -253,6 +253,7 @@ function SectionPanel({ section }: { section: ViewerSection }) {
     : <span>{section.title}</span>;
 
   if (shift) return <ShiftSection section={section} shift={shift} titleEl={titleEl} />;
+  if (section.layout === "matrix") return <MatrixSection section={section} titleEl={titleEl} />;
 
   return (
     <div class="section-panel">
@@ -263,6 +264,45 @@ function SectionPanel({ section }: { section: ViewerSection }) {
         ))}
       </div>
     </div>
+  );
+}
+
+/** Dense table for scalar metrics: rows = metrics, columns = a value per run
+ *  then the delta badge. Run names appear once as headers. Uses its own cell
+ *  classes so it stays out of the global alignRunColumns width calc. */
+function MatrixSection(
+  { section, titleEl }:
+  { section: ViewerSection; titleEl: preact.JSX.Element },
+) {
+  const runs = section.rows[0].entries;
+  const style = { "--runs": String(runs.length) } as Record<string, string>;
+  return (
+    <div class="section-panel matrix-section">
+      <div class="panel-header">{titleEl}</div>
+      <div class="panel-body">
+        <div class="matrix" style={style}>
+          <span class="m-label" />
+          {runs.map((run, i) => <span key={i} class="m-head">{run.runName}</span>)}
+          <span class="m-head" />
+          <span />
+          {section.rows.map((row, i) => <MatrixRow key={i} row={row} />)}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/** One metric line in the matrix: label, a value per run, then the delta badge. */
+function MatrixRow({ row }: { row: ViewerRow }) {
+  return (
+    <>
+      <span class="m-label">{row.label}</span>
+      {row.entries.map((entry, i) => <span key={i} class="m-val">{entry.value}</span>)}
+      {row.comparisonCI
+        ? <ComparisonBadge ci={row.comparisonCI} compact />
+        : <span class="m-val" />}
+      <span />
+    </>
   );
 }
 

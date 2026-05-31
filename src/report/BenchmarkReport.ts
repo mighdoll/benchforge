@@ -37,6 +37,9 @@ export interface BenchmarkReport {
 export interface ReportSection {
   title: string;
   columns: ReportColumn[];
+
+  /** Rendering layout hint; "matrix" packs scalar metrics into a dense table. */
+  layout?: "matrix";
 }
 
 /** A table column with optional comparison behavior */
