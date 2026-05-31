@@ -257,6 +257,12 @@ For the suggested margin to apply to your real comparisons:
 - **Run on a quiet machine.** Quit other apps, pause background sync and
   software updates, and avoid thermal throttling. Calibration measures whatever
   moves between runs, so a busy machine inflates the suggested margin.
+- **For GC-sensitive code, give each batch a few full GCs.** Set `--duration`
+  long enough that at least ~2 major collections happen per batch. With only one,
+  the batch mean depends on where that collection lands, and its timing varies
+  between runs in a way the within-run CI can't see -- a common cause of the
+  overconfidence warning. Run with `--gc-stats` to check; calibrate warns when
+  full GCs per batch is too low. Longer batches fix this; more batches don't.
 
 Use `--equiv-margin 0` to disable equivalence testing and fall back to the
 simple CI-excludes-zero approach.
