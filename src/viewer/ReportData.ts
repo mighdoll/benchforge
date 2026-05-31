@@ -110,6 +110,10 @@ export interface ShiftFunction {
 
 /** One percentile's diff distribution plus per-run absolute distributions. */
 export interface ShiftPercentile {
+  /** true for the leading mean point (a summary stat, not a percentile);
+   *  the plot gives it its own slot ahead of p1, set off by a divider. */
+  isMean?: boolean;
+
   /** Displayed-metric percentile in [0, 1] (e.g. 0.5 for the median). */
   percentile: number;
   /** Short label, e.g. "p50", "p99", "p0.1". */

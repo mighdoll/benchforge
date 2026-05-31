@@ -67,7 +67,8 @@ export function buildShiftFunction(
 ): ShiftFunction | undefined {
   if (!baseline?.samples?.length || !current.samples?.length) return undefined;
 
-  const stats: StatKind[] = shiftPercentiles.map(p => ({ percentile: p }));
+  // "mean" leads the stat list so its results sit at index 0; percentiles follow.
+  const stats: StatKind[] = ["mean", ...shiftPercentiles.map(p => ({ percentile: p }))];
   const noBatchTrim = comparison?.noBatchTrim;
   const opts = { equivMargin: comparison?.equivMargin, noBatchTrim };
   const diffs = diffCIs(
@@ -85,56 +86,29 @@ export function buildShiftFunction(
     noTrim: noBatchTrim,
   });
   const lowBatches = hasLowBatchCount(baseline, current, noBatchTrim);
+  const ctx = { col, current, baseline, currentMeta, baselineMeta, lowBatches, noBatchTrim };
 
-  const points = shiftPercentiles.flatMap((p, i) => {
-    const point = buildPoint({
-      p,
-      diff: diffs[i],
-      curResult: curAbs[i],
-      baseResult: baseAbs[i],
-      col,
-      current,
-      baseline,
-      currentMeta,
-      baselineMeta,
-      lowBatches,
-      noBatchTrim,
-    });
+  const percentiles = shiftPercentiles.flatMap((p, i) => {
+    // +1 skips the leading mean entry in the result arrays.
+    const point = buildPoint({ p, diff: diffs[i + 1], curResult: curAbs[i + 1], baseResult: baseAbs[i + 1], ...ctx });
     return point ? [point] : [];
   });
-  if (!points.length) return undefined;
-
   // higherIsBetter metrics read low==>high in displayed percentile, which is the
   // reverse of the timing percentile order; sort by displayed percentile.
-  points.sort((a, b) => a.percentile - b.percentile);
+  percentiles.sort((a, b) => a.percentile - b.percentile);
+
+  const mean = buildMeanPoint({ p: 0, diff: diffs[0], curResult: curAbs[0], baseResult: baseAbs[0], ...ctx });
+  const points = mean ? [mean, ...percentiles] : percentiles;
+  if (!points.length) return undefined;
   return { metric: sectionTitle, equivMargin: comparison?.equivMargin, points };
 }
 
-/** Build one shift-function point: flip + annotate the diff, format per-run
- *  absolute distributions, and gate reliability by tail coverage. */
+/** Build one percentile point: flip + annotate the diff, format per-run absolute
+ *  distributions, and gate reliability by tail coverage. */
 function buildPoint(args: PointArgs): ShiftPercentile | undefined {
-  const { p, diff, curResult, baseResult, col, lowBatches } = args;
-  if (!diff || !curResult || !baseResult) return undefined;
-
-  const flipped = col.higherIsBetter ? flipCI(diff) : diff;
-  const annotated = annotateCI(flipped, col.title, lowBatches);
-
-  const { current, baseline, currentMeta, baselineMeta, noBatchTrim } = args;
-  const runCI = (
-    r: BootstrapResult,
-    m: MeasuredResults,
-    meta?: UnknownRecord,
-  ) => formatBootstrapCI(col, r, m.batchOffsets, meta);
-  const runs: ShiftRun[] = [
-    {
-      runName: current.name,
-      bootstrapCI: runCI(curResult, current, currentMeta),
-    },
-    {
-      runName: "baseline",
-      bootstrapCI: runCI(baseResult, baseline, baselineMeta),
-    },
-  ];
+  const { p, col, lowBatches, current, baseline, noBatchTrim } = args;
+  const base = buildPointBase(args);
+  if (!base) return undefined;
 
   const curCoverage = tailCoverage(current, p, noBatchTrim);
   const baseCoverage = tailCoverage(baseline, p, noBatchTrim);
@@ -146,14 +120,65 @@ function buildPoint(args: PointArgs): ShiftPercentile | undefined {
   // displayed percentile mirrors for higherIsBetter (timing p99 == loc/sec p1)
   const displayed = col.higherIsBetter ? 1 - p : p;
   return {
+    ...base,
     percentile: displayed,
     label: percentileLabel(displayed),
-    diff: annotated,
-    runs,
     reliable,
     tailCount,
     tailBatches,
   };
+}
+
+/** Build the leading mean point. Mean uses every sample, so reliability is gated
+ *  only by batch count (no tail-coverage check), and tail counts report the full
+ *  sample/batch totals. Marked isMean for the renderer's leading-violin slot. */
+function buildMeanPoint(args: PointArgs): ShiftPercentile | undefined {
+  const { lowBatches, current, baseline, noBatchTrim } = args;
+  const base = buildPointBase(args);
+  if (!base) return undefined;
+
+  const tailCount = Math.min(current.samples.length, baseline.samples.length);
+  const tailBatches = Math.min(
+    effectiveBatches(current, noBatchTrim),
+    effectiveBatches(baseline, noBatchTrim),
+  );
+  return {
+    ...base,
+    isMean: true,
+    percentile: 0,
+    label: "mean",
+    reliable: !lowBatches,
+    tailCount,
+    tailBatches,
+  };
+}
+
+/** Shared point fields: flipped+annotated diff and per-run absolute distributions. */
+function buildPointBase(
+  args: PointArgs,
+): Pick<ShiftPercentile, "diff" | "runs"> | undefined {
+  const { diff, curResult, baseResult, col, lowBatches } = args;
+  if (!diff || !curResult || !baseResult) return undefined;
+
+  const flipped = col.higherIsBetter ? flipCI(diff) : diff;
+  const annotated = annotateCI(flipped, col.title, lowBatches);
+
+  const { current, baseline, currentMeta, baselineMeta } = args;
+  const runCI = (r: BootstrapResult, m: MeasuredResults, meta?: UnknownRecord) =>
+    formatBootstrapCI(col, r, m.batchOffsets, meta);
+  const runs: ShiftRun[] = [
+    { runName: current.name, bootstrapCI: runCI(curResult, current, currentMeta) },
+    { runName: "baseline", bootstrapCI: runCI(baseResult, baseline, baselineMeta) },
+  ];
+  return { diff: annotated, runs };
+}
+
+/** @return distinct batches the bootstrap kept (Tukey-trimmed unless noTrim),
+ *  or 1 when there is no batch structure. */
+function effectiveBatches(m: MeasuredResults, noTrim: boolean | undefined): number {
+  const { samples, batchOffsets } = m;
+  if (!batchOffsets || batchOffsets.length < 2) return 1;
+  return prepareBlocks(samples, batchOffsets, average, noTrim).keptSplits.length;
 }
 
 /** @return how many samples lie on the sparse side of the p-th percentile and

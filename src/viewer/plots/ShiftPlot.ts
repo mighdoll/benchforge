@@ -45,23 +45,54 @@ export function createShiftPlot(
   const plotWidth = opts.width - margin.left - margin.right;
   const plotHeight = opts.height - margin.top - margin.bottom;
   const yScale = buildYScale(points, shift.equivMargin, plotHeight);
-  const slotWidth = plotWidth / points.length;
-  const halfMax = slotWidth * 0.42;
+  const centers = slotCenters(points, plotWidth);
+  const halfMax = centers.slotWidth * 0.42;
   const maxCount = maxHistogramCount(points);
 
   if (shift.equivMargin)
     drawMarginBand(svg, shift.equivMargin, yScale, opts.width);
   drawZeroLine(svg, yScale, opts.width);
   drawYAxis(svg, yScale, points, shift.equivMargin);
+  if (centers.dividerX != null)
+    drawDivider(svg, centers.dividerX, plotHeight);
 
   points.forEach((point, i) => {
-    const cx = margin.left + slotWidth * (i + 0.5);
+    const cx = centers.cx[i];
     drawViolin(svg, point, cx, halfMax, maxCount, yScale, opts.onSelect);
     drawMarker(svg, point, cx, yScale);
     drawPercentileLabel(svg, point, cx, opts.height);
   });
 
   return svg;
+}
+
+/** Slot centers across the plot. A leading mean point gets its own slot, set off
+ *  from the percentiles by an extra half-slot gap with a divider line between. */
+function slotCenters(
+  points: ShiftPercentile[],
+  plotWidth: number,
+): { cx: number[]; slotWidth: number; dividerX: number | null } {
+  const hasMean = points[0]?.isMean ?? false;
+  // the gap before p1 costs one extra half-slot of width
+  const slots = points.length + (hasMean ? 0.5 : 0);
+  const slotWidth = plotWidth / slots;
+  const gap = hasMean ? slotWidth * 0.5 : 0;
+  const cx = points.map((_, i) => {
+    const lead = i === 0 || !hasMean ? 0 : gap;
+    return margin.left + lead + slotWidth * (i + 0.5);
+  });
+  const dividerX = hasMean ? margin.left + slotWidth + gap * 0.5 : null;
+  return { cx, slotWidth, dividerX };
+}
+
+/** Faint vertical divider separating the mean slot from the percentile slots. */
+function drawDivider(svg: SVGSVGElement, x: number, plotHeight: number): void {
+  svg.appendChild(
+    line(x, margin.top, x, margin.top + plotHeight, {
+      stroke: "#e0e0e0",
+      strokeWidth: "1",
+    }),
+  );
 }
 
 /** y-scale mapping diff-percent to pixels, spanning all violins + CI bounds,
@@ -230,14 +261,15 @@ function drawMarker(
   svg.appendChild(dot);
 }
 
-/** Percentile label (and tail-count caption for unreliable percentiles). */
+/** Percentile label (and tail-count caption for unreliable percentiles). The
+ *  mean label is drawn darker since it is the primary metric. */
 function drawPercentileLabel(
   svg: SVGSVGElement,
   point: ShiftPercentile,
   cx: number,
   height: number,
 ): void {
-  const color = point.reliable ? "#374151" : weakColor;
+  const color = point.isMean ? "#111827" : point.reliable ? "#374151" : weakColor;
   svg.appendChild(
     text(
       cx,
@@ -246,7 +278,7 @@ function drawPercentileLabel(
       "middle",
       "11",
       color,
-      "600",
+      point.isMean ? "700" : "600",
     ),
   );
   if (!point.reliable)

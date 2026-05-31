@@ -9,6 +9,8 @@
   display: none;
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
   line-height: 1.6;
+  /* equivalence-margin yellow, shared by the CI charts and the shift violins */
+  --equiv-margin: #f59e0b;
 }
 
 .report-panel.active { display: block; }
@@ -308,8 +310,8 @@
 .report-panel .plot-area svg g[aria-label="x-axis label"] text { font-size: 14px; }
 
 /* --- Equivalence margin zone --- */
-.margin-zone { stroke: #f59e0b; opacity: .7 }
-.margin-hatch-stroke { stroke: #f59e0b; stroke-width: 3.5; opacity: .7; }
+.margin-zone { stroke: var(--equiv-margin); opacity: .7 }
+.margin-hatch-stroke { stroke: var(--equiv-margin); stroke-width: 3.5; opacity: .7; }
 
 /* --- CI region overlay opacity (light/dark aware) --- */
 .ci-region { opacity: 0.55; }

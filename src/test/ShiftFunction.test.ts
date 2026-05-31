@@ -53,7 +53,7 @@ test("returns undefined without a baseline", () => {
   expect(sf).toBeUndefined();
 });
 
-test("produces one point per sampled percentile", () => {
+test("leads with mean, then one point per sampled percentile", () => {
   const sf = buildShiftFunction(
     timeCol,
     section,
@@ -64,11 +64,14 @@ test("produces one point per sampled percentile", () => {
     {},
   );
   expect(sf).toBeDefined();
-  expect(sf!.points.length).toBe(9);
+  expect(sf!.points.length).toBe(10);
   expect(sf!.metric).toBe(section);
+  expect(sf!.points[0].isMean).toBe(true);
+  expect(sf!.points[0].label).toBe("mean");
+  expect(sf!.points.slice(1).every(p => !p.isMean)).toBe(true);
 });
 
-test("points are sorted ascending by displayed percentile", () => {
+test("percentile points are sorted ascending (mean stays first)", () => {
   const sf = buildShiftFunction(
     timeCol,
     section,
@@ -78,7 +81,8 @@ test("points are sorted ascending by displayed percentile", () => {
     {},
     {},
   )!;
-  const ps = sf.points.map(p => p.percentile);
+  expect(sf.points[0].isMean).toBe(true);
+  const ps = sf.points.slice(1).map(p => p.percentile);
   expect(ps).toEqual([...ps].sort((a, b) => a - b));
 });
 
@@ -94,7 +98,9 @@ test("higherIsBetter keeps absolute estimates monotonic across percentiles", () 
     {},
     {},
   )!;
-  const ests = sf.points.map(p => p.runs[0].bootstrapCI.estimate);
+  expect(sf.points[0].isMean).toBe(true);
+  // skip the leading mean point; the percentile estimates should ramp upward.
+  const ests = sf.points.slice(1).map(p => p.runs[0].bootstrapCI.estimate);
   const monotonic = ests.every((v, i) => i === 0 || v >= ests[i - 1]);
   expect(monotonic).toBe(true);
 });

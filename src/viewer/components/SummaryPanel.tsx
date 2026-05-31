@@ -252,18 +252,43 @@ function SectionPanel({ section }: { section: ViewerSection }) {
     ? <a class="panel-title-link" onClick={() => (activeTabId.value = section.tabLink!)}>{section.title}</a>
     : <span>{section.title}</span>;
 
-  // The shift function summarizes the whole distribution across percentiles, so
-  // it supersedes the per-row inline CI sparklines; gate those off (inlineCI)
-  // and show plain values instead when a shift function is present.
+  if (shift) return <ShiftSection section={section} shift={shift} titleEl={titleEl} />;
+
   return (
     <div class="section-panel">
       <div class="panel-header">{titleEl}</div>
       <div class="panel-body">
         {section.rows.map((row, i) => (
-          <StatRow key={i} row={row} estimateRange={range} inlineCI={!shift} />
+          <StatRow key={i} row={row} estimateRange={range} />
         ))}
       </div>
-      {shift && <ShiftPanel shift={shift} />}
+    </div>
+  );
+}
+
+/** A section with a shift function: the primary row's diff chart, then the
+ *  per-percentile violins, then any shared rows (e.g. the line count). The
+ *  primary row's per-run absolute values are dropped here -- they live in the
+ *  violins' click-to-detail popup -- and non-primary comparable rows (p50, p95)
+ *  are represented by the violins, so they are omitted from the top stack. */
+function ShiftSection(
+  { section, shift, titleEl }:
+  { section: ViewerSection; shift: ShiftFunction; titleEl: preact.JSX.Element },
+) {
+  const primary = section.rows.find(r => r.primary);
+  const shared = section.rows.filter(r => r.shared);
+  return (
+    <div class="section-panel">
+      <div class="panel-header">{titleEl}</div>
+      <div class="panel-body">
+        {primary && <StatRow row={primary} chartOnly />}
+      </div>
+      <ShiftPanel shift={shift} />
+      {shared.length > 0 && (
+        <div class="panel-body">
+          {shared.map((row, i) => <StatRow key={i} row={row} />)}
+        </div>
+      )}
     </div>
   );
 }
@@ -427,8 +452,8 @@ function sectionEstimateRange(section: ViewerSection): [number, number] | undefi
 }
 
 function StatRow(
-  { row, estimateRange, inlineCI = true }:
-  { row: ViewerRow; estimateRange?: [number, number]; inlineCI?: boolean },
+  { row, estimateRange, chartOnly = false }:
+  { row: ViewerRow; estimateRange?: [number, number]; chartOnly?: boolean },
 ) {
   if (row.shared) {
     return (
@@ -450,8 +475,8 @@ function StatRow(
         <span class="row-label">{row.label}</span>
         {row.comparisonCI && <ComparisonBadge ci={row.comparisonCI} compact />}
       </div>
-      {row.entries.map((entry, i) => (
-        <RunEntry key={i} entry={entry} estimateRange={estimateRange} inlineCI={inlineCI} />
+      {!chartOnly && row.entries.map((entry, i) => (
+        <RunEntry key={i} entry={entry} estimateRange={estimateRange} />
       ))}
     </div>
   );
@@ -467,8 +492,8 @@ function SharedStat({ label, value }: { label: string; value: string }) {
 }
 
 function RunEntry(
-  { entry, estimateRange, inlineCI = true }:
-  { entry: ViewerEntry; estimateRange?: [number, number]; inlineCI?: boolean },
+  { entry, estimateRange }:
+  { entry: ViewerEntry; estimateRange?: [number, number] },
 ) {
   const ci = entry.bootstrapCI;
   const [lo, hi] = estimateRange ?? [0, 0];
@@ -476,7 +501,7 @@ function RunEntry(
   return (
     <div class="run-entry">
       <span class="run-name">{entry.runName}</span>
-      {ci && inlineCI
+      {ci
         ? <BootstrapCIMount ci={ci} label={entry.value} shift={shift} />
         : <span class="run-value">{entry.value}</span>}
     </div>
