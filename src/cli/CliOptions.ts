@@ -1,7 +1,6 @@
 import type { RunMatrixOptions } from "../matrix/BenchMatrix.ts";
 import type { HeapReportOptions } from "../profiling/node/HeapSampleReport.ts";
 import type { ComparisonOptions } from "../report/BenchmarkReport.ts";
-import { buildTimeSection } from "../report/StandardSections.ts";
 import type { RunnerOptions } from "../runners/BenchRunner.ts";
 import {
   type DefaultCliArgs,
@@ -47,8 +46,6 @@ export function validateArgs(args: DefaultCliArgs): void {
       "--gc-stats requires worker mode (the default). Remove --no-worker flag.",
     );
   }
-  // Eagerly validate --stats tokens so users see the error before running benchmarks.
-  if (args.stats) buildTimeSection(args.stats);
 }
 
 /** Convert CLI args to benchmark runner options. */

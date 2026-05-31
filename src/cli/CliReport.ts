@@ -16,10 +16,10 @@ import colors from "../report/Colors.ts";
 import { gcStatsSection } from "../report/GcSections.ts";
 import {
   adaptiveSections,
-  buildTimeSection,
   formatTierSummary,
   optSection,
   runsSection,
+  timeSection,
   totalTimeSection,
 } from "../report/StandardSections.ts";
 import { reportResults } from "../report/text/TextReport.ts";
@@ -131,17 +131,14 @@ export function matrixToReportGroups(results: MatrixResults[]): ReportGroup[] {
 }
 
 /** Assemble report sections from CLI flags. Under --adaptive, the
- *  adaptive section provides its own time columns and `stats` is ignored. */
+ *  adaptive section provides its own time columns. */
 export function buildReportSections(
   adaptive: boolean,
   gcStats: boolean,
   hasOptData: boolean,
-  stats?: string,
 ): ReportSection[] {
   return [
-    ...(adaptive
-      ? [...adaptiveSections, totalTimeSection]
-      : [buildTimeSection(stats)]),
+    ...(adaptive ? [...adaptiveSections, totalTimeSection] : [timeSection]),
     ...(gcStats ? [gcStatsSection] : []),
     ...(hasOptData ? [optSection] : []),
     runsSection,
@@ -153,9 +150,9 @@ function cliDefaultSections(
   groups: ReportGroup[],
   args: DefaultCliArgs,
 ): ReportSection[] {
-  const { adaptive, "gc-stats": gcStats, "trace-opt": traceOpt, stats } = args;
+  const { adaptive, "gc-stats": gcStats, "trace-opt": traceOpt } = args;
   const hasOpt = hasField(groups, "optStatus");
-  return buildReportSections(adaptive, gcStats, traceOpt && hasOpt, stats);
+  return buildReportSections(adaptive, gcStats, traceOpt && hasOpt);
 }
 
 /** Apply default sections and extra columns for matrix reports. */
@@ -168,12 +165,7 @@ function mergeMatrixDefaults(
   if (!merged.sections?.length) {
     const groups = matrixToReportGroups(results);
     const hasOpt = args["trace-opt"] && hasField(groups, "optStatus");
-    merged.sections = buildReportSections(
-      args.adaptive,
-      args["gc-stats"],
-      hasOpt,
-      args.stats,
-    );
+    merged.sections = buildReportSections(args.adaptive, args["gc-stats"], hasOpt);
   }
   if (!merged.comparison) merged.comparison = cliComparisonOptions(args);
   return merged;

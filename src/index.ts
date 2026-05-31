@@ -72,10 +72,10 @@ export {
 } from "./report/GitUtils.ts";
 export type { PrepareHtmlOptions } from "./report/HtmlReport.ts";
 export { prepareHtmlData } from "./report/HtmlReport.ts";
+export { markdownReport } from "./report/MarkdownReport.ts";
 export {
   adaptiveSections,
   buildGenericSections,
-  buildTimeSection,
   optSection,
   runsSection,
   timeSection,

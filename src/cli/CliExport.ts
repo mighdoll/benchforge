@@ -1,5 +1,5 @@
-import { writeFileSync } from "node:fs";
-import { resolve } from "node:path";
+import { mkdirSync, writeFileSync } from "node:fs";
+import { join, resolve } from "node:path";
 import { buildSpeedscopeFile } from "../export/AllocExport.ts";
 import { archiveBenchmark, collectSources } from "../export/ArchiveExport.ts";
 import {
@@ -15,6 +15,7 @@ import type { ReportGroup, ReportSection } from "../report/BenchmarkReport.ts";
 import { groupReports } from "../report/BenchmarkReport.ts";
 import type { GitVersion } from "../report/GitUtils.ts";
 import { prepareHtmlData } from "../report/HtmlReport.ts";
+import { markdownReport } from "../report/MarkdownReport.ts";
 import type { ReportData } from "../viewer/ReportData.ts";
 import type { DefaultCliArgs } from "./CliArgs.ts";
 import {
@@ -53,7 +54,6 @@ type FrameContainer = {
 export async function exportReports(options: ExportOptions): Promise<void> {
   const { results, args, sections, currentVersion, baselineVersion } = options;
 
-  const wantViewer = args.view || args["view-serve"] || args.archive != null;
   const comparison = cliComparisonOptions(args);
   const htmlOpts = {
     cliArgs: args,
@@ -62,12 +62,13 @@ export async function exportReports(options: ExportOptions): Promise<void> {
     baselineVersion,
     ...comparison,
   };
-  const reportData = wantViewer
-    ? withStatus("computing viewer data", () =>
-        prepareHtmlData(results, htmlOpts),
-      )
-    : undefined;
+  // Always computed: the markdown report (below) is always written, and the
+  // viewer/archive reuse the same data when requested.
+  const reportData = withStatus("computing viewer data", () =>
+    prepareHtmlData(results, htmlOpts),
+  );
 
+  writeMarkdownReport(reportData, args);
   exportFileFormats(results, args);
 
   const profileFile = buildSpeedscopeFile(results);
@@ -100,6 +101,38 @@ export async function finishReports(
     printHeapReports(results, cliHeapReportOptions(args));
   }
   await exportReports({ results, args, ...exportOptions });
+}
+
+// The shared output dir users gitignore. benchforge writes no HTML to disk
+// (reports are JSON archives + the in-memory viewer), so markdown sits here flat.
+const reportDir = "bench-report";
+
+/** Write the always-on markdown report (shift tables + GC/scalar comparison) so
+ *  agents and other text consumers get the full distribution the HTML viewer
+ *  shows. Default: a timestamped file plus a stable `latest.md` in bench-report/
+ *  (history preserved, predictable path for agents). `--report-md <path>` writes
+ *  a single explicit file instead. */
+function writeMarkdownReport(data: ReportData, args: DefaultCliArgs): void {
+  const md = markdownReport(data);
+  const override = args["report-md"];
+  if (override) {
+    const path = resolve(override);
+    writeFileSync(path, md);
+    console.log(`Markdown report written to: ${path}`);
+    return;
+  }
+  mkdirSync(reportDir, { recursive: true });
+  const stamp = fileStamp(data.metadata.timestamp);
+  const timestamped = resolve(join(reportDir, `bench-${stamp}.md`));
+  const latest = resolve(join(reportDir, "latest.md"));
+  writeFileSync(timestamped, md);
+  writeFileSync(latest, md);
+  console.log(`Markdown report written to: ${latest} (and ${timestamped})`);
+}
+
+/** ISO timestamp ==> filename-safe stamp (drop ms/zone, ':' is illegal on Windows). */
+function fileStamp(iso: string): string {
+  return iso.replace(/\.\d+Z$/, "").replace(/[:]/g, "-");
 }
 
 /** Write Perfetto and time profile files if requested by CLI args. */

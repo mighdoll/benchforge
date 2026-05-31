@@ -30,11 +30,7 @@ import {
 } from "./BenchmarkReport.ts";
 import { gcStatsSection } from "./GcSections.ts";
 import type { GitVersion } from "./GitUtils.ts";
-import {
-  buildTimeSection,
-  optSection,
-  runsSection,
-} from "./StandardSections.ts";
+import { optSection, runsSection, timeSection } from "./StandardSections.ts";
 import {
   buildViewerSections,
   hasLowBatchCount,
@@ -95,9 +91,8 @@ function defaultSections(
 ): ReportSection[] {
   const hasGc = cliArgs?.["gc-stats"] === true;
   const hasOpt = hasField(groups, "optStatus");
-  const stats = typeof cliArgs?.stats === "string" ? cliArgs.stats : undefined;
   return [
-    buildTimeSection(stats),
+    timeSection,
     hasGc ? gcStatsSection : undefined,
     hasOpt ? optSection : undefined,
     runsSection,

@@ -18,8 +18,6 @@ test("combines time and gc sections into report", () => {
 
   expect(rows[0].name).toBe("test");
   expect(rows[0].mean).toBeCloseTo(report.measuredResults.time.avg, 1);
-  expect(rows[0].p50).toBeCloseTo(report.measuredResults.time.p50, 1);
-  expect(rows[0].p99).toBeCloseTo(report.measuredResults.time.p99, 1);
   expect(rows[0].gc).toBeDefined();
 });
 

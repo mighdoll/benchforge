@@ -5,10 +5,16 @@ import type {
 import type { ReportSection } from "./BenchmarkReport.ts";
 import { formatConvergence, timeMs } from "./Formatters.ts";
 import { gcSections } from "./GcSections.ts";
-import { parseStatsArg } from "./ParseStats.ts";
 
-/** Default timing section: mean, p50, p99. */
-export const timeSection: ReportSection = buildTimeSection();
+/** Timing section: a single mean column (+ a Δ% CI when a baseline exists).
+ *  Per-percentile detail lives in the markdown report and HTML viewer (shift
+ *  function), so the CLI table stays a one-glance headline. */
+export const timeSection: ReportSection = {
+  title: "time",
+  columns: [
+    { key: "mean", title: "mean", formatter: timeMs, comparable: true, statKind: "mean" },
+  ],
+};
 
 /** Report section: number of sample iterations. */
 export const runsSection: ReportSection = {
@@ -98,21 +104,6 @@ export const optSection: ReportSection = {
     },
   ],
 };
-
-/** Build a time section with user-chosen percentile/stat columns. */
-export function buildTimeSection(stats = "mean,p50,p99"): ReportSection {
-  const specs = parseStatsArg(stats);
-  return {
-    title: "time",
-    columns: specs.map(s => ({
-      key: s.key,
-      title: s.title,
-      formatter: timeMs,
-      comparable: true,
-      statKind: s.statKind,
-    })),
-  };
-}
 
 /** Format V8 tier distribution sorted by count (e.g. "turbofan:85% sparkplug:15%"). */
 export function formatTierSummary(

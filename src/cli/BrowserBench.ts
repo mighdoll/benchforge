@@ -11,7 +11,7 @@ import {
   browserGcStatsSection,
   pageLoadStatsSections,
 } from "../report/GcSections.ts";
-import { buildTimeSection, runsSection } from "../report/StandardSections.ts";
+import { runsSection, timeSection } from "../report/StandardSections.ts";
 import { reportResults } from "../report/text/TextReport.ts";
 import type { MeasuredResults } from "../runners/MeasuredResults.ts";
 import {
@@ -132,7 +132,7 @@ function printBrowserReport(
   const hasIterSamples = !!result.samples?.length;
   const sections: ReportSection[] = [
     ...(hasPageLoad ? pageLoadStatsSections : []),
-    ...(hasIterSamples ? [buildTimeSection(args.stats)] : []),
+    ...(hasIterSamples ? [timeSection] : []),
     ...(result.gcStats ? [browserGcStatsSection] : []),
     ...(hasPageLoad || hasIterSamples ? [runsSection] : []),
   ];
