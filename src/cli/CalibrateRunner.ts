@@ -22,7 +22,7 @@ const minFullGcsPerBatch = 2;
 
 /** Format the calibration result as a per-run table plus a conclusion block. */
 export function formatCalibration(result: CalibrationResult): string {
-  const { runs, batches, pointEstimates, ciHalfWidths } = result;
+  const { pointEstimates, ciHalfWidths } = result;
   const rows = pointEstimates.map((p, i) => {
     const run = String(i + 1).padStart(4);
     return `  ${run}  ${formatSignedPercent(p).padStart(8)}     ${pct(ciHalfWidths[i]).padStart(8)}`;
