@@ -285,7 +285,7 @@ function ShiftSection(
       </div>
       <ShiftPanel shift={shift} />
       {shared.length > 0 && (
-        <div class="panel-body">
+        <div class="panel-body shift-shared">
           {shared.map((row, i) => <StatRow key={i} row={row} />)}
         </div>
       )}
@@ -303,10 +303,10 @@ function ShiftPanel({ shift }: { shift: ShiftFunction }) {
   }, [shift], "Shift plot");
   return (
     <div class="shift-panel">
-      <div class="shift-caption">
-        Δ% per percentile &middot; click a percentile for current vs baseline detail
+      <div class="shift-caption" title="click a percentile for current vs baseline detail">
+        change by percentile
       </div>
-      <div class="shift-plot" ref={ref} />
+      <div class="shift-plot" ref={ref} title="click a percentile for current vs baseline detail" />
       {selected && (
         <ShiftPopup
           point={selected}
@@ -456,15 +456,11 @@ function StatRow(
   { row: ViewerRow; estimateRange?: [number, number]; chartOnly?: boolean },
 ) {
   if (row.shared) {
+    // single value: keep label and value on one line instead of stacking
     return (
-      <div class="stat-row">
-        <div class="row-header">
-          <span class="row-label">{row.label}</span>
-        </div>
-        <div class="run-entry">
-          <span class="run-name" />
-          <span class="run-value">{row.entries[0]?.value}</span>
-        </div>
+      <div class="stat-row shared-row">
+        <span class="row-label">{row.label}</span>
+        <span class="row-value">{row.entries[0]?.value}</span>
       </div>
     );
   }
