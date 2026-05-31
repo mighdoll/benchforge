@@ -88,8 +88,8 @@ Valid tokens:
 | `pNN` (2 digits) | NN-th percentile (e.g. `p70`, `p95`, `p99`) |
 | `pN...` (3+ digits) | sub-percentile precision, must start with `9` (e.g. `p999` = 99.9%, `p9999` = 99.99%) |
 
-Each column gets a bootstrap confidence interval against the baseline (when
-one is present), computed in the same domain as the column.
+Each column gets a bootstrap confidence interval against the baseline (when one
+is present), computed in the same domain as the column.
 
 ## Tukey Trimming
 
@@ -104,59 +104,55 @@ removed. Only high outliers are trimmed.
 ## Block Bootstrap
 
 Each of 10,000 bootstrap iterations picks a random set of batches from the
-available batches (the same batch may be picked more than once), then
-reduces that set to a single value, the iteration's estimate of the
-statistic. The 2.5th and 97.5th percentiles of those 10,000 values form the
-95% confidence interval.
+available batches (the same batch may be picked more than once), then reduces
+that set to a single value, the iteration's estimate of the statistic. The 2.5th
+and 97.5th percentiles of those 10,000 values form the 95% confidence interval.
 
-The random pick is always a whole batch, never an individual sample within
-a batch. Bootstrap relies on its observations being independent of each
-other and drawn from the same distribution. Samples within a batch share
-thermal state, memory layout, and scheduler context, so they aren't
-independent; batches are. Picking whole batches preserves the independence
-bootstrap depends on.
+The random pick is always a whole batch, never an individual sample within a
+batch. Bootstrap relies on its observations being independent of each other and
+drawn from the same distribution. Samples within a batch share thermal state,
+memory layout, and scheduler context, so they aren't independent; batches are.
+Picking whole batches preserves the independence bootstrap depends on.
 
 This applies to both single-benchmark CIs and baseline comparisons. For
-comparisons, each iteration picks an independent random set of batches for
-the baseline and another for the current run, then computes the percentage
+comparisons, each iteration picks an independent random set of batches for the
+baseline and another for the current run, then computes the percentage
 difference between the two iteration values.
 
-Traditional bootstrap picks individual samples at random; block bootstrap
-picks whole batches instead. When a little noise moves the benchmark
-results differently in different batches, we want to report that by
-widening the confidence interval appropriately.
+Traditional bootstrap picks individual samples at random; block bootstrap picks
+whole batches instead. When a little noise moves the benchmark results
+differently in different batches, we want to report that by widening the
+confidence interval appropriately.
 
-Imagine a background OS task slows several iterations in the batch by 10%.
-That might not be enough to trigger Tukey trimming, but it would increase our
-batch level variance. We want to widen our confidence interval to indicate
-the uncertainty.
+Imagine a background OS task slows several iterations in the batch by 10%. That
+might not be enough to trigger Tukey trimming, but it would increase our batch
+level variance. We want to widen our confidence interval to indicate the
+uncertainty.
 
 If we mixed results across all batches, we'd be overconfident, imagining that
-our iterations are more independent than they actually are. We might
-erroneously report to the user that their code is slower when in fact it was
-just noise.
+our iterations are more independent than they actually are. We might erroneously
+report to the user that their code is slower when in fact it was just noise.
 
 ### What each iteration computes
 
-How each iteration reduces its selected batches to a single value depends
-on whether the statistic is linear in the samples:
+How each iteration reduces its selected batches to a single value depends on
+whether the statistic is linear in the samples:
 
 - **Mean**: each iteration takes `mean(per-batch mean)` over the selected
-  batches. With equal-size batches this equals `mean(pool)` exactly, so the
-  CI it builds is a valid uncertainty estimate for `mean(pool)`.
+  batches. With equal-size batches this equals `mean(pool)` exactly, so the CI
+  it builds is a valid uncertainty estimate for `mean(pool)`.
 
-- **Percentiles (p50, p90, p99, ...)**: `p50(pool)` is our best estimate
-  of the underlying p50, and we want the CI to bound how much that
-  estimate would shift if we'd drawn a different set of batches. So each
-  iteration pools its selected batches' samples and recomputes the
-  percentile on that pool, producing a fresh draw of the same quantity
-  we're estimating. The selection step is unchanged from the mean case;
-  we still pick whole batches at random and the same batch may be picked
-  more than once, with the samples inside a chosen batch traveling
+- **Percentiles (p50, p90, p99, ...)**: `p50(pool)` is our best estimate of the
+  underlying p50, and we want the CI to bound how much that estimate would shift
+  if we'd drawn a different set of batches. So each iteration pools its selected
+  batches' samples and recomputes the percentile on that pool, producing a fresh
+  draw of the same quantity we're estimating. The selection step is unchanged
+  from the mean case; we still pick whole batches at random and the same batch
+  may be picked more than once, with the samples inside a chosen batch traveling
   together.
 
-`min` and `max` aren't bootstrapped; the displayed value is the
-single observed extreme.
+`min` and `max` aren't bootstrapped; the displayed value is the single observed
+extreme.
 
 ## Batch Duration
 
@@ -225,14 +221,15 @@ it.
 
 #### Calibrating the Margin
 
-The default 2% margin is reasonable for most benchmarks, but the noise floor
-varies. Fast microbenchmarks may have < 1% noise; slow benchmarks with GC
-pressure may have 3-5%. Since there's no inherent "smallest difference that
-matters" for raw speed, the margin should equal the noise floor: any difference
-below it is indistinguishable from measurement noise.
+The right margin varies with the machine and the code. The margin should cover
+everything that makes a measurement move between runs *without* the code
+changing. Two sources dominate: other activity on the machine competing for CPU
+and memory (other apps, background daemons, indexing -- plus thermal and
+frequency shifts), and the code's own GC, whose collection timing varies run to
+run and wobbles the measured speed.
 
-`--calibrate` measures that floor directly. It runs the current build against an
-identical copy of itself (a true-zero comparison), repeated many times, then
+`--calibrate` measures this directly. It runs the current build against an
+identical copy of itself, repeated many times, then
 prints a suggested `--equiv-margin`:
 
 ```bash
@@ -258,8 +255,8 @@ For the suggested margin to apply to your real comparisons:
   width scales roughly with `1/sqrt(batches)`, so a margin measured at one batch
   count is wrong for another.
 - **Run on a quiet machine.** Quit other apps, pause background sync and
-  software updates, and avoid thermal throttling. Calibration measures
-  environmental noise, so a busy machine inflates the suggested margin.
+  software updates, and avoid thermal throttling. Calibration measures whatever
+  moves between runs, so a busy machine inflates the suggested margin.
 
 Use `--equiv-margin 0` to disable equivalence testing and fall back to the
 simple CI-excludes-zero approach.
