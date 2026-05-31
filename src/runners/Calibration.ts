@@ -3,7 +3,7 @@ import {
   type CalibrationSummary,
   summarizeCalibration,
 } from "../stats/CalibrationSummary.ts";
-import type { StatKind } from "../stats/StatisticalUtils.ts";
+import { average, type StatKind } from "../stats/StatisticalUtils.ts";
 import type { MeasuredResults } from "./MeasuredResults.ts";
 import { runBatched } from "./MergeBatches.ts";
 
@@ -38,6 +38,11 @@ export interface CalibrationResult {
   /** Per-run CI half-widths in percent. */
   ciHalfWidths: number[];
   summary: CalibrationSummary;
+  /** Mean full (major) GCs per batch, or undefined when GC stats are absent
+   *  (no --gc-stats). Below ~2, single-run CIs understate between-run GC
+   *  timing variance: the batch mean is dominated by where the lone collection
+   *  lands. Increase --duration so each batch averages over several GCs. */
+  fullGcsPerBatch?: number;
 }
 
 /** Measure the harness noise floor by comparing the current build against an
@@ -50,6 +55,7 @@ export async function runCalibration(
   const statKind: StatKind = params.statKind ?? "mean";
   const pointEstimates: number[] = [];
   const ciHalfWidths: number[] = [];
+  const fullGcs: number[] = [];
 
   for (let i = 0; i < runs; i++) {
     const { results, baseline } = await runBatched(
@@ -63,11 +69,29 @@ export async function runCalibration(
     const ciHalfWidth = (ci.ci[1] - ci.ci[0]) / 2;
     pointEstimates.push(point);
     ciHalfWidths.push(ciHalfWidth);
+    const fullGc = fullGcsForRun(results[0]);
+    if (fullGc !== undefined) fullGcs.push(fullGc);
     onRun?.({ run: i + 1, runs, point, ciHalfWidth });
   }
 
   const summary = summarizeCalibration(pointEstimates, ciHalfWidths);
-  return { runs, batches, pointEstimates, ciHalfWidths, summary };
+  const fullGcsPerBatch =
+    fullGcs.length === runs ? average(fullGcs) / batches : undefined;
+  return {
+    runs,
+    batches,
+    pointEstimates,
+    ciHalfWidths,
+    summary,
+    fullGcsPerBatch,
+  };
+}
+
+/** Full (major) GCs in one run's merged results, or undefined without gc stats. */
+function fullGcsForRun(r: MeasuredResults): number | undefined {
+  if (r.batchGcStats)
+    return r.batchGcStats.reduce((sum, g) => sum + g.markCompacts, 0);
+  return r.gcStats?.markCompacts;
 }
 
 /** Difference CI between two independent runs of the same build. */

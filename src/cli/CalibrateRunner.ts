@@ -1,7 +1,9 @@
 import colors from "../report/Colors.ts";
 import { formatSignedPercent } from "../report/Formatters.ts";
-import type { CalibrationResult, RunProgress } from "../runners/Calibration.ts";
-import type { CalibrationSummary } from "../stats/CalibrationSummary.ts";
+import type {
+  CalibrationResult,
+  RunProgress,
+} from "../runners/Calibration.ts";
 
 /** Format an unsigned percent magnitude, e.g. "1.85%". */
 const pct = (n: number) => `${n.toFixed(2)}%`;
@@ -17,23 +19,24 @@ export function reportCalibrateRun(p: RunProgress, label?: string): void {
   );
 }
 
+/** Below this many full GCs per batch, the batch mean is dominated by where the
+ *  lone collection lands and single-run CIs understate between-run GC variance. */
+const minFullGcsPerBatch = 2;
+
 /** Format the calibration result as a per-run table plus a conclusion block. */
 export function formatCalibration(result: CalibrationResult): string {
-  const { runs, batches, pointEstimates, ciHalfWidths, summary } = result;
+  const { runs, batches, pointEstimates, ciHalfWidths } = result;
   const rows = pointEstimates.map((p, i) => {
     const run = String(i + 1).padStart(4);
     return `  ${run}  ${formatSignedPercent(p).padStart(8)}     ${pct(ciHalfWidths[i]).padStart(8)}`;
   });
   const table = ["   run        Δ%   CI half-width", ...rows].join("\n");
-  return `${table}\n\n${conclusion(runs, batches, summary)}`;
+  return `${table}\n\n${conclusion(result)}`;
 }
 
 /** Conclusion block: noise floor estimates and the suggested margin. */
-function conclusion(
-  runs: number,
-  batches: number,
-  s: CalibrationSummary,
-): string {
+function conclusion(result: CalibrationResult): string {
+  const { runs, batches, summary: s, fullGcsPerBatch } = result;
   const { bold, yellow } = colors;
   const lines = [
     bold(
@@ -54,6 +57,18 @@ function conclusion(
         "    per-run CIs are overconfident; displayed CIs understate run-to-run",
       ),
       yellow("    noise. Margin taken from the scatter, not the CI."),
+    );
+  }
+  if (fullGcsPerBatch !== undefined && fullGcsPerBatch < minFullGcsPerBatch) {
+    lines.push(
+      "",
+      yellow(
+        `  warning: only ${fullGcsPerBatch.toFixed(1)} full GCs per batch (want >= ${minFullGcsPerBatch}) --`,
+      ),
+      yellow(
+        "    the batch mean depends on where the lone collection lands, so GC",
+      ),
+      yellow("    timing varies between runs. Increase --duration."),
     );
   }
   return lines.join("\n");
