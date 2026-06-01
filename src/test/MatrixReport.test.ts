@@ -43,76 +43,13 @@ test("reportMatrixResults: basic output includes matrix name", () => {
   expect(report).toContain("Matrix: TestMatrix");
 });
 
-test("reportMatrixResults: outputs one table per case", () => {
+test("reportMatrixResults: no baselines yields just the matrix name", () => {
   const results = mockResults("MultiCase", [
-    {
-      id: "fast",
-      cases: [
-        { caseId: "case1", mean: 1.0 },
-        { caseId: "case2", mean: 2.0 },
-      ],
-    },
-    {
-      id: "slow",
-      cases: [
-        { caseId: "case1", mean: 10.0 },
-        { caseId: "case2", mean: 20.0 },
-      ],
-    },
+    { id: "fast", cases: [{ caseId: "case1", mean: 1.0 }] },
+    { id: "slow", cases: [{ caseId: "case1", mean: 10.0 }] },
   ]);
   const report = reportMatrixResults(results);
-  expect(report).toContain("case1");
-  expect(report).toContain("case2");
-  expect(report).toContain("fast");
-  expect(report).toContain("slow");
-});
-
-test("reportMatrixResults: includes metadata in case title", () => {
-  const results = mockResults("WithMetadata", [
-    {
-      id: "fast",
-      cases: [{ caseId: "bevy_env_map", mean: 1.0, metadata: { LOC: 1200 } }],
-    },
-  ]);
-  const report = reportMatrixResults(results);
-  expect(report).toContain("bevy_env_map (1200 LOC)");
-});
-
-test("reportMatrixResults: formats time in ms", () => {
-  const results = mockResults("TimeFormat", [
-    { id: "variant", cases: [{ caseId: "test", mean: 2.34 }] },
-  ]);
-  const report = reportMatrixResults(results);
-  expect(report).toContain("2.34ms");
-});
-
-test("reportMatrixResults: formats time in seconds for large values", () => {
-  const results = mockResults("TimeFormat", [
-    { id: "variant", cases: [{ caseId: "test", mean: 1500 }] },
-  ]);
-  const report = reportMatrixResults(results);
-  expect(report).toContain("1.50s");
-});
-
-test("reportMatrixResults: shows variant column", () => {
-  const results = mockResults("VarCol", [
-    { id: "my_variant", cases: [{ caseId: "test", mean: 1.0 }] },
-  ]);
-  const report = reportMatrixResults(results);
-  expect(report).toContain("variant");
-  expect(report).toContain("my_variant");
-});
-
-test("reportMatrixResults: truncates long variant names", () => {
-  const results = mockResults("TruncTest", [
-    {
-      id: "this_is_a_very_long_variant_name_that_should_be_truncated",
-      cases: [{ caseId: "test", mean: 1.0 }],
-    },
-  ]);
-  const report = reportMatrixResults(results);
-  // 25 char limit => 22 chars + "..."
-  expect(report).toContain("this_is_a_very_long_va...");
+  expect(report).toBe("Matrix: MultiCase");
 });
 
 test("reportMatrixResults: empty variants returns header only", () => {
@@ -121,7 +58,7 @@ test("reportMatrixResults: empty variants returns header only", () => {
   expect(report).toBe("Matrix: Empty");
 });
 
-test("reportMatrixResults: with baseline shows diff percentage", () => {
+test("reportMatrixResults: with baseline shows a verdict with the diff percentage", () => {
   const baseline = mockMeasured(2.0, 20);
   const measured = mockMeasured(1.0, 20);
   const results: MatrixResults = {
@@ -134,6 +71,25 @@ test("reportMatrixResults: with baseline shows diff percentage", () => {
     ],
   };
   const report = reportMatrixResults(results);
-  // Should contain diff percentage inline (not as separate header)
+  expect(report).toContain("Verdict:");
+  expect(report).toContain("test/current");
   expect(report).toContain("-50.0%");
+  expect(report).toContain("vs baseline");
+});
+
+test("reportMatrixResults: truncates long variant names in the verdict", () => {
+  const baseline = mockMeasured(2.0, 20);
+  const measured = mockMeasured(1.0, 20);
+  const results: MatrixResults = {
+    name: "TruncTest",
+    variants: [
+      {
+        id: "this_is_a_very_long_variant_name_that_should_be_truncated",
+        cases: [{ caseId: "test", measured, baseline }],
+      },
+    ],
+  };
+  const report = reportMatrixResults(results);
+  // 25 char limit => 22 chars + "..."
+  expect(report).toContain("this_is_a_very_long_va...");
 });

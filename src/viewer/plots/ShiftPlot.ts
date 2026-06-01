@@ -53,8 +53,7 @@ export function createShiftPlot(
     drawMarginBand(svg, shift.equivMargin, yScale, opts.width);
   drawZeroLine(svg, yScale, opts.width);
   drawYAxis(svg, yScale, points, shift.equivMargin);
-  if (centers.dividerX != null)
-    drawDivider(svg, centers.dividerX, plotHeight);
+  if (centers.dividerX != null) drawDivider(svg, centers.dividerX, plotHeight);
 
   points.forEach((point, i) => {
     const cx = centers.cx[i];
@@ -269,7 +268,11 @@ function drawPercentileLabel(
   cx: number,
   height: number,
 ): void {
-  const color = point.isMean ? "#111827" : point.reliable ? "#374151" : weakColor;
+  const color = point.isMean
+    ? "#111827"
+    : point.reliable
+      ? "#374151"
+      : weakColor;
   svg.appendChild(
     text(
       cx,

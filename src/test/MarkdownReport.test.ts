@@ -23,8 +23,24 @@ function point(
     label,
     diff: { percent, ci, direction: percent < 0 ? "faster" : "slower" },
     runs: [
-      { runName: "current", bootstrapCI: { estimate: 0, ci: [0, 0], histogram: [], estimateLabel: cur } },
-      { runName: "baseline", bootstrapCI: { estimate: 0, ci: [0, 0], histogram: [], estimateLabel: base } },
+      {
+        runName: "current",
+        bootstrapCI: {
+          estimate: 0,
+          ci: [0, 0],
+          histogram: [],
+          estimateLabel: cur,
+        },
+      },
+      {
+        runName: "baseline",
+        bootstrapCI: {
+          estimate: 0,
+          ci: [0, 0],
+          histogram: [],
+          estimateLabel: base,
+        },
+      },
     ],
     reliable,
     tailCount: reliable ? 100 : 6,
@@ -34,7 +50,10 @@ function point(
 
 function entryWithShift(): BenchmarkEntry {
   const points = [
-    { ...point("mean", -2.1, [-3.8, -0.4], true, "1,240,000", "1,214,000"), isMean: true },
+    {
+      ...point("mean", -2.1, [-3.8, -0.4], true, "1,240,000", "1,214,000"),
+      isMean: true,
+    },
     point("p99", 14.8, [7, 22], false, "980,000", "1,150,000"),
   ];
   return {
@@ -72,8 +91,12 @@ test("renders a shift table with mean, percentiles, and reliability", () => {
   expect(md).toContain("## WESL Parser");
   expect(md).toContain("### reduceTwo");
   expect(md).toContain("#### lines / sec");
-  expect(md).toContain("| mean | 1,240,000 | 1,214,000 | -2.1% | [-3.8%, -0.4%] | better |");
-  expect(md).toContain("| p99 | 980,000 | 1,150,000 | +14.8% | [+7.0%, +22.0%] | worse (unreliable, n=6) |");
+  expect(md).toContain(
+    "| mean | 1,240,000 | 1,214,000 | -2.1% | [-3.8%, -0.4%] | better |",
+  );
+  expect(md).toContain(
+    "| p99 | 980,000 | 1,150,000 | +14.8% | [+7.0%, +22.0%] | worse (unreliable, n=6) |",
+  );
   // shared row (no baseline) rendered as a value table below the shift table
   expect(md).toContain("| lines | 85,000 |");
 });
@@ -86,11 +109,19 @@ test("scalar-only section (no baseline) renders a value table, lifts runs, skips
     sections: [
       {
         title: "time",
-        rows: [{ label: "mean", entries: [{ runName: "current", value: "1.2us" }] }],
+        rows: [
+          { label: "mean", entries: [{ runName: "current", value: "1.2us" }] },
+        ],
       },
       {
         title: "",
-        rows: [{ label: "runs", shared: true, entries: [{ runName: "current", value: "5" }] }],
+        rows: [
+          {
+            label: "runs",
+            shared: true,
+            entries: [{ runName: "current", value: "5" }],
+          },
+        ],
       },
     ],
   };
@@ -119,7 +150,11 @@ test("comparable scalar section (GC) shows current vs baseline with Δ%", () => 
         rows: [
           {
             label: "alloc/iter",
-            comparisonCI: { percent: -12.5, ci: [-12.5, -12.5], direction: "uncertain" },
+            comparisonCI: {
+              percent: -12.5,
+              ci: [-12.5, -12.5],
+              direction: "uncertain",
+            },
             entries: [
               { runName: "current", value: "1.2KB" },
               { runName: "baseline", value: "1.4KB" },
@@ -142,14 +177,19 @@ test("comparable scalar section (GC) shows current vs baseline with Δ%", () => 
 
 /** Batched samples as a global ramp, so percentile tails are genuinely sparse.
  *  scale > 1 makes every value larger (slower), simulating a regression. */
-function batched(batches: number, perBatch: number, scale = 1): MeasuredResults {
+function batched(
+  batches: number,
+  perBatch: number,
+  scale = 1,
+): MeasuredResults {
   const samples: number[] = [];
   const batchOffsets: number[] = [];
   const n = batches * perBatch;
   let k = 0;
   for (let b = 0; b < batches; b++) {
     batchOffsets.push(samples.length);
-    for (let i = 0; i < perBatch; i++) samples.push((1 + (k++ / n) * 2) * scale);
+    for (let i = 0; i < perBatch; i++)
+      samples.push((1 + (k++ / n) * 2) * scale);
   }
   return { name: "current", samples, batchOffsets } as MeasuredResults;
 }

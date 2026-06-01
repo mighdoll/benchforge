@@ -13,7 +13,10 @@ import { resolveProfile } from "../profiling/node/ResolvedProfile.ts";
 import type { ReportGroup, ReportSection } from "../report/BenchmarkReport.ts";
 import { groupReports, hasField } from "../report/BenchmarkReport.ts";
 import colors from "../report/Colors.ts";
+import { consoleSummary } from "../report/ConsoleSummary.ts";
 import { gcStatsSection } from "../report/GcSections.ts";
+import type { GitVersion } from "../report/GitUtils.ts";
+import { prepareHtmlData } from "../report/HtmlReport.ts";
 import {
   adaptiveSections,
   formatTierSummary,
@@ -22,13 +25,16 @@ import {
   timeSection,
   totalTimeSection,
 } from "../report/StandardSections.ts";
-import { reportResults } from "../report/text/TextReport.ts";
+import type { ReportData } from "../viewer/ReportData.ts";
 import type { DefaultCliArgs } from "./CliArgs.ts";
 import { cliComparisonOptions } from "./CliOptions.ts";
 
-/** Options for defaultReport: custom sections replace the CLI-derived defaults. */
+/** Options for defaultReportData: custom sections replace the CLI-derived
+ *  defaults; versions are stamped into the report metadata. */
 export interface DefaultReportOptions {
   sections?: ReportSection[];
+  currentVersion?: GitVersion;
+  baselineVersion?: GitVersion;
 }
 
 const { yellow, dim } = colors;
@@ -41,16 +47,32 @@ export function withStatus<T>(msg: string, fn: () => T): T {
   return result;
 }
 
-/** Generate text report table with standard sections based on CLI args. */
+/** Build the report data once, using custom or CLI-derived sections. The bench
+ *  pipeline reuses this for the console summary, markdown, and the viewer. */
+export function defaultReportData(
+  groups: ReportGroup[],
+  args: DefaultCliArgs,
+  opts?: DefaultReportOptions,
+): ReportData {
+  const sections = opts?.sections?.length
+    ? opts.sections
+    : cliDefaultSections(groups, args);
+  return prepareHtmlData(groups, {
+    cliArgs: args,
+    sections,
+    currentVersion: opts?.currentVersion,
+    baselineVersion: opts?.baselineVersion,
+    ...cliComparisonOptions(args),
+  });
+}
+
+/** @return the pithy console summary for the report data. */
 export function defaultReport(
   groups: ReportGroup[],
   args: DefaultCliArgs,
   opts?: DefaultReportOptions,
 ): string {
-  const sections = opts?.sections?.length
-    ? opts.sections
-    : cliDefaultSections(groups, args);
-  return reportResults(groups, sections, cliComparisonOptions(args));
+  return consoleSummary(defaultReportData(groups, args, opts));
 }
 
 /** Log V8 optimization tier distribution and deoptimizations. */
@@ -165,7 +187,11 @@ function mergeMatrixDefaults(
   if (!merged.sections?.length) {
     const groups = matrixToReportGroups(results);
     const hasOpt = args["trace-opt"] && hasField(groups, "optStatus");
-    merged.sections = buildReportSections(args.adaptive, args["gc-stats"], hasOpt);
+    merged.sections = buildReportSections(
+      args.adaptive,
+      args["gc-stats"],
+      hasOpt,
+    );
   }
   if (!merged.comparison) merged.comparison = cliComparisonOptions(args);
   return merged;

@@ -17,7 +17,7 @@ import type {
 } from "../viewer/ReportData.ts";
 import type {
   ComparisonOptions,
-  ReportColumn,
+  MetricSection,
   UnknownRecord,
 } from "./BenchmarkReport.ts";
 import {
@@ -31,7 +31,7 @@ interface PointArgs {
   diff: DifferenceCI | undefined;
   curResult: BootstrapResult | undefined;
   baseResult: BootstrapResult | undefined;
-  col: ReportColumn;
+  section: MetricSection;
   current: MeasuredResults;
   baseline: MeasuredResults;
   currentMeta: UnknownRecord | undefined;
@@ -52,13 +52,12 @@ const shiftPercentiles = [0.01, 0.05, 0.1, 0.25, 0.5, 0.75, 0.9, 0.95, 0.99];
 const minTailSamples = 10;
 const minTailBatches = 5;
 
-/** Build the per-percentile shift function for a section's primary comparable
- *  column. Computes diff CIs and per-run absolute distributions across the
- *  distribution from raw timing samples. Returns undefined when there is no
- *  baseline or too little batch structure for a meaningful comparison. */
+/** Build the per-percentile shift function for a metric section. Computes diff
+ *  CIs and per-run absolute distributions across the distribution from raw
+ *  timing samples. Returns undefined when there is no baseline or too little
+ *  batch structure for a meaningful comparison. */
 export function buildShiftFunction(
-  col: ReportColumn,
-  sectionTitle: string,
+  section: MetricSection,
   current: MeasuredResults,
   baseline: MeasuredResults | undefined,
   currentMeta: UnknownRecord | undefined,
@@ -67,17 +66,74 @@ export function buildShiftFunction(
 ): ShiftFunction | undefined {
   if (!baseline?.samples?.length || !current.samples?.length) return undefined;
 
-  // "mean" leads the stat list so its results sit at index 0; percentiles follow.
-  const stats: StatKind[] = ["mean", ...shiftPercentiles.map(p => ({ percentile: p }))];
   const noBatchTrim = comparison?.noBatchTrim;
-  const opts = { equivMargin: comparison?.equivMargin, noBatchTrim };
+  const { diffs, curAbs, baseAbs } = shiftStats(current, baseline, comparison);
+  const lowBatches = hasLowBatchCount(baseline, current, noBatchTrim);
+  const ctx = {
+    section,
+    current,
+    baseline,
+    currentMeta,
+    baselineMeta,
+    lowBatches,
+    noBatchTrim,
+  };
+
+  const percentiles = shiftPercentiles.flatMap((p, i) => {
+    // +1 skips the leading mean entry in the result arrays.
+    const point = buildPoint({
+      p,
+      diff: diffs[i + 1],
+      curResult: curAbs[i + 1],
+      baseResult: baseAbs[i + 1],
+      ...ctx,
+    });
+    return point ? [point] : [];
+  });
+  // higherIsBetter metrics read low==>high in displayed percentile, which is the
+  // reverse of the timing percentile order; sort by displayed percentile.
+  percentiles.sort((a, b) => a.percentile - b.percentile);
+
+  const mean = buildMeanPoint({
+    p: 0,
+    diff: diffs[0],
+    curResult: curAbs[0],
+    baseResult: baseAbs[0],
+    ...ctx,
+  });
+  const points = mean ? [mean, ...percentiles] : percentiles;
+  if (!points.length) return undefined;
+  return {
+    metric: section.title,
+    equivMargin: comparison?.equivMargin,
+    points,
+  };
+}
+
+/** Compute the diff CIs and per-run absolute distributions for mean + every
+ *  sampled percentile. "mean" leads the stat list so its results sit at index 0;
+ *  percentiles follow in shiftPercentiles order. */
+function shiftStats(
+  current: MeasuredResults,
+  baseline: MeasuredResults,
+  comparison: ComparisonOptions | undefined,
+): {
+  diffs: (DifferenceCI | undefined)[];
+  curAbs: (BootstrapResult | undefined)[];
+  baseAbs: (BootstrapResult | undefined)[];
+} {
+  const stats: StatKind[] = [
+    "mean",
+    ...shiftPercentiles.map(p => ({ percentile: p })),
+  ];
+  const noBatchTrim = comparison?.noBatchTrim;
   const diffs = diffCIs(
     baseline.samples,
     baseline.batchOffsets,
     current.samples,
     current.batchOffsets,
     stats,
-    opts,
+    { equivMargin: comparison?.equivMargin, noBatchTrim },
   );
   const curAbs = bootstrapCIs(current.samples, current.batchOffsets, stats, {
     noTrim: noBatchTrim,
@@ -85,28 +141,13 @@ export function buildShiftFunction(
   const baseAbs = bootstrapCIs(baseline.samples, baseline.batchOffsets, stats, {
     noTrim: noBatchTrim,
   });
-  const lowBatches = hasLowBatchCount(baseline, current, noBatchTrim);
-  const ctx = { col, current, baseline, currentMeta, baselineMeta, lowBatches, noBatchTrim };
-
-  const percentiles = shiftPercentiles.flatMap((p, i) => {
-    // +1 skips the leading mean entry in the result arrays.
-    const point = buildPoint({ p, diff: diffs[i + 1], curResult: curAbs[i + 1], baseResult: baseAbs[i + 1], ...ctx });
-    return point ? [point] : [];
-  });
-  // higherIsBetter metrics read low==>high in displayed percentile, which is the
-  // reverse of the timing percentile order; sort by displayed percentile.
-  percentiles.sort((a, b) => a.percentile - b.percentile);
-
-  const mean = buildMeanPoint({ p: 0, diff: diffs[0], curResult: curAbs[0], baseResult: baseAbs[0], ...ctx });
-  const points = mean ? [mean, ...percentiles] : percentiles;
-  if (!points.length) return undefined;
-  return { metric: sectionTitle, equivMargin: comparison?.equivMargin, points };
+  return { diffs, curAbs, baseAbs };
 }
 
 /** Build one percentile point: flip + annotate the diff, format per-run absolute
  *  distributions, and gate reliability by tail coverage. */
 function buildPoint(args: PointArgs): ShiftPercentile | undefined {
-  const { p, col, lowBatches, current, baseline, noBatchTrim } = args;
+  const { p, section, lowBatches, current, baseline, noBatchTrim } = args;
   const base = buildPointBase(args);
   if (!base) return undefined;
 
@@ -118,7 +159,7 @@ function buildPoint(args: PointArgs): ShiftPercentile | undefined {
     !lowBatches && tailCount >= minTailSamples && tailBatches >= minTailBatches;
 
   // displayed percentile mirrors for higherIsBetter (timing p99 == loc/sec p1)
-  const displayed = col.higherIsBetter ? 1 - p : p;
+  const displayed = section.higherIsBetter ? 1 - p : p;
   return {
     ...base,
     percentile: displayed,
@@ -157,28 +198,41 @@ function buildMeanPoint(args: PointArgs): ShiftPercentile | undefined {
 function buildPointBase(
   args: PointArgs,
 ): Pick<ShiftPercentile, "diff" | "runs"> | undefined {
-  const { diff, curResult, baseResult, col, lowBatches } = args;
+  const { diff, curResult, baseResult, section, lowBatches } = args;
   if (!diff || !curResult || !baseResult) return undefined;
 
-  const flipped = col.higherIsBetter ? flipCI(diff) : diff;
-  const annotated = annotateCI(flipped, col.title, lowBatches);
+  const flipped = section.higherIsBetter ? flipCI(diff) : diff;
+  const annotated = annotateCI(flipped, section.title, lowBatches);
 
   const { current, baseline, currentMeta, baselineMeta } = args;
-  const runCI = (r: BootstrapResult, m: MeasuredResults, meta?: UnknownRecord) =>
-    formatBootstrapCI(col, r, m.batchOffsets, meta);
+  const runCI = (
+    r: BootstrapResult,
+    m: MeasuredResults,
+    meta?: UnknownRecord,
+  ) => formatBootstrapCI(section, r, m.batchOffsets, meta);
   const runs: ShiftRun[] = [
-    { runName: current.name, bootstrapCI: runCI(curResult, current, currentMeta) },
-    { runName: "baseline", bootstrapCI: runCI(baseResult, baseline, baselineMeta) },
+    {
+      runName: current.name,
+      bootstrapCI: runCI(curResult, current, currentMeta),
+    },
+    {
+      runName: "baseline",
+      bootstrapCI: runCI(baseResult, baseline, baselineMeta),
+    },
   ];
   return { diff: annotated, runs };
 }
 
 /** @return distinct batches the bootstrap kept (Tukey-trimmed unless noTrim),
  *  or 1 when there is no batch structure. */
-function effectiveBatches(m: MeasuredResults, noTrim: boolean | undefined): number {
+function effectiveBatches(
+  m: MeasuredResults,
+  noTrim: boolean | undefined,
+): number {
   const { samples, batchOffsets } = m;
   if (!batchOffsets || batchOffsets.length < 2) return 1;
-  return prepareBlocks(samples, batchOffsets, average, noTrim).keptSplits.length;
+  return prepareBlocks(samples, batchOffsets, average, noTrim).keptSplits
+    .length;
 }
 
 /** @return how many samples lie on the sparse side of the p-th percentile and
@@ -212,8 +266,14 @@ function tailCoverage(
 }
 
 /** @return a short percentile label, e.g. "p50", "p99", "p0.1". */
-function percentileLabel(p: number): string {
+export function percentileLabel(p: number): string {
   const pct = p * 100;
   const rounded = Math.round(pct * 10) / 10;
   return `p${Number.isInteger(rounded) ? rounded : rounded.toFixed(1)}`;
+}
+
+/** @return a short stat label for headlines, e.g. "mean", "p50", "min". */
+export function statLabel(kind: StatKind): string {
+  if (typeof kind === "string") return kind;
+  return percentileLabel(kind.percentile);
 }

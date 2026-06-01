@@ -1,13 +1,17 @@
 import type { NavTiming } from "../profiling/browser/BrowserProfiler.ts";
 import type { MeasuredResults } from "../runners/MeasuredResults.ts";
 import { average, median, percentile } from "../stats/StatisticalUtils.ts";
-import type { ReportSection } from "./BenchmarkReport.ts";
+import {
+  type ReportSection,
+  type ScalarSection,
+  scalarSection,
+} from "./BenchmarkReport.ts";
 import { formatBytes, integer, percent, timeMs } from "./Formatters.ts";
 
 /** Report section: GC time as fraction of total benchmark time. */
-export const gcSection: ReportSection = {
+export const gcSection: ScalarSection = scalarSection({
   title: "gc",
-  columns: [
+  rows: [
     {
       key: "gc",
       title: "mean",
@@ -23,13 +27,13 @@ export const gcSection: ReportSection = {
       },
     },
   ],
-};
+});
 
 /** Report section: detailed GC stats from --trace-gc-nvp. */
-export const gcStatsSection: ReportSection = {
+export const gcStatsSection: ScalarSection = scalarSection({
   title: "gc",
   layout: "matrix",
-  columns: [
+  rows: [
     {
       key: "allocPerIter",
       title: "alloc/iter",
@@ -99,24 +103,24 @@ export const gcStatsSection: ReportSection = {
       },
     },
   ],
-};
+});
 
 /** Report section: browser GC stats from CDP tracing (subset of gcStatsSection). */
-export const browserGcStatsSection: ReportSection = {
+export const browserGcStatsSection: ScalarSection = scalarSection({
   title: "gc",
-  columns: [
-    gcStatsSection.columns.find(c => c.key === "collected")!,
-    gcStatsSection.columns.find(c => c.key === "scavenges")!,
-    gcStatsSection.columns.find(c => c.key === "fullGCs")!,
+  rows: [
+    gcStatsSection.rows.find(r => r.key === "collected")!,
+    gcStatsSection.rows.find(r => r.key === "scavenges")!,
+    gcStatsSection.rows.find(r => r.key === "fullGCs")!,
     {
       key: "pausePerIter",
       title: "pause",
       formatter: timeMs,
       comparable: true,
-      value: gcStatsSection.columns.find(c => c.key === "pausePerIter")!.value!,
+      value: gcStatsSection.rows.find(r => r.key === "pausePerIter")!.value,
     },
   ],
-};
+});
 
 /** Report sections: page-load stats (mean/p50/p99) across multiple iterations. */
 export const pageLoadStatsSections: ReportSection[] = [
@@ -130,13 +134,13 @@ export function gcSections(args: { "gc-stats"?: boolean }): ReportSection[] {
   return args["gc-stats"] ? [gcStatsSection] : [];
 }
 
-/** Build a page-load section with mean/p50/p99 columns from NavTiming data */
+/** Build a page-load section with mean/p50/p99 rows from NavTiming data */
 function pageLoadSection(
   title: string,
   extract: (n: NavTiming) => number | undefined,
 ): ReportSection {
   const vals = (r: MeasuredResults) => navValues(r.navTimings, extract);
-  const col = (suffix: string, stat: (v: number[]) => number) => ({
+  const row = (suffix: string, stat: (v: number[]) => number) => ({
     key: `${title.toLowerCase()}${suffix}`,
     title: suffix.toLowerCase(),
     formatter: timeMs,
@@ -145,14 +149,14 @@ function pageLoadSection(
       return v.length ? stat(v) : undefined;
     },
   });
-  return {
+  return scalarSection({
     title,
-    columns: [
-      col("Mean", average),
-      col("P50", median),
-      col("P99", v => percentile(v, 0.99)),
+    rows: [
+      row("Mean", average),
+      row("P50", median),
+      row("P99", v => percentile(v, 0.99)),
     ],
-  };
+  });
 }
 
 /** Extract one field from all NavTimings, filtering undefineds. */

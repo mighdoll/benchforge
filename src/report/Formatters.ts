@@ -1,11 +1,6 @@
-import {
-  type CIDirection,
-  type DifferenceCI,
-  flipCI,
-} from "../stats/StatisticalUtils.ts";
 import colors from "./Colors.ts";
 
-const { red, green } = colors;
+const { red } = colors;
 
 const lowConfidence = 80;
 
@@ -31,13 +26,6 @@ export function percent(fraction: unknown, precision = 1): string | null {
   return `${Math.abs(fraction * 100).toFixed(precision)}%`;
 }
 
-/** Format percentage difference between two values */
-export function diffPercent(main: unknown, base: unknown): string {
-  if (typeof main !== "number" || typeof base !== "number") return " ";
-  const diff = main - base;
-  return coloredPercent(diff, base);
-}
-
 /** Format bytes with appropriate units. Use `space: true` for `1.5 KB` style. */
 export function formatBytes(
   bytes: unknown,
@@ -50,19 +38,6 @@ export function formatBytes(
   if (bytes < mb) return `${(bytes / kb).toFixed(1)}${s}KB`;
   if (bytes < gb) return `${(bytes / mb).toFixed(1)}${s}MB`;
   return `${(bytes / gb).toFixed(1)}${s}GB`;
-}
-
-/** Format percentage difference with confidence interval.
- *  When higherIsBetter is true, flips the CI so positive = improvement. */
-export function formatDiffWithCI(
-  value: unknown,
-  higherIsBetter?: boolean,
-): string | null {
-  if (!isDifferenceCI(value)) return null;
-  const ci = higherIsBetter ? flipCI(value) : value;
-  const suffix = value.ciLevel === "sample" ? " *" : "";
-  const text = diffCIText(ci.percent, ci.ci) + suffix;
-  return colorByDirection(text, ci.direction);
 }
 
 /** @return truncated string with ellipsis if over maxLen */
@@ -81,30 +56,4 @@ export function formatConvergence(v: unknown): string {
   if (typeof v !== "number") return "—";
   const pct = `${Math.round(v)}%`;
   return v < lowConfidence ? red(pct) : pct;
-}
-
-/** Format fraction as colored +/- percentage (positive = green, negative = red) */
-function coloredPercent(numerator: number, denominator: number): string {
-  const fraction = numerator / denominator;
-  if (!Number.isFinite(fraction)) return " ";
-  const sign = fraction >= 0 ? "+" : "-";
-  const percentStr = `${sign}${percent(fraction)}`;
-  return fraction >= 0 ? green(percentStr) : red(percentStr);
-}
-
-function isDifferenceCI(x: unknown): x is DifferenceCI {
-  return typeof x === "object" && x !== null && "ci" in x && "direction" in x;
-}
-
-/** @return formatted "pct [lo, hi]" text for a diff with CI */
-function diffCIText(pct: number, ci: [number, number]): string {
-  const [lo, hi] = ci.map(formatSignedPercent);
-  return `${formatSignedPercent(pct)} [${lo}, ${hi}]`;
-}
-
-/** @return text colored green for faster/equivalent, red for slower */
-function colorByDirection(text: string, direction: CIDirection): string {
-  if (direction === "faster" || direction === "equivalent") return green(text);
-  if (direction === "slower") return red(text);
-  return text;
 }

@@ -7,8 +7,6 @@ import {
   type StatKind,
 } from "../stats/StatisticalUtils.ts";
 
-import type { AnyColumn } from "./text/TableReport.ts";
-
 /** Options that affect baseline comparison statistics */
 export interface ComparisonOptions {
   /** Equivalence margin in percent (0 to disable) */
@@ -33,68 +31,87 @@ export interface BenchmarkReport {
   metadata?: UnknownRecord;
 }
 
-/** A titled group of related columns (one per report section) */
-export interface ReportSection {
-  title: string;
-  columns: ReportColumn[];
+export type UnknownRecord = Record<string, unknown>;
 
+/** Formats a value for display (e.g. timeMs, integer, percent). */
+export type Formatter = (value: unknown) => string | null;
+
+/** A report section is either one comparable metric or a bag of scalar rows. */
+export type ReportSection = MetricSection | ScalarSection;
+
+/** One comparable metric: drives the verdict, the HTML header, and the
+ *  shift-function fan. Percentiles are not listed -- the fan is fixed. */
+export interface MetricSection {
+  kind: "metric";
+  title: string;
+  /** Stat the framework computes from samples; defaults to "mean". The named
+   *  verdict stat that the CLI/HTML headline and the shift fan are built on. */
+  statKind?: StatKind;
+  /** Set true for throughput metrics where higher values are better (lines/sec). */
+  higherIsBetter?: boolean;
+  /** Convert a timing-domain value to display domain (e.g. ms to lines/sec). */
+  toDisplay?: (timingValue: number, metadata?: UnknownRecord) => number;
+  formatter: Formatter;
+  /** Extra scalar cells shown alongside the metric (e.g. line counts). */
+  extras?: ScalarRow[];
+}
+
+/** A bag of named values pulled from results/metadata (gc, runs, v8 opt). */
+export interface ScalarSection {
+  kind: "scalar";
+  title: string;
+  rows: ScalarRow[];
   /** Rendering layout hint; "matrix" packs scalar metrics into a dense table. */
   layout?: "matrix";
 }
 
-/** A table column with optional comparison behavior */
-export type ReportColumn = AnyColumn<Record<string, unknown>> & {
-  /** Add diff column after this column when baseline exists */
+/** A single scalar value pulled from results/metadata. */
+export interface ScalarRow {
+  key?: string;
+  title: string;
+  formatter: Formatter;
+  value: (results: MeasuredResults, metadata?: UnknownRecord) => unknown;
+  /** Add a diff column when a baseline exists (point-ratio, no bootstrap CI). */
   comparable?: boolean;
-  /** Set true for throughput metrics where higher values are better (e.g., lines/sec) */
-  higherIsBetter?: boolean;
-  /** Stat descriptor: framework computes value from samples via computeStat */
-  statKind?: StatKind;
-  /** Accessor for non-sample data (e.g., run count, metadata fields) */
-  value?: (results: MeasuredResults, metadata?: UnknownRecord) => unknown;
-  /** Convert a timing-domain value to display domain (e.g., ms to lines/sec) */
-  toDisplay?: (
-    timingValue: number,
-    metadata?: Record<string, unknown>,
-  ) => number;
-};
+}
 
-export type UnknownRecord = Record<string, unknown>;
+/** @return a MetricSection with kind filled in. */
+export function metricSection(s: Omit<MetricSection, "kind">): MetricSection {
+  return { kind: "metric", ...s };
+}
 
-/** Compute column values for a section from results + metadata. Pass
- *  statSamples to use a trimmed sample array for statKind columns
- *  (defaults to results.samples). */
-export function computeColumnValues(
-  section: ReportSection,
+/** @return a ScalarSection with kind filled in. */
+export function scalarSection(s: Omit<ScalarSection, "kind">): ScalarSection {
+  return { kind: "scalar", ...s };
+}
+
+/** @return a metric section's verdict stat, defaulting to "mean". */
+export function metricStatKind(s: MetricSection): StatKind {
+  return s.statKind ?? "mean";
+}
+
+/** @return the metric's display value: statKind over samples, then toDisplay.
+ *  Pass statSamples to use a trimmed sample array (defaults to results.samples). */
+export function metricValue(
+  section: MetricSection,
   results: MeasuredResults,
   metadata?: UnknownRecord,
   statSamples?: number[],
-): UnknownRecord {
+): number {
   const samples = statSamples ?? results.samples;
-  return Object.fromEntries(
-    section.columns.map(col => {
-      const key = col.key ?? col.title;
-      if (col.value) return [key, col.value(results, metadata)];
-      if (col.statKind) {
-        const raw = computeStat(samples, col.statKind);
-        return [key, col.toDisplay ? col.toDisplay(raw, metadata) : raw];
-      }
-      return [key, undefined];
-    }),
-  );
+  const raw = computeStat(samples, metricStatKind(section));
+  return section.toDisplay ? section.toDisplay(raw, metadata) : raw;
 }
 
-/** Run each section's computeColumnValues and merge into one record */
-export function extractSectionValues(
-  measuredResults: MeasuredResults,
-  sections: ReadonlyArray<ReportSection>,
+/** @return scalar row values keyed by row key/title. */
+export function scalarValues(
+  rows: ScalarRow[],
+  results: MeasuredResults,
   metadata?: UnknownRecord,
-  statSamples?: number[],
 ): UnknownRecord {
-  const perSection = sections.map(s =>
-    computeColumnValues(s, measuredResults, metadata, statSamples),
+  return Object.fromEntries(
+    rows.map(row => [row.key ?? row.title, row.value(results, metadata)]),
   );
-  return Object.assign({}, ...perSection);
 }
 
 /** All reports in a group, including the baseline if present */
@@ -114,26 +131,20 @@ export function hasField(
   );
 }
 
-/** @return true if the first comparable column in sections has higherIsBetter set */
-export function isHigherIsBetter(sections: ReportSection[]): boolean {
-  const cols = sections.flatMap(s => s.columns);
-  return cols.find(c => c.comparable)?.higherIsBetter ?? false;
-}
-
-/** @return the first column eligible to drive the comparison CI (comparable
- *  with a bootstrappable statKind). Skips min/max so a `--stats max,mean` run
- *  still gets a CI from mean rather than nothing from max. */
-export function findPrimaryCIColumn(
+/** @return the metric section that drives the comparison CI: the first metric
+ *  section whose stat is bootstrappable (mean / percentile, not min/max). */
+export function findPrimaryMetric(
   sections?: ReportSection[],
-): ReportColumn | undefined {
-  return sections
-    ?.flatMap(s => s.columns)
-    .find(c => c.comparable && c.statKind && isBootstrappable(c.statKind));
+): MetricSection | undefined {
+  return sections?.find(
+    (s): s is MetricSection =>
+      s.kind === "metric" && isBootstrappable(metricStatKind(s)),
+  );
 }
 
-/** Bootstrap difference CI for a column, using batch structure when available.
+/** Bootstrap difference CI for a stat, using batch structure when available.
  *  Always returns the raw (time-domain) CI; display orientation for
- *  higherIsBetter columns is handled by formatDiffWithCI. */
+ *  higherIsBetter metrics is handled by the caller (flipCI). */
 export function computeDiffCI(
   baseline: MeasuredResults | undefined,
   current: MeasuredResults,

@@ -92,8 +92,11 @@ export interface ViewerRow {
   comparisonCI?: DifferenceCI;
   shared?: boolean;
 
-  /** First comparable row with a statKind in the section. */
+  /** The metric row of a metric section: drives the headline and shift fan. */
   primary?: boolean;
+
+  /** Short stat label for the headline, e.g. "mean", "p50". Set on metric rows. */
+  statLabel?: string;
 
   /** Per-percentile diff distribution for the shift-function plot, present on
    *  the primary row of a comparable section when a baseline exists. */

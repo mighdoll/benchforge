@@ -37,6 +37,8 @@ export interface ExportOptions {
   sections?: ReportSection[];
   currentVersion?: GitVersion;
   baselineVersion?: GitVersion;
+  /** Prebuilt report data to reuse, skipping a second prepareHtmlData pass. */
+  reportData?: ReportData;
 }
 
 /** Export options for matrix benchmarks (results/args supplied by the matrix pipeline). */
@@ -44,6 +46,7 @@ export interface MatrixExportOptions {
   sections?: ReportSection[];
   currentVersion?: GitVersion;
   baselineVersion?: GitVersion;
+  reportData?: ReportData;
 }
 
 type FrameContainer = {
@@ -62,11 +65,14 @@ export async function exportReports(options: ExportOptions): Promise<void> {
     baselineVersion,
     ...comparison,
   };
-  // Always computed: the markdown report (below) is always written, and the
-  // viewer/archive reuse the same data when requested.
-  const reportData = withStatus("computing viewer data", () =>
-    prepareHtmlData(results, htmlOpts),
-  );
+  // Reuse the prebuilt report data when the pipeline already computed it (the
+  // console summary builds it first); otherwise compute it here. The markdown
+  // report below is always written, and the viewer/archive reuse the same data.
+  const reportData =
+    options.reportData ??
+    withStatus("computing viewer data", () =>
+      prepareHtmlData(results, htmlOpts),
+    );
 
   writeMarkdownReport(reportData, args);
   exportFileFormats(results, args);

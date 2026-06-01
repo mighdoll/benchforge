@@ -1,18 +1,16 @@
 import {
   type ComparisonOptions,
   computeDiffCI,
-  extractSectionValues,
-  findPrimaryCIColumn,
+  findPrimaryMetric,
+  metricStatKind,
   type ReportSection,
 } from "../report/BenchmarkReport.ts";
 import colors from "../report/Colors.ts";
 import { truncate } from "../report/Formatters.ts";
 import { runsSection, timeSection } from "../report/StandardSections.ts";
-import { buildTable } from "../report/text/TableReport.ts";
-import { sectionColumnGroups } from "../report/text/TextReport.ts";
-import type { MeasuredResults } from "../runners/MeasuredResults.ts";
+import { verdictWord } from "../report/Verdict.ts";
 import type { CIDirection, DifferenceCI } from "../stats/StatisticalUtils.ts";
-import { flipCI, trimOutlierBatches } from "../stats/StatisticalUtils.ts";
+import { flipCI } from "../stats/StatisticalUtils.ts";
 import type {
   CaseResult,
   MatrixResults,
@@ -34,8 +32,6 @@ interface VariantCase {
   caseResult: CaseResult;
 }
 
-type Row = Record<string, unknown> & { name: string };
-
 interface LabeledDiff {
   label: string;
   ci: DifferenceCI;
@@ -43,7 +39,9 @@ interface LabeledDiff {
 
 const defaultSections: ReportSection[] = [timeSection, runsSection];
 
-/** Format matrix results as text, with one table per case */
+/** Format matrix results as a pithy console verdict (matrix name + per-case
+ *  better/worse summary). Detailed distributions live in the markdown report
+ *  and HTML viewer. */
 export function reportMatrixResults(
   results: MatrixResults,
   options?: MatrixReportOptions,
@@ -52,75 +50,39 @@ export function reportMatrixResults(
 
   // all variants have the same cases
   const caseIds = results.variants[0].cases.map(c => c.caseId);
-  const built = caseIds.map(caseId => buildCaseTable(results, caseId, options));
-  const tables = built.map(b => b.table);
-  const diffs = built.flatMap(b => b.diffs);
-  const sections = [`Matrix: ${results.name}`, ...tables];
+  const diffs = caseIds.flatMap(caseId => caseDiffs(results, caseId, options));
+  const sections = [`Matrix: ${results.name}`];
   const summary = verdictSummary(diffs);
   if (summary) sections.push(summary);
   return sections.join("\n\n");
 }
 
-/** Build table for a single case showing all variants */
-function buildCaseTable(
+/** Compute labeled comparison diffs for a single case across all variants. */
+function caseDiffs(
   results: MatrixResults,
   caseId: string,
   options?: MatrixReportOptions,
-): { table: string; diffs: LabeledDiff[] } {
-  const title = formatCaseTitle(results, caseId);
+): LabeledDiff[] {
   const sections = options?.sections ?? defaultSections;
-  const variantTitle = options?.variantTitle ?? "variant";
-  const primaryCol = findPrimaryCIColumn(sections);
+  const primary = findPrimaryMetric(sections);
+  if (!primary) return [];
+  const statKind = metricStatKind(primary);
+  const higher = !!primary.higherIsBetter;
 
-  const caseResults = collectCaseResults(results, caseId);
-  const shared = sharedBaseline(caseResults);
-
-  const noTrim = options?.comparison?.noBatchTrim;
-  const trimSamples = (m: MeasuredResults) =>
-    trimOutlierBatches(m.samples, m.batchOffsets, noTrim).samples;
-
-  const extractVals = (m: MeasuredResults, meta?: Record<string, unknown>) =>
-    extractSectionValues(m, sections, meta, trimSamples(m));
-
-  const rows: Row[] = caseResults.flatMap(({ variant, caseResult }) => {
-    const row: Row = {
-      name: truncate(variant.id, 25),
-      ...extractVals(caseResult.measured, caseResult.metadata),
-    };
-    if (caseResult.baseline && primaryCol?.statKind) {
-      const comp = options?.comparison;
-      row.diffCI = computeDiffCI(
+  return collectCaseResults(results, caseId).flatMap(
+    ({ variant, caseResult }) => {
+      if (!caseResult.baseline) return [];
+      const ci = computeDiffCI(
         caseResult.baseline,
         caseResult.measured,
-        primaryCol.statKind,
-        comp,
+        statKind,
+        options?.comparison,
       );
-    }
-    const out: Row[] = [row];
-    if (caseResult.baseline && !shared)
-      out.push({
-        name: " \u21B3 baseline",
-        ...extractVals(caseResult.baseline, caseResult.metadata),
-      });
-    return out;
-  });
-
-  if (shared)
-    rows.push({
-      name: "=> baseline",
-      ...extractSectionValues(shared, sections, undefined, trimSamples(shared)),
-    });
-
-  const hasDiff = rows.some(r => r.diffCI);
-  const cols = sectionColumnGroups(sections, hasDiff, variantTitle);
-  const higher = !!primaryCol?.higherIsBetter;
-  const diffs: LabeledDiff[] = rows.flatMap(r => {
-    const ci = r.diffCI as DifferenceCI | undefined;
-    if (!ci) return [];
-    return [{ label: `${caseId}/${r.name}`, ci: higher ? flipCI(ci) : ci }];
-  });
-  const table = `${title}\n${buildTable(cols, [{ results: rows }])}`;
-  return { table, diffs };
+      if (!ci) return [];
+      const label = `${caseId}/${truncate(variant.id, 25)}`;
+      return [{ label, ci: higher ? flipCI(ci) : ci }];
+    },
+  );
 }
 
 /** One-line verdict line. For a single comparison, includes name + Δ% inline.
@@ -129,18 +91,6 @@ function verdictSummary(diffs: LabeledDiff[]): string | undefined {
   if (diffs.length === 0) return undefined;
   if (diffs.length === 1) return singleVerdict(diffs[0]);
   return multiVerdict(diffs);
-}
-
-/** Format case title with metadata if available */
-function formatCaseTitle(results: MatrixResults, caseId: string): string {
-  const caseResult = results.variants[0]?.cases.find(c => c.caseId === caseId);
-  const metadata = caseResult?.metadata;
-
-  if (!metadata || Object.keys(metadata).length === 0) return caseId;
-  const meta = Object.entries(metadata)
-    .map(([k, v]) => `${v} ${k}`)
-    .join(", ");
-  return `${caseId} (${meta})`;
 }
 
 /** Collect (variant, caseResult) pairs for a given caseId */
@@ -154,23 +104,12 @@ function collectCaseResults(
   });
 }
 
-/** @return shared baseline if all variants reference the same one (baselineVariant mode) */
-function sharedBaseline(
-  caseResults: VariantCase[],
-): MeasuredResults | undefined {
-  const baselines = caseResults
-    .map(({ caseResult }) => caseResult.baseline)
-    .filter(Boolean);
-  if (baselines.length < 2) return undefined;
-  return baselines.every(b => b === baselines[0]) ? baselines[0] : undefined;
-}
-
 function singleVerdict(d: LabeledDiff): string {
   const { percent, ci, direction } = d.ci;
   const [lo, hi] = ci;
   const sign = (n: number) => (n >= 0 ? "+" : "");
   const range = `${sign(percent)}${percent.toFixed(1)}% [${sign(lo)}${lo.toFixed(1)}%, ${sign(hi)}${hi.toFixed(1)}%]`;
-  return `Verdict: ${d.label} ${verdictWord(direction)} ${range} vs baseline`;
+  return `Verdict: ${d.label} ${coloredVerdict(direction)} ${range} vs baseline`;
 }
 
 function multiVerdict(diffs: LabeledDiff[]): string {
@@ -183,8 +122,8 @@ function multiVerdict(diffs: LabeledDiff[]): string {
   for (const d of diffs) tally[d.ci.direction].push(d);
   const { green, red, dim } = colors;
   const parts = [
-    green(`${tally.faster.length} faster`),
-    red(`${tally.slower.length} slower`),
+    green(`${tally.faster.length} better`),
+    red(`${tally.slower.length} worse`),
     green(`${tally.equivalent.length} equivalent`),
     dim(`${tally.uncertain.length} uncertain`),
   ];
@@ -192,17 +131,18 @@ function multiVerdict(diffs: LabeledDiff[]): string {
   const names = (xs: LabeledDiff[]) => xs.map(d => d.label).join(", ");
   const detail: string[] = [];
   if (tally.faster.length)
-    detail.push(green(`  faster: ${names(tally.faster)}`));
-  if (tally.slower.length) detail.push(red(`  slower: ${names(tally.slower)}`));
+    detail.push(green(`  better: ${names(tally.faster)}`));
+  if (tally.slower.length) detail.push(red(`  worse: ${names(tally.slower)}`));
   if (tally.uncertain.length)
     detail.push(dim(`  uncertain: ${names(tally.uncertain)}`));
   return [head, ...detail].join("\n");
 }
 
-function verdictWord(d: CIDirection): string {
+/** @return the verdict word colored green (better/equivalent) or red (worse). */
+function coloredVerdict(d: CIDirection): string {
   const { green, red, dim } = colors;
-  if (d === "faster") return green("faster");
-  if (d === "slower") return red("slower");
-  if (d === "equivalent") return green("equivalent");
-  return dim("uncertain");
+  const word = verdictWord(d);
+  if (word === "better" || word === "equivalent") return green(word);
+  if (word === "worse") return red(word);
+  return dim(word);
 }

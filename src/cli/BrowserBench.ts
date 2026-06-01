@@ -7,12 +7,13 @@ import { launchChrome } from "../profiling/browser/ChromeLauncher.ts";
 import { isBrowserUserCode } from "../profiling/node/HeapSampleReport.ts";
 import type { ReportGroup, ReportSection } from "../report/BenchmarkReport.ts";
 import colors from "../report/Colors.ts";
+import { consoleSummary } from "../report/ConsoleSummary.ts";
 import {
   browserGcStatsSection,
   pageLoadStatsSections,
 } from "../report/GcSections.ts";
+import { prepareHtmlData } from "../report/HtmlReport.ts";
 import { runsSection, timeSection } from "../report/StandardSections.ts";
-import { reportResults } from "../report/text/TextReport.ts";
 import type { MeasuredResults } from "../runners/MeasuredResults.ts";
 import {
   type BatchProgress,
@@ -20,6 +21,7 @@ import {
   runBatched,
 } from "../runners/MergeBatches.ts";
 import { computeStats } from "../runners/SampleStats.ts";
+import type { ReportData } from "../viewer/ReportData.ts";
 import type { DefaultCliArgs } from "./CliArgs.ts";
 import { exportReports } from "./CliExport.ts";
 import {
@@ -54,14 +56,14 @@ export async function browserBenchExports(args: DefaultCliArgs): Promise<void> {
     const result = await profileBrowser(params);
     const results = browserResultGroups(name, result);
 
-    printBrowserReport(result, results, args);
-    await exportReports({ results, args });
+    const reportData = printBrowserReport(result, results, args);
+    await exportReports({ results, args, reportData });
     return;
   }
 
   const { lastRaw, results } = await runBrowserBatches(params, name, args);
-  printBrowserReport(lastRaw, results, args);
-  await exportReports({ results, args });
+  const reportData = printBrowserReport(lastRaw, results, args);
+  await exportReports({ results, args, reportData });
 }
 
 /** Warn about Node-only flags ignored in browser mode. */
@@ -121,31 +123,36 @@ function browserResultGroups(
   return [{ name, reports: [{ name, measuredResults }] }];
 }
 
-/** Print text report and optional heap profile for browser results. */
+/** Build the report data, print the console summary and optional heap profile
+ *  for browser results. @return the report data for reuse by exportReports. */
 function printBrowserReport(
   result: BrowserProfileResult,
   results: ReportGroup[],
   args: DefaultCliArgs,
-): void {
+): ReportData | undefined {
   const mr = results[0]?.reports[0]?.measuredResults;
   const hasPageLoad = (mr?.navTimings?.length ?? 0) > 0 || !!result.navTiming;
   const hasIterSamples = !!result.samples?.length;
   const sections: ReportSection[] = [
-    ...(hasPageLoad ? pageLoadStatsSections : []),
     ...(hasIterSamples ? [timeSection] : []),
+    ...(hasPageLoad ? pageLoadStatsSections : []),
     ...(result.gcStats ? [browserGcStatsSection] : []),
     ...(hasPageLoad || hasIterSamples ? [runsSection] : []),
   ];
+  let reportData: ReportData | undefined;
   if (sections.length > 0) {
-    console.log(
-      withStatus("computing report", () => reportResults(results, sections)),
+    reportData = withStatus("computing report", () =>
+      prepareHtmlData(results, { cliArgs: args, sections }),
     );
+    console.log(consoleSummary(reportData));
   }
-  if (!result.heapProfile) return;
-  printHeapReports(results, {
-    ...cliHeapReportOptions(args),
-    isUserCode: isBrowserUserCode,
-  });
+  if (result.heapProfile) {
+    printHeapReports(results, {
+      ...cliHeapReportOptions(args),
+      isUserCode: isBrowserUserCode,
+    });
+  }
+  return reportData;
 }
 
 /** Launch Chrome, run batched fresh tabs, merge results. */

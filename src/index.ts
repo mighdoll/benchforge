@@ -43,15 +43,22 @@ export { reportMatrixResults } from "./matrix/MatrixReport.ts";
 export type {
   BenchmarkReport,
   ComparisonOptions,
-  ReportColumn,
+  Formatter,
+  MetricSection,
   ReportGroup,
   ReportSection,
+  ScalarRow,
+  ScalarSection,
   UnknownRecord,
 } from "./report/BenchmarkReport.ts";
 export {
-  computeColumnValues,
+  findPrimaryMetric,
   hasField,
+  metricSection,
+  metricStatKind,
+  scalarSection,
 } from "./report/BenchmarkReport.ts";
+export { consoleSummary } from "./report/ConsoleSummary.ts";
 export {
   formatBytes,
   formatConvergence,
@@ -81,7 +88,6 @@ export {
   timeSection,
   totalTimeSection,
 } from "./report/StandardSections.ts";
-export { reportResults } from "./report/text/TextReport.ts";
 export type {
   BenchGroup,
   BenchmarkSpec,

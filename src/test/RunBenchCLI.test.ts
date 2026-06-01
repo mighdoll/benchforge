@@ -74,8 +74,7 @@ test("runs all benchmarks", { timeout: 30000 }, async () => {
   expect(output).toContain("template literal");
   expect(output).toContain("addition");
   expect(output).toContain("multiplication");
-  expect(output).toContain("mean");
-  expect(output).toContain("runs");
+  expect(output).toContain("(mean)");
 });
 
 test("filters by substring", { timeout: 15000 }, async () => {
@@ -113,13 +112,9 @@ test("e2e: runs user script", { timeout: 30000 }, () => {
 
   expect(output).toContain("plus");
   expect(output).toContain("multiply");
-  expect(output).toContain("mean");
-  expect(output).toContain("runs");
+  expect(output).toContain("(mean)");
 
   const lines = output.split("\n");
-  const headerLine = lines.find(l => l.includes("name"));
-  expect(headerLine).toBeTruthy();
-
   const plusLine = lines.find(l => l.includes("plus"));
   expect(plusLine).toBeTruthy();
 });
@@ -136,8 +131,7 @@ test("runs benchmarks with setup function", { timeout: 30000 }, async () => {
 
   expect(output).toContain("sum numbers");
   expect(output).toContain("join strings");
-  expect(output).toContain("mean");
-  expect(output).toContain("runs");
+  expect(output).toContain("(mean)");
 });
 
 test("runs benchmarks with baseline comparison", {
@@ -167,10 +161,9 @@ test("runs benchmarks with baseline comparison", {
 
   const output = await runBenchCLITest(suiteWithBaseline, "--iterations 20");
 
-  expect(output).toContain("baseline sort");
   expect(output).toContain("optimized sort");
-  expect(output).toContain("Δ%"); // Diff column should appear
-  expect(output).toContain("mean");
+  expect(output).toContain("vs baseline"); // verdict line for the comparison
+  expect(output).toContain("(mean)");
 });
 
 test("file mode: BenchSuite export", { timeout: 30000 }, () => {
@@ -181,12 +174,12 @@ test("file mode: BenchSuite export", { timeout: 30000 }, () => {
 
   expect(output).toContain("plus");
   expect(output).toContain("multiply");
-  expect(output).toContain("runs");
+  expect(output).toContain("(mean)");
 });
 
 test("file mode: function export", { timeout: 30000 }, () => {
   const output = executeBenchforgeFile("fn-export-bench.ts", "--iterations 5");
 
   expect(output).toContain("fn-export-bench");
-  expect(output).toContain("runs");
+  expect(output).toContain("(mean)");
 });

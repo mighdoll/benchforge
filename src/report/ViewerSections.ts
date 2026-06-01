@@ -24,12 +24,23 @@ import type {
 } from "../viewer/ReportData.ts";
 import {
   type ComparisonOptions,
-  computeColumnValues,
-  type ReportColumn,
+  type Formatter,
+  type MetricSection,
+  metricStatKind,
+  metricValue,
   type ReportSection,
+  type ScalarRow,
+  type ScalarSection,
   type UnknownRecord,
 } from "./BenchmarkReport.ts";
-import { buildShiftFunction } from "./ShiftFunction.ts";
+import { buildShiftFunction, statLabel } from "./ShiftFunction.ts";
+
+/** The bits of a metric a bootstrap-CI display needs: how to transform the
+ *  value and how to format it. */
+interface DisplaySpec {
+  toDisplay?: (timingValue: number, metadata?: UnknownRecord) => number;
+  formatter: Formatter;
+}
 
 /** Per-section reusable bootstrap results, indexed by stat-column order.
  *  Supplying cur/base/diff causes buildCIMap to skip the matching bootstrap
@@ -41,12 +52,10 @@ export interface SectionCICache {
   diff?: (DifferenceCI | undefined)[];
 }
 
-/** Context for building viewer rows within a column group */
+/** Context for building viewer rows within a section */
 interface RowContext {
   current: MeasuredResults;
   baseline?: MeasuredResults;
-  curVals: Record<string, unknown>;
-  baseVals?: Record<string, unknown>;
   currentMeta?: UnknownRecord;
   baselineMeta?: UnknownRecord;
   comparison?: ComparisonOptions;
@@ -113,10 +122,10 @@ export function annotateCI<T extends Annotatable | undefined>(
  *  matching bootstrap work on the second call. */
 export function buildViewerSections(
   sections: ReportSection[],
-  base: Omit<RowContext, "curVals" | "baseVals">,
+  base: RowContext,
   reuseCaches?: SectionCICache[],
 ): { sections: ViewerSection[]; caches: SectionCICache[] } {
-  const { current, baseline, currentMeta, baselineMeta, comparison } = base;
+  const { current, baseline, comparison } = base;
   const noTrim = comparison?.noBatchTrim;
   const trimmedSamples = (m: MeasuredResults) =>
     trimOutlierBatches(m.samples, m.batchOffsets, noTrim).samples;
@@ -125,44 +134,38 @@ export function buildViewerSections(
   const caches: SectionCICache[] = [];
   const viewerSections: ViewerSection[] = [];
   sections.forEach((section, i) => {
-    const curVals = computeColumnValues(
-      section,
-      current,
-      currentMeta,
-      curSamples,
-    );
-    const baseVals = baseline
-      ? computeColumnValues(section, baseline, baselineMeta, baseSamples)
-      : undefined;
-    const ctx: RowContext = { ...base, curVals, baseVals };
+    const ctx: RowContext = { ...base };
     const cache: SectionCICache = {};
-    const cols = section.columns as ReportColumn[];
-    const rows = buildGroupRows(
-      cols,
-      ctx,
-      section.title,
-      reuseCaches?.[i],
-      cache,
-    );
+    const layout = section.kind === "scalar" ? section.layout : undefined;
+    const rows =
+      section.kind === "metric"
+        ? metricRows(
+            section,
+            ctx,
+            curSamples,
+            baseSamples,
+            reuseCaches?.[i],
+            cache,
+          )
+        : scalarRows(section, ctx);
     caches[i] = cache;
     if (rows.length)
-      viewerSections.push({ title: section.title, rows, layout: section.layout });
+      viewerSections.push({ title: section.title, rows, layout });
   });
   return { sections: viewerSections, caches };
 }
 
 /** Format a BootstrapResult into display-domain BootstrapCIData */
 export function formatBootstrapCI(
-  col: ReportColumn,
+  spec: DisplaySpec,
   result: BootstrapResult,
   batchOffsets: number[] | undefined,
   metadata?: UnknownRecord,
 ): BootstrapCIData {
-  const toDisplay = col.toDisplay
-    ? (v: number) => col.toDisplay!(v, metadata)
+  const toDisplay = spec.toDisplay
+    ? (v: number) => spec.toDisplay!(v, metadata)
     : (v: number) => v;
-  const formatValue = (v: number) =>
-    (col.formatter ? col.formatter(v) : String(v)) ?? String(v);
+  const formatValue = (v: number) => spec.formatter(v) ?? String(v);
 
   const binned = binBootstrapResult(result);
   const dLo = toDisplay(binned.ci[0]);
@@ -204,153 +207,157 @@ function batchCount(m?: MeasuredResults): number {
   return m?.batchOffsets?.length ?? 0;
 }
 
-/** Build ViewerRow[] for a column group, using shared resampling for statKind columns */
-function buildGroupRows(
-  columns: ReportColumn[],
+/** Build the rows for a metric section: one comparable metric row (bootstrap CI
+ *  + shift fan, marked primary) followed by its scalar extras. The bootstrap
+ *  result for the metric is cached in populate / reused from reuse so the trim
+ *  and raw views can share work. */
+function metricRows(
+  section: MetricSection,
   ctx: RowContext,
-  sectionTitle: string,
+  curSamples: number[],
+  baseSamples: number[] | undefined,
   reuse?: SectionCICache,
   populate?: SectionCICache,
 ): ViewerRow[] {
-  const ciMap = buildCIMap(columns, ctx, reuse, populate);
-  const rows: ViewerRow[] = [];
-  for (const col of columns) {
-    const key = (col.key ?? col.title) as string;
-    const row = buildRow(col, key, ctx, ciMap.get(key));
-    if (row) rows.push(row);
-  }
-  attachPrimaryShiftFunction(columns, rows, ctx, sectionTitle);
-  return rows;
+  const cis = metricCIs(section, ctx, reuse, populate);
+  const row = metricRow(section, ctx, curSamples, baseSamples, cis);
+  const extras = (section.extras ?? []).flatMap(r => {
+    const out = scalarRow(r, ctx);
+    return out ? [out] : [];
+  });
+  return row ? [row, ...extras] : extras;
 }
 
-/** Compute batched bootstrap CIs, returning a Map keyed by column key. When
- *  reuse provides cur/base/diff arrays (aligned to the comparable+bootstrappable
- *  column order), those entries are taken as-is and the bootstrap is skipped.
- *  Computed results are written into populate so a caller can reuse them. */
-function buildCIMap(
-  columns: ReportColumn[],
+/** Build the rows for a scalar section: one row per scalar row. */
+function scalarRows(section: ScalarSection, ctx: RowContext): ViewerRow[] {
+  return section.rows.flatMap(r => {
+    const out = scalarRow(r, ctx);
+    return out ? [out] : [];
+  });
+}
+
+/** Bootstrap a metric section's single stat for current/baseline + the diff,
+ *  reusing cached results when supplied and writing computed ones to populate. */
+function metricCIs(
+  section: MetricSection,
   ctx: RowContext,
   reuse?: SectionCICache,
   populate?: SectionCICache,
-): Map<string, ColCIs> {
-  const ciCols = columns.filter(
-    c => c.comparable && c.statKind && isBootstrappable(c.statKind),
-  );
-  const statKinds = ciCols.map(c => c.statKind!);
-  const map = new Map<string, ColCIs>();
-  if (statKinds.length === 0) return map;
-
-  const curSamples = ctx.current.samples;
-  const baseSamples = ctx.baseline?.samples;
+): ColCIs {
+  if (!isBootstrappable(metricStatKind(section))) return {};
+  const stats = [metricStatKind(section)];
   const opts = { noTrim: ctx.comparison?.noBatchTrim };
-  const computeCIs = (s: number[], offsets?: number[]) =>
-    s.length > 1 ? bootstrapCIs(s, offsets, statKinds, opts) : undefined;
-  const curResults =
-    reuse?.cur ??
-    (curSamples ? computeCIs(curSamples, ctx.current.batchOffsets) : undefined);
-  const baseResults =
+  const computeCIs = (s: number[] | undefined, offsets?: number[]) =>
+    s && s.length > 1 ? bootstrapCIs(s, offsets, stats, opts) : undefined;
+  const cur =
+    reuse?.cur ?? computeCIs(ctx.current.samples, ctx.current.batchOffsets);
+  const base =
     reuse?.base ??
-    (baseSamples
-      ? computeCIs(baseSamples, ctx.baseline!.batchOffsets)
-      : undefined);
-  const diffResults = reuse?.diff ?? buildDiffResults(ciCols, statKinds, ctx);
-
+    computeCIs(ctx.baseline?.samples, ctx.baseline?.batchOffsets);
+  const diff = reuse?.diff ?? buildDiffResults(section, stats, ctx);
   if (populate) {
-    populate.cur = curResults;
-    populate.base = baseResults;
-    populate.diff = diffResults;
+    populate.cur = cur;
+    populate.base = base;
+    populate.diff = diff;
   }
-
-  for (let i = 0; i < ciCols.length; i++) {
-    const key = (ciCols[i].key ?? ciCols[i].title) as string;
-    map.set(key, {
-      cur: curResults?.[i],
-      base: baseResults?.[i],
-      diff: diffResults?.[i],
-    });
-  }
-  return map;
+  return { cur: cur?.[0], base: base?.[0], diff: diff?.[0] };
 }
 
-/** Build a ViewerRow for a column, using pre-computed CIs if available */
-function buildRow(
-  col: ReportColumn,
-  key: string,
+/** Build the comparable metric row: current + baseline entries (each with a
+ *  bootstrap CI), the diff CI, primary marker, and the shift-function fan. */
+function metricRow(
+  section: MetricSection,
   ctx: RowContext,
-  colCIs?: ColCIs,
+  curSamples: number[],
+  baseSamples: number[] | undefined,
+  cis: ColCIs,
 ): ViewerRow | undefined {
-  const curRaw = ctx.curVals[key];
-  const baseRaw = ctx.baseVals?.[key];
-  if (curRaw === undefined && baseRaw === undefined) return undefined;
+  const curRaw = metricValue(section, ctx.current, ctx.currentMeta, curSamples);
+  const format = (v: number) => section.formatter(v) ?? "";
 
-  const format = (v: unknown) => {
-    if (v === undefined) return "";
-    return (col.formatter ? col.formatter(v) : String(v)) ?? "";
-  };
-
-  // Non-comparable: shared single value
-  if (!col.comparable) {
-    const value = format(curRaw ?? baseRaw);
-    if (!value || value === "—") return undefined;
-    return {
-      label: col.title,
-      entries: [{ runName: ctx.current.name, value }],
-      shared: true,
-    };
-  }
-
-  // Comparable: current + baseline entries, optional CI
-  const curEntry = buildEntry(
-    ctx.current.name,
-    format(curRaw),
-    col,
-    colCIs?.cur,
-    ctx.current.batchOffsets,
-    ctx.currentMeta,
-  );
-  const entries: ViewerEntry[] = [curEntry];
-  if (ctx.baseline && baseRaw !== undefined) {
-    const baseEntry = buildEntry(
-      "baseline",
-      format(baseRaw),
-      col,
-      colCIs?.base,
-      ctx.baseline.batchOffsets,
+  const entries: ViewerEntry[] = [
+    buildEntry(
+      ctx.current.name,
+      format(curRaw),
+      section,
+      cis.cur,
+      ctx.current.batchOffsets,
+      ctx.currentMeta,
+    ),
+  ];
+  if (ctx.baseline) {
+    const baseRaw = metricValue(
+      section,
+      ctx.baseline,
       ctx.baselineMeta,
+      baseSamples,
     );
-    entries.push(baseEntry);
+    entries.push(
+      buildEntry(
+        "baseline",
+        format(baseRaw),
+        section,
+        cis.base,
+        ctx.baseline.batchOffsets,
+        ctx.baselineMeta,
+      ),
+    );
   }
-  const comparisonCI = colCIs?.diff ?? simpleDeltaCI(curRaw, baseRaw);
-  return { label: col.title, entries, comparisonCI };
-}
 
-/** Mark the first row with a bootstrap CI as primary and attach its
- *  shift-function data (per-percentile diff across the whole distribution). */
-function attachPrimaryShiftFunction(
-  columns: ReportColumn[],
-  rows: ViewerRow[],
-  ctx: RowContext,
-  sectionTitle: string,
-): void {
-  const primaryRow = rows.find(r => r.entries.some(e => e.bootstrapCI));
-  if (!primaryRow) return;
-  primaryRow.primary = true;
-  const col = columns.find(c => c.title === primaryRow.label);
-  if (!col) return;
-  primaryRow.shiftFunction = buildShiftFunction(
-    col,
-    sectionTitle,
+  const row: ViewerRow = {
+    label: section.title,
+    entries,
+    primary: true,
+    statLabel: statLabel(metricStatKind(section)),
+  };
+  if (cis.diff) row.comparisonCI = cis.diff;
+  row.shiftFunction = buildShiftFunction(
+    section,
     ctx.current,
     ctx.baseline,
     ctx.currentMeta,
     ctx.baselineMeta,
     ctx.comparison,
   );
+  return row;
 }
 
-/** Compute difference CIs with annotation and higher-is-better flip */
+/** Build a viewer row for one scalar row: a shared single value, or (when
+ *  comparable with a baseline) current + baseline + a point-ratio delta. */
+function scalarRow(scalar: ScalarRow, ctx: RowContext): ViewerRow | undefined {
+  const { current, baseline, currentMeta, baselineMeta } = ctx;
+  const curRaw = scalar.value(current, currentMeta);
+  const baseRaw = baseline ? scalar.value(baseline, baselineMeta) : undefined;
+  if (curRaw === undefined && baseRaw === undefined) return undefined;
+
+  const format = (v: unknown) =>
+    v === undefined ? "" : (scalar.formatter(v) ?? "");
+
+  if (!scalar.comparable) {
+    const value = format(curRaw ?? baseRaw);
+    if (!value || value === "—") return undefined;
+    return {
+      label: scalar.title,
+      entries: [{ runName: current.name, value }],
+      shared: true,
+    };
+  }
+
+  const entries: ViewerEntry[] = [
+    { runName: current.name, value: format(curRaw) },
+  ];
+  if (baseline && baseRaw !== undefined)
+    entries.push({ runName: "baseline", value: format(baseRaw) });
+  return {
+    label: scalar.title,
+    entries,
+    comparisonCI: simpleDeltaCI(curRaw, baseRaw),
+  };
+}
+
+/** Compute the metric's difference CI with annotation and higher-is-better flip. */
 function buildDiffResults(
-  cols: ReportColumn[],
+  section: MetricSection,
   stats: StatKind[],
   ctx: RowContext,
 ): (DifferenceCI | undefined)[] | undefined {
@@ -374,11 +381,10 @@ function buildDiffResults(
     current,
     comparison?.noBatchTrim,
   );
-  return rawCIs.map((ci, i) => {
+  return rawCIs.map(ci => {
     if (!ci) return undefined;
-    const col = cols[i];
-    const adjusted = col.higherIsBetter ? flipCI(ci) : ci;
-    return annotateCI(adjusted, col.title, lowBatches);
+    const adjusted = section.higherIsBetter ? flipCI(ci) : ci;
+    return annotateCI(adjusted, section.title, lowBatches);
   });
 }
 
@@ -386,19 +392,18 @@ function buildDiffResults(
 function buildEntry(
   runName: string,
   value: string,
-  col: ReportColumn,
+  spec: DisplaySpec,
   result: BootstrapResult | undefined,
   batchOffsets: number[] | undefined,
   metadata?: UnknownRecord,
 ): ViewerEntry {
   if (!result) return { runName, value };
-  const bootstrapCI = formatBootstrapCI(col, result, batchOffsets, metadata);
+  const bootstrapCI = formatBootstrapCI(spec, result, batchOffsets, metadata);
   return { runName, value, bootstrapCI };
 }
 
-/** @return a CI-less DifferenceCI for non-bootstrappable comparable columns
- *  (e.g. min/max). Direction is "uncertain" since we have no significance
- *  test; percent is just the displayed-value ratio. */
+/** @return a CI-less DifferenceCI for comparable scalar rows. Direction is
+ *  "uncertain" since we have no significance test; percent is the value ratio. */
 function simpleDeltaCI(
   curRaw: unknown,
   baseRaw: unknown,

@@ -180,8 +180,22 @@ function buildScales(
   const ptBounds = pointEstimate != null ? [pointEstimate] : [];
   const lo = domain ? [domain[0]] : [];
   const hi = domain ? [domain[1]] : [];
-  const xMin = Math.min(...xs, ci[0], ...extra, ...marginBounds, ...ptBounds, ...lo);
-  const xMax = Math.max(...xs, ci[1], ...extra, ...marginBounds, ...ptBounds, ...hi);
+  const xMin = Math.min(
+    ...xs,
+    ci[0],
+    ...extra,
+    ...marginBounds,
+    ...ptBounds,
+    ...lo,
+  );
+  const xMax = Math.max(
+    ...xs,
+    ci[1],
+    ...extra,
+    ...marginBounds,
+    ...ptBounds,
+    ...hi,
+  );
   const yMax = Math.max(...histogram.map(b => b.count));
   const xRange = xMax - xMin || 1;
   return {

@@ -1,4 +1,3 @@
-import type { CIDirection } from "../stats/StatisticalUtils.ts";
 import type {
   BenchmarkEntry,
   BenchmarkGroup,
@@ -10,6 +9,7 @@ import type {
   ViewerSection,
 } from "../viewer/ReportData.ts";
 import { formatGitVersion, type GitVersion } from "./GitUtils.ts";
+import { verdictWord } from "./Verdict.ts";
 
 /** Render a ReportData as a self-contained markdown report for agents and other
  *  text consumers that cannot open the HTML viewer. Re-renders the shift-function
@@ -17,7 +17,10 @@ import { formatGitVersion, type GitVersion } from "./GitUtils.ts";
  *  reliability flags), so it adds no statistics of its own. */
 export function markdownReport(data: ReportData): string {
   const { currentVersion, baselineVersion } = data.metadata;
-  const head = ["# Benchmark report", versionLine(currentVersion, baselineVersion)];
+  const head = [
+    "# Benchmark report",
+    versionLine(currentVersion, baselineVersion),
+  ];
   const groups = data.groups.map(groupMarkdown).filter(Boolean);
   return [...head.filter(Boolean), ...groups].join("\n\n") + "\n";
 }
@@ -32,10 +35,14 @@ function versionLine(current?: GitVersion, baseline?: GitVersion): string {
 
 /** One group as a `##` section, with each benchmark below it. */
 function groupMarkdown(group: BenchmarkGroup): string {
-  const benches = group.benchmarks.map(b => benchmarkMarkdown(b)).filter(Boolean);
+  const benches = group.benchmarks
+    .map(b => benchmarkMarkdown(b))
+    .filter(Boolean);
   if (!benches.length) return "";
   const warnings = group.warnings?.map(w => `> ${w}`).join("\n") ?? "";
-  return [`## ${group.name}`, warnings, ...benches].filter(Boolean).join("\n\n");
+  return [`## ${group.name}`, warnings, ...benches]
+    .filter(Boolean)
+    .join("\n\n");
 }
 
 /** One benchmark as a `###` section: a leading metadata line (runs), then a
@@ -100,7 +107,9 @@ function scalarTable(rows: ViewerRow[]): string | undefined {
 
   if (!hasBaseline) {
     const header = "| metric | value |\n|---|---|";
-    const body = usable.map(r => `| ${r.label} | ${entryValue(r.entries[0])} |`);
+    const body = usable.map(
+      r => `| ${r.label} | ${entryValue(r.entries[0])} |`,
+    );
     return [header, ...body].join("\n");
   }
 
@@ -137,11 +146,4 @@ function isRunsRow(row: ViewerRow): boolean {
 
 function signedPercent(v: number): string {
   return `${v >= 0 ? "+" : ""}${v.toFixed(1)}%`;
-}
-
-function verdictWord(direction: CIDirection): string {
-  if (direction === "faster") return "better";
-  if (direction === "slower") return "worse";
-  if (direction === "equivalent") return "equivalent";
-  return "uncertain";
 }

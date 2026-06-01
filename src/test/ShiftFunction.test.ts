@@ -1,25 +1,25 @@
 import { expect, test } from "vitest";
-import type { ReportColumn } from "../report/BenchmarkReport.ts";
+import {
+  type MetricSection,
+  metricSection,
+} from "../report/BenchmarkReport.ts";
+import { timeMs } from "../report/Formatters.ts";
 import { buildShiftFunction } from "../report/ShiftFunction.ts";
 import type { MeasuredResults } from "../runners/MeasuredResults.ts";
 
-const section = "lines / sec";
-
-const timeCol: ReportColumn = {
-  key: "p50",
-  title: "p50",
-  comparable: true,
-  statKind: { percentile: 0.5 },
-};
-
-const locCol: ReportColumn = {
-  key: "locSec",
+const timeMetric: MetricSection = metricSection({
   title: "lines / sec",
-  comparable: true,
+  statKind: { percentile: 0.5 },
+  formatter: timeMs,
+});
+
+const locMetric: MetricSection = metricSection({
+  title: "lines / sec",
   higherIsBetter: true,
   statKind: { percentile: 0.5 },
   toDisplay: (ms: number) => 1000 / ms,
-};
+  formatter: timeMs,
+});
 
 /** Build batched samples as a single global ramp across all batches, so each
  *  percentile's tail is genuinely sparse (good for reliability-gate tests).
@@ -42,8 +42,7 @@ function batched(
 
 test("returns undefined without a baseline", () => {
   const sf = buildShiftFunction(
-    timeCol,
-    section,
+    timeMetric,
     batched(30, 50),
     undefined,
     {},
@@ -55,8 +54,7 @@ test("returns undefined without a baseline", () => {
 
 test("leads with mean, then one point per sampled percentile", () => {
   const sf = buildShiftFunction(
-    timeCol,
-    section,
+    timeMetric,
     batched(30, 50, 0.1),
     batched(30, 50),
     {},
@@ -65,7 +63,7 @@ test("leads with mean, then one point per sampled percentile", () => {
   );
   expect(sf).toBeDefined();
   expect(sf!.points.length).toBe(10);
-  expect(sf!.metric).toBe(section);
+  expect(sf!.metric).toBe("lines / sec");
   expect(sf!.points[0].isMean).toBe(true);
   expect(sf!.points[0].label).toBe("mean");
   expect(sf!.points.slice(1).every(p => !p.isMean)).toBe(true);
@@ -73,8 +71,7 @@ test("leads with mean, then one point per sampled percentile", () => {
 
 test("percentile points are sorted ascending (mean stays first)", () => {
   const sf = buildShiftFunction(
-    timeCol,
-    section,
+    timeMetric,
     batched(30, 50, 0.1),
     batched(30, 50),
     {},
@@ -90,8 +87,7 @@ test("higherIsBetter keeps absolute estimates monotonic across percentiles", () 
   // loc/sec displayed-low percentile is the slow-time tail; mapping inverts so
   // absolute throughput should still increase with displayed percentile.
   const sf = buildShiftFunction(
-    locCol,
-    section,
+    locMetric,
     batched(30, 50, 0.1),
     batched(30, 50),
     {},
@@ -107,8 +103,7 @@ test("higherIsBetter keeps absolute estimates monotonic across percentiles", () 
 
 test("each point carries current and baseline absolute distributions", () => {
   const sf = buildShiftFunction(
-    timeCol,
-    section,
+    timeMetric,
     batched(30, 50, 0.1),
     batched(30, 50),
     {},
@@ -125,8 +120,7 @@ test("each point carries current and baseline absolute distributions", () => {
 test("extreme tail percentiles are unreliable with too few samples", () => {
   // 30 x 5 = 150 samples: p1 has ~2 sparse-side samples => unreliable; p50 ok.
   const sf = buildShiftFunction(
-    timeCol,
-    section,
+    timeMetric,
     batched(30, 5, 0.1),
     batched(30, 5),
     {},
@@ -139,8 +133,7 @@ test("extreme tail percentiles are unreliable with too few samples", () => {
 
 test("equivMargin is recorded for the plot band", () => {
   const sf = buildShiftFunction(
-    timeCol,
-    section,
+    timeMetric,
     batched(30, 50, 0.1),
     batched(30, 50),
     {},
@@ -165,10 +158,9 @@ test("tail coverage counts only the batches the bootstrap kept", () => {
   // than the untrimmed view sees.
   const cur = withSlowBatch(8, 50);
   const base = withSlowBatch(8, 50);
-  const trimmed = buildShiftFunction(timeCol, section, cur, base, {}, {}, {})!;
+  const trimmed = buildShiftFunction(timeMetric, cur, base, {}, {}, {})!;
   const raw = buildShiftFunction(
-    timeCol,
-    section,
+    timeMetric,
     cur,
     base,
     {},

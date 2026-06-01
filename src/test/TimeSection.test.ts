@@ -1,14 +1,16 @@
 import { expect, test } from "vitest";
-import type {
-  BenchmarkReport,
-  ReportSection,
-} from "../report/BenchmarkReport.ts";
+import type { ReportGroup } from "../report/BenchmarkReport.ts";
 import {
-  computeColumnValues,
-  findPrimaryCIColumn,
+  findPrimaryMetric,
+  type MetricSection,
+  metricSection,
+  metricStatKind,
+  metricValue,
 } from "../report/BenchmarkReport.ts";
+import { consoleSummary } from "../report/ConsoleSummary.ts";
+import { timeMs } from "../report/Formatters.ts";
+import { prepareHtmlData } from "../report/HtmlReport.ts";
 import { timeSection } from "../report/StandardSections.ts";
-import { reportResults, valuesForReports } from "../report/text/TextReport.ts";
 import type { MeasuredResults } from "../runners/MeasuredResults.ts";
 
 /** @return minimal MeasuredResults with the given samples (time fields derived trivially). */
@@ -29,74 +31,51 @@ function measured(samples: number[]): MeasuredResults {
   };
 }
 
-function report(name: string, samples: number[]): BenchmarkReport {
-  return { name, measuredResults: measured(samples) };
-}
-
 function range(n: number): number[] {
   return Array.from({ length: n }, (_, i) => i + 1);
 }
 
-/** A section mixing a non-bootstrappable max with a bootstrappable mean, to
- *  exercise primary-column and Δ% placement without the removed --stats parser. */
-const maxMeanSection: ReportSection = {
+const maxMetric: MetricSection = metricSection({
   title: "time",
-  columns: [
-    { key: "max", title: "max", statKind: "max", comparable: true },
-    { key: "mean", title: "mean", statKind: "mean", comparable: true },
-  ],
-};
-
-test("timeSection is mean only", () => {
-  expect(timeSection.columns.map(c => c.key ?? c.title)).toEqual(["mean"]);
+  statKind: "max",
+  formatter: timeMs,
 });
 
-test("computeColumnValues computes the mean from samples", () => {
-  const row = computeColumnValues(timeSection, measured([10, 20, 30, 40, 50]));
-  expect(row.mean).toBe(30);
+test("timeSection is a mean metric", () => {
+  expect(timeSection.kind).toBe("metric");
+  expect(metricStatKind(timeSection)).toBe("mean");
+  expect(timeSection.higherIsBetter).toBeFalsy();
 });
 
-test("findPrimaryCIColumn skips non-bootstrappable stats", () => {
-  // max comes first but is non-bootstrappable; mean must win.
-  expect(findPrimaryCIColumn([maxMeanSection])?.key).toBe("mean");
+test("metricValue computes the mean from samples", () => {
+  expect(metricValue(timeSection, measured([10, 20, 30, 40, 50]))).toBe(30);
 });
 
-test("findPrimaryCIColumn returns undefined when no stat is bootstrappable", () => {
-  const maxMin: ReportSection = {
-    title: "time",
-    columns: [
-      { key: "max", title: "max", statKind: "max", comparable: true },
-      { key: "min", title: "min", statKind: "min", comparable: true },
-    ],
-  };
-  expect(findPrimaryCIColumn([maxMin])).toBeUndefined();
+test("findPrimaryMetric returns a bootstrappable metric section", () => {
+  expect(findPrimaryMetric([timeSection])).toBe(timeSection);
 });
 
-test("reportResults with a baseline shows Δ% next to the first bootstrappable column", () => {
-  const groups = [
+test("findPrimaryMetric skips a non-bootstrappable metric (max)", () => {
+  expect(findPrimaryMetric([maxMetric])).toBeUndefined();
+});
+
+test("consoleSummary with a baseline shows the headline and verdict", () => {
+  const groups: ReportGroup[] = [
     {
       name: "g",
-      reports: [report("bench", range(100))],
-      baseline: report(
-        "baseline",
-        range(100).map(x => x * 2),
-      ),
+      reports: [{ name: "bench", measuredResults: measured(range(100)) }],
+      baseline: {
+        name: "baseline",
+        measuredResults: measured(range(100).map(x => x * 2)),
+      },
     },
   ];
-  const table = reportResults(groups, [maxMeanSection]);
-  expect(table).toContain("Δ% CI");
-  // Δ% column sits after mean (the primary), not after the leading max.
-  const lines = table.split("\n");
-  const header = lines.find(l => l.includes("max") && l.includes("mean"));
-  expect(header).toBeDefined();
-  const maxIdx = header!.indexOf("max");
-  const meanIdx = header!.indexOf("mean");
-  const ciIdx = header!.indexOf("Δ% CI");
-  expect(ciIdx).toBeGreaterThan(meanIdx);
-  expect(meanIdx).toBeGreaterThan(maxIdx);
+  const data = prepareHtmlData(groups, { sections: [timeSection] });
+  const summary = consoleSummary(data);
+  expect(summary).toContain("(mean)");
+  expect(summary).toContain("vs baseline");
 });
 
-test("valuesForReports extracts the section's column keys", () => {
-  const rows = valuesForReports([report("bench", range(100))], [timeSection]);
-  expect(rows[0].mean).toBeCloseTo(50.5, 0);
+test("metricValue extracts the section's stat", () => {
+  expect(metricValue(timeSection, measured(range(100)))).toBeCloseTo(50.5, 0);
 });

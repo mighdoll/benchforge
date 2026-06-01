@@ -19,6 +19,7 @@ import {
 } from "../matrix/MatrixFilter.ts";
 import type { MatrixReportOptions } from "../matrix/MatrixReport.ts";
 import type { ReportSection } from "../report/BenchmarkReport.ts";
+import { consoleSummary } from "../report/ConsoleSummary.ts";
 import type { GitVersion } from "../report/GitUtils.ts";
 import type { BenchSuite } from "../runners/BenchmarkSpec.ts";
 import { browserBenchExports } from "./BrowserBench.ts";
@@ -32,7 +33,7 @@ import { finishReports } from "./CliExport.ts";
 import { cliToMatrixOptions, validateArgs } from "./CliOptions.ts";
 import {
   defaultMatrixReport,
-  defaultReport,
+  defaultReportData,
   matrixToReportGroups,
   withStatus,
 } from "./CliReport.ts";
@@ -153,7 +154,9 @@ function isMatrixResult(result: BuildResult): result is MatrixBuildResult {
   return "matrices" in result.suite;
 }
 
-/** Matrix end-to-end: filter, run, print report, finish exports. */
+/** Matrix end-to-end: filter, run, build the report data once, print the
+ *  per-benchmark console summary plus the matrix verdict tally, then reuse the
+ *  same data for markdown/viewer exports. */
 async function runMatrixPipeline(
   m: MatrixBuildResult,
   args: DefaultCliArgs,
@@ -161,34 +164,39 @@ async function runMatrixPipeline(
   if (args.calibrate) return runMatrixCalibratePipeline(m.suite, args);
   const results = await runFilteredMatrices(m.suite, args);
   const groups = matrixToReportGroups(results);
-  console.log(
-    withStatus("computing report", () =>
-      defaultMatrixReport(
-        results,
-        { sections: m.sections, ...m.reportOptions },
-        args,
-      ),
-    ),
+  const reportData = withStatus("computing report", () =>
+    defaultReportData(groups, args, {
+      sections: m.sections,
+      currentVersion: m.currentVersion,
+      baselineVersion: m.baselineVersion,
+    }),
   );
+  const tally = defaultMatrixReport(
+    results,
+    { sections: m.sections, ...m.reportOptions },
+    args,
+  );
+  console.log([consoleSummary(reportData), tally].filter(Boolean).join("\n\n"));
   await finishReports(groups, args, {
     sections: m.sections,
     currentVersion: m.currentVersion,
     baselineVersion: m.baselineVersion,
+    reportData,
   });
 }
 
-/** Bench end-to-end: run, print report, finish exports. */
+/** Bench end-to-end: run, build the report data once, print the console summary,
+ *  then reuse the same data for markdown/viewer exports. */
 async function runBenchPipeline(
   b: BenchBuildResult,
   args: DefaultCliArgs,
 ): Promise<void> {
   const groups = await runBench(b.suite, args);
-  console.log(
-    withStatus("computing report", () =>
-      defaultReport(groups, args, { sections: b.sections }),
-    ),
+  const reportData = withStatus("computing report", () =>
+    defaultReportData(groups, args, { sections: b.sections }),
   );
-  await finishReports(groups, args, { sections: b.sections });
+  console.log(consoleSummary(reportData));
+  await finishReports(groups, args, { sections: b.sections, reportData });
 }
 
 /** Load a benchmark file and shape its default export into a BuildResult. */

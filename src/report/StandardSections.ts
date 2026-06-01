@@ -2,24 +2,29 @@ import type {
   MeasuredResults,
   OptStatusInfo,
 } from "../runners/MeasuredResults.ts";
-import type { ReportSection } from "./BenchmarkReport.ts";
+import {
+  type MetricSection,
+  metricSection,
+  type ReportSection,
+  type ScalarSection,
+  scalarSection,
+} from "./BenchmarkReport.ts";
 import { formatConvergence, timeMs } from "./Formatters.ts";
 import { gcSections } from "./GcSections.ts";
 
-/** Timing section: a single mean column (+ a Δ% CI when a baseline exists).
- *  Per-percentile detail lives in the markdown report and HTML viewer (shift
- *  function), so the CLI table stays a one-glance headline. */
-export const timeSection: ReportSection = {
+/** Timing section: the mean (+ a Δ% CI when a baseline exists). Per-percentile
+ *  detail lives in the markdown report and HTML viewer (shift function), so the
+ *  console stays a one-glance headline. */
+export const timeSection: MetricSection = metricSection({
   title: "time",
-  columns: [
-    { key: "mean", title: "mean", formatter: timeMs, comparable: true, statKind: "mean" },
-  ],
-};
+  statKind: "mean",
+  formatter: timeMs,
+});
 
 /** Report section: number of sample iterations. */
-export const runsSection: ReportSection = {
+export const runsSection: ScalarSection = scalarSection({
   title: "",
-  columns: [
+  rows: [
     {
       key: "runs",
       title: "runs",
@@ -27,12 +32,12 @@ export const runsSection: ReportSection = {
       value: (r: MeasuredResults) => r.iterations ?? r.samples.length,
     },
   ],
-};
+});
 
 /** Report section: total sampling duration. */
-export const totalTimeSection: ReportSection = {
+export const totalTimeSection: ScalarSection = scalarSection({
   title: "",
-  columns: [
+  rows: [
     {
       key: "totalTime",
       title: "time",
@@ -40,38 +45,19 @@ export const totalTimeSection: ReportSection = {
       value: (r: MeasuredResults) => r.totalTime,
     },
   ],
-};
+});
 
-/** Report sections: timing stats and convergence for adaptive mode. */
+/** Report sections for adaptive mode: median time (the shift fan covers the
+ *  rest of the distribution) plus convergence confidence. */
 export const adaptiveSections: ReportSection[] = [
-  {
+  metricSection({
     title: "time",
-    columns: [
-      {
-        key: "median",
-        title: "median",
-        formatter: timeMs,
-        comparable: true,
-        statKind: { percentile: 0.5 },
-      },
-      {
-        key: "mean",
-        title: "mean",
-        formatter: timeMs,
-        comparable: true,
-        statKind: "mean",
-      },
-      {
-        key: "p99",
-        title: "p99",
-        formatter: timeMs,
-        statKind: { percentile: 0.99 },
-      },
-    ],
-  },
-  {
+    statKind: { percentile: 0.5 },
+    formatter: timeMs,
+  }),
+  scalarSection({
     title: "",
-    columns: [
+    rows: [
       {
         key: "convergence",
         title: "conv%",
@@ -79,13 +65,13 @@ export const adaptiveSections: ReportSection[] = [
         value: (r: MeasuredResults) => r.convergence?.confidence,
       },
     ],
-  },
+  }),
 ];
 
 /** Report section: V8 optimization tier distribution and deopt count. */
-export const optSection: ReportSection = {
+export const optSection: ScalarSection = scalarSection({
   title: "v8 opt",
-  columns: [
+  rows: [
     {
       key: "tiers",
       title: "tiers",
@@ -103,7 +89,7 @@ export const optSection: ReportSection = {
       },
     },
   ],
-};
+});
 
 /** Format V8 tier distribution sorted by count (e.g. "turbofan:85% sparkplug:15%"). */
 export function formatTierSummary(
