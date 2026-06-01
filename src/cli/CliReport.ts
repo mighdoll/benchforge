@@ -1,5 +1,4 @@
 import type { MatrixResults } from "../matrix/BenchMatrix.ts";
-import type { MatrixReportOptions } from "../matrix/MatrixReport.ts";
 import { reportMatrixResults } from "../matrix/MatrixReport.ts";
 import {
   aggregateSites,
@@ -131,16 +130,9 @@ export function printHeapReports(
   }
 }
 
-/** Format matrix benchmark results as text, applying default sections from CLI args. */
-export function defaultMatrixReport(
-  results: MatrixResults[],
-  reportOptions?: MatrixReportOptions,
-  args?: DefaultCliArgs,
-): string {
-  const options = args
-    ? mergeMatrixDefaults(reportOptions, args, results)
-    : reportOptions;
-  return results.map(r => reportMatrixResults(r, options)).join("\n\n");
+/** Roll up the matrix verdicts from the prepared report data into a tally line. */
+export function defaultMatrixReport(data: ReportData): string {
+  return reportMatrixResults(data);
 }
 
 /** Convert MatrixResults to ReportGroup[] for the standard export pipeline. */
@@ -175,26 +167,6 @@ function cliDefaultSections(
   const { adaptive, "gc-stats": gcStats, "trace-opt": traceOpt } = args;
   const hasOpt = hasField(groups, "optStatus");
   return buildReportSections(adaptive, gcStats, traceOpt && hasOpt);
-}
-
-/** Apply default sections and extra columns for matrix reports. */
-function mergeMatrixDefaults(
-  opts: MatrixReportOptions | undefined,
-  args: DefaultCliArgs,
-  results: MatrixResults[],
-): MatrixReportOptions {
-  const merged: MatrixReportOptions = { ...opts };
-  if (!merged.sections?.length) {
-    const groups = matrixToReportGroups(results);
-    const hasOpt = args["trace-opt"] && hasField(groups, "optStatus");
-    merged.sections = buildReportSections(
-      args.adaptive,
-      args["gc-stats"],
-      hasOpt,
-    );
-  }
-  if (!merged.comparison) merged.comparison = cliComparisonOptions(args);
-  return merged;
 }
 
 /** Wrap a single matrix case and its optional baseline into a ReportGroup. */

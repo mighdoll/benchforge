@@ -1,95 +1,60 @@
 import { expect, test } from "vitest";
-import type { CaseResult, MatrixResults } from "../matrix/BenchMatrix.ts";
 import { reportMatrixResults } from "../matrix/MatrixReport.ts";
+import type { ReportGroup } from "../report/BenchmarkReport.ts";
+import { prepareHtmlData } from "../report/HtmlReport.ts";
+import { timeSection } from "../report/StandardSections.ts";
+import type { ReportData } from "../viewer/ReportData.ts";
+import { createBenchmarkReport } from "./TestUtils.ts";
 
-/** Create simple measured results for testing */
-function mockMeasured(avg: number, count = 10): CaseResult["measured"] {
-  const samples = Array(count).fill(avg);
+/** Build a matrix-shaped group ("variant / case", single report + baseline). */
+function matrixGroup(
+  variant: string,
+  caseId: string,
+  current: [number, number],
+  baseline: [number, number],
+): ReportGroup {
   return {
-    name: "test",
-    samples,
-    time: { avg, min: avg, max: avg, p50: avg, p75: avg, p99: avg, p999: avg },
+    name: `${variant} / ${caseId}`,
+    reports: [createBenchmarkReport(variant, current)],
+    baseline: createBenchmarkReport(`${variant} (baseline)`, baseline),
   };
 }
 
-/** Create a mock matrix result */
-function mockResults(
-  name: string,
-  variants: Array<{
-    id: string;
-    cases: Array<{
-      caseId: string;
-      mean: number;
-      metadata?: Record<string, unknown>;
-    }>;
-  }>,
-): MatrixResults {
-  const mapped = variants.map(v => ({
-    id: v.id,
-    cases: v.cases.map(c => ({
-      caseId: c.caseId,
-      measured: mockMeasured(c.mean),
-      metadata: c.metadata,
-    })),
-  }));
-  return { name, variants: mapped };
+/** Build ReportData the way the matrix pipeline does, via prepareHtmlData. */
+function matrixData(groups: ReportGroup[]): ReportData {
+  return prepareHtmlData(groups, { sections: [timeSection] });
 }
 
-test("reportMatrixResults: basic output includes matrix name", () => {
-  const results = mockResults("TestMatrix", [
-    { id: "fast", cases: [{ caseId: "a", mean: 1.0 }] },
+test("reportMatrixResults: a single comparison yields no tally (console prints it)", () => {
+  const data = matrixData([matrixGroup("current", "test", [0, 30], [30, 60])]);
+  expect(reportMatrixResults(data)).toBe("");
+});
+
+test("reportMatrixResults: no comparisons yields an empty string", () => {
+  const data = prepareHtmlData(
+    [{ name: "v / a", reports: [createBenchmarkReport("v", [0, 30])] }],
+    { sections: [timeSection] },
+  );
+  expect(reportMatrixResults(data)).toBe("");
+});
+
+test("reportMatrixResults: multiple comparisons roll up into a tally", () => {
+  const data = matrixData([
+    matrixGroup("fast", "a", [0, 30], [30, 60]),
+    matrixGroup("slow", "b", [30, 60], [0, 30]),
   ]);
-  const report = reportMatrixResults(results);
-  expect(report).toContain("Matrix: TestMatrix");
+  const report = reportMatrixResults(data);
+  expect(report).toContain("Verdicts (2 vs baseline):");
+  expect(report).toContain("better");
+  expect(report).toContain("worse");
 });
 
-test("reportMatrixResults: no baselines yields just the matrix name", () => {
-  const results = mockResults("MultiCase", [
-    { id: "fast", cases: [{ caseId: "case1", mean: 1.0 }] },
-    { id: "slow", cases: [{ caseId: "case1", mean: 10.0 }] },
+test("reportMatrixResults: tally labels name each variant / case", () => {
+  const data = matrixData([
+    matrixGroup("fast", "a", [0, 30], [30, 60]),
+    matrixGroup("slow", "b", [30, 60], [0, 30]),
   ]);
-  const report = reportMatrixResults(results);
-  expect(report).toBe("Matrix: MultiCase");
-});
-
-test("reportMatrixResults: empty variants returns header only", () => {
-  const results: MatrixResults = { name: "Empty", variants: [] };
-  const report = reportMatrixResults(results);
-  expect(report).toBe("Matrix: Empty");
-});
-
-test("reportMatrixResults: with baseline shows a verdict with the diff percentage", () => {
-  const baseline = mockMeasured(2.0, 20);
-  const measured = mockMeasured(1.0, 20);
-  const results: MatrixResults = {
-    name: "WithBaseline",
-    variants: [
-      {
-        id: "current",
-        cases: [{ caseId: "test", measured, baseline, deltaPercent: -50 }],
-      },
-    ],
-  };
-  const report = reportMatrixResults(results);
-  expect(report).toContain("Verdict:");
-  expect(report).toContain("test/current");
-  expect(report).toContain("-50.0%");
-  expect(report).toContain("vs baseline");
-});
-
-test("reportMatrixResults: truncates long variant names in the verdict", () => {
-  const baseline = mockMeasured(2.0, 20);
-  const measured = mockMeasured(1.0, 20);
-  const results: MatrixResults = {
-    name: "TruncTest",
-    variants: [
-      {
-        id: "this_is_a_very_long_variant_name_that_should_be_truncated",
-        cases: [{ caseId: "test", measured, baseline }],
-      },
-    ],
-  };
-  const report = reportMatrixResults(results);
-  // 25 char limit => 22 chars + "..."
-  expect(report).toContain("this_is_a_very_long_va...");
+  const report = reportMatrixResults(data);
+  expect(report).toContain("fast / a");
+  expect(report).toContain("slow / b");
 });

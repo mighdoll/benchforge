@@ -38,7 +38,6 @@ export type { CasesModule } from "./matrix/CaseLoader.ts";
 export { loadCaseData, loadCasesModule } from "./matrix/CaseLoader.ts";
 export type { FilteredMatrix, MatrixFilter } from "./matrix/MatrixFilter.ts";
 export { filterMatrix, parseMatrixFilter } from "./matrix/MatrixFilter.ts";
-export type { MatrixReportOptions } from "./matrix/MatrixReport.ts";
 export { reportMatrixResults } from "./matrix/MatrixReport.ts";
 export type {
   BenchmarkReport,

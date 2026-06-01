@@ -17,7 +17,6 @@ import {
   resolveCaseIds,
   resolveVariantIds,
 } from "../matrix/MatrixFilter.ts";
-import type { MatrixReportOptions } from "../matrix/MatrixReport.ts";
 import type { ReportSection } from "../report/BenchmarkReport.ts";
 import { consoleSummary } from "../report/ConsoleSummary.ts";
 import type { GitVersion } from "../report/GitUtils.ts";
@@ -47,7 +46,6 @@ export interface BenchBuildResult {
 export interface MatrixBuildResult {
   suite: MatrixSuite;
   sections?: ReportSection[];
-  reportOptions?: MatrixReportOptions;
   currentVersion?: GitVersion;
   baselineVersion?: GitVersion;
 }
@@ -171,11 +169,7 @@ async function runMatrixPipeline(
       baselineVersion: m.baselineVersion,
     }),
   );
-  const tally = defaultMatrixReport(
-    results,
-    { sections: m.sections, ...m.reportOptions },
-    args,
-  );
+  const tally = defaultMatrixReport(reportData);
   console.log([consoleSummary(reportData), tally].filter(Boolean).join("\n\n"));
   await finishReports(groups, args, {
     sections: m.sections,
