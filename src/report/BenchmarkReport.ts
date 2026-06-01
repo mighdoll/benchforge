@@ -1,11 +1,5 @@
 import type { MeasuredResults } from "../runners/MeasuredResults.ts";
-import { diffCIs } from "../stats/BootstrapDifference.ts";
-import {
-  computeStat,
-  type DifferenceCI,
-  isBootstrappable,
-  type StatKind,
-} from "../stats/StatisticalUtils.ts";
+import { computeStat, type StatKind } from "../stats/StatisticalUtils.ts";
 
 /** Options that affect baseline comparison statistics */
 export interface ComparisonOptions {
@@ -129,37 +123,4 @@ export function hasField(
       ({ measuredResults }) => measuredResults[field] !== undefined,
     ),
   );
-}
-
-/** @return the metric section that drives the comparison CI: the first metric
- *  section whose stat is bootstrappable (mean / percentile, not min/max). */
-export function findPrimaryMetric(
-  sections?: ReportSection[],
-): MetricSection | undefined {
-  return sections?.find(
-    (s): s is MetricSection =>
-      s.kind === "metric" && isBootstrappable(metricStatKind(s)),
-  );
-}
-
-/** Bootstrap difference CI for a stat, using batch structure when available.
- *  Always returns the raw (time-domain) CI; display orientation for
- *  higherIsBetter metrics is handled by the caller (flipCI). */
-export function computeDiffCI(
-  baseline: MeasuredResults | undefined,
-  current: MeasuredResults,
-  statKind: StatKind,
-  comparison?: ComparisonOptions,
-): DifferenceCI | undefined {
-  if (!baseline?.samples?.length || !current.samples?.length) return undefined;
-  const { equivMargin, noBatchTrim } = comparison ?? {};
-  const rawCIs = diffCIs(
-    baseline.samples,
-    baseline.batchOffsets,
-    current.samples,
-    current.batchOffsets,
-    [statKind],
-    { equivMargin, noBatchTrim },
-  );
-  return rawCIs[0];
 }

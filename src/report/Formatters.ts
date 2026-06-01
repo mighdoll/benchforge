@@ -40,11 +40,6 @@ export function formatBytes(
   return `${(bytes / gb).toFixed(1)}${s}GB`;
 }
 
-/** @return truncated string with ellipsis if over maxLen */
-export function truncate(str: string, maxLen = 30): string {
-  return str.length > maxLen ? str.slice(0, maxLen - 3) + "..." : str;
-}
-
 /** @return signed percentage string (e.g. "+1.2%", "-3.4%") */
 export function formatSignedPercent(v: number): string {
   const sign = v >= 0 ? "+" : "";

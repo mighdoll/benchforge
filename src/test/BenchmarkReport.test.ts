@@ -8,24 +8,9 @@ import {
 } from "../report/BenchmarkReport.ts";
 import { consoleSummary } from "../report/ConsoleSummary.ts";
 import { integer } from "../report/Formatters.ts";
-import { gcSection } from "../report/GcSections.ts";
 import { prepareHtmlData } from "../report/HtmlReport.ts";
 import { adaptiveSections, timeSection } from "../report/StandardSections.ts";
 import { createBenchmarkReport, createMeasuredResults } from "./TestUtils.ts";
-
-test("combines a time metric and a gc scalar section", () => {
-  const sections = [timeSection, gcSection];
-  const report = createBenchmarkReport("test", [100, 150]);
-  const data = prepareHtmlData([{ name: "g", reports: [report] }], {
-    sections,
-  });
-  const entry = data.groups[0].benchmarks[0];
-
-  const metric = entry.sections?.find(s => s.title === "time");
-  expect(metric?.rows[0].entries[0].value).toBeTruthy();
-  const gc = entry.sections?.find(s => s.title === "gc");
-  expect(gc).toBeDefined();
-});
 
 test("produces a comparison CI and verdict for a baseline", () => {
   const groups = [

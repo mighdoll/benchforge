@@ -51,7 +51,6 @@ export type {
   UnknownRecord,
 } from "./report/BenchmarkReport.ts";
 export {
-  findPrimaryMetric,
   hasField,
   metricSection,
   metricStatKind,
@@ -63,13 +62,8 @@ export {
   formatConvergence,
   integer,
   timeMs,
-  truncate,
 } from "./report/Formatters.ts";
-export {
-  gcSection,
-  gcSections,
-  gcStatsSection,
-} from "./report/GcSections.ts";
+export { gcSections, gcStatsSection } from "./report/GcSections.ts";
 export type { GitVersion } from "./report/GitUtils.ts";
 export {
   formatGitVersion,
@@ -81,7 +75,6 @@ export { prepareHtmlData } from "./report/HtmlReport.ts";
 export { markdownReport } from "./report/MarkdownReport.ts";
 export {
   adaptiveSections,
-  buildGenericSections,
   optSection,
   runsSection,
   timeSection,

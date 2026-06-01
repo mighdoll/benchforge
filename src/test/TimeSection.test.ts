@@ -1,14 +1,10 @@
 import { expect, test } from "vitest";
 import type { ReportGroup } from "../report/BenchmarkReport.ts";
 import {
-  findPrimaryMetric,
-  type MetricSection,
-  metricSection,
   metricStatKind,
   metricValue,
 } from "../report/BenchmarkReport.ts";
 import { consoleSummary } from "../report/ConsoleSummary.ts";
-import { timeMs } from "../report/Formatters.ts";
 import { prepareHtmlData } from "../report/HtmlReport.ts";
 import { timeSection } from "../report/StandardSections.ts";
 import type { MeasuredResults } from "../runners/MeasuredResults.ts";
@@ -35,12 +31,6 @@ function range(n: number): number[] {
   return Array.from({ length: n }, (_, i) => i + 1);
 }
 
-const maxMetric: MetricSection = metricSection({
-  title: "time",
-  statKind: "max",
-  formatter: timeMs,
-});
-
 test("timeSection is a mean metric", () => {
   expect(timeSection.kind).toBe("metric");
   expect(metricStatKind(timeSection)).toBe("mean");
@@ -49,14 +39,6 @@ test("timeSection is a mean metric", () => {
 
 test("metricValue computes the mean from samples", () => {
   expect(metricValue(timeSection, measured([10, 20, 30, 40, 50]))).toBe(30);
-});
-
-test("findPrimaryMetric returns a bootstrappable metric section", () => {
-  expect(findPrimaryMetric([timeSection])).toBe(timeSection);
-});
-
-test("findPrimaryMetric skips a non-bootstrappable metric (max)", () => {
-  expect(findPrimaryMetric([maxMetric])).toBeUndefined();
 });
 
 test("consoleSummary with a baseline shows the headline and verdict", () => {

@@ -8,27 +8,6 @@ import {
 } from "./BenchmarkReport.ts";
 import { formatBytes, integer, percent, timeMs } from "./Formatters.ts";
 
-/** Report section: GC time as fraction of total benchmark time. */
-export const gcSection: ScalarSection = scalarSection({
-  title: "gc",
-  rows: [
-    {
-      key: "gc",
-      title: "mean",
-      formatter: percent,
-      comparable: true,
-      value: (r: MeasuredResults) => {
-        const { nodeGcTime, time, samples } = r;
-        if (!nodeGcTime || !time?.avg) return undefined;
-        const totalBenchTime = time.avg * samples.length;
-        if (totalBenchTime <= 0) return undefined;
-        const gcFraction = nodeGcTime.inRun / totalBenchTime;
-        return gcFraction <= 1 ? gcFraction : undefined;
-      },
-    },
-  ],
-});
-
 /** Report section: detailed GC stats from --trace-gc-nvp. */
 export const gcStatsSection: ScalarSection = scalarSection({
   title: "gc",

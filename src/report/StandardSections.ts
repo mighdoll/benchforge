@@ -10,7 +10,6 @@ import {
   scalarSection,
 } from "./BenchmarkReport.ts";
 import { formatConvergence, timeMs } from "./Formatters.ts";
-import { gcSections } from "./GcSections.ts";
 
 /** Timing section: the mean (+ a Δ% CI when a baseline exists). Per-percentile
  *  detail lives in the markdown report and HTML viewer (shift function), so the
@@ -104,14 +103,6 @@ export function formatTierSummary(
     .sort((a, b) => b[1].count - a[1].count)
     .map(([name, t]) => `${name}${nameValueSep}${pct(t.count)}`)
     .join(entrySep);
-}
-
-/** @return default report sections from CLI flags (GC stats if enabled, plus run count). */
-export function buildGenericSections(args: {
-  "gc-stats"?: boolean;
-  alloc?: boolean;
-}): ReportSection[] {
-  return [...gcSections(args), runsSection];
 }
 
 /** Format total time; brackets indicate >= 30s. */
