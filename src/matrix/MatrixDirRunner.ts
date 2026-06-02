@@ -128,7 +128,6 @@ function buildVariantArgs<T>(
     caseId,
     caseData: matrix.cases && !matrix.casesModule ? caseId : undefined,
     casesModule: matrix.casesModule,
-    runner: "timing" as const,
     options: ctx.runnerOpts,
     useWorker: ctx.useWorker,
   };

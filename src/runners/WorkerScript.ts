@@ -5,20 +5,15 @@ import type { HeapProfile } from "../profiling/node/HeapSampler.ts";
 import type { TimeProfile } from "../profiling/node/TimeSampler.ts";
 import type { BenchmarkFunction, BenchmarkSpec } from "./BenchmarkSpec.ts";
 import type { BenchRunner, RunnerOptions } from "./BenchRunner.ts";
-import type { KnownRunner } from "./CreateRunner.ts";
 import type { MeasuredResults } from "./MeasuredResults.ts";
-import {
-  createBenchRunner,
-  importBenchFn,
-  resolveVariantFn,
-} from "./RunnerUtils.ts";
+import { importBenchFn, resolveVariantFn } from "./RunnerUtils.ts";
+import { TimingRunner } from "./TimingRunner.ts";
 import { debugWorkerTiming, getElapsed, getPerfNow } from "./TimingUtils.ts";
 
 /** Message sent to worker process to start a benchmark run. */
 export interface RunMessage {
   type: "run";
   spec: BenchmarkSpec;
-  runnerName: KnownRunner;
   options: RunnerOptions;
   /** Serialized function body (mutually exclusive with modulePath) */
   fnCode?: string;
@@ -206,11 +201,11 @@ function buildProfilingChain(
 process.on("message", async (message: RunMessage) => {
   if (message.type !== "run") return;
 
-  logTiming(`Processing ${message.spec.name} with ${message.runnerName}`);
+  logTiming(`Processing ${message.spec.name}`);
 
   try {
     const start = getPerfNow();
-    const runner = await createBenchRunner(message.runnerName);
+    const runner = new TimingRunner();
     logTiming("Runner created in", getElapsed(start));
 
     const benchStart = getPerfNow();

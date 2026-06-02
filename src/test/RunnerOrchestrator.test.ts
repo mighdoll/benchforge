@@ -17,7 +17,6 @@ test("TimingRunner runs benchmark in worker mode", async () => {
 
   const results = await runBenchmark({
     spec,
-    runner: "timing",
     options: {
       maxTime: 5,
       maxIterations: 50,
@@ -46,7 +45,6 @@ test("TimingRunner runs benchmark in non-worker mode", async () => {
 
   const results = await runBenchmark({
     spec,
-    runner: "timing",
     options: {
       maxTime: 5,
       maxIterations: 50,
@@ -74,7 +72,6 @@ test("TimingRunner with parameterized benchmark", async () => {
 
   const results = await runBenchmark({
     spec,
-    runner: "timing",
     options: { maxTime: 5, maxIterations: 20 },
     useWorker: false,
     params: 100,
@@ -94,7 +91,6 @@ test("RunnerOrchestrator propagates errors from worker", async () => {
 
   const promise = runBenchmark({
     spec,
-    runner: "timing",
     options: { maxTime: 1, maxIterations: 1 },
     useWorker: true,
   });

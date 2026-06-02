@@ -6,14 +6,10 @@ import type { HeapProfile } from "../profiling/node/HeapSampler.ts";
 import type { TimeProfile } from "../profiling/node/TimeSampler.ts";
 import type { BenchmarkFunction, BenchmarkSpec } from "./BenchmarkSpec.ts";
 import type { RunnerOptions } from "./BenchRunner.ts";
-import type { KnownRunner } from "./CreateRunner.ts";
 import { aggregateGcStats, type GcEvent, parseGcLine } from "./GcStats.ts";
 import type { MeasuredResults } from "./MeasuredResults.ts";
-import {
-  createBenchRunner,
-  importBenchFn,
-  resolveVariantFn,
-} from "./RunnerUtils.ts";
+import { importBenchFn, resolveVariantFn } from "./RunnerUtils.ts";
+import { TimingRunner } from "./TimingRunner.ts";
 import { debugWorkerTiming, getElapsed, getPerfNow } from "./TimingUtils.ts";
 import type {
   ErrorMessage,
@@ -28,14 +24,12 @@ export interface RunMatrixVariantParams {
   caseId: string;
   caseData?: unknown;
   casesModule?: string;
-  runner: KnownRunner;
   options: RunnerOptions;
   useWorker?: boolean;
 }
 
 interface RunBenchmarkParams<T = unknown> {
   spec: BenchmarkSpec<T>;
-  runner: KnownRunner;
   options: RunnerOptions;
   useWorker?: boolean;
   params?: T;
@@ -48,7 +42,6 @@ const logTiming = debugWorkerTiming
 /** Run a benchmark spec, optionally in an isolated worker process for profiling support. */
 export async function runBenchmark<T = unknown>({
   spec,
-  runner,
   options,
   useWorker = false,
   params,
@@ -57,11 +50,10 @@ export async function runBenchmark<T = unknown>({
     const resolved = spec.modulePath
       ? await resolveModuleSpec(spec, params)
       : { spec, params };
-    const benchRunner = await createBenchRunner(runner);
-    return benchRunner.runBench(resolved.spec, options, resolved.params);
+    return new TimingRunner().runBench(resolved.spec, options, resolved.params);
   }
 
-  const msg = createRunMessage(spec, runner, options, params);
+  const msg = createRunMessage(spec, options, params);
   return runWorkerWithMessage(spec.name, options, msg);
 }
 
@@ -69,7 +61,7 @@ export async function runBenchmark<T = unknown>({
 export async function runMatrixVariant(
   params: RunMatrixVariantParams,
 ): Promise<MeasuredResults[]> {
-  const { variantId, caseId, runner, options, useWorker = true } = params;
+  const { variantId, caseId, options, useWorker = true } = params;
   const name = `${variantId}/${caseId}`;
 
   if (!useWorker) return runMatrixVariantDirect(params, name);
@@ -78,7 +70,6 @@ export async function runMatrixVariant(
   const message: RunMessage = {
     type: "run",
     spec: { name } as BenchmarkSpec,
-    runnerName: runner,
     options,
     variantDir,
     variantId,
@@ -108,7 +99,6 @@ async function resolveModuleSpec<T>(
 /** Serialize a BenchmarkSpec into a worker-safe message (modulePath or fnCode) */
 function createRunMessage<T>(
   spec: BenchmarkSpec<T>,
-  runnerName: KnownRunner,
   options: RunnerOptions,
   params?: T,
 ): RunMessage {
@@ -116,7 +106,6 @@ function createRunMessage<T>(
   const message: RunMessage = {
     type: "run",
     spec: rest as BenchmarkSpec,
-    runnerName,
     options,
     params,
   };
@@ -195,10 +184,9 @@ async function runMatrixVariantDirect(
   params: RunMatrixVariantParams,
   name: string,
 ): Promise<MeasuredResults[]> {
-  const { runner, options } = params;
+  const { options } = params;
   const { fn } = await resolveVariantFn(params);
-  const benchRunner = await createBenchRunner(runner);
-  return benchRunner.runBench({ name, fn }, options);
+  return new TimingRunner().runBench({ name, fn }, options);
 }
 
 /** Spawn worker process with V8 flags */

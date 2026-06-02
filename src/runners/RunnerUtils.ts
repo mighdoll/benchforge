@@ -2,8 +2,6 @@ import { prepareBenchFn } from "../matrix/BenchMatrix.ts";
 import { loadCaseData, loadCasesModule } from "../matrix/CaseLoader.ts";
 import { loadVariant } from "../matrix/VariantLoader.ts";
 import type { BenchmarkFunction } from "./BenchmarkSpec.ts";
-import type { BenchRunner } from "./BenchRunner.ts";
-import { createRunner, type KnownRunner } from "./CreateRunner.ts";
 
 export const msToNs = 1e6;
 
@@ -57,11 +55,4 @@ export async function resolveVariantFn(params: {
   const variant = await loadVariant(params.variantDir, params.variantId);
   const fn = await prepareBenchFn(variant, caseData);
   return { fn, params: undefined };
-}
-
-/** Create a runner for the given runner name. */
-export async function createBenchRunner(
-  runnerName: KnownRunner,
-): Promise<BenchRunner> {
-  return createRunner(runnerName);
 }

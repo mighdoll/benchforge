@@ -8,7 +8,6 @@ import type {
   BenchSuite,
 } from "../runners/BenchmarkSpec.ts";
 import type { RunnerOptions } from "../runners/BenchRunner.ts";
-import type { KnownRunner } from "../runners/CreateRunner.ts";
 import { runBatched } from "../runners/MergeBatches.ts";
 import { runBenchmark } from "../runners/RunnerOrchestrator.ts";
 import type { DefaultCliArgs } from "./CliArgs.ts";
@@ -16,7 +15,6 @@ import { cliToRunnerOptions, validateArgs } from "./CliOptions.ts";
 import { filterBenchmarks } from "./FilterBenchmarks.ts";
 
 type RunParams = {
-  runner: KnownRunner;
   options: RunnerOptions;
   useWorker: boolean;
   params: unknown;
@@ -24,7 +22,6 @@ type RunParams = {
 };
 
 type SuiteParams = {
-  runner: KnownRunner;
   options: RunnerOptions;
   useWorker: boolean;
   batches: number;
@@ -42,14 +39,7 @@ export async function runBench(
   const options = cliToRunnerOptions(args);
   const filtered = filterBenchmarks(suite, filter);
 
-  const runner = "timing";
-  const suiteParams: SuiteParams = {
-    runner,
-    options,
-    useWorker,
-    batches,
-    warmupBatch,
-  };
+  const suiteParams: SuiteParams = { options, useWorker, batches, warmupBatch };
   return serialMap(filtered.groups, g => runGroup(g, suiteParams));
 }
 
@@ -147,14 +137,8 @@ async function runMultipleBatches(
 /** Run single benchmark and create report. */
 async function runSingleBenchmark(
   spec: BenchmarkSpec,
-  { runner, options, useWorker, params, metadata }: RunParams,
+  { options, useWorker, params, metadata }: RunParams,
 ): Promise<BenchmarkReport> {
-  const [result] = await runBenchmark({
-    spec,
-    runner,
-    options,
-    useWorker,
-    params,
-  });
+  const [result] = await runBenchmark({ spec, options, useWorker, params });
   return { name: spec.name, measuredResults: result, metadata };
 }

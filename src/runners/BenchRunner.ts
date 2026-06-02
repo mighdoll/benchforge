@@ -12,20 +12,14 @@ export interface BenchRunner {
 
 /** Configuration for benchmark execution: timing limits, warmup, profiling, and V8 options. */
 export interface RunnerOptions {
-  /** Maximum time to run each benchmark - ignored by mitata (milliseconds) */
+  /** Maximum time to run each benchmark (milliseconds) */
   maxTime?: number;
-  /** Maximum iterations per benchmark - ignored by TinyBench */
+  /** Maximum iterations per benchmark */
   maxIterations?: number;
   /** Warmup iterations before measurement (default: 0) */
   warmup?: number;
   /** Warmup time before measurement (milliseconds) */
   warmupTime?: number;
-  /** Warmup samples - mitata only, for reducing test time */
-  warmupSamples?: number;
-  /** Warmup threshold - mitata only (nanoseconds) */
-  warmupThreshold?: number;
-  /** Minimum samples required - mitata only */
-  minSamples?: number;
   /** Force GC after each iteration (requires --expose-gc) */
   gcForce?: boolean;
   /** Trace V8 optimization tiers (requires --allow-natives-syntax) */
