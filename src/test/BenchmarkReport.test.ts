@@ -4,12 +4,11 @@ import { defaultReport } from "../cli/CliReport.ts";
 import {
   type BenchmarkReport,
   metricSection,
-  scalarValues,
 } from "../report/BenchmarkReport.ts";
 import { consoleSummary } from "../report/ConsoleSummary.ts";
 import { integer } from "../report/Formatters.ts";
 import { prepareHtmlData } from "../report/HtmlReport.ts";
-import { adaptiveSections, timeSection } from "../report/StandardSections.ts";
+import { timeSection } from "../report/StandardSections.ts";
 import { createBenchmarkReport, createMeasuredResults } from "./TestUtils.ts";
 
 test("produces a comparison CI and verdict for a baseline", () => {
@@ -63,15 +62,4 @@ test("defaultReport falls back to CLI defaults without opts", () => {
   const args = parseCliArgs(undefined, ["--duration", "0.1"]);
   const output = defaultReport(groups, args);
   expect(output).toContain("(mean)");
-});
-
-test("adaptive convergence is a scalar row", () => {
-  const report = createBenchmarkReport("test-adaptive", [400, 500], {
-    convergence: { converged: true, confidence: 95, reason: "stable" },
-  });
-  const convSection = adaptiveSections.find(s => s.kind === "scalar");
-  expect(convSection?.kind).toBe("scalar");
-  if (convSection?.kind !== "scalar") throw new Error("expected scalar");
-  const vals = scalarValues(convSection.rows, report.measuredResults);
-  expect(vals.convergence).toBe(95);
 });

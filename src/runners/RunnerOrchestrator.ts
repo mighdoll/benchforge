@@ -57,7 +57,7 @@ export async function runBenchmark<T = unknown>({
     const resolved = spec.modulePath
       ? await resolveModuleSpec(spec, params)
       : { spec, params };
-    const benchRunner = await createBenchRunner(runner, options);
+    const benchRunner = await createBenchRunner(runner);
     return benchRunner.runBench(resolved.spec, options, resolved.params);
   }
 
@@ -197,7 +197,7 @@ async function runMatrixVariantDirect(
 ): Promise<MeasuredResults[]> {
   const { runner, options } = params;
   const { fn } = await resolveVariantFn(params);
-  const benchRunner = await createBenchRunner(runner, options);
+  const benchRunner = await createBenchRunner(runner);
   return benchRunner.runBench({ name, fn }, options);
 }
 

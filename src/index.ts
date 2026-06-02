@@ -53,12 +53,7 @@ export {
   scalarSection,
 } from "./report/BenchmarkReport.ts";
 export { consoleSummary } from "./report/ConsoleSummary.ts";
-export {
-  formatBytes,
-  formatConvergence,
-  integer,
-  timeMs,
-} from "./report/Formatters.ts";
+export { formatBytes, integer, timeMs } from "./report/Formatters.ts";
 export { gcSections, gcStatsSection } from "./report/GcSections.ts";
 export type { GitVersion } from "./report/GitUtils.ts";
 export {
@@ -70,11 +65,9 @@ export type { PrepareHtmlOptions } from "./report/HtmlReport.ts";
 export { prepareHtmlData } from "./report/HtmlReport.ts";
 export { markdownReport } from "./report/MarkdownReport.ts";
 export {
-  adaptiveSections,
   optSection,
   runsSection,
   timeSection,
-  totalTimeSection,
 } from "./report/StandardSections.ts";
 export type {
   BenchGroup,

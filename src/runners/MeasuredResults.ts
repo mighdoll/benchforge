@@ -68,13 +68,6 @@ export interface MeasuredResults {
   /** Monotonic start time (μs, hrtime-based) for Perfetto trace alignment. */
   startTime?: number;
 
-  /** Convergence information for adaptive mode */
-  convergence?: {
-    converged: boolean;
-    confidence: number;
-    reason: string;
-  };
-
   /** V8 optimization tier tracking (requires --allow-natives-syntax) */
   optStatus?: OptStatusInfo;
 

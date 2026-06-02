@@ -1,12 +1,8 @@
 import { prepareBenchFn } from "../matrix/BenchMatrix.ts";
 import { loadCaseData, loadCasesModule } from "../matrix/CaseLoader.ts";
 import { loadVariant } from "../matrix/VariantLoader.ts";
-import {
-  type AdaptiveOptions,
-  createAdaptiveWrapper,
-} from "./AdaptiveWrapper.ts";
 import type { BenchmarkFunction } from "./BenchmarkSpec.ts";
-import type { BenchRunner, RunnerOptions } from "./BenchRunner.ts";
+import type { BenchRunner } from "./BenchRunner.ts";
 import { createRunner, type KnownRunner } from "./CreateRunner.ts";
 
 export const msToNs = 1e6;
@@ -63,14 +59,9 @@ export async function resolveVariantFn(params: {
   return { fn, params: undefined };
 }
 
-/** Create runner, wrapping with adaptive sampling if options.adaptive is set */
+/** Create a runner for the given runner name. */
 export async function createBenchRunner(
   runnerName: KnownRunner,
-  options: RunnerOptions,
 ): Promise<BenchRunner> {
-  const base = await createRunner(runnerName);
-  if ("adaptive" in options && options.adaptive) {
-    return createAdaptiveWrapper(base, options as AdaptiveOptions);
-  }
-  return base;
+  return createRunner(runnerName);
 }

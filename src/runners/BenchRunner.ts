@@ -12,8 +12,6 @@ export interface BenchRunner {
 
 /** Configuration for benchmark execution: timing limits, warmup, profiling, and V8 options. */
 export interface RunnerOptions {
-  /** Minimum time to run each benchmark (milliseconds) */
-  minTime?: number;
   /** Maximum time to run each benchmark - ignored by mitata (milliseconds) */
   maxTime?: number;
   /** Maximum iterations per benchmark - ignored by TinyBench */

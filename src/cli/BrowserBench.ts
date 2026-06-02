@@ -74,7 +74,6 @@ function warnBrowserFlags(args: DefaultCliArgs): void {
     [!args.worker, "--no-worker"],
     [!!args["trace-opt"], "--trace-opt"],
     [!!args["gc-force"], "--gc-force"],
-    [!!args.adaptive, "--adaptive"],
   ];
   const ignored = checks.filter(([active]) => active).map(([, flag]) => flag);
   if (ignored.length > 0)

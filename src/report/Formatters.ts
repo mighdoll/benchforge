@@ -1,9 +1,3 @@
-import colors from "./Colors.ts";
-
-const { red } = colors;
-
-const lowConfidence = 80;
-
 /** Format time in milliseconds with appropriate units */
 export function timeMs(ms: unknown): string | null {
   if (typeof ms !== "number") return null;
@@ -44,11 +38,4 @@ export function formatBytes(
 export function formatSignedPercent(v: number): string {
   const sign = v >= 0 ? "+" : "";
   return `${sign}${v.toFixed(1)}%`;
-}
-
-/** @return convergence percentage with color for low values */
-export function formatConvergence(v: unknown): string {
-  if (typeof v !== "number") return "—";
-  const pct = `${Math.round(v)}%`;
-  return v < lowConfidence ? red(pct) : pct;
 }

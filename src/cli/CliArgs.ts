@@ -30,9 +30,6 @@ const cliOptions = {
   "pause-duration": { type: "number", default: 100, describe: "pause duration in ms for V8 optimization" },
   "gc-stats":       { type: "boolean", default: false, describe: "collect GC statistics (Node: --trace-gc-nvp, browser: CDP tracing)" },
   "gc-force":       { type: "boolean", default: false, describe: "force GC after each iteration" },
-  adaptive:         { type: "boolean", default: false, describe: "adaptive sampling (experimental)" },
-  "min-time":       { type: "number",  default: 1, describe: "minimum time before adaptive convergence can stop" },
-  convergence:      { type: "number",  default: 95, describe: "adaptive confidence threshold (0-100)" },
   alloc:            { type: "boolean", default: false, describe: "allocation sampling attribution (includes garbage)" },
   "alloc-interval": { type: "number",  default: 32768, describe: "allocation sampling interval in bytes" },
   "alloc-depth":    { type: "number",  default: 64, describe: "allocation sampling stack depth" },
@@ -66,7 +63,6 @@ const cliOptions = {
 } as const;
 
 export const defaultDuration = 0.642;
-export const defaultAdaptiveMaxTime = 20;
 
 /** Default values for all CLI options, including alias keys for yargs filtering. */
 export const cliDefaults: Record<string, unknown> = Object.fromEntries(
@@ -127,7 +123,6 @@ const optionGroups = {
     "pause-duration",
     "pause-warmup",
   ],
-  "Adaptive:": ["adaptive", "min-time", "convergence"],
 } as const;
 
 const { url: _url, ...browserOnlyOptions } = cliOptions;

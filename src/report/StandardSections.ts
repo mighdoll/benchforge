@@ -5,11 +5,10 @@ import type {
 import {
   type MetricSection,
   metricSection,
-  type ReportSection,
   type ScalarSection,
   scalarSection,
 } from "./BenchmarkReport.ts";
-import { formatConvergence, timeMs } from "./Formatters.ts";
+import { timeMs } from "./Formatters.ts";
 
 /** Timing section: the mean (+ a Δ% CI when a baseline exists). Per-percentile
  *  detail lives in the markdown report and HTML viewer (shift function), so the
@@ -32,40 +31,6 @@ export const runsSection: ScalarSection = scalarSection({
     },
   ],
 });
-
-/** Report section: total sampling duration. */
-export const totalTimeSection: ScalarSection = scalarSection({
-  title: "",
-  rows: [
-    {
-      key: "totalTime",
-      title: "time",
-      formatter: formatTotalTime,
-      value: (r: MeasuredResults) => r.totalTime,
-    },
-  ],
-});
-
-/** Report sections for adaptive mode: median time (the shift fan covers the
- *  rest of the distribution) plus convergence confidence. */
-export const adaptiveSections: ReportSection[] = [
-  metricSection({
-    title: "time",
-    statKind: { percentile: 0.5 },
-    formatter: timeMs,
-  }),
-  scalarSection({
-    title: "",
-    rows: [
-      {
-        key: "convergence",
-        title: "conv%",
-        formatter: formatConvergence,
-        value: (r: MeasuredResults) => r.convergence?.confidence,
-      },
-    ],
-  }),
-];
 
 /** Report section: V8 optimization tier distribution and deopt count. */
 export const optSection: ScalarSection = scalarSection({
@@ -103,10 +68,4 @@ export function formatTierSummary(
     .sort((a, b) => b[1].count - a[1].count)
     .map(([name, t]) => `${name}${nameValueSep}${pct(t.count)}`)
     .join(entrySep);
-}
-
-/** Format total time; brackets indicate >= 30s. */
-function formatTotalTime(v: unknown): string {
-  if (typeof v !== "number") return "";
-  return v >= 30 ? `[${v.toFixed(1)}s]` : `${v.toFixed(1)}s`;
 }

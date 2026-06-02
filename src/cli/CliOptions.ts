@@ -1,13 +1,8 @@
 import type { RunMatrixOptions } from "../matrix/BenchMatrix.ts";
 import type { HeapReportOptions } from "../profiling/node/HeapSampleReport.ts";
 import type { ComparisonOptions } from "../report/BenchmarkReport.ts";
-import type { AdaptiveOptions } from "../runners/AdaptiveWrapper.ts";
 import type { RunnerOptions } from "../runners/BenchRunner.ts";
-import {
-  type DefaultCliArgs,
-  defaultAdaptiveMaxTime,
-  defaultDuration,
-} from "./CliArgs.ts";
+import { type DefaultCliArgs, defaultDuration } from "./CliArgs.ts";
 
 /** Runner limits resolved from the duration/iterations flags. */
 type Limits = {
@@ -42,11 +37,10 @@ export function validateArgs(args: DefaultCliArgs): void {
 
 /** Convert CLI args to benchmark runner options. */
 export function cliToRunnerOptions(args: DefaultCliArgs): RunnerOptions {
-  const { inspect, iterations, adaptive } = args;
+  const { inspect, iterations } = args;
   const gcForce = args["gc-force"];
   if (inspect)
     return { maxIterations: iterations ?? 1, warmupTime: 0, gcForce };
-  if (adaptive) return createAdaptiveOptions(args);
   return { ...resolveLimits(args), ...cliCommonOptions(args) };
 }
 
@@ -133,16 +127,5 @@ function cliCommonOptions(args: DefaultCliArgs) {
     allocDepth,
     profile: needsProfile(args),
     profileInterval,
-  };
-}
-
-/** Build runner options for adaptive sampling mode. */
-function createAdaptiveOptions(args: DefaultCliArgs): AdaptiveOptions {
-  return {
-    minTime: (args["min-time"] ?? 1) * 1000,
-    maxTime: defaultAdaptiveMaxTime * 1000,
-    targetConfidence: args.convergence,
-    adaptive: true,
-    ...cliCommonOptions(args),
   };
 }

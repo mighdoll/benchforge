@@ -17,12 +17,10 @@ import { gcStatsSection } from "../report/GcSections.ts";
 import type { GitVersion } from "../report/GitUtils.ts";
 import { prepareHtmlData } from "../report/HtmlReport.ts";
 import {
-  adaptiveSections,
   formatTierSummary,
   optSection,
   runsSection,
   timeSection,
-  totalTimeSection,
 } from "../report/StandardSections.ts";
 import type { ReportData } from "../viewer/ReportData.ts";
 import type { DefaultCliArgs } from "./CliArgs.ts";
@@ -144,15 +142,13 @@ export function matrixToReportGroups(results: MatrixResults[]): ReportGroup[] {
   );
 }
 
-/** Assemble report sections from CLI flags. Under --adaptive, the
- *  adaptive section provides its own time columns. */
+/** Assemble report sections from CLI flags (time/gc/opt/runs). */
 export function buildReportSections(
-  adaptive: boolean,
   gcStats: boolean,
   hasOptData: boolean,
 ): ReportSection[] {
   return [
-    ...(adaptive ? [...adaptiveSections, totalTimeSection] : [timeSection]),
+    timeSection,
     ...(gcStats ? [gcStatsSection] : []),
     ...(hasOptData ? [optSection] : []),
     runsSection,
@@ -164,9 +160,9 @@ function cliDefaultSections(
   groups: ReportGroup[],
   args: DefaultCliArgs,
 ): ReportSection[] {
-  const { adaptive, "gc-stats": gcStats, "trace-opt": traceOpt } = args;
+  const { "gc-stats": gcStats, "trace-opt": traceOpt } = args;
   const hasOpt = hasField(groups, "optStatus");
-  return buildReportSections(adaptive, gcStats, traceOpt && hasOpt);
+  return buildReportSections(gcStats, traceOpt && hasOpt);
 }
 
 /** Wrap a single matrix case and its optional baseline into a ReportGroup. */

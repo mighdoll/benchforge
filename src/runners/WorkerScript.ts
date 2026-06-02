@@ -210,7 +210,7 @@ process.on("message", async (message: RunMessage) => {
 
   try {
     const start = getPerfNow();
-    const runner = await createBenchRunner(message.runnerName, message.options);
+    const runner = await createBenchRunner(message.runnerName);
     logTiming("Runner created in", getElapsed(start));
 
     const benchStart = getPerfNow();
