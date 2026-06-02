@@ -1,9 +1,6 @@
 import { expect, test } from "vitest";
 import type { ReportGroup } from "../report/BenchmarkReport.ts";
-import {
-  metricStatKind,
-  metricValue,
-} from "../report/BenchmarkReport.ts";
+import { metricStatKind, metricValue } from "../report/BenchmarkReport.ts";
 import { consoleSummary } from "../report/ConsoleSummary.ts";
 import { prepareHtmlData } from "../report/HtmlReport.ts";
 import { timeSection } from "../report/StandardSections.ts";
