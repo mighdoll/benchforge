@@ -41,13 +41,8 @@ export interface ExportOptions {
   reportData?: ReportData;
 }
 
-/** Export options for matrix benchmarks (results/args supplied by the matrix pipeline). */
-export interface MatrixExportOptions {
-  sections?: ReportSection[];
-  currentVersion?: GitVersion;
-  baselineVersion?: GitVersion;
-  reportData?: ReportData;
-}
+/** Export options for matrix benchmarks; the matrix pipeline supplies results/args. */
+export type MatrixExportOptions = Omit<ExportOptions, "results" | "args">;
 
 type FrameContainer = {
   shared: { frames: { name: string; file?: string; line?: number }[] };
