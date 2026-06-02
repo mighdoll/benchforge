@@ -1,14 +1,10 @@
 import type {
+  CIDirection,
   CILevel,
   DifferenceCI,
   HistogramBin,
 } from "../../stats/StatisticalUtils.ts";
-import {
-  type Direction,
-  directionColors,
-  formatPct,
-  gaussianSmooth,
-} from "./PlotTypes.ts";
+import { directionColors, formatPct, gaussianSmooth } from "./PlotTypes.ts";
 import {
   createSvg,
   ensureHatchPattern,
@@ -24,7 +20,7 @@ export interface DistributionPlotOptions {
   height?: number;
   title?: string;
   smooth?: boolean;
-  direction?: Direction;
+  direction?: CIDirection;
   /** Pre-formatted CI bound labels (overrides default formatPct) */
   ciLabels?: [string, string];
   /** Include zero in x scale (default true, set false for absolute-value plots) */
@@ -232,7 +228,7 @@ function drawCIRegion(
   scales: Scales,
   layout: Layout,
   opts: DistributionPlotOptions & {
-    direction: Direction;
+    direction: CIDirection;
     includeZero: boolean;
   },
   fill: string,

@@ -8,6 +8,7 @@ import type {
   ViewerRow,
   ViewerSection,
 } from "../viewer/ReportData.ts";
+import { formatSignedPercent } from "./Formatters.ts";
 import { formatGitVersion, type GitVersion } from "./GitUtils.ts";
 import { verdictWord } from "./Verdict.ts";
 
@@ -88,10 +89,10 @@ function pointRow(point: ShiftPercentile): string {
   const { diff, runs, label, reliable, tailCount } = point;
   const cur = runs[0]?.bootstrapCI.estimateLabel ?? "";
   const base = runs[1]?.bootstrapCI.estimateLabel ?? "";
-  const [lo, hi] = diff.ci.map(signedPercent);
+  const [lo, hi] = diff.ci.map(formatSignedPercent);
   const word = verdictWord(diff.direction);
   const verdict = reliable ? word : `${word} (unreliable, n=${tailCount})`;
-  return `| ${label} | ${cur} | ${base} | ${signedPercent(diff.percent)} | [${lo}, ${hi}] | ${verdict} |`;
+  return `| ${label} | ${cur} | ${base} | ${formatSignedPercent(diff.percent)} | [${lo}, ${hi}] | ${verdict} |`;
 }
 
 /** A current-vs-baseline table for scalar sections (GC, line counts). When no
@@ -114,7 +115,9 @@ function scalarTable(rows: ViewerRow[]): string | undefined {
   const body = usable.map(r => {
     const cur = entryValue(r.entries[0]) ?? "";
     const base = entryValue(r.entries[1]) ?? "";
-    const pct = r.comparisonCI ? signedPercent(r.comparisonCI.percent) : "";
+    const pct = r.comparisonCI
+      ? formatSignedPercent(r.comparisonCI.percent)
+      : "";
     return `| ${r.label} | ${cur} | ${base} | ${pct} |`;
   });
   return [header, ...body].join("\n");
@@ -139,8 +142,4 @@ function findRunsValue(sections: ViewerSection[]): string | undefined {
 /** The runs row is the shared "runs" count, lifted to benchmark metadata. */
 function isRunsRow(row: ViewerRow): boolean {
   return row.label === "runs" && !!row.shared;
-}
-
-function signedPercent(v: number): string {
-  return `${v >= 0 ? "+" : ""}${v.toFixed(1)}%`;
 }

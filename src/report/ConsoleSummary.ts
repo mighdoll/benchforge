@@ -6,6 +6,7 @@ import type {
   ViewerRow,
 } from "../viewer/ReportData.ts";
 import colors from "./Colors.ts";
+import { formatSignedPercent } from "./Formatters.ts";
 import { verdictWord } from "./Verdict.ts";
 
 const { bold, dim, green, red } = colors;
@@ -38,7 +39,7 @@ function benchmarkLines(entry: BenchmarkEntry, groupName: string): string[] {
 }
 
 /** @return a label that names the benchmark without repeating segments. */
-function benchLabel(name: string, groupName: string): string {
+export function benchLabel(name: string, groupName: string): string {
   if (!groupName || groupName === name) return name;
   // matrix group names are "variant / case"; the entry name repeats the variant.
   if (groupName.split(" / ").includes(name)) return groupName;
@@ -56,8 +57,8 @@ function headline(metric: ViewerRow): string {
 /** The verdict line body: colored direction word, Δ%, CI, "vs baseline". */
 function verdict(ci: DifferenceCI): string {
   const word = colorVerdict(ci.direction);
-  const [lo, hi] = ci.ci.map(signed);
-  return `${word} ${signed(ci.percent)} [${lo}, ${hi}] vs baseline`;
+  const [lo, hi] = ci.ci.map(formatSignedPercent);
+  return `${word} ${formatSignedPercent(ci.percent)} [${lo}, ${hi}] vs baseline`;
 }
 
 function colorVerdict(direction: CIDirection): string {
@@ -65,8 +66,4 @@ function colorVerdict(direction: CIDirection): string {
   if (word === "better") return green(word);
   if (word === "worse") return red(word);
   return dim(word);
-}
-
-function signed(v: number): string {
-  return `${v >= 0 ? "+" : ""}${v.toFixed(1)}%`;
 }

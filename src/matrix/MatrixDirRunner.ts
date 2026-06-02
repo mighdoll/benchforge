@@ -67,17 +67,8 @@ export async function runMatrixCalibration<T>(
   const ctx = await createDirContext(matrix, options);
   const caseId = ctx.caseIds[0];
   const label = `${variantId}/${caseId}`;
-  const variantArgs: VariantArgs = {
-    variantDir: matrix.variantDir!,
-    variantId,
-    caseId,
-    caseData: matrix.cases && !matrix.casesModule ? caseId : undefined,
-    casesModule: matrix.casesModule,
-    runner: "timing" as const,
-    options: ctx.runnerOpts,
-    useWorker: ctx.useWorker,
-  };
-  const current = async () => (await runMatrixVariant(variantArgs))[0];
+  const variantArgs = buildVariantArgs(matrix, variantId, caseId, ctx);
+  const current = () => runVariantOnce(variantArgs);
 
   return runCalibration({
     current,
@@ -129,21 +120,11 @@ async function runDirVariantCases<T>(
   variantId: string,
   ctx: DirMatrixContext<T>,
 ): Promise<CaseResult[]> {
-  const { matrix, casesModule, caseIds, runnerOpts, batches } = ctx;
+  const { matrix, casesModule, caseIds, batches } = ctx;
   const cases: CaseResult[] = [];
 
   for (const caseId of caseIds) {
-    const caseData = matrix.cases && !matrix.casesModule ? caseId : undefined;
-    const variantArgs: VariantArgs = {
-      variantDir: matrix.variantDir!,
-      variantId,
-      caseId,
-      caseData,
-      casesModule: matrix.casesModule,
-      runner: "timing" as const,
-      options: runnerOpts,
-      useWorker: ctx.useWorker,
-    };
+    const variantArgs = buildVariantArgs(matrix, variantId, caseId, ctx);
     const baselineArgs =
       matrix.baselineDir && ctx.baselineIds.includes(variantId)
         ? { ...variantArgs, variantDir: matrix.baselineDir! }
@@ -168,10 +149,8 @@ async function runCaseBatched<T>(
   baselineArgs: VariantArgs | undefined,
   ctx: DirMatrixContext<T>,
 ): Promise<{ measured: MeasuredResults; baseline?: MeasuredResults }> {
-  const runCurrent = async () => (await runMatrixVariant(variantArgs))[0];
-  const runBase = baselineArgs
-    ? async () => (await runMatrixVariant(baselineArgs))[0]
-    : undefined;
+  const runCurrent = () => runVariantOnce(variantArgs);
+  const runBase = baselineArgs ? () => runVariantOnce(baselineArgs) : undefined;
   const { results, baseline } = await runBatched(
     [runCurrent],
     runBase,
@@ -186,9 +165,33 @@ async function runCaseSingle(
   variantArgs: VariantArgs,
   baselineArgs: VariantArgs | undefined,
 ): Promise<{ measured: MeasuredResults; baseline?: MeasuredResults }> {
-  const [measured] = await runMatrixVariant(variantArgs);
+  const measured = await runVariantOnce(variantArgs);
   const baseline = baselineArgs
-    ? (await runMatrixVariant(baselineArgs))[0]
+    ? await runVariantOnce(baselineArgs)
     : undefined;
   return { measured, baseline };
+}
+
+/** Build the args to run one variant/case, directly or in a worker. */
+function buildVariantArgs<T>(
+  matrix: BenchMatrix<T>,
+  variantId: string,
+  caseId: string,
+  ctx: DirMatrixContext<T>,
+): VariantArgs {
+  return {
+    variantDir: matrix.variantDir!,
+    variantId,
+    caseId,
+    caseData: matrix.cases && !matrix.casesModule ? caseId : undefined,
+    casesModule: matrix.casesModule,
+    runner: "timing" as const,
+    options: ctx.runnerOpts,
+    useWorker: ctx.useWorker,
+  };
+}
+
+/** Run one variant/case, returning its single MeasuredResults. */
+async function runVariantOnce(args: VariantArgs): Promise<MeasuredResults> {
+  return (await runMatrixVariant(args))[0];
 }

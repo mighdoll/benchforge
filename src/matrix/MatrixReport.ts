@@ -1,10 +1,7 @@
 import colors from "../report/Colors.ts";
+import { benchLabel } from "../report/ConsoleSummary.ts";
 import type { CIDirection } from "../stats/StatisticalUtils.ts";
-import type {
-  BenchmarkEntry,
-  BenchmarkGroup,
-  ReportData,
-} from "../viewer/ReportData.ts";
+import type { BenchmarkGroup, ReportData } from "../viewer/ReportData.ts";
 
 interface LabeledDiff {
   label: string;
@@ -28,16 +25,8 @@ function labeledDiffs(group: BenchmarkGroup): LabeledDiff[] {
   return group.benchmarks.flatMap(b => {
     const ci = b.comparisonCI;
     if (!ci) return [];
-    return [{ label: groupLabel(group, b), direction: ci.direction }];
+    return [{ label: benchLabel(b.name, group.name), direction: ci.direction }];
   });
-}
-
-/** The benchmark's display label: the group name when it already names the
- *  benchmark (matrix "variant / case"), else "group / name". */
-function groupLabel(group: BenchmarkGroup, entry: BenchmarkEntry): string {
-  if (group.name === entry.name) return entry.name;
-  if (group.name.split(" / ").includes(entry.name)) return group.name;
-  return `${group.name} / ${entry.name}`;
 }
 
 /** Tally line + names of the non-equivalent results, grouped by direction. */

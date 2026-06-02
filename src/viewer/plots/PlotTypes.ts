@@ -1,4 +1,7 @@
-import type { HistogramBin } from "../../stats/StatisticalUtils.ts";
+import type {
+  CIDirection,
+  HistogramBin,
+} from "../../stats/StatisticalUtils.ts";
 
 /** A single timing sample from a benchmark run */
 export interface Sample {
@@ -47,8 +50,6 @@ export interface TimeUnit {
   formatValue: (d: number) => string;
 }
 
-export type Direction = "faster" | "slower" | "uncertain" | "equivalent";
-
 /** Shared Observable Plot layout: margins, dimensions, font size */
 export const plotLayout = {
   marginTop: 24,
@@ -62,7 +63,7 @@ export const plotLayout = {
 
 /** Fill/stroke palette keyed by comparison direction, shared across plots. */
 export const directionColors: Record<
-  Direction,
+  CIDirection,
   { fill: string; stroke: string }
 > = {
   faster: { fill: "#bbf7d0", stroke: "#22c55e" },
