@@ -8,11 +8,7 @@ export {
   type MatrixBuildResult,
   runBenchCli,
 } from "./cli/RunBenchCLI.ts";
-export {
-  buildSpeedscopeFile,
-  exportSpeedscope,
-  heapProfileToSpeedscope,
-} from "./export/AllocExport.ts";
+export { buildSpeedscopeFile } from "./export/AllocExport.ts";
 export { archiveBenchmark } from "./export/ArchiveExport.ts";
 export type {
   ArchiveMetadata,

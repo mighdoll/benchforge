@@ -1,8 +1,5 @@
 /** Heap profile export to Speedscope format. */
 
-import { writeFileSync } from "node:fs";
-import { resolve } from "node:path";
-import type { HeapProfile } from "../profiling/node/HeapSampler.ts";
 import {
   type ResolvedProfile,
   resolveProfile,
@@ -16,33 +13,6 @@ import {
   type SpeedscopeHeapProfile,
   speedscopeFile,
 } from "./SpeedscopeTypes.ts";
-
-/** Export heap profiles to speedscope JSON. Returns output path, or undefined if no profiles. */
-export function exportSpeedscope(
-  groups: ReportGroup[],
-  outputPath: string,
-): string | undefined {
-  const file = buildSpeedscopeFile(groups);
-  if (!file) {
-    console.log("No heap profiles to export.");
-    return undefined;
-  }
-
-  const absPath = resolve(outputPath);
-  writeFileSync(absPath, JSON.stringify(file));
-  console.log(`Speedscope profile exported to: ${outputPath}`);
-  return absPath;
-}
-
-/** Convert a single HeapProfile to speedscope format. */
-export function heapProfileToSpeedscope(
-  name: string,
-  profile: HeapProfile,
-): SpeedscopeFile {
-  const ctx = frameContext();
-  const p = buildProfile(name, resolveProfile(profile), ctx);
-  return speedscopeFile(ctx, [p]);
-}
 
 /** Build SpeedscopeFile from report groups. Returns undefined if no profiles found. */
 export function buildSpeedscopeFile(
