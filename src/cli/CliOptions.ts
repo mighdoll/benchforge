@@ -39,8 +39,7 @@ export function validateArgs(args: DefaultCliArgs): void {
 export function cliToRunnerOptions(args: DefaultCliArgs): RunnerOptions {
   const { inspect, iterations } = args;
   const gcForce = args["gc-force"];
-  if (inspect)
-    return { maxIterations: iterations ?? 1, warmupTime: 0, gcForce };
+  if (inspect) return { maxIterations: iterations ?? 1, gcForce };
   return { ...resolveLimits(args), ...cliCommonOptions(args) };
 }
 

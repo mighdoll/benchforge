@@ -18,8 +18,6 @@ export interface RunnerOptions {
   maxIterations?: number;
   /** Warmup iterations before measurement (default: 0) */
   warmup?: number;
-  /** Warmup time before measurement (milliseconds) */
-  warmupTime?: number;
   /** Force GC after each iteration (requires --expose-gc) */
   gcForce?: boolean;
   /** Trace V8 optimization tiers (requires --allow-natives-syntax) */
