@@ -1,11 +1,7 @@
 import colors from "../../report/Colors.ts";
 import { formatBytes } from "../../report/Formatters.ts";
-import type { HeapProfile, HeapSample } from "./HeapSampler.ts";
-import {
-  type ResolvedFrame,
-  type ResolvedProfile,
-  resolveProfile,
-} from "./ResolvedProfile.ts";
+import type { HeapSample } from "./HeapSampler.ts";
+import type { ResolvedFrame, ResolvedProfile } from "./ResolvedProfile.ts";
 
 /** An allocation site with byte totals, call stack, and optional raw samples */
 export interface HeapSite {
@@ -46,11 +42,6 @@ export interface HeapReportOptions {
   totalUserCode?: number;
   /** Number of samples taken */
   sampleCount?: number;
-}
-
-/** Sum selfSize across all nodes in profile (before any filtering) */
-export function totalProfileBytes(profile: HeapProfile): number {
-  return resolveProfile(profile).totalBytes;
 }
 
 /** Flatten resolved profile into sorted list of allocation sites with call stacks.

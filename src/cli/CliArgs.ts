@@ -125,31 +125,12 @@ const optionGroups = {
   ],
 } as const;
 
-const { url: _url, ...browserOnlyOptions } = cliOptions;
-
 /** Parse command line arguments with optional custom yargs configuration. */
 export function parseCliArgs<T = DefaultCliArgs>(
   configure: Configure<T> = defaultCliArgs as Configure<T>,
   args: string[] = hideBin(process.argv),
 ): T {
   return configure(yargs(args)).parseSync() as T;
-}
-
-/** Configure yargs for browser benchmarking with url as a required positional. */
-export function browserCliArgs(yargsInstance: Argv): Argv<DefaultCliArgs> {
-  return applyGroups(
-    yargsInstance
-      .command("$0 <url>", "run browser benchmarks", y => {
-        y.positional("url", {
-          type: "string",
-          describe: "page URL for browser profiling",
-        });
-      })
-      .options(browserOnlyOptions)
-      .version(pkg.version)
-      .help()
-      .strict(),
-  ) as Argv<DefaultCliArgs>;
 }
 
 /** Configure yargs with standard benchmark options and file positional. */

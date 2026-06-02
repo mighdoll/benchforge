@@ -12,12 +12,10 @@ import { resolveProfile } from "../profiling/node/ResolvedProfile.ts";
 import type { ReportGroup, ReportSection } from "../report/BenchmarkReport.ts";
 import { groupReports, hasField } from "../report/BenchmarkReport.ts";
 import colors from "../report/Colors.ts";
-import { consoleSummary } from "../report/ConsoleSummary.ts";
 import { gcStatsSection } from "../report/GcSections.ts";
 import type { GitVersion } from "../report/GitUtils.ts";
 import { prepareHtmlData } from "../report/HtmlReport.ts";
 import {
-  formatTierSummary,
   optSection,
   runsSection,
   timeSection,
@@ -34,7 +32,7 @@ export interface DefaultReportOptions {
   baselineVersion?: GitVersion;
 }
 
-const { yellow, dim } = colors;
+const { dim } = colors;
 
 /** Show a transient status message on stderr, run a sync computation, then clear. */
 export function withStatus<T>(msg: string, fn: () => T): T {
@@ -61,41 +59,6 @@ export function defaultReportData(
     baselineVersion: opts?.baselineVersion,
     ...cliComparisonOptions(args),
   });
-}
-
-/** @return the pithy console summary for the report data. */
-export function defaultReport(
-  groups: ReportGroup[],
-  args: DefaultCliArgs,
-  opts?: DefaultReportOptions,
-): string {
-  return consoleSummary(defaultReportData(groups, args, opts));
-}
-
-/** Log V8 optimization tier distribution and deoptimizations. */
-export function reportOptStatus(groups: ReportGroup[]): void {
-  const optData = groups.flatMap(group =>
-    groupReports(group)
-      .filter(r => r.measuredResults.optStatus)
-      .map(({ name, measuredResults: m }) => ({
-        name,
-        opt: m.optStatus!,
-        samples: m.samples.length,
-      })),
-  );
-  if (optData.length === 0) return;
-
-  console.log(dim("\nV8 optimization:"));
-  for (const { name, opt, samples } of optData) {
-    const tierParts = formatTierSummary(opt, " ", ", ");
-    console.log(`  ${name}: ${tierParts} ${dim(`(${samples} samples)`)}`);
-  }
-
-  const totalDeopts = optData.reduce((sum, d) => sum + d.opt.deoptCount, 0);
-  if (totalDeopts > 0) {
-    const plural = totalDeopts > 1 ? "s" : "";
-    console.log(yellow(`  ⚠ ${totalDeopts} deoptimization${plural} detected`));
-  }
 }
 
 /** Print heap allocation profiles for each benchmark in the report groups. */

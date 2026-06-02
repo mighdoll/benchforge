@@ -60,41 +60,6 @@ interface DiffOp {
   pointEstimate: (s: number[]) => number;
 }
 
-/** @return sample-level bootstrap CI for percentage difference between baseline (a) and current (b). */
-export function sampleDifferenceCI(
-  a: number[],
-  b: number[],
-  statFn: (s: number[]) => number,
-  options: DiffOptions = {},
-): DifferenceCI {
-  const { resamples = bootstrapSamples, confidence: conf = defaultConfidence } =
-    options;
-  const baseVal = statFn(a);
-  const currVal = statFn(b);
-  const observedPct = ((currVal - baseVal) / baseVal) * 100;
-
-  const subA = subsample(a, maxBootstrapInput);
-  const subB = subsample(b, maxBootstrapInput);
-  const bufA = new Array(subA.length);
-  const bufB = new Array(subB.length);
-  const diffs = Array.from({ length: resamples }, () => {
-    resampleInto(subA, bufA);
-    resampleInto(subB, bufB);
-    const base = statFn(bufA);
-    return ((statFn(bufB) - base) / base) * 100;
-  });
-  const ci = computeInterval(diffs, conf);
-  const capped = subA !== a || subB !== b;
-  return {
-    percent: observedPct,
-    ci,
-    direction: classifyDirection(ci, observedPct, options.equivMargin),
-    histogram: binValues(diffs),
-    ciLevel: "sample",
-    ...(capped && { subsampled: Math.max(a.length, b.length) }),
-  };
-}
-
 /** Shared-resample difference CI: one resample pair per iteration, all stats computed.
  *  @return DifferenceCI[] in same order as input stats. */
 export function multiSampleDifferenceCI(

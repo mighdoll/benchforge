@@ -1,53 +1,53 @@
 import { expect, test } from "vitest";
-import { sampleDifferenceCI } from "../stats/BootstrapDifference.ts";
+import { multiSampleDifferenceCI } from "../stats/BootstrapDifference.ts";
 import {
   average,
   maxBootstrapInput,
+  multiSampleBootstrap,
   percentile,
-  sampleBootstrap,
 } from "../stats/StatisticalUtils.ts";
 
-test("sampleBootstrap uses full samples for point estimate", () => {
+test("multiSampleBootstrap uses full samples for point estimate", () => {
   const samples = Array.from({ length: 5000 }, (_, i) => i);
-  const result = sampleBootstrap(samples, average, { resamples: 100 });
+  const [result] = multiSampleBootstrap(samples, ["mean"], { resamples: 100 });
   expect(result.estimate).toBe(average(samples));
 });
 
-test("sampleDifferenceCI preserves point estimate", () => {
+test("multiSampleDifferenceCI preserves point estimate", () => {
   const a = Array.from({ length: 5000 }, () => 50 + Math.random() * 10);
   const b = a.map(v => v * 1.1);
-  const result = sampleDifferenceCI(a, b, average, { resamples: 100 });
+  const [result] = multiSampleDifferenceCI(a, b, ["mean"], { resamples: 100 });
   const expected = ((average(b) - average(a)) / average(a)) * 100;
   expect(result.percent).toBeCloseTo(expected, 10);
 });
 
-test("sampleBootstrap point estimate uses full array when capped", () => {
+test("multiSampleBootstrap point estimate uses full array when capped", () => {
   const n = maxBootstrapInput + 5000;
   const samples = Array.from({ length: n }, (_, i) => i);
-  const result = sampleBootstrap(samples, average, { resamples: 50 });
+  const [result] = multiSampleBootstrap(samples, ["mean"], { resamples: 50 });
   expect(result.estimate).toBe(average(samples));
   expect(result.subsampled).toBe(n);
 });
 
-test("sampleBootstrap does not set subsampled when under cap", () => {
+test("multiSampleBootstrap does not set subsampled when under cap", () => {
   const samples = Array.from({ length: 100 }, (_, i) => i);
-  const result = sampleBootstrap(samples, average, { resamples: 50 });
+  const [result] = multiSampleBootstrap(samples, ["mean"], { resamples: 50 });
   expect(result.subsampled).toBeUndefined();
 });
 
-test("sampleDifferenceCI sets subsampled when inputs exceed cap", () => {
+test("multiSampleDifferenceCI sets subsampled when inputs exceed cap", () => {
   const n = maxBootstrapInput + 1000;
   const a = Array.from({ length: n }, () => 50 + Math.random() * 10);
   const b = a.map(v => v * 1.1);
-  const result = sampleDifferenceCI(a, b, average, { resamples: 50 });
+  const [result] = multiSampleDifferenceCI(a, b, ["mean"], { resamples: 50 });
   expect(result.percent).toBeCloseTo(10, 0);
   expect(result.subsampled).toBe(n);
 });
 
-test("sampleDifferenceCI no subsampled flag when under cap", () => {
+test("multiSampleDifferenceCI no subsampled flag when under cap", () => {
   const a = Array.from({ length: 100 }, () => 50 + Math.random() * 10);
   const b = a.map(v => v * 1.1);
-  const result = sampleDifferenceCI(a, b, average, { resamples: 50 });
+  const [result] = multiSampleDifferenceCI(a, b, ["mean"], { resamples: 50 });
   expect(result.subsampled).toBeUndefined();
 });
 
@@ -72,9 +72,9 @@ test("quickselect handles duplicate values", () => {
   expect(percentile(data, 0.99)).toBe(10);
 });
 
-test("sampleBootstrap reuses buffer (no per-iteration allocation)", () => {
+test("multiSampleBootstrap reuses buffer (no per-iteration allocation)", () => {
   const samples = [10, 20, 30, 40, 50];
-  const result = sampleBootstrap(samples, average, { resamples: 50 });
+  const [result] = multiSampleBootstrap(samples, ["mean"], { resamples: 50 });
   expect(result.estimate).toBe(average(samples));
   expect(result.samples).toHaveLength(50);
   expect(result.ci[0]).toBeLessThanOrEqual(result.estimate);

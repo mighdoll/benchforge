@@ -48,7 +48,7 @@ export async function runPageLoad(
 }
 
 /** Read navigation timing from the page via Performance API. */
-export async function readNavTiming(page: CdpPage): Promise<NavTiming> {
+async function readNavTiming(page: CdpPage): Promise<NavTiming> {
   return page.evaluate(() => {
     const perf = performance as any;
     const nav = perf.getEntriesByType("navigation")[0] ?? {};

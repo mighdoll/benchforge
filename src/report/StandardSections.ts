@@ -56,16 +56,12 @@ export const optSection: ScalarSection = scalarSection({
 });
 
 /** Format V8 tier distribution sorted by count (e.g. "turbofan:85% sparkplug:15%"). */
-export function formatTierSummary(
-  opt: OptStatusInfo,
-  nameValueSep = ":",
-  entrySep = " ",
-): string {
+function formatTierSummary(opt: OptStatusInfo): string {
   const tiers = Object.entries(opt.byTier);
   const total = tiers.reduce((s, [, t]) => s + t.count, 0);
   const pct = (n: number) => `${((n / total) * 100).toFixed(0)}%`;
   return tiers
     .sort((a, b) => b[1].count - a[1].count)
-    .map(([name, t]) => `${name}${nameValueSep}${pct(t.count)}`)
-    .join(entrySep);
+    .map(([name, t]) => `${name}:${pct(t.count)}`)
+    .join(" ");
 }

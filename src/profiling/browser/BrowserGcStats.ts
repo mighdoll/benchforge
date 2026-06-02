@@ -5,6 +5,11 @@ import {
 } from "../../runners/GcStats.ts";
 import type { TraceEvent } from "./ChromeTraceEvent.ts";
 
+/** Parse and aggregate CDP trace events into GcStats. */
+export function browserGcStats(traceEvents: TraceEvent[]): GcStats {
+  return aggregateGcStats(parseGcTraceEvents(traceEvents));
+}
+
 /** Convert MinorGC/MajorGC trace events into GcEvent[]. */
 export function parseGcTraceEvents(traceEvents: TraceEvent[]): GcEvent[] {
   return traceEvents
@@ -18,11 +23,6 @@ export function parseGcTraceEvents(traceEvents: TraceEvent[]): GcEvent[] {
           Number(e.args?.usedHeapSizeAfter ?? 0),
       ),
     }));
-}
-
-/** Parse and aggregate CDP trace events into GcStats. */
-export function browserGcStats(traceEvents: TraceEvent[]): GcStats {
-  return aggregateGcStats(parseGcTraceEvents(traceEvents));
 }
 
 /** Map CDP event names (MinorGC/MajorGC) to GcEvent type. */

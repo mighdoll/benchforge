@@ -59,37 +59,6 @@ export async function collectTracing(
   return browserGcStats(traceEvents);
 }
 
-/** Start CDP Profiler for CPU time sampling (caller manages Profiler.enable/disable) */
-export async function startTimeProfiling(
-  cdp: CdpClient,
-  interval?: number,
-): Promise<void> {
-  if (interval) await cdp.send("Profiler.setSamplingInterval", { interval });
-  await cdp.send("Profiler.start");
-}
-
-/** Stop CDP CPU sampling and return the profile. */
-export async function stopTimeProfiling(cdp: CdpClient): Promise<TimeProfile> {
-  const { profile } = await cdp.send("Profiler.stop");
-  return profile as unknown as TimeProfile;
-}
-
-/** Start precise coverage (caller manages Profiler.enable/disable). */
-export async function startCoverageCollection(cdp: CdpClient): Promise<void> {
-  await cdp.send("Profiler.startPreciseCoverage", {
-    callCount: true,
-    detailed: true,
-  });
-}
-
-/** Collect precise coverage, filtering out browser-internal scripts. */
-export async function collectCoverage(cdp: CdpClient): Promise<CoverageData> {
-  const { result } = await cdp.send("Profiler.takePreciseCoverage");
-  await cdp.send("Profiler.stopPreciseCoverage");
-  const scripts = (result as unknown as ScriptCoverage[]).filter(isPageScript);
-  return { scripts };
-}
-
 /** Stop active instruments and return collected profiles/coverage. */
 export async function stopInstruments(
   cdp: CdpClient,
@@ -123,6 +92,37 @@ export async function startInstruments(
   if (opts.profile || opts.callCounts) await cdp.send("Profiler.enable");
   if (opts.profile) await startTimeProfiling(cdp, opts.profileInterval);
   if (opts.callCounts) await startCoverageCollection(cdp);
+}
+
+/** Start CDP Profiler for CPU time sampling (caller manages Profiler.enable/disable) */
+async function startTimeProfiling(
+  cdp: CdpClient,
+  interval?: number,
+): Promise<void> {
+  if (interval) await cdp.send("Profiler.setSamplingInterval", { interval });
+  await cdp.send("Profiler.start");
+}
+
+/** Stop CDP CPU sampling and return the profile. */
+async function stopTimeProfiling(cdp: CdpClient): Promise<TimeProfile> {
+  const { profile } = await cdp.send("Profiler.stop");
+  return profile as unknown as TimeProfile;
+}
+
+/** Start precise coverage (caller manages Profiler.enable/disable). */
+async function startCoverageCollection(cdp: CdpClient): Promise<void> {
+  await cdp.send("Profiler.startPreciseCoverage", {
+    callCount: true,
+    detailed: true,
+  });
+}
+
+/** Collect precise coverage, filtering out browser-internal scripts. */
+async function collectCoverage(cdp: CdpClient): Promise<CoverageData> {
+  const { result } = await cdp.send("Profiler.takePreciseCoverage");
+  await cdp.send("Profiler.stopPreciseCoverage");
+  const scripts = (result as unknown as ScriptCoverage[]).filter(isPageScript);
+  return { scripts };
 }
 
 /** Exclude chrome:// and devtools:// internal scripts. */

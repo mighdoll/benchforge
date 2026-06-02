@@ -3,7 +3,6 @@ import {
   blockDifferenceCI,
   blockPoolDifferenceCI,
   diffCIs,
-  sampleDifferenceCI,
 } from "../stats/BootstrapDifference.ts";
 import {
   average,
@@ -14,7 +13,6 @@ import {
   median,
   medianAbsoluteDeviation,
   percentile,
-  sampleBootstrap,
   standardDeviation,
 } from "../stats/StatisticalUtils.ts";
 import { assertValid, getSampleData } from "./TestUtils.ts";
@@ -89,14 +87,6 @@ test("identifies outliers in mixed data", () => {
   expect(outliers.indices).toContain(51);
 });
 
-test("sampleBootstrap estimates median with CI", () => {
-  const stable = getSampleData(400, 450);
-  const result = sampleBootstrap(stable, median, { resamples: 1000 });
-  expect(result.ciLevel).toBe("sample");
-  expect(result.ci[0]).toBeLessThanOrEqual(result.estimate);
-  expect(result.ci[1]).toBeGreaterThanOrEqual(result.estimate);
-});
-
 test("blockBootstrap estimates median with confidence intervals", () => {
   const stable = getSampleData(400, 450);
   const actual = percentile(stable, 0.5);
@@ -109,16 +99,6 @@ test("blockBootstrap estimates median with confidence intervals", () => {
   expect(result.ci[1]).toBeGreaterThanOrEqual(result.estimate);
   expect(result.ci[1] - result.ci[0]).toBeLessThan(5);
   expect(result.samples).toHaveLength(1000);
-});
-
-test("sampleDifferenceCI detects improvement", () => {
-  const baseline = getSampleData(0, 100);
-  const improved = baseline.map(v => v * 0.8);
-  const result = sampleDifferenceCI(baseline, improved, median, {
-    resamples: 1000,
-  });
-  expect(result.ciLevel).toBe("sample");
-  expect(result.percent).toBeCloseTo(-20, 0);
 });
 
 test("blockDifferenceCI detects improvement", () => {

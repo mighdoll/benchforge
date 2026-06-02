@@ -162,7 +162,6 @@ function formatCliArgs(
     if (defaults?.[key] === value) return false;
     // skip camelCase aliases (yargs generates both kebab-case and camelCase)
     if (!key.includes("-") && key !== key.toLowerCase()) return false;
-    if (key === "convergence" && !args.adaptive) return false;
     return true;
   };
   const flags = Object.entries(args)

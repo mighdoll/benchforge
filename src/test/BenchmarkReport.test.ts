@@ -1,6 +1,6 @@
 import { expect, test } from "vitest";
 import { parseCliArgs } from "../cli/CliArgs.ts";
-import { defaultReport } from "../cli/CliReport.ts";
+import { defaultReportData } from "../cli/CliReport.ts";
 import {
   type BenchmarkReport,
   metricSection,
@@ -24,7 +24,7 @@ test("produces a comparison CI and verdict for a baseline", () => {
   expect(consoleSummary(data)).toContain("vs baseline");
 });
 
-test("defaultReport uses custom sections when provided", () => {
+test("report uses custom sections when provided", () => {
   const locSection = metricSection({
     title: "lines / sec",
     higherIsBetter: true,
@@ -51,15 +51,17 @@ test("defaultReport uses custom sections when provided", () => {
   const groups = [{ name: "parser", reports: [report] }];
   const args = parseCliArgs(undefined, ["--duration", "0.1"]);
 
-  const output = defaultReport(groups, args, { sections: [locSection] });
+  const output = consoleSummary(
+    defaultReportData(groups, args, { sections: [locSection] }),
+  );
   expect(output).toContain("lines / sec");
   expect(output).toContain("(mean)");
 });
 
-test("defaultReport falls back to CLI defaults without opts", () => {
+test("report falls back to CLI defaults without opts", () => {
   const report = createBenchmarkReport("plain", [100, 150]);
   const groups = [{ name: "g", reports: [report] }];
   const args = parseCliArgs(undefined, ["--duration", "0.1"]);
-  const output = defaultReport(groups, args);
+  const output = consoleSummary(defaultReportData(groups, args));
   expect(output).toContain("(mean)");
 });

@@ -163,29 +163,6 @@ export function findOutliers(samples: number[]): {
   return { rate: indices.length / samples.length, indices };
 }
 
-/** Sample-level bootstrap CI: resample individual samples with replacement. */
-export function sampleBootstrap(
-  samples: number[],
-  statFn: (s: number[]) => number,
-  options: BootstrapOptions = {},
-): BootstrapResult {
-  const { resamples = bootstrapSamples, confidence: conf = defaultConfidence } =
-    options;
-  const sub = subsample(samples, maxBootstrapInput);
-  const buf = new Array(sub.length);
-  const stats = Array.from({ length: resamples }, () => {
-    resampleInto(sub, buf);
-    return statFn(buf);
-  });
-  return {
-    estimate: statFn(samples),
-    ci: computeInterval(stats, conf),
-    samples: stats,
-    ciLevel: "sample",
-    ...(sub !== samples && { subsampled: samples.length }),
-  };
-}
-
 /** Shared-resample bootstrap: one resample per iteration, all stats computed on it.
  *  Mean is computed first (non-destructive), then percentiles via in-place quickSelect. */
 export function multiSampleBootstrap(

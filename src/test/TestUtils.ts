@@ -1,8 +1,9 @@
 import type { Configure, DefaultCliArgs } from "../cli/CliArgs.ts";
 import { parseCliArgs } from "../cli/CliArgs.ts";
-import { defaultReport } from "../cli/CliReport.ts";
+import { defaultReportData } from "../cli/CliReport.ts";
 import { runBench } from "../cli/SuiteRunner.ts";
 import type { BenchmarkReport } from "../report/BenchmarkReport.ts";
+import { consoleSummary } from "../report/ConsoleSummary.ts";
 import type { BenchSuite } from "../runners/BenchmarkSpec.ts";
 import type { MeasuredResults } from "../runners/MeasuredResults.ts";
 import { average, percentile } from "../stats/StatisticalUtils.ts";
@@ -45,7 +46,7 @@ export async function runBenchCLITest<T = DefaultCliArgs>(
   const argv = args.split(/\s+/).filter(arg => arg.length > 0);
   const parsedArgs = parseCliArgs(configureArgs, argv) as T & DefaultCliArgs;
   const results = await runBench(suite, parsedArgs);
-  return defaultReport(results, parsedArgs);
+  return consoleSummary(defaultReportData(results, parsedArgs));
 }
 
 /** @return slice of bevy30 samples for consistent test data */
