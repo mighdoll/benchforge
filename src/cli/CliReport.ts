@@ -1,4 +1,4 @@
-import type { MatrixResults } from "../matrix/BenchMatrix.ts";
+import type { CaseResult, MatrixResults } from "../matrix/BenchMatrix.ts";
 import { reportMatrixResults } from "../matrix/MatrixReport.ts";
 import {
   aggregateSites,
@@ -170,10 +170,7 @@ function cliDefaultSections(
 }
 
 /** Wrap a single matrix case and its optional baseline into a ReportGroup. */
-function caseToReportGroup(
-  variantId: string,
-  c: MatrixResults["variants"][0]["cases"][0],
-): ReportGroup {
+function caseToReportGroup(variantId: string, c: CaseResult): ReportGroup {
   const { metadata, baseline: baselineMeasured } = c;
   const report = { name: variantId, measuredResults: c.measured, metadata };
   const baseline = baselineMeasured

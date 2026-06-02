@@ -96,15 +96,7 @@ export function createDistributionPlot(
   if (equivMargin && includeZero)
     drawMarginZone(svg, equivMargin, scales, layout);
 
-  const ciX = scales.x(ci[0]);
-  const ciRect = rect(ciX, margin.top, scales.x(ci[1]) - ciX, plot.h, { fill });
-  const strength = includeZero ? "ci-region-strong" : "ci-region";
-  ciRect.classList.add(strength, `ci-${opts.direction}`);
-  if (opts.ciReliable === false) {
-    ciRect.classList.add("ci-unreliable");
-    ciRect.setAttribute("filter", `url(#${ensureSketchFilter(svg)})`);
-  }
-  svg.appendChild(ciRect);
+  drawCIRegion(svg, ci, scales, layout, opts, fill);
 
   if (opts.smooth) drawSmoothedDist(svg, histogram, scales, stroke);
   else drawHistogramBars(svg, histogram, scales, layout, stroke);
@@ -230,6 +222,30 @@ function drawMarginZone(
   const zone = rect(x1, bandY, x2 - x1, bandH, { fill, strokeWidth: "1.5" });
   zone.classList.add("margin-zone");
   svg.appendChild(zone);
+}
+
+/** Draw the shaded CI band; an unreliable CI gets a sketchy (dashed) filter. */
+function drawCIRegion(
+  svg: SVGSVGElement,
+  ci: [number, number],
+  scales: Scales,
+  layout: Layout,
+  opts: DistributionPlotOptions & {
+    direction: Direction;
+    includeZero: boolean;
+  },
+  fill: string,
+): void {
+  const { margin, plot } = layout;
+  const ciX = scales.x(ci[0]);
+  const ciRect = rect(ciX, margin.top, scales.x(ci[1]) - ciX, plot.h, { fill });
+  const strength = opts.includeZero ? "ci-region-strong" : "ci-region";
+  ciRect.classList.add(strength, `ci-${opts.direction}`);
+  if (opts.ciReliable === false) {
+    ciRect.classList.add("ci-unreliable");
+    ciRect.setAttribute("filter", `url(#${ensureSketchFilter(svg)})`);
+  }
+  svg.appendChild(ciRect);
 }
 
 /** Draw a filled area + stroke path using gaussian-smoothed histogram data */

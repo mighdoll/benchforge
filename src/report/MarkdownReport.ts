@@ -89,9 +89,8 @@ function pointRow(point: ShiftPercentile): string {
   const cur = runs[0]?.bootstrapCI.estimateLabel ?? "";
   const base = runs[1]?.bootstrapCI.estimateLabel ?? "";
   const [lo, hi] = diff.ci.map(signedPercent);
-  const verdict = reliable
-    ? verdictWord(diff.direction)
-    : `${verdictWord(diff.direction)} (unreliable, n=${tailCount})`;
+  const word = verdictWord(diff.direction);
+  const verdict = reliable ? word : `${word} (unreliable, n=${tailCount})`;
   return `| ${label} | ${cur} | ${base} | ${signedPercent(diff.percent)} | [${lo}, ${hi}] | ${verdict} |`;
 }
 

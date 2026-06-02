@@ -2,9 +2,6 @@ import colors from "../report/Colors.ts";
 import { formatSignedPercent } from "../report/Formatters.ts";
 import type { CalibrationResult, RunProgress } from "../runners/Calibration.ts";
 
-/** Format an unsigned percent magnitude, e.g. "1.85%". */
-const pct = (n: number) => `${n.toFixed(2)}%`;
-
 /** Print one progress line per completed self-comparison run (to stderr). */
 export function reportCalibrateRun(p: RunProgress, label?: string): void {
   const where = label ? ` ${label}` : "";
@@ -15,10 +12,6 @@ export function reportCalibrateRun(p: RunProgress, label?: string): void {
     ),
   );
 }
-
-/** Below this many full GCs per batch, the batch mean is dominated by where the
- *  lone collection lands and single-run CIs understate between-run GC variance. */
-const minFullGcsPerBatch = 2;
 
 /** Format the calibration result as a per-run table plus a conclusion block. */
 export function formatCalibration(result: CalibrationResult): string {
@@ -70,3 +63,12 @@ function conclusion(result: CalibrationResult): string {
   }
   return lines.join("\n");
 }
+
+/** Format an unsigned percent magnitude, e.g. "1.85%". */
+function pct(n: number): string {
+  return `${n.toFixed(2)}%`;
+}
+
+/** Below this many full GCs per batch, the batch mean is dominated by where the
+ *  lone collection lands and single-run CIs understate between-run GC variance. */
+const minFullGcsPerBatch = 2;

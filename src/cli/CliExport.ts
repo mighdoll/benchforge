@@ -204,7 +204,10 @@ function exportTimeProfile(results: ReportGroup[], path: string): void {
   const profile = results
     .flatMap(g => groupReports(g))
     .find(r => r.measuredResults.timeProfile)?.measuredResults.timeProfile;
-  if (!profile) return void console.log("No time profiles to export.");
+  if (!profile) {
+    console.log("No time profiles to export.");
+    return;
+  }
   writeFileSync(resolve(path), JSON.stringify(profile));
   console.log(`Time profile exported to: ${path}`);
 }

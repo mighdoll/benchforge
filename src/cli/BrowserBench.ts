@@ -1,8 +1,10 @@
-import {
-  type BrowserProfileResult,
-  type NavTiming,
-  profileBrowser,
+import type {
+  BrowserProfileParams,
+  BrowserProfileResult,
+  NavTiming,
 } from "../profiling/browser/BrowserProfiler.ts";
+import { profileBrowser } from "../profiling/browser/BrowserProfiler.ts";
+import type { ChromeInstance } from "../profiling/browser/ChromeLauncher.ts";
 import { launchChrome } from "../profiling/browser/ChromeLauncher.ts";
 import { isBrowserUserCode } from "../profiling/node/HeapSampleReport.ts";
 import type { ReportGroup, ReportSection } from "../report/BenchmarkReport.ts";
@@ -212,7 +214,7 @@ async function runBatchedTabs(
   params: ReturnType<typeof buildBrowserParams>,
   name: string,
   args: DefaultCliArgs,
-  chrome: any,
+  chrome: ChromeInstance,
 ): Promise<{ lastRaw: BrowserProfileResult; results: ReportGroup[] }> {
   const baselineUrl = args["baseline-url"];
   const { maxTime, maxIterations } = params;
@@ -260,7 +262,7 @@ async function runBatchedTabs(
 /** Create a batch runner closure for a single URL (current or baseline). */
 function makeTabRunner(
   params: ReturnType<typeof buildBrowserParams>,
-  chrome: any,
+  chrome: ChromeInstance,
   limits: { maxTime?: number; maxIterations?: number },
   warmup: boolean,
   state: TabRunnerState,
@@ -295,15 +297,14 @@ function makeTabRunner(
 
 /** Run page loads until duration or iteration limit, collecting wallTimeMs as samples. */
 async function runMultiPageLoad(
-  params: any, // BrowserProfileParams with chrome attached by caller
+  params: BrowserProfileParams, // chrome instance attached by caller
   name: string,
   limits: { maxTime?: number; maxIterations?: number },
 ): Promise<MeasuredResults> {
   const { maxTime, maxIterations } = limits;
   const raws: BrowserProfileResult[] = [];
   let accumulated = 0;
-  for (let i = 0; ; i++) {
-    if (maxIterations != null && i >= maxIterations) break;
+  for (let i = 0; maxIterations == null || i < maxIterations; i++) {
     const raw = await profileBrowser(params);
     raws.push(raw);
     accumulated += raw.wallTimeMs ?? 0;

@@ -1,3 +1,4 @@
+import type { CIDirection, DifferenceCI } from "../stats/StatisticalUtils.ts";
 import type {
   BenchmarkEntry,
   BenchmarkGroup,
@@ -54,18 +55,14 @@ function headline(metric: ViewerRow): string {
 }
 
 /** The verdict line body: colored direction word, Δ%, CI, "vs baseline". */
-function verdict(ci: {
-  percent: number;
-  ci: [number, number];
-  direction: string;
-}): string {
+function verdict(ci: DifferenceCI): string {
   const word = colorVerdict(ci.direction);
   const [lo, hi] = ci.ci.map(signed);
   return `${word} ${signed(ci.percent)} [${lo}, ${hi}] vs baseline`;
 }
 
-function colorVerdict(direction: string): string {
-  const word = verdictWord(direction as never);
+function colorVerdict(direction: CIDirection): string {
+  const word = verdictWord(direction);
   if (word === "better") return green(word);
   if (word === "worse") return red(word);
   return dim(word);

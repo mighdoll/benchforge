@@ -171,6 +171,17 @@ function buildWarnings(
   return parts.length ? parts : undefined;
 }
 
+/** Viewer sections plus the per-section bootstrap caches that produced them. */
+type ViewerView = { sections: ViewerSection[]; caches: SectionCICache[] };
+
+/** Current + baseline results and metadata, before the trim/no-trim choice. */
+interface BaseContext {
+  current: MeasuredResults;
+  baseline?: MeasuredResults;
+  currentMeta?: UnknownRecord;
+  baselineMeta?: UnknownRecord;
+}
+
 /** @return a single benchmark entry with both trimmed and raw section views.
  *  When trimming was a no-op for a side, the raw view reuses the trimmed view's
  *  per-side bootstrap result for that side. When it was a no-op for both sides,
@@ -180,9 +191,8 @@ function prepareReportEntry(
   report: BenchmarkReport,
   ctx: GroupContext,
 ): BenchmarkEntry {
-  const m = report.measuredResults;
   const baseCtx = {
-    current: m,
+    current: report.measuredResults,
     baseline: ctx.baseM,
     currentMeta: report.metadata,
     baselineMeta: ctx.baseMeta,
@@ -193,42 +203,46 @@ function prepareReportEntry(
         comparison: ctx.comparison,
       })
     : undefined;
-
-  const noTrim = ctx.comparison?.noBatchTrim === true;
-  const trimCount = (mr?: MeasuredResults) =>
-    !mr || noTrim
-      ? 0
-      : trimOutlierBatches(mr.samples, mr.batchOffsets).trimCount;
-  const curTrimCount = trimCount(m);
-  const baseTrimCount = trimCount(ctx.baseM);
-  const anyTrimmed = curTrimCount > 0 || baseTrimCount > 0;
-
-  let rawView:
-    | { sections: ViewerSection[]; caches: SectionCICache[] }
-    | undefined;
-  if (ctx.sections && anyTrimmed) {
-    const reuse: SectionCICache[] | undefined = trimmedView?.caches.map(c => ({
-      cur: curTrimCount === 0 ? c.cur : undefined,
-      base: baseTrimCount === 0 ? c.base : undefined,
-      // diff depends on both sides; only safe to reuse when neither was trimmed
-      diff: undefined,
-    }));
-    const rawCtx = {
-      ...baseCtx,
-      comparison: { ...ctx.comparison, noBatchTrim: true },
-    };
-    rawView = buildViewerSections(ctx.sections, rawCtx, reuse);
-  }
+  const rawView = buildRawView(ctx, baseCtx, trimmedView);
 
   return {
     ...prepareBenchmarkData(report),
     sections: trimmedView?.sections,
     rawSections: rawView?.sections,
     comparisonCI: findPrimarySectionCI(trimmedView?.sections),
-    rawComparisonCI: rawView
-      ? findPrimarySectionCI(rawView.sections)
-      : undefined,
+    rawComparisonCI: findPrimarySectionCI(rawView?.sections),
   };
+}
+
+/** @return the untrimmed section view, or undefined when trimming changed
+ *  nothing (the raw view would equal the trimmed one). Reuses the trimmed
+ *  view's bootstrap result for any side trimming left untouched. */
+function buildRawView(
+  ctx: GroupContext,
+  baseCtx: BaseContext,
+  trimmedView: ViewerView | undefined,
+): ViewerView | undefined {
+  if (!ctx.sections) return undefined;
+  const noTrim = ctx.comparison?.noBatchTrim === true;
+  const trimCount = (mr?: MeasuredResults) =>
+    !mr || noTrim
+      ? 0
+      : trimOutlierBatches(mr.samples, mr.batchOffsets).trimCount;
+  const curTrimCount = trimCount(baseCtx.current);
+  const baseTrimCount = trimCount(ctx.baseM);
+  if (curTrimCount === 0 && baseTrimCount === 0) return undefined;
+
+  const reuse = trimmedView?.caches.map(c => ({
+    cur: curTrimCount === 0 ? c.cur : undefined,
+    base: baseTrimCount === 0 ? c.base : undefined,
+    // diff depends on both sides; only safe to reuse when neither was trimmed
+    diff: undefined,
+  }));
+  const rawCtx = {
+    ...baseCtx,
+    comparison: { ...ctx.comparison, noBatchTrim: true },
+  };
+  return buildViewerSections(ctx.sections, rawCtx, reuse);
 }
 
 /** Compute heap allocation summary from profile */

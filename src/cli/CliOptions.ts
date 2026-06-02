@@ -1,6 +1,7 @@
 import type { RunMatrixOptions } from "../matrix/BenchMatrix.ts";
 import type { HeapReportOptions } from "../profiling/node/HeapSampleReport.ts";
 import type { ComparisonOptions } from "../report/BenchmarkReport.ts";
+import type { AdaptiveOptions } from "../runners/AdaptiveWrapper.ts";
 import type { RunnerOptions } from "../runners/BenchRunner.ts";
 import {
   type DefaultCliArgs,
@@ -135,12 +136,12 @@ function cliCommonOptions(args: DefaultCliArgs) {
 }
 
 /** Build runner options for adaptive sampling mode. */
-function createAdaptiveOptions(args: DefaultCliArgs): RunnerOptions {
+function createAdaptiveOptions(args: DefaultCliArgs): AdaptiveOptions {
   return {
     minTime: (args["min-time"] ?? 1) * 1000,
     maxTime: defaultAdaptiveMaxTime * 1000,
     targetConfidence: args.convergence,
     adaptive: true,
     ...cliCommonOptions(args),
-  } as any;
+  };
 }

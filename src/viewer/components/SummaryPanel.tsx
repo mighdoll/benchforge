@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "preact/hooks";
 import { useLazyPlot } from "./LazyPlot.ts";
 import type { GitVersion } from "../../report/GitUtils.ts";
-import type { DifferenceCI } from "../../stats/StatisticalUtils.ts";
+import type { CIDirection, DifferenceCI } from "../../stats/StatisticalUtils.ts";
 import { formatRelativeTime } from "../DateFormat.ts";
 import { formatCount, formatDecimalBytes } from "../LineData.ts";
 import type {
@@ -28,7 +28,7 @@ declare const __BENCHFORGE_BUILD_DATE__: string;
 /** Proportional horizontal offset range for aligning bootstrap CI plots. */
 const maxCIShift = 80;
 
-const directionLabels: Record<string, string> = {
+const directionLabels: Record<CIDirection, string> = {
   faster: "Faster", slower: "Slower", uncertain: "Inconclusive", equivalent: "Equivalent",
 };
 

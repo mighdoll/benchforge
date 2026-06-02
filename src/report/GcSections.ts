@@ -3,6 +3,7 @@ import type { MeasuredResults } from "../runners/MeasuredResults.ts";
 import { average, median, percentile } from "../stats/StatisticalUtils.ts";
 import {
   type ReportSection,
+  type ScalarRow,
   type ScalarSection,
   scalarSection,
 } from "./BenchmarkReport.ts";
@@ -88,15 +89,15 @@ export const gcStatsSection: ScalarSection = scalarSection({
 export const browserGcStatsSection: ScalarSection = scalarSection({
   title: "gc",
   rows: [
-    gcStatsSection.rows.find(r => r.key === "collected")!,
-    gcStatsSection.rows.find(r => r.key === "scavenges")!,
-    gcStatsSection.rows.find(r => r.key === "fullGCs")!,
+    gcRow("collected"),
+    gcRow("scavenges"),
+    gcRow("fullGCs"),
     {
       key: "pausePerIter",
       title: "pause",
       formatter: timeMs,
       comparable: true,
-      value: gcStatsSection.rows.find(r => r.key === "pausePerIter")!.value,
+      value: gcRow("pausePerIter").value,
     },
   ],
 });
@@ -111,6 +112,13 @@ export const pageLoadStatsSections: ReportSection[] = [
 /** @return GC stats sections if enabled by CLI flags */
 export function gcSections(args: { "gc-stats"?: boolean }): ReportSection[] {
   return args["gc-stats"] ? [gcStatsSection] : [];
+}
+
+/** @return the gcStatsSection row with the given key (must exist). */
+function gcRow(key: string): ScalarRow {
+  const row = gcStatsSection.rows.find(r => r.key === key);
+  if (!row) throw new Error(`gc row not found: ${key}`);
+  return row;
 }
 
 /** Build a page-load section with mean/p50/p99 rows from NavTiming data */

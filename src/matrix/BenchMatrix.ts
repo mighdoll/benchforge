@@ -183,10 +183,9 @@ export function applyBaselineVariant(
     if (variant.id === baselineVariantId) continue;
     for (const cr of variant.cases) {
       const base = baselineByCase.get(cr.caseId);
-      if (base) {
-        cr.baseline = base;
-        cr.deltaPercent = computeDeltaPercent(base, cr.measured);
-      }
+      if (!base) continue;
+      cr.baseline = base;
+      cr.deltaPercent = computeDeltaPercent(base, cr.measured);
     }
   }
 }
