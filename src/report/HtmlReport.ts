@@ -182,11 +182,8 @@ interface BaseContext {
   baselineMeta?: UnknownRecord;
 }
 
-/** @return a single benchmark entry with both trimmed and raw section views.
- *  When trimming was a no-op for a side, the raw view reuses the trimmed view's
- *  per-side bootstrap result for that side. When it was a no-op for both sides,
- *  the raw view is identical to the trimmed view and is omitted from the
- *  entry, hiding the toggle in the UI. */
+/** @return a single benchmark entry with its trimmed sections and, when trimming
+ *  changed something, the raw (untrimmed) sections for the UI toggle. */
 function prepareReportEntry(
   report: BenchmarkReport,
   ctx: GroupContext,

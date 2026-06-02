@@ -113,7 +113,8 @@ export function createDistributionPlot(
   return svg;
 }
 
-/** Convenience wrapper for DifferenceCI data */
+/** Plot a DifferenceCI: forwards its histogram, label, direction, and CI level
+ *  to createDistributionPlot (caller opts override). */
 export function createCIPlot(
   ci: DifferenceCI,
   options: Partial<DistributionPlotOptions> = {},

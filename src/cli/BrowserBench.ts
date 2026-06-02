@@ -289,7 +289,7 @@ function makeTabRunner(
     }
     const raw = await profileBrowser(p);
     state.lastRaw = raw;
-    // Probe: if no iteration samples and navTiming present, it's page-load mode
+    // No iteration samples but navTiming present means the page had no __bench: page-load mode
     if (!raw.samples?.length && raw.navTiming) state.detectedPageLoad = true;
     return toBrowserMeasured(label, raw);
   };

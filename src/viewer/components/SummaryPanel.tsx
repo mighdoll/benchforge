@@ -69,6 +69,7 @@ export function SummaryPanel() {
   );
 }
 
+/** Report header: the reconstructed CLI command, run date, and git versions. */
 function ReportHeader({ data }: { data: ReportData }) {
   const { metadata } = data;
   const { cliArgs, cliDefaults, currentVersion, baselineVersion } = metadata;
@@ -189,6 +190,7 @@ function activeView(entry: BenchmarkEntry): {
   return { sections: entry.sections, comparisonCI: entry.comparisonCI };
 }
 
+/** Comparison verdict: a colored chip (group header) or plain delta text (compact). */
 function ComparisonBadge({ ci, compact }: { ci: DifferenceCI; compact?: boolean }) {
   // Colored chip is reserved for the main verdict; per-row (compact) comparisons
   // render as plain bold text regardless of direction.
@@ -203,6 +205,7 @@ function ComparisonBadge({ ci, compact }: { ci: DifferenceCI; compact?: boolean 
   );
 }
 
+/** A group's panels (sections, heap, coverage), aligning run columns after layout. */
 function GroupContent({ current }: { current: BenchmarkEntry }) {
   const ref = useRef<HTMLDivElement>(null);
   const sections = activeView(current).sections;
@@ -244,6 +247,7 @@ function alignRunColumns(panel: HTMLElement): void {
   if (maxValue) panel.style.setProperty("--run-value-width", `${maxValue}px`);
 }
 
+/** One section panel, dispatching to the shift, matrix, or plain stat-row layout. */
 function SectionPanel({ section }: { section: ViewerSection }) {
   if (!section.rows.length) return null;
   const range = useMemo(() => sectionEstimateRange(section), [section]);
@@ -491,6 +495,8 @@ function sectionEstimateRange(section: ViewerSection): [number, number] | undefi
   return max > min ? [min, max] : undefined;
 }
 
+/** One metric row: header plus per-run distribution charts. `shared` rows render
+ *  label/value inline; `chartOnly` drops the per-run charts (shift sections). */
 function StatRow(
   { row, estimateRange, chartOnly = false }:
   { row: ViewerRow; estimateRange?: [number, number]; chartOnly?: boolean },
@@ -527,6 +533,8 @@ function SharedStat({ label, value }: { label: string; value: string }) {
   );
 }
 
+/** One run's row: its name and either a distribution plot (shifted to position
+ *  the estimate within estimateRange) or a plain value. */
 function RunEntry(
   { entry, estimateRange }:
   { entry: ViewerEntry; estimateRange?: [number, number] },

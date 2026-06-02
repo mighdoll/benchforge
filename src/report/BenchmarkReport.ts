@@ -38,8 +38,7 @@ export type ReportSection = MetricSection | ScalarSection;
 export interface MetricSection {
   kind: "metric";
   title: string;
-  /** Stat the framework computes from samples; defaults to "mean". The named
-   *  verdict stat that the CLI/HTML headline and the shift fan are built on. */
+  /** Stat computed from samples to drive verdict/headline/fan; defaults to "mean". */
   statKind?: StatKind;
   /** Set true for throughput metrics where higher values are better (lines/sec). */
   higherIsBetter?: boolean;

@@ -18,8 +18,7 @@ export function consoleSummary(data: ReportData): string {
   return data.groups.flatMap(groupLines).join("\n");
 }
 
-/** Lines for one group: a header when it carries more than its single benchmark,
- *  then each benchmark's headline (+ verdict). */
+/** Each benchmark's headline (+ verdict) for one group; no group header. */
 function groupLines(group: BenchmarkGroup): string[] {
   return group.benchmarks.flatMap(b => benchmarkLines(b, group.name));
 }

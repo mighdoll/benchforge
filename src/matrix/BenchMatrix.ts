@@ -6,10 +6,10 @@ import { loadCasesModule } from "./CaseLoader.ts";
 import { runMatrixWithDir } from "./MatrixDirRunner.ts";
 import { runMatrixInline } from "./MatrixInlineRunner.ts";
 
-/** Stateless variant - called each iteration with case data */
+/** Stateless variant: called each iteration with case data. */
 export type VariantFn<T = unknown> = (caseData: T) => void;
 
-/** Stateful variant - setup once, run many */
+/** Stateful variant: setup once, run many. */
 export interface StatefulVariant<T = unknown, S = unknown> {
   setup: (caseData: T) => S | Promise<S>;
   run: (state: S) => void;
@@ -167,7 +167,7 @@ export function isStatefulVariant<T, S>(
   return typeof v === "object" && "setup" in v && "run" in v;
 }
 
-/** Apply baselineVariant comparison - one variant is the reference for all others */
+/** Apply baselineVariant comparison: one variant is the reference for all others. */
 export function applyBaselineVariant(
   variants: VariantResult[],
   baselineVariantId: string,

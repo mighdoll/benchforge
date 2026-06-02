@@ -9,16 +9,7 @@ import {
   defaultDuration,
 } from "./CliArgs.ts";
 
-/**
- * Resolve duration/iterations flags into runner limits.
- *
- * | Flags set         | maxTime            | maxIterations |
- * |-------------------|--------------------|---------------|
- * | neither           | defaultDuration*1000 | undefined   |
- * | --iterations only | undefined          | N             |
- * | --duration only   | duration*1000      | undefined     |
- * | both              | duration*1000      | N             |
- */
+/** Runner limits resolved from the duration/iterations flags. */
 type Limits = {
   maxTime: number | undefined;
   maxIterations: number | undefined;
@@ -94,6 +85,16 @@ export function cliComparisonOptions(args: DefaultCliArgs): ComparisonOptions {
   };
 }
 
+/**
+ * Resolve duration/iterations flags into runner limits.
+ *
+ * | Flags set         | maxTime              | maxIterations |
+ * |-------------------|----------------------|---------------|
+ * | neither           | defaultDuration*1000 | undefined     |
+ * | --iterations only | undefined            | N             |
+ * | --duration only   | duration*1000        | undefined     |
+ * | both              | duration*1000        | N             |
+ */
 export function resolveLimits(args: {
   duration?: number;
   iterations?: number;
