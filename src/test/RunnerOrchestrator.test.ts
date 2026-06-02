@@ -81,6 +81,34 @@ test("TimingRunner with parameterized benchmark", async () => {
   expect(results[0].name).toBe("parameterized-test");
 });
 
+test("gcForce calls gc() once per measured iteration", async () => {
+  // gcFunction() resolves globalThis.gc ?? __gc; install a counting stub there.
+  const g = globalThis as { gc?: () => void };
+  const saved = g.gc;
+  let gcCalls = 0;
+  g.gc = () => {
+    gcCalls++;
+  };
+  const run = (gcForce: boolean) =>
+    runBenchmark({
+      spec: { name: "gc-force-test", fn: simpleTestFunction },
+      options: { maxIterations: 20, gcForce },
+      useWorker: false,
+    });
+  try {
+    const off = (await run(false))[0].samples.length;
+    const baseline = gcCalls; // warmup-settle gc only, no per-sample gc
+    gcCalls = 0;
+    const on = (await run(true))[0].samples.length;
+    // gcForce adds exactly one gc() per measured sample on top of warmup
+    expect(gcCalls).toBe(on + baseline);
+    expect(off).toBe(20);
+    expect(on).toBe(20);
+  } finally {
+    g.gc = saved;
+  }
+});
+
 test("RunnerOrchestrator propagates errors from worker", async () => {
   const spec: BenchmarkSpec = {
     name: "error-test",

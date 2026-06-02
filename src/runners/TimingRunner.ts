@@ -22,6 +22,7 @@ type CollectParams<T = unknown> = {
   params?: T;
   skipWarmup?: boolean;
   traceOpt?: boolean;
+  gcForce?: boolean;
   pauseWarmup?: number;
   pauseFirst?: number;
   pauseInterval?: number;
@@ -174,6 +175,7 @@ async function runSampleLoop<T>(
   const { pauseInterval = 0, pauseDuration = 100 } = config;
   const getOptStatus = config.traceOpt ? createOptStatusGetter() : undefined;
   const trackOpt = !!getOptStatus;
+  const forceGc = config.gcForce ? gcFunction() : () => {};
   const estimated = maxIterations || Math.ceil(maxTime / 0.1);
   const arrays = createSampleArrays(estimated, trackOpt);
 
@@ -195,6 +197,7 @@ async function runSampleLoop<T>(
     if (getOptStatus)
       arrays.optStatuses[count] = getOptStatus(config.benchmark.fn);
     count++;
+    forceGc();
 
     if (shouldPause(count, pauseFirst, pauseInterval)) {
       const sampleIndex = count - 1;
