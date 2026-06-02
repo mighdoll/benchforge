@@ -115,6 +115,30 @@ async function runDirVariants<T>(
   return variants;
 }
 
+/** Build the args to run one variant/case, directly or in a worker. */
+function buildVariantArgs<T>(
+  matrix: BenchMatrix<T>,
+  variantId: string,
+  caseId: string,
+  ctx: DirMatrixContext<T>,
+): VariantArgs {
+  return {
+    variantDir: matrix.variantDir!,
+    variantId,
+    caseId,
+    caseData: matrix.cases && !matrix.casesModule ? caseId : undefined,
+    casesModule: matrix.casesModule,
+    runner: "timing" as const,
+    options: ctx.runnerOpts,
+    useWorker: ctx.useWorker,
+  };
+}
+
+/** Run one variant/case, returning its single MeasuredResults. */
+async function runVariantOnce(args: VariantArgs): Promise<MeasuredResults> {
+  return (await runMatrixVariant(args))[0];
+}
+
 /** Run all cases for a single variant */
 async function runDirVariantCases<T>(
   variantId: string,
@@ -170,28 +194,4 @@ async function runCaseSingle(
     ? await runVariantOnce(baselineArgs)
     : undefined;
   return { measured, baseline };
-}
-
-/** Build the args to run one variant/case, directly or in a worker. */
-function buildVariantArgs<T>(
-  matrix: BenchMatrix<T>,
-  variantId: string,
-  caseId: string,
-  ctx: DirMatrixContext<T>,
-): VariantArgs {
-  return {
-    variantDir: matrix.variantDir!,
-    variantId,
-    caseId,
-    caseData: matrix.cases && !matrix.casesModule ? caseId : undefined,
-    casesModule: matrix.casesModule,
-    runner: "timing" as const,
-    options: ctx.runnerOpts,
-    useWorker: ctx.useWorker,
-  };
-}
-
-/** Run one variant/case, returning its single MeasuredResults. */
-async function runVariantOnce(args: VariantArgs): Promise<MeasuredResults> {
-  return (await runMatrixVariant(args))[0];
 }

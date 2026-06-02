@@ -35,13 +35,6 @@ import {
 } from "./BenchmarkReport.ts";
 import { buildShiftFunction, statLabel } from "./ShiftFunction.ts";
 
-/** The bits of a metric a bootstrap-CI display needs: how to transform the
- *  value and how to format it. */
-interface DisplaySpec {
-  toDisplay?: (timingValue: number, metadata?: UnknownRecord) => number;
-  formatter: Formatter;
-}
-
 /** Per-section reusable bootstrap results, indexed by stat-column order.
  *  Supplying cur/base/diff causes buildCIMap to skip the matching bootstrap
  *  call and reuse the provided result. Used to share computation between
@@ -50,6 +43,13 @@ export interface SectionCICache {
   cur?: (BootstrapResult | undefined)[];
   base?: (BootstrapResult | undefined)[];
   diff?: (DifferenceCI | undefined)[];
+}
+
+/** The bits of a metric a bootstrap-CI display needs: how to transform the
+ *  value and how to format it. */
+interface DisplaySpec {
+  toDisplay?: (timingValue: number, metadata?: UnknownRecord) => number;
+  formatter: Formatter;
 }
 
 /** Context for building viewer rows within a section */

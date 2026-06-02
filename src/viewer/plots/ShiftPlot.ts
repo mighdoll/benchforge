@@ -65,35 +65,6 @@ export function createShiftPlot(
   return svg;
 }
 
-/** Slot centers across the plot. A leading mean point gets its own slot, set off
- *  from the percentiles by an extra half-slot gap with a divider line between. */
-function slotCenters(
-  points: ShiftPercentile[],
-  plotWidth: number,
-): { cx: number[]; slotWidth: number; dividerX: number | null } {
-  const hasMean = points[0]?.isMean ?? false;
-  // the gap before p1 costs one extra half-slot of width
-  const slots = points.length + (hasMean ? 0.5 : 0);
-  const slotWidth = plotWidth / slots;
-  const gap = hasMean ? slotWidth * 0.5 : 0;
-  const cx = points.map((_, i) => {
-    const lead = i === 0 || !hasMean ? 0 : gap;
-    return margin.left + lead + slotWidth * (i + 0.5);
-  });
-  const dividerX = hasMean ? margin.left + slotWidth + gap * 0.5 : null;
-  return { cx, slotWidth, dividerX };
-}
-
-/** Faint vertical divider separating the mean slot from the percentile slots. */
-function drawDivider(svg: SVGSVGElement, x: number, plotHeight: number): void {
-  svg.appendChild(
-    line(x, margin.top, x, margin.top + plotHeight, {
-      stroke: "#e0e0e0",
-      strokeWidth: "1",
-    }),
-  );
-}
-
 /** y-scale mapping diff-percent to pixels, spanning all violins + CI bounds,
  *  the margin band, and zero. */
 function buildYScale(
@@ -121,6 +92,25 @@ function buildYScale(
   max += pad;
   const range = max - min || 1;
   return (v: number) => margin.top + plotH - ((v - min) / range) * plotH;
+}
+
+/** Slot centers across the plot. A leading mean point gets its own slot, set off
+ *  from the percentiles by an extra half-slot gap with a divider line between. */
+function slotCenters(
+  points: ShiftPercentile[],
+  plotWidth: number,
+): { cx: number[]; slotWidth: number; dividerX: number | null } {
+  const hasMean = points[0]?.isMean ?? false;
+  // the gap before p1 costs one extra half-slot of width
+  const slots = points.length + (hasMean ? 0.5 : 0);
+  const slotWidth = plotWidth / slots;
+  const gap = hasMean ? slotWidth * 0.5 : 0;
+  const cx = points.map((_, i) => {
+    const lead = i === 0 || !hasMean ? 0 : gap;
+    return margin.left + lead + slotWidth * (i + 0.5);
+  });
+  const dividerX = hasMean ? margin.left + slotWidth + gap * 0.5 : null;
+  return { cx, slotWidth, dividerX };
 }
 
 /** @return the largest histogram bin count across all percentiles, for a
@@ -193,6 +183,16 @@ function drawYAxis(
       text(margin.left - 7, y + 3.5, formatPct(tick, decimals), "end", "10"),
     );
   }
+}
+
+/** Faint vertical divider separating the mean slot from the percentile slots. */
+function drawDivider(svg: SVGSVGElement, x: number, plotHeight: number): void {
+  svg.appendChild(
+    line(x, margin.top, x, margin.top + plotHeight, {
+      stroke: "#e0e0e0",
+      strokeWidth: "1",
+    }),
+  );
 }
 
 /** A vertical violin: the smoothed diff distribution mirrored around cx. */
@@ -293,12 +293,6 @@ function drawPercentileLabel(
     );
 }
 
-/** Label color: dark for the primary mean, mid-grey when reliable, weak otherwise. */
-function labelColor(point: ShiftPercentile): string {
-  if (point.isMean) return "#111827";
-  return point.reliable ? "#374151" : weakColor;
-}
-
 /** @return [min, max] of the diff-percent axis. */
 function axisSpan(
   points: ShiftPercentile[],
@@ -325,4 +319,10 @@ function niceStep(raw: number): number {
   if (mantissa < 3) return 2 * mag;
   if (mantissa < 7) return 5 * mag;
   return 10 * mag;
+}
+
+/** Label color: dark for the primary mean, mid-grey when reliable, weak otherwise. */
+function labelColor(point: ShiftPercentile): string {
+  if (point.isMean) return "#111827";
+  return point.reliable ? "#374151" : weakColor;
 }

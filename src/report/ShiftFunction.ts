@@ -110,6 +110,19 @@ export function buildShiftFunction(
   };
 }
 
+/** @return a short percentile label, e.g. "p50", "p99", "p0.1". */
+export function percentileLabel(p: number): string {
+  const pct = p * 100;
+  const rounded = Math.round(pct * 10) / 10;
+  return `p${Number.isInteger(rounded) ? rounded : rounded.toFixed(1)}`;
+}
+
+/** @return a short stat label for headlines, e.g. "mean", "p50", "min". */
+export function statLabel(kind: StatKind): string {
+  if (typeof kind === "string") return kind;
+  return percentileLabel(kind.percentile);
+}
+
 /** Compute the diff CIs and per-run absolute distributions for mean + every
  *  sampled percentile. "mean" leads the stat list so its results sit at index 0;
  *  percentiles follow in shiftPercentiles order. */
@@ -223,18 +236,6 @@ function buildPointBase(
   return { diff: annotated, runs };
 }
 
-/** @return distinct batches the bootstrap kept (Tukey-trimmed unless noTrim),
- *  or 1 when there is no batch structure. */
-function effectiveBatches(
-  m: MeasuredResults,
-  noTrim: boolean | undefined,
-): number {
-  const { samples, batchOffsets } = m;
-  if (!batchOffsets || batchOffsets.length < 2) return 1;
-  return prepareBlocks(samples, batchOffsets, average, noTrim).keptSplits
-    .length;
-}
-
 /** @return how many samples lie on the sparse side of the p-th percentile and
  *  how many distinct batches contribute them. The sparse side is whichever end
  *  is closer (lower tail for p<=0.5, upper tail for p>0.5); that count is what
@@ -265,15 +266,14 @@ function tailCoverage(
   return { count, batches };
 }
 
-/** @return a short percentile label, e.g. "p50", "p99", "p0.1". */
-export function percentileLabel(p: number): string {
-  const pct = p * 100;
-  const rounded = Math.round(pct * 10) / 10;
-  return `p${Number.isInteger(rounded) ? rounded : rounded.toFixed(1)}`;
-}
-
-/** @return a short stat label for headlines, e.g. "mean", "p50", "min". */
-export function statLabel(kind: StatKind): string {
-  if (typeof kind === "string") return kind;
-  return percentileLabel(kind.percentile);
+/** @return distinct batches the bootstrap kept (Tukey-trimmed unless noTrim),
+ *  or 1 when there is no batch structure. */
+function effectiveBatches(
+  m: MeasuredResults,
+  noTrim: boolean | undefined,
+): number {
+  const { samples, batchOffsets } = m;
+  if (!batchOffsets || batchOffsets.length < 2) return 1;
+  return prepareBlocks(samples, batchOffsets, average, noTrim).keptSplits
+    .length;
 }

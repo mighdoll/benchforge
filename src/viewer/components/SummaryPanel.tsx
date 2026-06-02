@@ -271,176 +271,6 @@ function SectionPanel({ section }: { section: ViewerSection }) {
   );
 }
 
-/** Dense table for scalar metrics: rows = metrics, columns = a value per run
- *  then the delta badge. Run names appear once as headers. Uses its own cell
- *  classes so it stays out of the global alignRunColumns width calc. */
-function MatrixSection(
-  { section, titleEl }:
-  { section: ViewerSection; titleEl: preact.JSX.Element },
-) {
-  const runs = section.rows[0].entries;
-  const style = { "--runs": String(runs.length) } as Record<string, string>;
-  return (
-    <div class="section-panel matrix-section">
-      <div class="panel-header">{titleEl}</div>
-      <div class="panel-body">
-        <div class="matrix" style={style}>
-          <span class="m-label" />
-          {runs.map((run, i) => <span key={i} class="m-head">{run.runName}</span>)}
-          <span class="m-head" />
-          <span />
-          {section.rows.map((row, i) => <MatrixRow key={i} row={row} />)}
-        </div>
-      </div>
-    </div>
-  );
-}
-
-/** One metric line in the matrix: label, a value per run, then the delta badge. */
-function MatrixRow({ row }: { row: ViewerRow }) {
-  return (
-    <>
-      <span class="m-label">{row.label}</span>
-      {row.entries.map((entry, i) => <span key={i} class="m-val">{entry.value}</span>)}
-      {row.comparisonCI
-        ? <ComparisonBadge ci={row.comparisonCI} compact />
-        : <span class="m-val" />}
-      <span />
-    </>
-  );
-}
-
-/** A section with a shift function: the primary row's diff chart, then the
- *  per-percentile violins, then any shared rows (e.g. the line count). The
- *  primary row's per-run absolute values are dropped here -- they live in the
- *  violins' click-to-detail popup -- and non-primary comparable rows (p50, p95)
- *  are represented by the violins, so they are omitted from the top stack. */
-function ShiftSection(
-  { section, shift, titleEl }:
-  { section: ViewerSection; shift: ShiftFunction; titleEl: preact.JSX.Element },
-) {
-  const primary = section.rows.find(r => r.primary);
-  const shared = section.rows.filter(r => r.shared);
-  return (
-    <div class="section-panel">
-      <div class="panel-header">{titleEl}</div>
-      <div class="panel-body">
-        {primary && <StatRow row={primary} chartOnly />}
-      </div>
-      <ShiftPanel shift={shift} />
-      {shared.length > 0 && (
-        <div class="panel-body shift-shared">
-          {shared.map((row, i) => <StatRow key={i} row={row} />)}
-        </div>
-      )}
-    </div>
-  );
-}
-
-/** Always-visible per-percentile shift function below the section's stat rows,
- *  with a click-to-detail popup for any percentile. */
-function ShiftPanel({ shift }: { shift: ShiftFunction }) {
-  const [selected, setSelected] = useState<ShiftPercentile | null>(null);
-  const ref = useLazyPlot(async () => {
-    const { createShiftPlot } = await import("../plots/ShiftPlot.ts");
-    return createShiftPlot(shift, { onSelect: p => setSelected(p) });
-  }, [shift], "Shift plot");
-  return (
-    <div class="shift-panel">
-      <div class="shift-caption" title="click a percentile for current vs baseline detail">
-        change by percentile
-      </div>
-      <div class="shift-plot" ref={ref} title="click a percentile for current vs baseline detail" />
-      {selected && (
-        <ShiftPopup
-          point={selected}
-          metric={shift.metric}
-          equivMargin={shift.equivMargin}
-          onClose={() => setSelected(null)}
-        />
-      )}
-    </div>
-  );
-}
-
-/** Modal detailing one percentile: the diff CI chart, then each run's absolute
- *  distribution. */
-function ShiftPopup({ point, metric, equivMargin, onClose }: {
-  point: ShiftPercentile;
-  metric: string;
-  equivMargin?: number;
-  onClose: () => void;
-}) {
-  const { diff } = point;
-  // Shared x-domain so the per-run absolute charts use one scale: equal pixel
-  // positions mean equal values, making medians and CIs comparable across runs.
-  const domain = runsDomain(point.runs);
-  const unreliableNote = point.reliable
-    ? null
-    : <span class="shift-unreliable"> (unreliable, n={point.tailCount})</span>;
-  return (
-    <div class="shift-overlay" onClick={e => e.target === e.currentTarget && onClose()}>
-      <div class="shift-popup">
-        <span class="shift-close" onClick={onClose}>{"×"}</span>
-        <div class="shift-popup-head">
-          <h3>{metric} &middot; {point.label}{unreliableNote}</h3>
-        </div>
-        <ShiftPopupDiff ci={diff} equivMargin={equivMargin} />
-        {point.runs.map((run, i) => (
-          <ShiftPopupAbsolute key={i} runName={run.runName} ci={run.bootstrapCI} domain={domain} />
-        ))}
-      </div>
-    </div>
-  );
-}
-
-/** Min/max x across every run's histogram bins and CI bounds, for a shared scale. */
-function runsDomain(runs: ShiftRun[]): [number, number] | undefined {
-  const xs = runs.flatMap(r => [...r.bootstrapCI.histogram.map(b => b.x), ...r.bootstrapCI.ci]);
-  if (xs.length < 2) return undefined;
-  const min = Math.min(...xs), max = Math.max(...xs);
-  return max > min ? [min, max] : undefined;
-}
-
-/** The diff CI chart in the popup (reuses createCIPlot). The Δ% point estimate
- *  is drawn as a bold label above the median line, not in the popup title. */
-function ShiftPopupDiff({ ci, equivMargin }: { ci: DifferenceCI; equivMargin?: number }) {
-  const ref = useLazyPlot(async () => {
-    const { createCIPlot } = await import("../plots/CIPlot.ts");
-    const opts = { width: 320, height: 90, title: "", pointLabel: formatPct(ci.percent), equivMargin };
-    return createCIPlot(ci, opts);
-  }, [ci], "Shift diff plot");
-  return (
-    <div class="shift-chart">
-      <div class="shift-chart-label">difference</div>
-      <div ref={ref} />
-    </div>
-  );
-}
-
-/** One run's absolute distribution in the popup (reuses createDistributionPlot).
- *  `domain` shares the x-scale across runs so positions are comparable. */
-function ShiftPopupAbsolute(
-  { runName, ci, domain }:
-  { runName: string; ci: BootstrapCIData; domain?: [number, number] },
-) {
-  const ref = useLazyPlot(async () => {
-    const { createDistributionPlot } = await import("../plots/CIPlot.ts");
-    const opts = {
-      width: 320, height: 90, title: "", direction: "uncertain" as const,
-      ciLabels: ci.ciLabels, includeZero: false, smooth: true, pointLabel: ci.estimateLabel,
-      ciLevel: ci.ciLevel, ciReliable: ci.ciReliable, domain,
-    };
-    return createDistributionPlot(ci.histogram, ci.ci, ci.estimate, opts);
-  }, [ci, domain], "Shift absolute plot");
-  return (
-    <div class="shift-chart">
-      <div class="shift-chart-label">{runName}</div>
-      <div ref={ref} />
-    </div>
-  );
-}
-
 function HeapPanel({ entry }: { entry: BenchmarkEntry }) {
   const { heapSummary: heap, allocationSamples: allocSamples } = entry;
   if (!heap && !allocSamples?.length) return null;
@@ -495,6 +325,58 @@ function sectionEstimateRange(section: ViewerSection): [number, number] | undefi
   return max > min ? [min, max] : undefined;
 }
 
+/** A section with a shift function: the primary row's diff chart, then the
+ *  per-percentile violins, then any shared rows (e.g. the line count). The
+ *  primary row's per-run absolute values are dropped here -- they live in the
+ *  violins' click-to-detail popup -- and non-primary comparable rows (p50, p95)
+ *  are represented by the violins, so they are omitted from the top stack. */
+function ShiftSection(
+  { section, shift, titleEl }:
+  { section: ViewerSection; shift: ShiftFunction; titleEl: preact.JSX.Element },
+) {
+  const primary = section.rows.find(r => r.primary);
+  const shared = section.rows.filter(r => r.shared);
+  return (
+    <div class="section-panel">
+      <div class="panel-header">{titleEl}</div>
+      <div class="panel-body">
+        {primary && <StatRow row={primary} chartOnly />}
+      </div>
+      <ShiftPanel shift={shift} />
+      {shared.length > 0 && (
+        <div class="panel-body shift-shared">
+          {shared.map((row, i) => <StatRow key={i} row={row} />)}
+        </div>
+      )}
+    </div>
+  );
+}
+
+/** Dense table for scalar metrics: rows = metrics, columns = a value per run
+ *  then the delta badge. Run names appear once as headers. Uses its own cell
+ *  classes so it stays out of the global alignRunColumns width calc. */
+function MatrixSection(
+  { section, titleEl }:
+  { section: ViewerSection; titleEl: preact.JSX.Element },
+) {
+  const runs = section.rows[0].entries;
+  const style = { "--runs": String(runs.length) } as Record<string, string>;
+  return (
+    <div class="section-panel matrix-section">
+      <div class="panel-header">{titleEl}</div>
+      <div class="panel-body">
+        <div class="matrix" style={style}>
+          <span class="m-label" />
+          {runs.map((run, i) => <span key={i} class="m-head">{run.runName}</span>)}
+          <span class="m-head" />
+          <span />
+          {section.rows.map((row, i) => <MatrixRow key={i} row={row} />)}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 /** One metric row: header plus per-run distribution charts. `shared` rows render
  *  label/value inline; `chartOnly` drops the per-run charts (shift sections). */
 function StatRow(
@@ -533,6 +415,46 @@ function SharedStat({ label, value }: { label: string; value: string }) {
   );
 }
 
+/** Always-visible per-percentile shift function below the section's stat rows,
+ *  with a click-to-detail popup for any percentile. */
+function ShiftPanel({ shift }: { shift: ShiftFunction }) {
+  const [selected, setSelected] = useState<ShiftPercentile | null>(null);
+  const ref = useLazyPlot(async () => {
+    const { createShiftPlot } = await import("../plots/ShiftPlot.ts");
+    return createShiftPlot(shift, { onSelect: p => setSelected(p) });
+  }, [shift], "Shift plot");
+  return (
+    <div class="shift-panel">
+      <div class="shift-caption" title="click a percentile for current vs baseline detail">
+        change by percentile
+      </div>
+      <div class="shift-plot" ref={ref} title="click a percentile for current vs baseline detail" />
+      {selected && (
+        <ShiftPopup
+          point={selected}
+          metric={shift.metric}
+          equivMargin={shift.equivMargin}
+          onClose={() => setSelected(null)}
+        />
+      )}
+    </div>
+  );
+}
+
+/** One metric line in the matrix: label, a value per run, then the delta badge. */
+function MatrixRow({ row }: { row: ViewerRow }) {
+  return (
+    <>
+      <span class="m-label">{row.label}</span>
+      {row.entries.map((entry, i) => <span key={i} class="m-val">{entry.value}</span>)}
+      {row.comparisonCI
+        ? <ComparisonBadge ci={row.comparisonCI} compact />
+        : <span class="m-val" />}
+      <span />
+    </>
+  );
+}
+
 /** One run's row: its name and either a distribution plot (shifted to position
  *  the estimate within estimateRange) or a plain value. */
 function RunEntry(
@@ -552,6 +474,37 @@ function RunEntry(
   );
 }
 
+/** Modal detailing one percentile: the diff CI chart, then each run's absolute
+ *  distribution. */
+function ShiftPopup({ point, metric, equivMargin, onClose }: {
+  point: ShiftPercentile;
+  metric: string;
+  equivMargin?: number;
+  onClose: () => void;
+}) {
+  const { diff } = point;
+  // Shared x-domain so the per-run absolute charts use one scale: equal pixel
+  // positions mean equal values, making medians and CIs comparable across runs.
+  const domain = runsDomain(point.runs);
+  const unreliableNote = point.reliable
+    ? null
+    : <span class="shift-unreliable"> (unreliable, n={point.tailCount})</span>;
+  return (
+    <div class="shift-overlay" onClick={e => e.target === e.currentTarget && onClose()}>
+      <div class="shift-popup">
+        <span class="shift-close" onClick={onClose}>{"×"}</span>
+        <div class="shift-popup-head">
+          <h3>{metric} &middot; {point.label}{unreliableNote}</h3>
+        </div>
+        <ShiftPopupDiff ci={diff} equivMargin={equivMargin} />
+        {point.runs.map((run, i) => (
+          <ShiftPopupAbsolute key={i} runName={run.runName} ci={run.bootstrapCI} domain={domain} />
+        ))}
+      </div>
+    </div>
+  );
+}
+
 /** Lazy-imports CIPlot and renders a bootstrap distribution sparkline inline. */
 function BootstrapCIMount({ ci, label, shift }: {
   ci: BootstrapCIData; label?: string; shift?: number;
@@ -567,4 +520,51 @@ function BootstrapCIMount({ ci, label, shift }: {
   }, [ci, label], "Bootstrap CI plot");
   const style = shift != null ? { marginLeft: `${Math.round(shift)}px` } : undefined;
   return <div class="ci-plot-inline" style={style} ref={ref} />;
+}
+
+/** Min/max x across every run's histogram bins and CI bounds, for a shared scale. */
+function runsDomain(runs: ShiftRun[]): [number, number] | undefined {
+  const xs = runs.flatMap(r => [...r.bootstrapCI.histogram.map(b => b.x), ...r.bootstrapCI.ci]);
+  if (xs.length < 2) return undefined;
+  const min = Math.min(...xs), max = Math.max(...xs);
+  return max > min ? [min, max] : undefined;
+}
+
+/** The diff CI chart in the popup (reuses createCIPlot). The Δ% point estimate
+ *  is drawn as a bold label above the median line, not in the popup title. */
+function ShiftPopupDiff({ ci, equivMargin }: { ci: DifferenceCI; equivMargin?: number }) {
+  const ref = useLazyPlot(async () => {
+    const { createCIPlot } = await import("../plots/CIPlot.ts");
+    const opts = { width: 320, height: 90, title: "", pointLabel: formatPct(ci.percent), equivMargin };
+    return createCIPlot(ci, opts);
+  }, [ci], "Shift diff plot");
+  return (
+    <div class="shift-chart">
+      <div class="shift-chart-label">difference</div>
+      <div ref={ref} />
+    </div>
+  );
+}
+
+/** One run's absolute distribution in the popup (reuses createDistributionPlot).
+ *  `domain` shares the x-scale across runs so positions are comparable. */
+function ShiftPopupAbsolute(
+  { runName, ci, domain }:
+  { runName: string; ci: BootstrapCIData; domain?: [number, number] },
+) {
+  const ref = useLazyPlot(async () => {
+    const { createDistributionPlot } = await import("../plots/CIPlot.ts");
+    const opts = {
+      width: 320, height: 90, title: "", direction: "uncertain" as const,
+      ciLabels: ci.ciLabels, includeZero: false, smooth: true, pointLabel: ci.estimateLabel,
+      ciLevel: ci.ciLevel, ciReliable: ci.ciReliable, domain,
+    };
+    return createDistributionPlot(ci.histogram, ci.ci, ci.estimate, opts);
+  }, [ci, domain], "Shift absolute plot");
+  return (
+    <div class="shift-chart">
+      <div class="shift-chart-label">{runName}</div>
+      <div ref={ref} />
+    </div>
+  );
 }

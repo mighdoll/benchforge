@@ -56,6 +56,17 @@ interface GroupContext {
   lowBatches: boolean;
 }
 
+/** Viewer sections plus the per-section bootstrap caches that produced them. */
+type ViewerView = { sections: ViewerSection[]; caches: SectionCICache[] };
+
+/** Current + baseline results and metadata, before the trim/no-trim choice. */
+interface BaseContext {
+  current: MeasuredResults;
+  baseline?: MeasuredResults;
+  currentMeta?: UnknownRecord;
+  baselineMeta?: UnknownRecord;
+}
+
 /** Convert benchmark results into a ReportData payload for the HTML viewer */
 export function prepareHtmlData(
   groups: ReportGroup[],
@@ -171,17 +182,6 @@ function buildWarnings(
   return parts.length ? parts : undefined;
 }
 
-/** Viewer sections plus the per-section bootstrap caches that produced them. */
-type ViewerView = { sections: ViewerSection[]; caches: SectionCICache[] };
-
-/** Current + baseline results and metadata, before the trim/no-trim choice. */
-interface BaseContext {
-  current: MeasuredResults;
-  baseline?: MeasuredResults;
-  currentMeta?: UnknownRecord;
-  baselineMeta?: UnknownRecord;
-}
-
 /** @return a single benchmark entry with its trimmed sections and, when trimming
  *  changed something, the raw (untrimmed) sections for the UI toggle. */
 function prepareReportEntry(
@@ -209,6 +209,23 @@ function prepareReportEntry(
     comparisonCI: findPrimarySectionCI(trimmedView?.sections),
     rawComparisonCI: findPrimarySectionCI(rawView?.sections),
   };
+}
+
+/** Compute heap allocation summary from profile */
+function summarizeHeap(profile: HeapProfile): HeapSummary {
+  const resolved = resolveProfile(profile);
+  const userSites = filterSites(flattenProfile(resolved));
+  return { totalBytes: resolved.totalBytes, userBytes: totalBytes(userSites) };
+}
+
+/** Compute coverage summary from V8 coverage data */
+function summarizeCoverage(coverage: CoverageData): CoverageSummary {
+  const fns = coverage.scripts.flatMap(s => s.functions);
+  const called = fns.filter(
+    fn => fn.ranges.length > 0 && fn.ranges[0].count > 0,
+  );
+  const totalCalls = called.reduce((sum, fn) => sum + fn.ranges[0].count, 0);
+  return { functionCount: called.length, totalCalls };
 }
 
 /** @return the untrimmed section view, or undefined when trimming changed
@@ -240,23 +257,6 @@ function buildRawView(
     comparison: { ...ctx.comparison, noBatchTrim: true },
   };
   return buildViewerSections(ctx.sections, rawCtx, reuse);
-}
-
-/** Compute heap allocation summary from profile */
-function summarizeHeap(profile: HeapProfile): HeapSummary {
-  const resolved = resolveProfile(profile);
-  const userSites = filterSites(flattenProfile(resolved));
-  return { totalBytes: resolved.totalBytes, userBytes: totalBytes(userSites) };
-}
-
-/** Compute coverage summary from V8 coverage data */
-function summarizeCoverage(coverage: CoverageData): CoverageSummary {
-  const fns = coverage.scripts.flatMap(s => s.functions);
-  const called = fns.filter(
-    fn => fn.ranges.length > 0 && fn.ranges[0].count > 0,
-  );
-  const totalCalls = called.reduce((sum, fn) => sum + fn.ranges[0].count, 0);
-  return { functionCount: called.length, totalCalls };
 }
 
 /** Extract the comparison CI from the first primary row across all sections */

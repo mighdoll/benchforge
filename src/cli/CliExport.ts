@@ -53,6 +53,10 @@ type FrameContainer = {
   shared: { frames: { name: string; file?: string; line?: number }[] };
 };
 
+// The shared output dir users gitignore. benchforge writes no HTML to disk
+// (reports are JSON archives + the in-memory viewer), so markdown sits here flat.
+const reportDir = "bench-report";
+
 /** Export reports (JSON, Perfetto, archive, viewer) based on CLI args. */
 export async function exportReports(options: ExportOptions): Promise<void> {
   const { results, args, sections, currentVersion, baselineVersion } = options;
@@ -109,10 +113,6 @@ export async function finishReports(
   await exportReports({ results, args, ...exportOptions });
 }
 
-// The shared output dir users gitignore. benchforge writes no HTML to disk
-// (reports are JSON archives + the in-memory viewer), so markdown sits here flat.
-const reportDir = "bench-report";
-
 /** Write the always-on markdown report (shift tables + GC/scalar comparison) so
  *  agents and other text consumers get the full distribution the HTML viewer
  *  shows. Default: a timestamped file plus a stable `latest.md` in bench-report/
@@ -134,11 +134,6 @@ function writeMarkdownReport(data: ReportData, args: DefaultCliArgs): void {
   writeFileSync(timestamped, md);
   writeFileSync(latest, md);
   console.log(`Markdown report written to: ${latest} (and ${timestamped})`);
-}
-
-/** ISO timestamp ==> filename-safe stamp (drop ms/zone, ':' is illegal on Windows). */
-function fileStamp(iso: string): string {
-  return iso.replace(/\.\d+Z$/, "").replace(/[:]/g, "-");
 }
 
 /** Write Perfetto and time profile files if requested by CLI args. */
@@ -197,6 +192,11 @@ async function openViewer(
   });
   await waitForCtrlC();
   viewer.close();
+}
+
+/** ISO timestamp ==> filename-safe stamp (drop ms/zone, ':' is illegal on Windows). */
+function fileStamp(iso: string): string {
+  return iso.replace(/\.\d+Z$/, "").replace(/[:]/g, "-");
 }
 
 /** Export the first raw V8 TimeProfile to a JSON file. */

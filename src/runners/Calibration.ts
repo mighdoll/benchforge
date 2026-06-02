@@ -87,13 +87,6 @@ export async function runCalibration(
   };
 }
 
-/** Full (major) GCs in one run's merged results, or undefined without gc stats. */
-function fullGcsForRun(r: MeasuredResults): number | undefined {
-  if (r.batchGcStats)
-    return r.batchGcStats.reduce((sum, g) => sum + g.markCompacts, 0);
-  return r.gcStats?.markCompacts;
-}
-
 /** Difference CI between two independent runs of the same build. */
 function currentVsCurrentCI(
   a: MeasuredResults,
@@ -106,4 +99,11 @@ function currentVsCurrentCI(
   if (!ci)
     throw new Error(`Cannot compute calibration CI for stat ${statKind}`);
   return ci;
+}
+
+/** Full (major) GCs in one run's merged results, or undefined without gc stats. */
+function fullGcsForRun(r: MeasuredResults): number | undefined {
+  if (r.batchGcStats)
+    return r.batchGcStats.reduce((sum, g) => sum + g.markCompacts, 0);
+  return r.gcStats?.markCompacts;
 }

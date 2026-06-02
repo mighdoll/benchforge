@@ -146,13 +146,6 @@ function buildLayout(
   return { width, height, margin, plot };
 }
 
-/** Top margin: room for the point-label, else the title, else a thin band. */
-function layoutTop(hasPointLabel?: boolean, hasTitle?: boolean): number {
-  if (hasPointLabel) return 30;
-  if (hasTitle) return defaultMargin.top;
-  return 6;
-}
-
 function buildScales(
   histogram: HistogramBin[],
   ci: [number, number],
@@ -330,4 +323,11 @@ function drawCILabels(
     svg.appendChild(text(loX, labelY, loLabel, "middle", "11"));
     svg.appendChild(text(hiX, labelY, hiLabel, "middle", "11"));
   }
+}
+
+/** Top margin: room for the point-label, else the title, else a thin band. */
+function layoutTop(hasPointLabel?: boolean, hasTitle?: boolean): number {
+  if (hasPointLabel) return 30;
+  if (hasTitle) return defaultMargin.top;
+  return 6;
 }

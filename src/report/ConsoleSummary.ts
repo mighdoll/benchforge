@@ -19,6 +19,14 @@ export function consoleSummary(data: ReportData): string {
   return data.groups.flatMap(groupLines).join("\n");
 }
 
+/** @return a label that names the benchmark without repeating segments. */
+export function benchLabel(name: string, groupName: string): string {
+  if (!groupName || groupName === name) return name;
+  // matrix group names are "variant / case"; the entry name repeats the variant.
+  if (groupName.split(" / ").includes(name)) return groupName;
+  return `${groupName} / ${name}`;
+}
+
 /** Each benchmark's headline (+ verdict) for one group; no group header. */
 function groupLines(group: BenchmarkGroup): string[] {
   return group.benchmarks.flatMap(b => benchmarkLines(b, group.name));
@@ -36,14 +44,6 @@ function benchmarkLines(entry: BenchmarkEntry, groupName: string): string[] {
   const ci = entry.comparisonCI;
   if (!ci) return [head];
   return [head, `  ${dim("->")} ${verdict(ci)}`];
-}
-
-/** @return a label that names the benchmark without repeating segments. */
-export function benchLabel(name: string, groupName: string): string {
-  if (!groupName || groupName === name) return name;
-  // matrix group names are "variant / case"; the entry name repeats the variant.
-  if (groupName.split(" / ").includes(name)) return groupName;
-  return `${groupName} / ${name}`;
 }
 
 /** The headline value with its unit and stat, e.g. "285,200 lines / sec (mean)". */
