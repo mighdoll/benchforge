@@ -14,16 +14,13 @@ const { bold, dim, green, red } = colors;
  *  rows already computed in ReportData; scalar sections (gc, runs) are omitted
  *  here -- they live in the markdown report and HTML viewer. */
 export function consoleSummary(data: ReportData): string {
-  const blocks = data.groups.flatMap(g => groupLines(g));
-  return blocks.join("\n");
+  return data.groups.flatMap(groupLines).join("\n");
 }
 
 /** Lines for one group: a header when it carries more than its single benchmark,
  *  then each benchmark's headline (+ verdict). */
 function groupLines(group: BenchmarkGroup): string[] {
-  const benches = group.benchmarks.flatMap(b => benchmarkLines(b, group.name));
-  if (!benches.length) return [];
-  return benches;
+  return group.benchmarks.flatMap(b => benchmarkLines(b, group.name));
 }
 
 /** Headline + optional verdict for one benchmark. The label is the group name

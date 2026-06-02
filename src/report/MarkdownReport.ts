@@ -35,9 +35,7 @@ function versionLine(current?: GitVersion, baseline?: GitVersion): string {
 
 /** One group as a `##` section, with each benchmark below it. */
 function groupMarkdown(group: BenchmarkGroup): string {
-  const benches = group.benchmarks
-    .map(b => benchmarkMarkdown(b))
-    .filter(Boolean);
+  const benches = group.benchmarks.map(benchmarkMarkdown).filter(Boolean);
   if (!benches.length) return "";
   const warnings = group.warnings?.map(w => `> ${w}`).join("\n") ?? "";
   return [`## ${group.name}`, warnings, ...benches]

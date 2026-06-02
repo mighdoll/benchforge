@@ -174,28 +174,14 @@ function buildScales(
   domain?: [number, number],
 ): Scales {
   const { margin, plot } = layout;
-  const xs = histogram.map(b => b.x);
-  const extra = includeZero ? [0] : [];
-  const marginBounds = equivMargin ? [-equivMargin, equivMargin] : [];
-  const ptBounds = pointEstimate != null ? [pointEstimate] : [];
-  const lo = domain ? [domain[0]] : [];
-  const hi = domain ? [domain[1]] : [];
-  const xMin = Math.min(
-    ...xs,
-    ci[0],
-    ...extra,
-    ...marginBounds,
-    ...ptBounds,
-    ...lo,
-  );
-  const xMax = Math.max(
-    ...xs,
-    ci[1],
-    ...extra,
-    ...marginBounds,
-    ...ptBounds,
-    ...hi,
-  );
+  const bounds = histogram.map(b => b.x);
+  bounds.push(ci[0], ci[1]);
+  if (includeZero) bounds.push(0);
+  if (equivMargin) bounds.push(-equivMargin, equivMargin);
+  if (pointEstimate != null) bounds.push(pointEstimate);
+  if (domain) bounds.push(domain[0], domain[1]);
+  const xMin = Math.min(...bounds);
+  const xMax = Math.max(...bounds);
   const yMax = Math.max(...histogram.map(b => b.count));
   const xRange = xMax - xMin || 1;
   return {
@@ -214,18 +200,18 @@ function drawTitles(
     svg.appendChild(
       text(margin.left, 14, opts.title, "start", "13", "currentColor", "600"),
     );
-  if (opts.pointLabel) {
-    const el = text(
-      pointX,
-      margin.top - 6,
-      opts.pointLabel,
-      "middle",
-      "15",
-      "currentColor",
-      "700",
+  if (opts.pointLabel)
+    svg.appendChild(
+      text(
+        pointX,
+        margin.top - 6,
+        opts.pointLabel,
+        "middle",
+        "15",
+        "currentColor",
+        "700",
+      ),
     );
-    svg.appendChild(el);
-  }
 }
 
 /** Draw equivalence margin zone: hatched band centered vertically */

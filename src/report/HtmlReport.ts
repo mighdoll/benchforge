@@ -131,11 +131,9 @@ function prepareGroupData(
 }
 
 /** @return benchmark data with samples, stats, and profiling summaries */
-function prepareBenchmarkData(report: {
-  name: string;
-  measuredResults: MeasuredResults;
-  metadata?: UnknownRecord;
-}): Omit<BenchmarkEntry, "comparisonCI" | "sections"> {
+function prepareBenchmarkData(
+  report: BenchmarkReport,
+): Omit<BenchmarkEntry, "comparisonCI" | "sections"> {
   const { measuredResults: m, name, metadata } = report;
   return {
     name,

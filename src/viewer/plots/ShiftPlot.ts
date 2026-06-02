@@ -268,11 +268,7 @@ function drawPercentileLabel(
   cx: number,
   height: number,
 ): void {
-  const color = point.isMean
-    ? "#111827"
-    : point.reliable
-      ? "#374151"
-      : weakColor;
+  const color = labelColor(point);
   svg.appendChild(
     text(
       cx,
@@ -295,6 +291,12 @@ function drawPercentileLabel(
         weakColor,
       ),
     );
+}
+
+/** Label color: dark for the primary mean, mid-grey when reliable, weak otherwise. */
+function labelColor(point: ShiftPercentile): string {
+  if (point.isMean) return "#111827";
+  return point.reliable ? "#374151" : weakColor;
 }
 
 /** @return [min, max] of the diff-percent axis. */

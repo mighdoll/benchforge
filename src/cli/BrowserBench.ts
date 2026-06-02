@@ -220,11 +220,11 @@ async function runBatchedTabs(
   const state: TabRunnerState = { detectedPageLoad: params.pageLoad };
 
   const warmup = !(args["warmup-batch"] ?? false) && args.batches > 1;
-  const mk = (url: string, label: string) =>
+  const makeRunner = (url: string, label: string) =>
     makeTabRunner(params, chrome, limits, warmup, state, url, label);
-  const runCurrent = mk(params.url, name);
+  const runCurrent = makeRunner(params.url, name);
   const runBaseline = baselineUrl
-    ? mk(baselineUrl, nameFromUrl(baselineUrl))
+    ? makeRunner(baselineUrl, nameFromUrl(baselineUrl))
     : undefined;
 
   const progress = (p: BatchProgress) => {
