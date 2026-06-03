@@ -14,20 +14,12 @@ import {
   gcFunction,
 } from "./SampleStats.ts";
 
-type CollectParams<T = unknown> = {
-  benchmark: BenchmarkSpec<T>;
-  maxTime: number;
-  maxIterations: number;
-  warmup: number;
-  params?: T;
-  skipWarmup?: boolean;
-  traceOpt?: boolean;
-  gcForce?: boolean;
-  pauseWarmup?: number;
-  pauseFirst?: number;
-  pauseInterval?: number;
-  pauseDuration?: number;
-};
+type CollectParams<T = unknown> = RunnerOptions &
+  Required<Pick<RunnerOptions, "maxTime" | "maxIterations" | "warmup">> & {
+    benchmark: BenchmarkSpec<T>;
+    params?: T;
+    skipWarmup?: boolean;
+  };
 
 type CollectResult = {
   samples: number[];
@@ -47,7 +39,10 @@ type SampleArrays = {
   pausePoints: PausePoint[];
 };
 
-const defaultCollectOptions = {
+const defaultCollectOptions: Required<
+  Pick<RunnerOptions, "maxTime" | "maxIterations" | "warmup">
+> &
+  Pick<RunnerOptions, "traceOpt" | "pauseWarmup"> = {
   maxTime: 5000,
   maxIterations: 1000000,
   warmup: 0,
@@ -65,8 +60,8 @@ export class TimingRunner implements BenchRunner {
     options: RunnerOptions,
     params?: T,
   ): Promise<MeasuredResults[]> {
-    const opts = { ...defaultCollectOptions, ...(options as any) };
-    const collected = await collectSamples({ benchmark, params, ...opts });
+    const opts = { ...defaultCollectOptions, ...options };
+    const collected = await collectSamples({ ...opts, benchmark, params });
     return [buildMeasuredResults(benchmark.name, collected)];
   }
 }
