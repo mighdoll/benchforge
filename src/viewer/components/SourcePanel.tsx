@@ -1,11 +1,4 @@
-import { createHighlighterCore, type HighlighterCore } from "shiki/core";
-import langCss from "shiki/dist/langs/css.mjs";
-import langHtml from "shiki/dist/langs/html.mjs";
-import langJs from "shiki/dist/langs/javascript.mjs";
-import langTs from "shiki/dist/langs/typescript.mjs";
-import themeDark from "shiki/dist/themes/github-dark.mjs";
-import themeLight from "shiki/dist/themes/github-light.mjs";
-import { createJavaScriptRegexEngine } from "shiki/engine/javascript";
+import type { HighlighterCore } from "shiki/core";
 import { useEffect, useRef, useState } from "preact/hooks";
 import { filePathFromUrl, guessLang } from "../Helpers.ts";
 import {
@@ -27,13 +20,38 @@ import {
 
 let highlighterPromise: Promise<HighlighterCore> | undefined;
 
-/** Lazily create a shared Shiki highlighter with light/dark themes. */
+/**
+ * Lazily create a shared Shiki highlighter with light/dark themes.
+ * Shiki plus its grammars are ~400 KB, so they load via dynamic import
+ * only when the first source tab opens, keeping the entry chunk small.
+ */
 function getHighlighter(): Promise<HighlighterCore> {
-  highlighterPromise ??= createHighlighterCore({
-    themes: [themeLight, themeDark],
-    langs: [langJs, langTs, langCss, langHtml],
-    engine: createJavaScriptRegexEngine(),
-  });
+  highlighterPromise ??= (async () => {
+    const [
+      { createHighlighterCore },
+      { createJavaScriptRegexEngine },
+      langCss,
+      langHtml,
+      langJs,
+      langTs,
+      themeDark,
+      themeLight,
+    ] = await Promise.all([
+      import("shiki/core"),
+      import("shiki/engine/javascript"),
+      import("shiki/dist/langs/css.mjs"),
+      import("shiki/dist/langs/html.mjs"),
+      import("shiki/dist/langs/javascript.mjs"),
+      import("shiki/dist/langs/typescript.mjs"),
+      import("shiki/dist/themes/github-dark.mjs"),
+      import("shiki/dist/themes/github-light.mjs"),
+    ]);
+    return createHighlighterCore({
+      themes: [themeLight.default, themeDark.default],
+      langs: [langJs.default, langTs.default, langCss.default, langHtml.default],
+      engine: createJavaScriptRegexEngine(),
+    });
+  })();
   return highlighterPromise;
 }
 
