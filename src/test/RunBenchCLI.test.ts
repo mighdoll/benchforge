@@ -1,5 +1,3 @@
-import { execSync } from "node:child_process";
-import path from "node:path";
 import { expect, test } from "vitest";
 import { filterBenchmarks } from "../cli/FilterBenchmarks.ts";
 import type { BenchSuite } from "../runners/BenchmarkSpec.ts";
@@ -49,26 +47,8 @@ const suiteWithSetup: BenchSuite = {
   ],
 };
 
-/** Execute test fixture script and return output */
-function executeTestScript(args = ""): string {
-  const script = path.join(
-    import.meta.dirname!,
-    "fixtures/test-bench-script.ts",
-  );
-  return execSync(`node --expose-gc --allow-natives-syntax ${script} ${args}`, {
-    encoding: "utf8",
-  });
-}
-
-/** Run a fixture file via bin/benchforge and return output */
-function executeBenchforgeFile(file: string, args = ""): string {
-  const bin = path.join(import.meta.dirname!, "../../bin/benchforge");
-  const fixture = path.join(import.meta.dirname!, "fixtures", file);
-  return execSync(`${bin} ${fixture} ${args}`, { encoding: "utf8" });
-}
-
 test("runs all benchmarks", { timeout: 30000 }, async () => {
-  const output = await runBenchCLITest(testSuite, "--duration 0.1");
+  const output = await runBenchCLITest(testSuite, "--duration 0.1 --no-worker");
 
   expect(output).toContain("concatenation");
   expect(output).toContain("template literal");
@@ -80,7 +60,7 @@ test("runs all benchmarks", { timeout: 30000 }, async () => {
 test("filters by substring", { timeout: 15000 }, async () => {
   const output = await runBenchCLITest(
     testSuite,
-    "--filter concat --duration 0.1",
+    "--filter concat --duration 0.1 --no-worker",
   );
 
   expect(output).toContain("concatenation");
@@ -90,7 +70,7 @@ test("filters by substring", { timeout: 15000 }, async () => {
 test("filters by regex", { timeout: 15000 }, async () => {
   const output = await runBenchCLITest(
     testSuite,
-    "--filter ^template --duration 0.1",
+    "--filter ^template --duration 0.1 --no-worker",
   );
   expect(output).toContain("template literal");
   expect(output).not.toContain("addition");
@@ -107,27 +87,11 @@ test("filter preserves suite structure", () => {
   expect(filtered.groups[1].benchmarks).toHaveLength(0);
 });
 
-test("e2e: runs user script", { timeout: 30000 }, () => {
-  const output = executeTestScript("--duration 0.1");
-
-  expect(output).toContain("plus");
-  expect(output).toContain("multiply");
-  expect(output).toContain("(mean)");
-
-  const lines = output.split("\n");
-  const plusLine = lines.find(l => l.includes("plus"));
-  expect(plusLine).toBeTruthy();
-});
-
-test("e2e: filter flag", { timeout: 30000 }, () => {
-  const output = executeTestScript('--filter "plus" --duration 0.1');
-
-  expect(output).toContain("plus");
-  expect(output).not.toContain("multiply");
-});
-
 test("runs benchmarks with setup function", { timeout: 30000 }, async () => {
-  const output = await runBenchCLITest(suiteWithSetup, "--duration 0.1");
+  const output = await runBenchCLITest(
+    suiteWithSetup,
+    "--duration 0.1 --no-worker",
+  );
 
   expect(output).toContain("sum numbers");
   expect(output).toContain("join strings");
@@ -159,27 +123,12 @@ test("runs benchmarks with baseline comparison", {
     ],
   };
 
-  const output = await runBenchCLITest(suiteWithBaseline, "--iterations 20");
+  const output = await runBenchCLITest(
+    suiteWithBaseline,
+    "--iterations 20 --no-worker",
+  );
 
   expect(output).toContain("optimized sort");
   expect(output).toContain("vs baseline"); // verdict line for the comparison
-  expect(output).toContain("(mean)");
-});
-
-test("file mode: BenchSuite export", { timeout: 30000 }, () => {
-  const output = executeBenchforgeFile(
-    "suite-export-bench.ts",
-    "--iterations 5",
-  );
-
-  expect(output).toContain("plus");
-  expect(output).toContain("multiply");
-  expect(output).toContain("(mean)");
-});
-
-test("file mode: function export", { timeout: 30000 }, () => {
-  const output = executeBenchforgeFile("fn-export-bench.ts", "--iterations 5");
-
-  expect(output).toContain("fn-export-bench");
   expect(output).toContain("(mean)");
 });

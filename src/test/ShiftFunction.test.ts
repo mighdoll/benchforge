@@ -7,6 +7,9 @@ import { timeMs } from "../report/Formatters.ts";
 import { buildShiftFunction } from "../report/ShiftFunction.ts";
 import type { MeasuredResults } from "../runners/MeasuredResults.ts";
 
+// Structure tests don't need CI precision; a small bootstrap keeps them fast.
+const fast = { resamples: 200 };
+
 const timeMetric: MetricSection = metricSection({
   title: "lines / sec",
   statKind: { percentile: 0.5 },
@@ -47,7 +50,7 @@ test("returns undefined without a baseline", () => {
     undefined,
     {},
     {},
-    {},
+    fast,
   );
   expect(sf).toBeUndefined();
 });
@@ -59,7 +62,7 @@ test("leads with mean, then one point per sampled percentile", () => {
     batched(30, 50),
     {},
     {},
-    {},
+    fast,
   );
   expect(sf).toBeDefined();
   expect(sf!.points.length).toBe(10);
@@ -76,7 +79,7 @@ test("percentile points are sorted ascending (mean stays first)", () => {
     batched(30, 50),
     {},
     {},
-    {},
+    fast,
   )!;
   expect(sf.points[0].isMean).toBe(true);
   const ps = sf.points.slice(1).map(p => p.percentile);
@@ -92,7 +95,7 @@ test("higherIsBetter keeps absolute estimates monotonic across percentiles", () 
     batched(30, 50),
     {},
     {},
-    {},
+    fast,
   )!;
   expect(sf.points[0].isMean).toBe(true);
   // skip the leading mean point; the percentile estimates should ramp upward.
@@ -108,7 +111,7 @@ test("each point carries current and baseline absolute distributions", () => {
     batched(30, 50),
     {},
     {},
-    {},
+    fast,
   )!;
   for (const point of sf.points) {
     expect(point.runs.map(r => r.runName)).toEqual(["x", "baseline"]);
@@ -125,7 +128,7 @@ test("extreme tail percentiles are unreliable with too few samples", () => {
     batched(30, 5),
     {},
     {},
-    {},
+    fast,
   )!;
   expect(sf.points.find(p => p.label === "p1")!.reliable).toBe(false);
   expect(sf.points.find(p => p.label === "p50")!.reliable).toBe(true);
@@ -138,7 +141,7 @@ test("equivMargin is recorded for the plot band", () => {
     batched(30, 50),
     {},
     {},
-    { equivMargin: 2 },
+    { ...fast, equivMargin: 2 },
   )!;
   expect(sf.equivMargin).toBe(2);
 });
@@ -158,7 +161,7 @@ test("tail coverage counts only the batches the bootstrap kept", () => {
   // than the untrimmed view sees.
   const cur = withSlowBatch(8, 50);
   const base = withSlowBatch(8, 50);
-  const trimmed = buildShiftFunction(timeMetric, cur, base, {}, {}, {})!;
+  const trimmed = buildShiftFunction(timeMetric, cur, base, {}, {}, fast)!;
   const raw = buildShiftFunction(
     timeMetric,
     cur,
@@ -166,6 +169,7 @@ test("tail coverage counts only the batches the bootstrap kept", () => {
     {},
     {},
     {
+      ...fast,
       noBatchTrim: true,
     },
   )!;

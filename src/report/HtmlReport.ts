@@ -74,7 +74,11 @@ export function prepareHtmlData(
 ): ReportData {
   const { cliArgs, currentVersion, baselineVersion, equivMargin, noBatchTrim } =
     options;
-  const comparison: ComparisonOptions = { equivMargin, noBatchTrim };
+  const comparison: ComparisonOptions = {
+    equivMargin,
+    noBatchTrim,
+    resamples: options.resamples,
+  };
   const sections = options.sections ?? defaultSections(groups, cliArgs);
   return {
     groups: groups.map(g => prepareGroupData(g, sections, comparison)),

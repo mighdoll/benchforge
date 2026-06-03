@@ -204,7 +204,10 @@ test("integration: baseline run flows through prepareHtmlData into a shift table
       baseline: { name: "baseline", measuredResults: baseline },
     },
   ];
-  const data = prepareHtmlData(groups, { sections: [timeSection] });
+  const data = prepareHtmlData(groups, {
+    sections: [timeSection],
+    resamples: 200,
+  });
   const md = markdownReport(data);
 
   expect(md).toContain("#### time");

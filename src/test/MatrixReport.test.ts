@@ -22,7 +22,7 @@ function matrixGroup(
 
 /** Build ReportData the way the matrix pipeline does, via prepareHtmlData. */
 function matrixData(groups: ReportGroup[]): ReportData {
-  return prepareHtmlData(groups, { sections: [timeSection] });
+  return prepareHtmlData(groups, { sections: [timeSection], resamples: 200 });
 }
 
 test("reportMatrixResults: a single comparison yields no tally (console prints it)", () => {

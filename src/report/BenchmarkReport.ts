@@ -9,6 +9,9 @@ export interface ComparisonOptions {
    *  means and drops slow-side outliers only; fast batches are kept since
    *  they reflect less environmental noise rather than errors. */
   noBatchTrim?: boolean;
+  /** Bootstrap resample count (default 10000). Lower it only in tests that
+   *  check shift-function structure rather than CI precision. */
+  resamples?: number;
 }
 
 /** Benchmark results with optional baseline for comparison */

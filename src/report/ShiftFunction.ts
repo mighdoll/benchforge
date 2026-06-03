@@ -140,19 +140,22 @@ function shiftStats(
     ...shiftPercentiles.map(p => ({ percentile: p })),
   ];
   const noBatchTrim = comparison?.noBatchTrim;
+  const resamples = comparison?.resamples;
   const diffs = diffCIs(
     baseline.samples,
     baseline.batchOffsets,
     current.samples,
     current.batchOffsets,
     stats,
-    { equivMargin: comparison?.equivMargin, noBatchTrim },
+    { equivMargin: comparison?.equivMargin, noBatchTrim, resamples },
   );
   const curAbs = bootstrapCIs(current.samples, current.batchOffsets, stats, {
     noTrim: noBatchTrim,
+    resamples,
   });
   const baseAbs = bootstrapCIs(baseline.samples, baseline.batchOffsets, stats, {
     noTrim: noBatchTrim,
+    resamples,
   });
   return { diffs, curAbs, baseAbs };
 }
