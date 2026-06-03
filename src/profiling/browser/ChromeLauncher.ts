@@ -54,6 +54,7 @@ export async function launchChrome(opts: {
     `--user-data-dir=${userDataDir}`,
     "--no-first-run",
     "--no-default-browser-check",
+    "--no-startup-window",
     ...quietFlags,
     ...(headless ? ["--headless=new"] : []),
     ...args,
