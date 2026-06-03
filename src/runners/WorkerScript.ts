@@ -8,7 +8,6 @@ import type { BenchRunner, RunnerOptions } from "./BenchRunner.ts";
 import type { MeasuredResults } from "./MeasuredResults.ts";
 import { importBenchFn, resolveVariantFn } from "./RunnerUtils.ts";
 import { TimingRunner } from "./TimingRunner.ts";
-import { debugWorkerTiming, getElapsed, getPerfNow } from "./TimingUtils.ts";
 
 /** Message sent to worker process to start a benchmark run. */
 export interface RunMessage {
@@ -66,14 +65,7 @@ interface ProfilingState {
   profilerSession?: Session;
 }
 
-const workerStartTime = getPerfNow();
 const maxLifetime = 5 * 60 * 1000;
-
-const logTiming = debugWorkerTiming ? _logTiming : () => {};
-function _logTiming(operation: string, duration?: number) {
-  const suffix = duration !== undefined ? ` ${duration.toFixed(1)}ms` : "";
-  console.log(`[Worker] ${operation}${suffix}`);
-}
 
 /** Send IPC message to parent then exit the worker process */
 function sendAndExit(msg: ResultMessage | ErrorMessage, exitCode: number) {
@@ -82,8 +74,6 @@ function sendAndExit(msg: ResultMessage | ErrorMessage, exitCode: number) {
       const kind = msg.type === "result" ? "results" : "error message";
       console.error(`[Worker] Error sending ${kind}:`, err);
     }
-    const suffix = exitCode === 0 ? "" : " (error)";
-    logTiming(`Total worker duration${suffix}:`, getElapsed(workerStartTime));
     process.exit(exitCode);
   });
 }
@@ -97,10 +87,6 @@ async function resolveBenchmarkFn(
   }
   if (message.modulePath) {
     const { modulePath, exportName, setupExportName, params } = message;
-    logTiming(
-      `Importing from ${modulePath}${exportName ? ` (${exportName})` : ""}`,
-    );
-    if (setupExportName) logTiming(`Calling setup: ${setupExportName}`);
     return importBenchFn(modulePath, exportName, setupExportName, params);
   }
   return { fn: reconstructFunction(message.fnCode!), params: message.params };
@@ -111,7 +97,6 @@ async function importVariantModule(
   message: RunMessage,
 ): Promise<BenchmarkImportResult> {
   const { variantDir, variantId } = message;
-  logTiming(`Importing variant ${variantId} from ${variantDir}`);
   return resolveVariantFn({
     ...message,
     variantDir: variantDir!,
@@ -201,16 +186,9 @@ function buildProfilingChain(
 process.on("message", async (message: RunMessage) => {
   if (message.type !== "run") return;
 
-  logTiming(`Processing ${message.spec.name}`);
-
   try {
-    const start = getPerfNow();
     const runner = new TimingRunner();
-    logTiming("Runner created in", getElapsed(start));
-
-    const benchStart = getPerfNow();
     const result = await runWithProfiling(message, runner);
-    logTiming("Benchmark execution took", getElapsed(benchStart));
     sendAndExit(result, 0);
   } catch (error) {
     const err = error instanceof Error ? error : undefined;

@@ -10,7 +10,6 @@ import { aggregateGcStats, type GcEvent, parseGcLine } from "./GcStats.ts";
 import type { MeasuredResults } from "./MeasuredResults.ts";
 import { importBenchFn, resolveVariantFn } from "./RunnerUtils.ts";
 import { TimingRunner } from "./TimingRunner.ts";
-import { debugWorkerTiming, getElapsed, getPerfNow } from "./TimingUtils.ts";
 import type {
   ErrorMessage,
   ResultMessage,
@@ -34,10 +33,6 @@ interface RunBenchmarkParams<T = unknown> {
   useWorker?: boolean;
   params?: T;
 }
-
-const logTiming = debugWorkerTiming
-  ? (message: string) => console.log(`[RunnerOrchestrator] ${message}`)
-  : () => {};
 
 /** Run a benchmark spec, optionally in an isolated worker process for profiling support. */
 export async function runBenchmark<T = unknown>({
@@ -125,9 +120,7 @@ function runWorkerWithMessage(
   options: RunnerOptions,
   message: RunMessage,
 ): Promise<MeasuredResults[]> {
-  const startTime = getPerfNow();
   const collectGcStats = options.gcStats ?? false;
-  logTiming(`Starting worker for ${name}`);
 
   return new Promise((resolve, reject) => {
     const gcEvents: GcEvent[] = [];
@@ -151,8 +144,6 @@ function runWorkerWithMessage(
         if (msg.stack) error.stack = msg.stack;
         return reject(error);
       }
-      const elapsed = getElapsed(startTime).toFixed(1);
-      logTiming(`Total worker time for ${name}: ${elapsed}ms`);
       const { results, heapProfile, timeProfile, coverage } = msg;
       attachProfilingData(
         results,
