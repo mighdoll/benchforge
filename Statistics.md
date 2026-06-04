@@ -5,11 +5,11 @@
 Benchmark data has two kinds of variability that look similar but need opposite
 treatment:
 
-**Intermittent signals** -- GC pauses, JIT tier transitions, memory pressure.
+**Intermittent signals**: GC pauses, JIT tier transitions, memory pressure.
 These are real costs your code pays. A function that allocates more triggers
 more GC, and that overhead is part of its true cost. These should be captured.
 
-**Intermittent noise** -- other applications waking up, OS scheduling jitter,
+**Intermittent noise**: other applications waking up, OS scheduling jitter,
 thermal throttling, background updates. These have nothing to do with the code
 under test. These should be rejected.
 
@@ -57,7 +57,7 @@ divided by iterations.
 
 **When median and mean diverge**, that's informative. A large gap means GC or
 other intermittent costs are significant. If a code change makes mean worse
-while median stays flat, you likely increased allocation pressure -- a real
+while median stays flat, you likely increased allocation pressure, a real
 regression that median alone would hide.
 
 **Tail percentiles** (p90, p99) show worst-case iteration behavior. High p99
@@ -93,11 +93,11 @@ is present), computed in the same domain as the column.
 
 ## Tukey Trimming
 
-Individual samples within a batch are correlated -- they share the same thermal
+Individual samples within a batch are correlated: they share the same thermal
 state, memory layout, and background load. Batches are the unit of independence.
 
 By default, outlier batches are removed. The batch means are sorted and divided
-into quartiles -- Q1 (25th percentile) and Q3 (75th percentile). The
+into quartiles, Q1 (25th percentile) and Q3 (75th percentile). The
 interquartile range (IQR) is Q3 - Q1. Batches whose mean exceeds Q3 + 3x IQR are
 removed. Only high outliers are trimmed.
 
@@ -224,7 +224,7 @@ it.
 The right margin varies with the machine and the code. The margin should cover
 everything that makes a measurement move between runs *without* the code
 changing. Two sources dominate: other activity on the machine competing for CPU
-and memory (other apps, background daemons, indexing -- plus thermal and
+and memory (other apps, background daemons, indexing, plus thermal and
 frequency shifts), and the code's own GC, whose collection timing varies run to
 run and wobbles the measured speed.
 
@@ -247,7 +247,7 @@ bootstrap claims) and the **between-run scatter** of the point estimates (what
 actually happens on repeat). The suggested margin is the larger of the two, so
 the self-comparison reads "equivalent" essentially every time. If the scatter
 exceeds the within-run CI, calibrate warns that the displayed CIs are
-overconfident -- run-to-run drift the bootstrap can't see from inside one run.
+overconfident: run-to-run drift the bootstrap can't see from inside one run.
 
 For the suggested margin to apply to your real comparisons:
 
@@ -299,9 +299,9 @@ Results are displayed as: `+2.5% [-1.2%, +6.1%]`
 The UI display shows even more information.
 
 **"Uncertain" or "Inconclusive"** means the CI is too wide to decide. The fix is
-more batches -- each additional batch is another independent observation that
+more batches: each additional batch is another independent observation that
 narrows the interval. Aim for 40+ batches for reliable results.
 
 **Median and mean tell different stories?** Check whether GC overhead changed.
 If mean regressed but median didn't, allocation patterns likely shifted. Both
-numbers matter -- median for algorithmic cost, mean for real-world throughput.
+numbers matter: median for algorithmic cost, mean for real-world throughput.
