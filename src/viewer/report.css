@@ -89,8 +89,11 @@
 
 .report-panel .badge-faster { background: #dcfce7; color: #166534; }
 .report-panel .badge-slower { background: #fee2e2; color: #991b1b; }
-.report-panel .badge-uncertain { background: #dbeafe; color: #1e40af; }
-.report-panel .badge-equivalent { background: #f0fdf4; color: #166534; }
+.report-panel .badge-uncertain { background: #e5e7eb; color: #4b5563; }
+.report-panel .badge-equivalent { background: #dbeafe; color: #1e40af; }
+.report-panel .badge-insufficient {
+  background: #e5e7eb; color: #4b5563; border: 1px dashed #9ca3af;
+}
 
 /* Per-row comparison value: bold text, no colored chip (chip reserved for verdict) */
 .report-panel .comparison-plain {
@@ -382,8 +385,9 @@
   :root:not([data-theme="light"]) .dist-fill { opacity: 0.08; }
   :root:not([data-theme="light"]) .report-panel .badge-faster { background: #166534; color: #bbf7d0; }
   :root:not([data-theme="light"]) .report-panel .badge-slower { background: #991b1b; color: #fecaca; }
-  :root:not([data-theme="light"]) .report-panel .badge-uncertain { background: #1e40af; color: #bfdbfe; }
-  :root:not([data-theme="light"]) .report-panel .badge-equivalent { background: #166534; color: #bbf7d0; }
+  :root:not([data-theme="light"]) .report-panel .badge-uncertain { background: #374151; color: #d1d5db; }
+  :root:not([data-theme="light"]) .report-panel .badge-equivalent { background: #1e40af; color: #bfdbfe; }
+  :root:not([data-theme="light"]) .report-panel .badge-insufficient { background: #374151; color: #d1d5db; border-color: #6b7280; }
   :root:not([data-theme="light"]) .report-panel .comparison-plain { color: #bbb; }
   :root:not([data-theme="light"]) .margin-hatch-stroke { opacity: 0.65; }
   :root:not([data-theme="light"]) .margin-zone { opacity: 0.65; }
@@ -428,8 +432,9 @@
 :root[data-theme="dark"] .dist-fill { opacity: 0.08; }
 :root[data-theme="dark"] .report-panel .badge-faster { background: #166534; color: #bbf7d0; }
 :root[data-theme="dark"] .report-panel .badge-slower { background: #991b1b; color: #fecaca; }
-:root[data-theme="dark"] .report-panel .badge-uncertain { background: #1e40af; color: #bfdbfe; }
-:root[data-theme="dark"] .report-panel .badge-equivalent { background: #166534; color: #bbf7d0; }
+:root[data-theme="dark"] .report-panel .badge-uncertain { background: #374151; color: #d1d5db; }
+:root[data-theme="dark"] .report-panel .badge-equivalent { background: #1e40af; color: #bfdbfe; }
+:root[data-theme="dark"] .report-panel .badge-insufficient { background: #374151; color: #d1d5db; border-color: #6b7280; }
 :root[data-theme="dark"] .report-panel .comparison-plain { color: #bbb; }
 :root[data-theme="dark"] .margin-hatch-stroke { opacity: 0.4; }
 :root[data-theme="dark"] .margin-zone { opacity: 0.4; }
@@ -458,17 +463,23 @@
 .shift-close { float: right; cursor: pointer; color: #999; font-size: 20px; line-height: 1; }
 .shift-chart { display: flex; align-items: center; gap: 10px; margin: 12px 0 0; }
 .shift-chart-label { flex: 0 0 110px; font-size: 13px; font-weight: 600; color: #555; }
-.shift-unreliable { color: #999; font-weight: 400; }
+.shift-verdict { display: inline-flex; align-items: baseline; gap: 8px; }
+.shift-verdict-pct { font-size: 14px; font-weight: 700; color: #555; }
+.shift-gloss { font-weight: 400; color: #888; }
 
 :root[data-theme="dark"] .report-panel .shift-panel { border-top-color: #3a3a3a; }
 :root[data-theme="dark"] .report-panel .shift-caption { color: #bbb; }
 :root[data-theme="dark"] .shift-popup { background: #252525; border-color: #3a3a3a; }
 :root[data-theme="dark"] .shift-popup h3 { color: #ddd; }
+:root[data-theme="dark"] .shift-verdict-pct { color: #ccc; }
+:root[data-theme="dark"] .shift-gloss { color: #999; }
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) .report-panel .shift-panel { border-top-color: #3a3a3a; }
   :root:not([data-theme="light"]) .report-panel .shift-caption { color: #bbb; }
   :root:not([data-theme="light"]) .shift-popup { background: #252525; border-color: #3a3a3a; }
   :root:not([data-theme="light"]) .shift-popup h3 { color: #ddd; }
+  :root:not([data-theme="light"]) .shift-verdict-pct { color: #ccc; }
+  :root:not([data-theme="light"]) .shift-gloss { color: #999; }
 }
 
 /* --- Matrix section: dense table of scalar metrics (e.g. GC) --- */

@@ -61,15 +61,18 @@ export const plotLayout = {
   style: { fontSize: "14px" },
 } as const;
 
-/** Fill/stroke palette keyed by comparison direction, shared across plots. */
+/** Fill/stroke palette keyed by comparison direction, shared across plots.
+ *  green=better, red=worse, blue=confirmed equivalent (CI inside the margin),
+ *  grey=uncertain (CI straddles zero, no signal). Equivalent is a real verdict
+ *  ("confirmed no meaningful change"), so it reads distinct from "can't tell". */
 export const directionColors: Record<
   CIDirection,
   { fill: string; stroke: string }
 > = {
   faster: { fill: "#bbf7d0", stroke: "#22c55e" },
   slower: { fill: "#fee2e2", stroke: "#ef4444" },
-  uncertain: { fill: "#dbeafe", stroke: "#3b82f6" },
-  equivalent: { fill: "#dcfce7", stroke: "#86efac" },
+  uncertain: { fill: "#e5e7eb", stroke: "#9ca3af" },
+  equivalent: { fill: "#dbeafe", stroke: "#3b82f6" },
 };
 
 /** Format a number as a signed percentage string (e.g. "+1.2%", "-3.4%") */

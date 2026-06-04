@@ -1,3 +1,4 @@
+import { verdictWord } from "../../report/Verdict.ts";
 import type { ShiftFunction, ShiftPercentile } from "../ReportData.ts";
 import { directionColors, formatPct, gaussianSmooth } from "./PlotTypes.ts";
 import {
@@ -225,6 +226,7 @@ function drawViolin(
   const group = document.createElementNS(svgNS, "g");
   group.classList.add("shift-violin");
   if (!point.reliable) group.classList.add("shift-weak");
+  group.appendChild(violinTitle(point));
   if (onSelect) {
     group.style.cursor = "pointer";
     group.addEventListener("click", () => onSelect(point));
@@ -239,6 +241,16 @@ function drawViolin(
   });
   group.appendChild(outline);
   svg.appendChild(group);
+}
+
+/** Native hover tooltip: verdict word + diff for a reliable percentile, or the
+ *  tail-sample count when there is too little data to trust it. */
+function violinTitle(point: ShiftPercentile): SVGTitleElement {
+  const node = document.createElementNS(svgNS, "title");
+  node.textContent = point.reliable
+    ? `${point.label} - ${verdictWord(point.diff.direction)} - ${formatPct(point.diff.percent)}`
+    : `${point.label} - insufficient data (n=${point.tailCount})`;
+  return node;
 }
 
 /** Point-estimate marker: hollow circle, grey when unreliable. */
