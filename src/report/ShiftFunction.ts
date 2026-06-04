@@ -15,6 +15,7 @@ import type {
   ShiftPercentile,
   ShiftRun,
 } from "../viewer/ReportData.ts";
+import { metricStatKind } from "./BenchmarkReport.ts";
 import type {
   ComparisonOptions,
   MetricSection,
@@ -38,6 +39,7 @@ interface PointArgs {
   baselineMeta: UnknownRecord | undefined;
   lowBatches: boolean;
   noBatchTrim: boolean | undefined;
+  verdict: StatKind;
 }
 
 /** Timing-domain percentiles sampled for the shift function: symmetric and
@@ -69,6 +71,7 @@ export function buildShiftFunction(
   const noBatchTrim = comparison?.noBatchTrim;
   const { diffs, curAbs, baseAbs } = shiftStats(current, baseline, comparison);
   const lowBatches = hasLowBatchCount(baseline, current, noBatchTrim);
+  const verdict = metricStatKind(section);
   const ctx = {
     section,
     current,
@@ -77,6 +80,7 @@ export function buildShiftFunction(
     baselineMeta,
     lowBatches,
     noBatchTrim,
+    verdict,
   };
 
   const percentiles = shiftPercentiles.flatMap((p, i) => {
@@ -176,8 +180,12 @@ function buildPoint(args: PointArgs): ShiftPercentile | undefined {
 
   // displayed percentile mirrors for higherIsBetter (timing p99 == loc/sec p1)
   const displayed = section.higherIsBetter ? 1 - p : p;
+  // match the verdict in timing space, before the higherIsBetter mirror
+  const isPrimary =
+    typeof args.verdict === "object" && args.verdict.percentile === p;
   return {
     ...base,
+    isPrimary,
     percentile: displayed,
     label: percentileLabel(displayed),
     reliable,
@@ -202,6 +210,7 @@ function buildMeanPoint(args: PointArgs): ShiftPercentile | undefined {
   return {
     ...base,
     isMean: true,
+    isPrimary: args.verdict === "mean",
     percentile: 0,
     label: "mean",
     reliable: !lowBatches,

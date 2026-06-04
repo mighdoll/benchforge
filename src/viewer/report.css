@@ -465,21 +465,18 @@
 .shift-chart-label { flex: 0 0 110px; font-size: 13px; font-weight: 600; color: #555; }
 .shift-verdict { display: inline-flex; align-items: baseline; gap: 8px; }
 .shift-verdict-pct { font-size: 14px; font-weight: 700; color: #555; }
-.shift-gloss { font-weight: 400; color: #888; }
 
 :root[data-theme="dark"] .report-panel .shift-panel { border-top-color: #3a3a3a; }
 :root[data-theme="dark"] .report-panel .shift-caption { color: #bbb; }
 :root[data-theme="dark"] .shift-popup { background: #252525; border-color: #3a3a3a; }
 :root[data-theme="dark"] .shift-popup h3 { color: #ddd; }
 :root[data-theme="dark"] .shift-verdict-pct { color: #ccc; }
-:root[data-theme="dark"] .shift-gloss { color: #999; }
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) .report-panel .shift-panel { border-top-color: #3a3a3a; }
   :root:not([data-theme="light"]) .report-panel .shift-caption { color: #bbb; }
   :root:not([data-theme="light"]) .shift-popup { background: #252525; border-color: #3a3a3a; }
   :root:not([data-theme="light"]) .shift-popup h3 { color: #ddd; }
   :root:not([data-theme="light"]) .shift-verdict-pct { color: #ccc; }
-  :root:not([data-theme="light"]) .shift-gloss { color: #999; }
 }
 
 /* --- Matrix section: dense table of scalar metrics (e.g. GC) --- */

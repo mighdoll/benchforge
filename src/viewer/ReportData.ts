@@ -120,6 +120,10 @@ export interface ShiftPercentile {
    *  the plot gives it its own slot ahead of p1, set off by a divider. */
   isMean?: boolean;
 
+  /** true for the point matching the section's configured verdict stat (the
+   *  selected verdict); rendered with a larger label. */
+  isPrimary?: boolean;
+
   /** Displayed-metric percentile in [0, 1] (e.g. 0.5 for the median). */
   percentile: number;
   /** Short label, e.g. "p50", "p99", "p0.1". */
