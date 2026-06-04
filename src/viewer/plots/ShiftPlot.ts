@@ -273,7 +273,7 @@ function drawMarker(
 }
 
 /** Percentile label (and tail-count caption for unreliable percentiles). The
- *  mean label is drawn darker since it is the primary metric. */
+ *  verdict's label is enlarged and bolded so it reads as the selected stat. */
 function drawPercentileLabel(
   svg: SVGSVGElement,
   point: ShiftPercentile,
@@ -287,9 +287,9 @@ function drawPercentileLabel(
       height - margin.bottom + 16,
       point.label,
       "middle",
-      "11",
+      point.isPrimary ? "13" : "11",
       color,
-      point.isMean ? "700" : "600",
+      point.isPrimary ? "700" : "600",
     ),
   );
   if (!point.reliable)

@@ -72,6 +72,36 @@ test("leads with mean, then one point per sampled percentile", () => {
   expect(sf!.points.slice(1).every(p => !p.isMean)).toBe(true);
 });
 
+test("isPrimary marks the configured verdict percentile, not the mean", () => {
+  const sf = buildShiftFunction(
+    timeMetric, // statKind: { percentile: 0.5 }
+    batched(30, 50, 0.1),
+    batched(30, 50),
+    {},
+    {},
+    fast,
+  )!;
+  expect(sf.points[0].isPrimary).toBe(false); // leading mean is not the verdict
+  const primary = sf.points.filter(p => p.isPrimary);
+  expect(primary.length).toBe(1);
+  expect(primary[0].percentile).toBe(0.5);
+});
+
+test("isPrimary marks the mean when the verdict stat is mean", () => {
+  const meanMetric = metricSection({ title: "lines / sec", formatter: timeMs });
+  const sf = buildShiftFunction(
+    meanMetric,
+    batched(30, 50, 0.1),
+    batched(30, 50),
+    {},
+    {},
+    fast,
+  )!;
+  expect(sf.points[0].isMean).toBe(true);
+  expect(sf.points[0].isPrimary).toBe(true);
+  expect(sf.points.slice(1).every(p => !p.isPrimary)).toBe(true);
+});
+
 test("percentile points are sorted ascending (mean stays first)", () => {
   const sf = buildShiftFunction(
     timeMetric,

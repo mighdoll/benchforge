@@ -427,7 +427,6 @@ function ShiftPanel({ shift }: { shift: ShiftFunction }) {
     <div class="shift-panel">
       <div class="shift-caption" title="click a percentile for current vs baseline detail">
         change by percentile
-        <span class="shift-gloss"> &mdash; green better, red worse, blue no change, grey uncertain</span>
       </div>
       <div class="shift-plot" ref={ref} title="click a percentile for current vs baseline detail" />
       {selected && (
