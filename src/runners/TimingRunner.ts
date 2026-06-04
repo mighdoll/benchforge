@@ -27,6 +27,9 @@ type CollectResult = {
   heapGrowth: number;
   heapSamples: number[];
   startTime: number;
+  /** performance.now() at loop start, sharing the clock of --trace-gc-nvp
+   *  offsets, so GC events can be rebased to loop-relative time. */
+  loopStartTime: number;
   optStatus?: OptStatusInfo;
   optSamples?: number[];
   pausePoints: PausePoint[];
@@ -75,8 +78,9 @@ async function collectSamples<T>(
   }
   const warmupSamples = config.skipWarmup ? [] : await runWarmup(config);
   const heapBefore = process.memoryUsage().heapUsed;
-  const { samples, heapSamples, optStatuses, pausePoints, startTime } =
-    await runSampleLoop(config);
+  const loop = await runSampleLoop(config);
+  const { samples, heapSamples, optStatuses, pausePoints } = loop;
+  const { startTime, loopStartTime } = loop;
   if (samples.length === 0)
     throw new Error(
       `No samples collected for benchmark: ${config.benchmark.name}`,
@@ -95,6 +99,7 @@ async function collectSamples<T>(
     heapGrowth,
     heapSamples,
     startTime,
+    loopStartTime,
     optStatus,
     optSamples,
     pausePoints,
@@ -107,8 +112,8 @@ function buildMeasuredResults(
   collected: CollectResult,
 ): MeasuredResults {
   const { samples, warmupSamples, heapSamples } = collected;
-  const { optStatus, optSamples, pausePoints, heapGrowth, startTime } =
-    collected;
+  const { optStatus, optSamples, pausePoints, heapGrowth } = collected;
+  const { startTime, loopStartTime } = collected;
   const time = computeStats(samples);
   const heapSize = { avg: heapGrowth, min: heapGrowth, max: heapGrowth };
   return {
@@ -119,6 +124,7 @@ function buildMeasuredResults(
     time,
     heapSize,
     startTime,
+    loopStartTime,
     optStatus,
     optSamples,
     pausePoints,
@@ -165,7 +171,7 @@ async function runWarmup<T>(config: CollectParams<T>): Promise<number[]> {
 /** Collect timing samples with optional periodic pauses for V8 background compilation to complete. */
 async function runSampleLoop<T>(
   config: CollectParams<T>,
-): Promise<SampleArrays & { startTime: number }> {
+): Promise<SampleArrays & { startTime: number; loopStartTime: number }> {
   const { maxTime, maxIterations, pauseFirst } = config;
   const { pauseInterval = 0, pauseDuration = 100 } = config;
   const getOptStatus = config.traceOpt ? createOptStatusGetter() : undefined;
@@ -205,7 +211,7 @@ async function runSampleLoop<T>(
   }
 
   trimArrays(arrays, count, trackOpt);
-  return { ...arrays, startTime };
+  return { ...arrays, startTime, loopStartTime: loopStart };
 }
 
 /** Pre-allocate sample arrays to reduce GC pressure during measurement. */

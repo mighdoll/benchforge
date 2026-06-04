@@ -1,3 +1,4 @@
+import type { GcByBatchSummary } from "../report/GcByBatch.ts";
 import type { GitVersion } from "../report/GitUtils.ts";
 import type { PausePoint } from "../runners/MeasuredResults.ts";
 import type {
@@ -50,6 +51,8 @@ export interface BenchmarkEntry {
   optSamples?: number[];
   pausePoints?: PausePoint[];
   batchOffsets?: number[];
+  /** Per-batch full-GC diagnostic summary (worker-mode --gc-stats runs). */
+  gcByBatch?: GcByBatchSummary;
   stats: BenchmarkStats;
   heapSize?: { min: number; max: number; avg: number };
   totalTime?: number;

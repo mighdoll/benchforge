@@ -9,11 +9,23 @@ test("parseGcLine parses scavenge event from real V8 output", () => {
   expect(event).toMatchObject({
     type: "scavenge",
     pauseMs: 0.5,
+    offset: 9,
     allocated: 293224,
     promoted: 653480,
     survived: 290176,
     collected: 4392688 - 4287840,
   });
+});
+
+test("parseGcLine extracts offset from the nvp line prefix", () => {
+  const line =
+    "[1234:0x12345:0] 247 ms: pause=12.3 gc=mc start_object_size=5000000 end_object_size=3000000";
+  expect(parseGcLine(line)?.offset).toBe(247);
+});
+
+test("parseGcLine has undefined offset when prefix is absent", () => {
+  const line = "gc=s pause=1.0";
+  expect(parseGcLine(line)?.offset).toBeUndefined();
 });
 
 test("parseGcLine parses mark-sweep event", () => {

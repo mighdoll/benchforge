@@ -2,8 +2,7 @@ import type { NavTiming } from "../profiling/browser/BrowserProfiler.ts";
 import type { CoverageData } from "../profiling/node/CoverageTypes.ts";
 import type { HeapProfile } from "../profiling/node/HeapSampler.ts";
 import type { TimeProfile } from "../profiling/node/TimeSampler.ts";
-import type { GcStats } from "../runners/GcStats.ts";
-import type { NodeGCTime } from "../runners/NodeGC.ts";
+import type { GcEvent, GcStats } from "../runners/GcStats.ts";
 
 /** Benchmark results: times in milliseconds, sizes in kilobytes */
 export interface MeasuredResults {
@@ -59,14 +58,15 @@ export interface MeasuredResults {
     max: number;
   };
 
-  /** Stop-the-world GC pause time (ms) via Node perf hooks (nodeObserveGC). */
-  nodeGcTime?: NodeGCTime;
-
   /** Total time spent collecting samples (seconds) */
   totalTime?: number;
 
   /** Monotonic start time (μs, hrtime-based) for Perfetto trace alignment. */
   startTime?: number;
+
+  /** performance.now() at sample-loop start, sharing the clock of
+   *  --trace-gc-nvp offsets. Used to rebase GC events to loop-relative time. */
+  loopStartTime?: number;
 
   /** V8 optimization tier tracking (requires --allow-natives-syntax) */
   optStatus?: OptStatusInfo;
@@ -82,6 +82,10 @@ export interface MeasuredResults {
 
   /** GC stats from V8's --trace-gc-nvp (requires --gc-stats and worker mode) */
   gcStats?: GcStats;
+
+  /** Per-event GC records with loop-relative offsets, preserved alongside the
+   *  aggregate gcStats (requires --gc-stats and worker mode). */
+  gcEvents?: GcEvent[];
 
   /** Heap sampling allocation profile (requires --heap-sample and worker mode) */
   heapProfile?: HeapProfile;

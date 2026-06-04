@@ -8,7 +8,13 @@ import type {
   ViewerRow,
   ViewerSection,
 } from "../viewer/ReportData.ts";
-import { formatSignedPercent } from "./Formatters.ts";
+import {
+  formatBytes,
+  formatSignedPercent,
+  integer,
+  timeMs,
+} from "./Formatters.ts";
+import type { GcByBatchSummary, Spread } from "./GcByBatch.ts";
 import { formatGitVersion, type GitVersion } from "./GitUtils.ts";
 import { verdictWord } from "./Verdict.ts";
 
@@ -51,8 +57,54 @@ function benchmarkMarkdown(entry: BenchmarkEntry): string {
   const runs = findRunsValue(sections);
   const meta = runs ? [`runs: ${runs}`] : [];
   const parts = sections.flatMap(s => sectionMarkdown(s));
-  if (!parts.length && !meta.length) return "";
-  return [`### ${entry.name}`, ...meta, ...parts].join("\n\n");
+  const gc = entry.gcByBatch ? gcByBatchMarkdown(entry.gcByBatch) : [];
+  if (!parts.length && !meta.length && !gc.length) return "";
+  return [`### ${entry.name}`, ...meta, ...parts, ...gc].join("\n\n");
+}
+
+/** Per-batch full-GC diagnostic: how much full-collection cost and placement
+ *  vary batch-to-batch, plus a post-GC cache-penalty probe. Rendered only when
+ *  full GCs were observed (the framing is full collections). */
+function gcByBatchMarkdown(gc: GcByBatchSummary): string[] {
+  if (gc.fullGCs === 0) return [];
+  const header = "| measure | per batch / event |\n|---|---|";
+  const rows = [
+    `| full GCs / batch | ${spreadCounts(gc.fullPerBatch)} |`,
+    `| full-GC pause | ${spreadTime(gc.fullPause)} |`,
+    `| bytes collected / full GC | ${spreadBytes(gc.fullCollected)} |`,
+    `| totals | ${gc.fullGCs} full, ${gc.scavenges} scavenge, ${gc.batches} batches |`,
+  ];
+  return [
+    "#### full GC by batch",
+    [header, ...rows].join("\n"),
+    ...cacheProbeLine(gc),
+  ];
+}
+
+/** One-line cache-penalty readout, or nothing when unmeasurable. */
+function cacheProbeLine(gc: GcByBatchSummary): string[] {
+  const p = gc.cacheProbe;
+  if (!p) return [];
+  const post = timeMs(p.postGcMean);
+  const all = timeMs(p.overallMean);
+  const pen = formatSignedPercent(p.penaltyRatio * 100);
+  return [
+    `post-GC cache probe: first ${p.windowK} iters after each full GC ` +
+      `average ${post} vs loop mean ${all} (${pen}), n=${p.events} full GCs`,
+  ];
+}
+
+function spreadCounts(s: Spread): string {
+  const range = s.min === s.max ? `${s.min}` : `${s.min}..${s.max}`;
+  return `${range} (mean ${s.mean.toFixed(1)})`;
+}
+
+function spreadTime(s: Spread): string {
+  return `${timeMs(s.min)}..${timeMs(s.max)} (mean ${timeMs(s.mean)}, CV ${integer(s.cv * 100)}%)`;
+}
+
+function spreadBytes(s: Spread): string {
+  return `${formatBytes(s.min)}..${formatBytes(s.max)} (mean ${formatBytes(s.mean)}, CV ${integer(s.cv * 100)}%)`;
 }
 
 /** @return the runs count from the runs row (current run), if any. */
