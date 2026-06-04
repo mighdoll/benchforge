@@ -22,6 +22,9 @@ export interface GcEvent {
   type: "scavenge" | "mark-compact" | "minor-ms" | "unknown";
   pauseMs: number;
   collected: number;
+  /** Wall-clock ms since process start, from the nvp line prefix (Node only).
+   *  Rebased to benchmark-loop time downstream for sample-index mapping. */
+  offset?: number;
   /** Node only. */
   allocated?: number;
   /** Node only. */
@@ -49,8 +52,9 @@ export function parseGcLine(line: string): GcEvent | undefined {
   const start = intField("start_object_size");
   const end = intField("end_object_size");
   const collected = start > end ? start - end : 0;
+  const offset = parseOffset(line);
 
-  return { type, pauseMs, allocated, collected, promoted, survived };
+  return { type, pauseMs, offset, allocated, collected, promoted, survived };
 }
 
 /** Aggregate a list of GC events into summary statistics. */
@@ -84,6 +88,13 @@ export function aggregateGcStats(events: GcEvent[]): GcStats {
     gcPauseTime,
     ...(hasNode && { totalAllocated, totalPromoted, totalSurvived }),
   };
+}
+
+/** Extract the wall-clock offset (ms since process start) from the nvp line
+ *  prefix, e.g. `[71753:0x...:0] 9 ms: ...` ==> 9. Undefined if absent. */
+function parseOffset(line: string): number | undefined {
+  const match = line.match(/^\[[^\]]*\]\s+(\d+)\s+ms:/);
+  return match ? Number.parseInt(match[1], 10) : undefined;
 }
 
 /** Parse name=value pairs from a trace-gc-nvp line. */

@@ -15,12 +15,12 @@ import type {
   ShiftPercentile,
   ShiftRun,
 } from "../viewer/ReportData.ts";
-import { metricStatKind } from "./BenchmarkReport.ts";
 import type {
   ComparisonOptions,
   MetricSection,
   UnknownRecord,
 } from "./BenchmarkReport.ts";
+import { metricStatKind } from "./BenchmarkReport.ts";
 import {
   annotateCI,
   formatBootstrapCI,

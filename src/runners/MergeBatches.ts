@@ -1,4 +1,4 @@
-import type { GcStats } from "./GcStats.ts";
+import type { GcEvent, GcStats } from "./GcStats.ts";
 import type { MeasuredResults } from "./MeasuredResults.ts";
 import { computeStats } from "./SampleStats.ts";
 
@@ -38,18 +38,8 @@ export function mergeBatchResults(results: MeasuredResults[]): MeasuredResults {
   const allSamples = trimmed.flatMap(r => r.samples);
   const time = computeStats(allSamples);
 
-  const batchOffsets: number[] = [];
-  const offsetPauses: MeasuredResults["pausePoints"] = [];
-  let offset = 0;
-  for (const r of trimmed) {
-    batchOffsets.push(offset);
-    for (const p of r.pausePoints ?? []) {
-      const sampleIndex = p.sampleIndex + offset;
-      offsetPauses.push({ sampleIndex, durationMs: p.durationMs });
-    }
-    offset += r.samples.length;
-  }
-
+  const { batchOffsets, offsetPauses, mergedGcEvents } =
+    mergeTimelines(trimmed);
   const iterations = results.reduce(
     (sum, r) => sum + (r.iterations ?? r.samples.length),
     0,
@@ -76,6 +66,7 @@ export function mergeBatchResults(results: MeasuredResults[]): MeasuredResults {
     batchOffsets,
     gcStats: mergeGcStats(results),
     batchGcStats: batchGcStats.length ? batchGcStats : undefined,
+    gcEvents: mergedGcEvents.length ? mergedGcEvents : undefined,
   };
 }
 
@@ -142,6 +133,40 @@ export async function runBatched(
   return { results, baseline: mergedBaseline };
 }
 
+/** Per-batch timeline data shifted onto the merged sample timeline. */
+interface MergedTimelines {
+  batchOffsets: number[];
+  offsetPauses: NonNullable<MeasuredResults["pausePoints"]>;
+  mergedGcEvents: GcEvent[];
+}
+
+/** Walk the batches, shifting pause points (by sample index) and GC events (by
+ *  cumulative loop time) onto the merged timeline, and record each batch's start
+ *  offset. GC offsets are loop-relative per batch; adding the prior batches'
+ *  total time lets the merged cumulative-sample mapping place them correctly. */
+function mergeTimelines(batches: MeasuredResults[]): MergedTimelines {
+  const batchOffsets: number[] = [];
+  const offsetPauses: NonNullable<MeasuredResults["pausePoints"]> = [];
+  const mergedGcEvents: GcEvent[] = [];
+  let offset = 0;
+  let prefixTime = 0;
+  for (const r of batches) {
+    batchOffsets.push(offset);
+    for (const p of r.pausePoints ?? [])
+      offsetPauses.push({
+        sampleIndex: p.sampleIndex + offset,
+        durationMs: p.durationMs,
+      });
+    for (const e of r.gcEvents ?? [])
+      mergedGcEvents.push(
+        e.offset === undefined ? e : { ...e, offset: e.offset + prefixTime },
+      );
+    offset += r.samples.length;
+    prefixTime += r.samples.reduce((sum, s) => sum + s, 0);
+  }
+  return { batchOffsets, offsetPauses, mergedGcEvents };
+}
+
 /** Systematically subsample parallel sample arrays in a batch by `factor`.
  *  Stride sampling preserves time-order for time-series plots; the bootstrap
  *  doesn't care about ordering, so this is unbiased for stats too. */
@@ -161,6 +186,7 @@ function subsampleBatch(r: MeasuredResults, factor: number): MeasuredResults {
     optSamples: opt(r.optSamples),
     allocationSamples: opt(r.allocationSamples),
     pausePoints: undefined, // sample indices no longer match after stride
+    gcEvents: undefined, // time offsets no longer map to strided samples
   };
 }
 

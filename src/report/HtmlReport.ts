@@ -7,6 +7,7 @@ import {
 } from "../profiling/node/HeapSampleReport.ts";
 import type { HeapProfile } from "../profiling/node/HeapSampler.ts";
 import { resolveProfile } from "../profiling/node/ResolvedProfile.ts";
+import type { GcEvent } from "../runners/GcStats.ts";
 import type { MeasuredResults } from "../runners/MeasuredResults.ts";
 import {
   type DifferenceCI,
@@ -18,6 +19,7 @@ import type {
   CoverageSummary,
   HeapSummary,
   ReportData,
+  GcEvent as ViewerGcEvent,
   ViewerSection,
 } from "../viewer/ReportData.ts";
 import {
@@ -28,6 +30,7 @@ import {
   type ReportSection,
   type UnknownRecord,
 } from "./BenchmarkReport.ts";
+import { gcByBatch } from "./GcByBatch.ts";
 import { gcStatsSection } from "./GcSections.ts";
 import type { GitVersion } from "./GitUtils.ts";
 import { optSection, runsSection, timeSection } from "./StandardSections.ts";
@@ -157,16 +160,28 @@ function prepareBenchmarkData(
     warmupSamples: m.warmupSamples,
     allocationSamples: m.allocationSamples,
     heapSamples: m.heapSamples,
-    gcEvents: m.nodeGcTime?.events,
+    gcEvents: viewerGcEvents(m.gcEvents),
     optSamples: m.optSamples,
     pausePoints: m.pausePoints,
     batchOffsets: m.batchOffsets,
+    gcByBatch: gcByBatch(m),
     stats: m.time,
     heapSize: m.heapSize,
     totalTime: m.totalTime,
     heapSummary: m.heapProfile ? summarizeHeap(m.heapProfile) : undefined,
     coverageSummary: m.coverage ? summarizeCoverage(m.coverage) : undefined,
   };
+}
+
+/** Map engine GC events to the viewer's {offset, duration} shape, keeping only
+ *  events whose offset was rebased to loop-relative time (others can't be placed
+ *  on the time-series axis). */
+function viewerGcEvents(
+  events: GcEvent[] | undefined,
+): ViewerGcEvent[] | undefined {
+  const placed = events?.filter(e => e.offset !== undefined);
+  if (!placed?.length) return undefined;
+  return placed.map(e => ({ offset: e.offset!, duration: e.pauseMs }));
 }
 
 /** @return user-facing warning strings about CI reliability, or undefined if none apply */

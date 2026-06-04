@@ -74,14 +74,6 @@ export function createMeasuredResults(
       p99: percentile(samples, 0.99),
       p999: percentile(samples, 0.999),
     },
-    nodeGcTime: {
-      inRun: 0.09,
-      before: 0.01,
-      after: 0.02,
-      total: 0.12,
-      collects: 3,
-      events: [],
-    },
     ...overrides,
   };
 }

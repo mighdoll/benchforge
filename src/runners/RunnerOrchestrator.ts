@@ -211,7 +211,10 @@ function setupGcCapture(worker: ChildProcess, gcEvents: GcEvent[]): void {
   });
 }
 
-/** Attach profiling data collected by the worker to each result. */
+/** Attach profiling data collected by the worker to each result. The GC
+ *  aggregate and per-event array both count only in-loop events; warmup and
+ *  import GCs (offsets before loop start) are excluded so the GC summary
+ *  reflects the measured iterations, not setup. */
 function attachProfilingData(
   results: MeasuredResults[],
   gcEvents: GcEvent[] | undefined,
@@ -219,17 +222,43 @@ function attachProfilingData(
   timeProfile?: TimeProfile,
   coverage?: CoverageData,
 ): void {
-  const gcStats = gcEvents?.length ? aggregateGcStats(gcEvents) : undefined;
   const attach = <K extends keyof MeasuredResults>(
     key: K,
     value: MeasuredResults[K] | undefined,
   ) => {
     if (value) for (const r of results) r[key] = value;
   };
-  attach("gcStats", gcStats);
   attach("heapProfile", heapProfile);
   attach("timeProfile", timeProfile);
   attach("coverage", coverage);
+  // GC offsets are process-start-relative; rebase per result to loop time so
+  // they share the sample timeline, then drop pre-loop (warmup/import) events.
+  if (!gcEvents?.length) return;
+  for (const r of results) {
+    const loopEvents = loopGcEvents(gcEvents, r.loopStartTime);
+    r.gcEvents = loopEvents;
+    r.gcStats = loopEvents.length ? aggregateGcStats(loopEvents) : undefined;
+  }
+}
+
+/** Rebase GC offsets to loop-relative time and keep only in-loop events.
+ *  Without a loop anchor we can't tell warmup from loop, so keep all (offsets
+ *  dropped, since they can't be placed on the sample timeline). */
+function loopGcEvents(
+  gcEvents: GcEvent[],
+  loopStartTime: number | undefined,
+): GcEvent[] {
+  if (loopStartTime === undefined) return gcEvents.map(stripOffset);
+  const rebased = gcEvents.map(e =>
+    e.offset === undefined ? e : { ...e, offset: e.offset - loopStartTime },
+  );
+  return rebased.filter(e => e.offset === undefined || e.offset >= 0);
+}
+
+/** Drop the offset (unanchored, so not placeable on the sample timeline). */
+function stripOffset(e: GcEvent): GcEvent {
+  const { offset: _drop, ...rest } = e;
+  return rest;
 }
 
 /** Resolve WorkerScript path for dev (.ts) or dist (.mjs) */
