@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "preact/hooks";
 import { useLazyPlot } from "./LazyPlot.ts";
 import type { GitVersion } from "../../report/GitUtils.ts";
+import { verdictWord } from "../../report/Verdict.ts";
 import type { CIDirection, DifferenceCI } from "../../stats/StatisticalUtils.ts";
 import { formatRelativeTime } from "../DateFormat.ts";
 import { formatCount, formatDecimalBytes } from "../LineData.ts";
@@ -426,6 +427,7 @@ function ShiftPanel({ shift }: { shift: ShiftFunction }) {
     <div class="shift-panel">
       <div class="shift-caption" title="click a percentile for current vs baseline detail">
         change by percentile
+        <span class="shift-gloss"> &mdash; green better, red worse, blue no change, grey uncertain</span>
       </div>
       <div class="shift-plot" ref={ref} title="click a percentile for current vs baseline detail" />
       {selected && (
@@ -485,15 +487,13 @@ function ShiftPopup({ point, metric, equivMargin, onClose }: {
   // Shared x-domain so the per-run absolute charts use one scale: equal pixel
   // positions mean equal values, making medians and CIs comparable across runs.
   const domain = runsDomain(point.runs);
-  const unreliableNote = point.reliable
-    ? null
-    : <span class="shift-unreliable"> (unreliable, n={point.tailCount})</span>;
   return (
     <div class="shift-overlay" onClick={e => e.target === e.currentTarget && onClose()}>
       <div class="shift-popup">
         <span class="shift-close" onClick={onClose}>{"×"}</span>
         <div class="shift-popup-head">
-          <h3>{metric} &middot; {point.label}{unreliableNote}</h3>
+          <h3>{metric} &middot; {point.label}</h3>
+          <ShiftVerdict point={point} />
         </div>
         <ShiftPopupDiff ci={diff} equivMargin={equivMargin} />
         {point.runs.map((run, i) => (
@@ -501,6 +501,27 @@ function ShiftPopup({ point, metric, equivMargin, onClose }: {
         ))}
       </div>
     </div>
+  );
+}
+
+/** Capitalize the first letter (verdict words are lowercase). */
+function cap(s: string): string {
+  return s.charAt(0).toUpperCase() + s.slice(1);
+}
+
+/** Popup-title verdict chip. Unreliable percentiles report insufficient data
+ *  instead of a verdict (the direction is untrustworthy with too few samples). */
+function ShiftVerdict({ point }: { point: ShiftPercentile }) {
+  if (!point.reliable)
+    return (
+      <span class="badge badge-insufficient">Insufficient data &middot; n={point.tailCount}</span>
+    );
+  const { direction, percent } = point.diff;
+  return (
+    <span class="shift-verdict">
+      <span class={`badge badge-${direction}`}>{cap(verdictWord(direction))}</span>
+      <span class="shift-verdict-pct">{formatPct(percent)}</span>
+    </span>
   );
 }
 
