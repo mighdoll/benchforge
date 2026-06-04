@@ -229,8 +229,8 @@ frequency shifts), and the code's own GC, whose collection timing varies run to
 run and wobbles the measured speed.
 
 `--calibrate` measures this directly. It runs the current build against an
-identical copy of itself, repeated many times, then
-prints a suggested `--equiv-margin`:
+identical copy of itself, repeated many times, then prints a suggested
+`--equiv-margin`:
 
 ```bash
 benchforge my-bench.ts --calibrate --batches 50 --duration 2
@@ -254,15 +254,31 @@ For the suggested margin to apply to your real comparisons:
 - **Use the same `--batches` and `--duration`** you'll use for comparisons. CI
   width scales roughly with `1/sqrt(batches)`, so a margin measured at one batch
   count is wrong for another.
-- **Run on a quiet machine.** Quit other apps, pause background sync and
-  software updates, and avoid thermal throttling. Calibration measures whatever
-  moves between runs, so a busy machine inflates the suggested margin.
 - **For GC-sensitive code, give each batch a few full GCs.** Set `--duration`
-  long enough that at least ~2 major collections happen per batch. With only one,
-  the batch mean depends on where that collection lands, and its timing varies
-  between runs in a way the within-run CI can't see -- a common cause of the
-  overconfidence warning. Run with `--gc-stats` to check; calibrate warns when
-  full GCs per batch is too low. Longer batches fix this; more batches don't.
+  long enough that at least ~2 major collections happen per batch. With only
+  one, the batch mean depends on where that collection lands, and its timing
+  varies between runs in a way the within-run CI can't see, a common cause of
+  the overconfidence warning. Run with `--gc-stats` to check; calibrate warns
+  when full GCs per batch is too low. Longer batches fix this; more batches
+  don't.
+
+##### Calibrate the way you'll compare
+
+Calibration measures the background load present while it runs, so a quiet
+machine gives the tightest margin (quit other apps, pause background sync and
+updates, avoid thermal throttling). But if you do routine checks with your
+editor and browser open, calibrate that way too, so the margin reflects your
+steady background load rather than an idle machine.
+
+Bursty noise is different: a surge may or may not fire during any given
+calibration run, so the margin can't reliably account for it. Benchforge drops
+slow-outlier batches, so a clear surge is discarded outright. A sub-threshold
+surge is diluted across the other batches, usually widening the interval to
+"uncertain" rather than flipping a verdict. But with a narrow margin, a
+sub-threshold surge can still tip a result to a false better/worse. Two things
+guard against a false verdict: calibrate the steady floor under representative
+conditions, and run more batches when the machine is noisy (more batches both
+dilute each surge and give the outlier filter more to work with).
 
 Use `--equiv-margin 0` to disable equivalence testing and fall back to the
 simple CI-excludes-zero approach.
@@ -271,7 +287,8 @@ simple CI-excludes-zero approach.
 
 Benchforge warns when a comparison has fewer than 20 batches and disables the
 direction indicator. For reliable comparisons, use 40+ batches. More batches
-narrow the confidence interval, the tradeoff is increased time for tests.
+narrow the confidence interval and shrink how much any single environmental
+surge can move the result; the tradeoff is increased time for tests.
 
 ## Reading the Results
 
