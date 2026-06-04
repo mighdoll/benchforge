@@ -2,6 +2,7 @@ import { expect, test } from "vitest";
 import {
   blockDifferenceCI,
   blockPoolDifferenceCI,
+  classifyDirection,
   diffCIs,
 } from "../stats/BootstrapDifference.ts";
 import {
@@ -141,6 +142,34 @@ test("blockDifferenceCI shows uncertainty for noise", () => {
   expect(result.ci[0]).toBeLessThanOrEqual(0);
   expect(result.ci[1]).toBeGreaterThanOrEqual(0);
   expect(result.direction).toBe("uncertain");
+});
+
+test("classifyDirection without a margin colors any CI excluding zero", () => {
+  expect(classifyDirection([-3, -1], -2)).toBe("faster");
+  expect(classifyDirection([1, 3], 2)).toBe("slower");
+  expect(classifyDirection([-1, 2], 0.5)).toBe("uncertain");
+});
+
+test("classifyDirection: CI fully inside the margin is equivalent", () => {
+  expect(classifyDirection([-0.5, 0.4], 0.1, 2)).toBe("equivalent");
+});
+
+test("classifyDirection: CI straddling zero and exceeding the margin is uncertain", () => {
+  // Straddles zero AND pokes outside the band, so it is neither proven-equivalent
+  // nor proven-different: inconclusive.
+  expect(classifyDirection([-3, 2.5], -0.6, 2)).toBe("uncertain");
+});
+
+test("classifyDirection: excludes zero but point estimate within margin is equivalent", () => {
+  // The straddler: CI clears zero (a real effect) but its center sits inside the
+  // noise band, so it is "real but within noise" -> equivalent, not slower.
+  expect(classifyDirection([-2.5, -0.2], -1, 2)).toBe("equivalent");
+  expect(classifyDirection([0.2, 2.5], 1, 2)).toBe("equivalent");
+});
+
+test("classifyDirection: effect clearing the margin is faster/slower", () => {
+  expect(classifyDirection([-4, -2.5], -3, 2)).toBe("faster");
+  expect(classifyDirection([2.5, 4], 3, 2)).toBe("slower");
 });
 
 test("blockPoolBootstrap CI brackets the pooled estimate", () => {

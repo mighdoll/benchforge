@@ -187,18 +187,22 @@ export function binBootstrapResult(result: BootstrapResult): BinnedCI {
   return { estimate, ci, histogram: binValues(samples) };
 }
 
-/** @return CI direction, with optional equivalence margin (in percent) */
-function classifyDirection(
+/** @return CI direction, with optional equivalence margin (in percent).
+ *  faster/slower require the effect to clear the margin (the calibrated noise
+ *  floor), not merely exclude zero: a CI that excludes zero but whose point
+ *  estimate sits inside +/-margin is "real but within noise", reported as
+ *  equivalent. Without a margin, any CI excluding zero is faster/slower. */
+export function classifyDirection(
   ci: [number, number],
   observed: number,
   margin?: number,
 ): CIDirection {
-  const withinMargin =
-    margin != null && margin > 0 && ci[0] >= -margin && ci[1] <= margin;
-  if (withinMargin) return "equivalent";
+  const hasMargin = margin != null && margin > 0;
+  if (hasMargin && ci[0] >= -margin && ci[1] <= margin) return "equivalent";
   const excludesZero = ci[0] > 0 || ci[1] < 0;
-  if (excludesZero) return observed < 0 ? "faster" : "slower";
-  return "uncertain";
+  if (!excludesZero) return "uncertain";
+  if (hasMargin && Math.abs(observed) <= margin) return "equivalent";
+  return observed < 0 ? "faster" : "slower";
 }
 
 /** @return values binned into histogram for compact visualization */
