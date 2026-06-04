@@ -280,9 +280,6 @@ guard against a false verdict: calibrate the steady floor under representative
 conditions, and run more batches when the machine is noisy (more batches both
 dilute each surge and give the outlier filter more to work with).
 
-Use `--equiv-margin 0` to disable equivalence testing and fall back to the
-simple CI-excludes-zero approach.
-
 ### Batch Count
 
 Benchforge warns when a comparison has fewer than 20 batches and disables the
