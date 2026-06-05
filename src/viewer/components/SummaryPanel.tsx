@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "preact/hooks";
-import { useLazyPlot } from "./LazyPlot.ts";
+import { useLazyPlot, useResponsivePlot } from "./LazyPlot.ts";
 import type { GitVersion } from "../../report/GitUtils.ts";
 import { verdictWord } from "../../report/Verdict.ts";
 import type { CIDirection, DifferenceCI } from "../../stats/StatisticalUtils.ts";
@@ -391,7 +391,7 @@ function ShiftSection(
   const primary = section.rows.find(r => r.primary);
   const shared = section.rows.filter(r => r.shared);
   return (
-    <div class="section-panel">
+    <div class="section-panel primary-section">
       <div class="panel-header">{titleEl}</div>
       <div class="panel-body">
         {primary && <StatRow row={primary} chartOnly />}
@@ -477,9 +477,9 @@ function SharedStat({ label, value }: { label: string; value: string }) {
 /** Always-visible per-percentile shift function below the section's stat rows.
  *  Clicking any violin opens the shared detail popup for that percentile. */
 function ShiftPanel({ shift }: { shift: ShiftFunction }) {
-  const ref = useLazyPlot(async () => {
+  const ref = useResponsivePlot(async width => {
     const { createShiftPlot } = await import("../plots/ShiftPlot.ts");
-    return createShiftPlot(shift, { onSelect: p => openShiftDetail(shift, p) });
+    return createShiftPlot(shift, { width, onSelect: p => openShiftDetail(shift, p) });
   }, [shift], "Shift plot");
   return (
     <div class="shift-panel">

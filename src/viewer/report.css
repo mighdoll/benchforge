@@ -124,9 +124,15 @@
 
 .report-panel .panel-grid {
   display: grid;
-  grid-template-columns: repeat(2, 1fr);
+  grid-template-columns: repeat(auto-fit, minmax(380px, 1fr));
   gap: 12px;
   margin-top: 12px;
+  align-items: start;
+}
+
+/* The metric/shift card needs the full width to show all percentile violins. */
+.report-panel .panel-grid > .section-panel.primary-section {
+  grid-column: 1 / -1;
 }
 
 /* --- Section panel --- */
