@@ -114,12 +114,17 @@ function buildMeasuredResults(
  * (Ignition ==> Sparkplug ==> Maglev ==> TurboFan) before measurement. Returns
  * warmup timings.
  *
- * The gc runs BEFORE the warmup loop, not after: warmup allocations then refill
- * the heap to its working set, so measurement starts on a warm heap. A gc placed
- * AFTER warmup would reset the heap to its post-collection floor, and the first
- * measured iterations would re-pay the heap-fill / allocation-site retenuring
- * transient -- leaving a residual ramp even after a long warmup. With warmup=0
- * this is just a clean-heap gc before measurement (unchanged from before).
+ * The gc runs BEFORE the warmup loop, not after, so measurement starts on a warm
+ * heap. What carries across is NOT the heap contents (each call drops its objects
+ * as garbage) -- it is the optimized code AND the allocation-site pretenuring
+ * assumptions that code was compiled against (new-gen vs old-gen per alloc site,
+ * baked into the machine code). A gc placed AFTER warmup re-evaluates pretenuring
+ * on a just-collected heap; a flipped decision invalidates the dependent optimized
+ * code (V8: "dependent allocation site tenuring changed"), deopting the parser hot
+ * set so the first measured iterations run un-optimized. Refill scavenges add
+ * single-iteration pauses on top. Both are heap-state transients, not object reuse,
+ * and gc-before avoids both -- the ramp survives even a long warmup with gc-after.
+ * With warmup=0 this is just a clean-heap gc before measurement (unchanged).
  *
  * Tiering is invocation-gated (it needs enough calls, not main-thread idle time),
  * so a settle pause does not speed it up; bevy/link needs ~40-50 warmup iters to
