@@ -49,7 +49,6 @@ const cliOptions = {
   "report-md":      { type: "string",  requiresArg: true, describe: "markdown report path (default: bench-report/latest.md + timestamped copy; always written)" },
   editor:           { type: "string",  default: "vscode", describe: "editor for source links: vscode, cursor, or custom://scheme" },
   inspect:          { type: "boolean", default: false, describe: "run once for external profiler attach" },
-  "trace-opt":      { type: "boolean", default: false, describe: "trace V8 optimization tiers (requires --allow-natives-syntax)" },
   "pause-warmup":   { type: "number",  default: 0, requiresArg: true, describe: "post-warmup settle time in ms for V8 background compilation (0 to skip)" },
   url:              { type: "string",  requiresArg: true, describe: "page URL for browser profiling (enables browser mode)" },
   "page-load":      { type: "boolean", default: false, describe: "passive page-load profiling (no __bench needed)" },
@@ -117,7 +116,6 @@ const optionGroups = {
   "Selecting Benchmarks:": ["filter", "all", "list"],
   "V8 Tuning:": [
     "warmup",
-    "trace-opt",
     "pause-first",
     "pause-interval",
     "pause-duration",

@@ -20,8 +20,6 @@ export interface RunnerOptions {
   warmup?: number;
   /** Force GC after each iteration (requires --expose-gc) */
   gcForce?: boolean;
-  /** Trace V8 optimization tiers (requires --allow-natives-syntax) */
-  traceOpt?: boolean;
   /** Post-warmup settle time in ms for V8 background compilation (0 to skip) */
   pauseWarmup?: number;
   /** Iterations before first pause (then pauseInterval applies) */

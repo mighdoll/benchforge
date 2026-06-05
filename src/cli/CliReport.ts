@@ -10,16 +10,12 @@ import {
 } from "../profiling/node/HeapSampleReport.ts";
 import { resolveProfile } from "../profiling/node/ResolvedProfile.ts";
 import type { ReportGroup, ReportSection } from "../report/BenchmarkReport.ts";
-import { groupReports, hasField } from "../report/BenchmarkReport.ts";
+import { groupReports } from "../report/BenchmarkReport.ts";
 import colors from "../report/Colors.ts";
 import { gcStatsSection } from "../report/GcSections.ts";
 import type { GitVersion } from "../report/GitUtils.ts";
 import { prepareHtmlData } from "../report/HtmlReport.ts";
-import {
-  optSection,
-  runsSection,
-  timeSection,
-} from "../report/StandardSections.ts";
+import { runsSection, timeSection } from "../report/StandardSections.ts";
 import type { ReportData } from "../viewer/ReportData.ts";
 import type { DefaultCliArgs } from "./CliArgs.ts";
 import { cliComparisonOptions } from "./CliOptions.ts";
@@ -51,7 +47,7 @@ export function defaultReportData(
 ): ReportData {
   const sections = opts?.sections?.length
     ? opts.sections
-    : cliDefaultSections(groups, args);
+    : cliDefaultSections(args);
   return prepareHtmlData(groups, {
     cliArgs: args,
     sections,
@@ -105,27 +101,19 @@ export function matrixToReportGroups(results: MatrixResults[]): ReportGroup[] {
   );
 }
 
-/** Assemble report sections from CLI flags (time/gc/opt/runs). */
-export function buildReportSections(
-  gcStats: boolean,
-  hasOptData: boolean,
-): ReportSection[] {
+/** Assemble report sections from CLI flags (time/gc/runs). */
+export function buildReportSections(gcStats: boolean): ReportSection[] {
   return [
     timeSection,
     ...(gcStats ? [gcStatsSection] : []),
-    ...(hasOptData ? [optSection] : []),
     runsSection,
   ];
 }
 
-/** Build sections from CLI feature flags (time/gc/opt/runs). */
-function cliDefaultSections(
-  groups: ReportGroup[],
-  args: DefaultCliArgs,
-): ReportSection[] {
-  const { "gc-stats": gcStats, "trace-opt": traceOpt } = args;
-  const hasOpt = hasField(groups, "optStatus");
-  return buildReportSections(gcStats, traceOpt && hasOpt);
+/** Build sections from CLI feature flags (time/gc/runs). */
+function cliDefaultSections(args: DefaultCliArgs): ReportSection[] {
+  const { "gc-stats": gcStats } = args;
+  return buildReportSections(gcStats);
 }
 
 /** Wrap a single matrix case and its optional baseline into a ReportGroup. */

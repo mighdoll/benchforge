@@ -99,8 +99,6 @@ export interface RunMatrixOptions {
   filteredVariants?: string[];
   /** Force garbage collection between iterations */
   gcForce?: boolean;
-  /** Track V8 optimization/deoptimization events */
-  traceOpt?: boolean;
   /** Pause duration in ms before warmup begins */
   pauseWarmup?: number;
   /** Pause duration in ms before first measurement */

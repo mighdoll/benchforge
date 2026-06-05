@@ -58,7 +58,6 @@ export function mergeBatchResults(results: MeasuredResults[]): MeasuredResults {
     warmupSamples: concatOptional(trimmed, r => r.warmupSamples),
     allocationSamples: concatOptional(trimmed, r => r.allocationSamples),
     heapSamples: concatOptional(trimmed, r => r.heapSamples),
-    optSamples: concatOptional(trimmed, r => r.optSamples),
     time,
     startTime: trimmed[0].startTime,
     totalTime: results.reduce((sum, r) => sum + (r.totalTime || 0), 0),
@@ -183,7 +182,6 @@ function subsampleBatch(r: MeasuredResults, factor: number): MeasuredResults {
     ...r,
     samples: stride(r.samples),
     heapSamples: opt(r.heapSamples),
-    optSamples: opt(r.optSamples),
     allocationSamples: opt(r.allocationSamples),
     pausePoints: undefined, // sample indices no longer match after stride
     gcEvents: undefined, // time offsets no longer map to strided samples

@@ -1,7 +1,4 @@
-import type {
-  MeasuredResults,
-  OptStatusInfo,
-} from "../runners/MeasuredResults.ts";
+import type { MeasuredResults } from "../runners/MeasuredResults.ts";
 import {
   type MetricSection,
   metricSection,
@@ -31,37 +28,3 @@ export const runsSection: ScalarSection = scalarSection({
     },
   ],
 });
-
-/** Report section: V8 optimization tier distribution and deopt count. */
-export const optSection: ScalarSection = scalarSection({
-  title: "v8 opt",
-  rows: [
-    {
-      key: "tiers",
-      title: "tiers",
-      formatter: v => (typeof v === "string" ? v : ""),
-      value: (r: MeasuredResults) =>
-        r.optStatus ? formatTierSummary(r.optStatus) : undefined,
-    },
-    {
-      key: "deopt",
-      title: "deopt",
-      formatter: v => (typeof v === "number" ? String(v) : ""),
-      value: (r: MeasuredResults) => {
-        const deoptCount = r.optStatus?.deoptCount;
-        return deoptCount && deoptCount > 0 ? deoptCount : undefined;
-      },
-    },
-  ],
-});
-
-/** Format V8 tier distribution sorted by count (e.g. "turbofan:85% sparkplug:15%"). */
-function formatTierSummary(opt: OptStatusInfo): string {
-  const tiers = Object.entries(opt.byTier);
-  const total = tiers.reduce((s, [, t]) => s + t.count, 0);
-  const pct = (n: number) => `${((n / total) * 100).toFixed(0)}%`;
-  return tiers
-    .sort((a, b) => b[1].count - a[1].count)
-    .map(([name, t]) => `${name}:${pct(t.count)}`)
-    .join(" ");
-}

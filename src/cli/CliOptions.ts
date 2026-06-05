@@ -105,7 +105,7 @@ export function resolveLimits(args: {
 function cliCommonOptions(args: DefaultCliArgs) {
   const { warmup } = args;
   const { "gc-force": gcForce, "gc-stats": gcStats } = args;
-  const { "trace-opt": traceOpt, "call-counts": callCounts } = args;
+  const { "call-counts": callCounts } = args;
   const { "pause-warmup": pauseWarmup, "pause-first": pauseFirst } = args;
   const { "pause-interval": pauseInterval, "pause-duration": pauseDuration } =
     args;
@@ -114,7 +114,6 @@ function cliCommonOptions(args: DefaultCliArgs) {
   return {
     gcForce,
     warmup,
-    traceOpt,
     gcStats,
     callCounts,
     pauseWarmup,

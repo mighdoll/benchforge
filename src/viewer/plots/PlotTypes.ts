@@ -18,8 +18,6 @@ export interface TimeSeriesPoint {
   isWarmup: boolean;
   isBaseline?: boolean;
   isRejected?: boolean;
-  /** V8 optimization status code (e.g. 17=turbofan, 33=maglev) */
-  optStatus?: number;
 }
 
 /** Heap usage sample (in bytes) at a given iteration */
