@@ -8,6 +8,7 @@ import {
   type RunMatrixVariantParams,
   runMatrixVariant,
 } from "../runners/RunnerOrchestrator.ts";
+import type { VariantSource } from "../runners/RunnerUtils.ts";
 import type {
   BenchMatrix,
   RunMatrixOptions,
@@ -49,13 +50,25 @@ export async function runMatrixWithDir<T>(
   return runMatrixPlan(matrix.name, await dirPlan(matrix, variantIds, ctx));
 }
 
-/** Build a source-agnostic plan that loads each variant (and its baseline, when
- *  baselineDir is set) from a directory by id. */
+/** Build a source-agnostic plan that loads each variant from a directory by id,
+ *  with its interleaved baseline from baselineDir (same id, baseline directory)
+ *  or baselineVariant (the named reference variant from the same directory). */
 async function dirPlan<T>(
   matrix: BenchMatrix<T>,
   variantIds: string[],
   ctx: DirMatrixContext<T>,
 ): Promise<MatrixPlan<T>> {
+  const dirSource = (id: string) => ({
+    variantDir: matrix.variantDir!,
+    variantId: id,
+  });
+  const baselineFor = (variantId: string): VariantSource | undefined => {
+    if (matrix.baselineDir && ctx.baselineIds.includes(variantId))
+      return { variantDir: matrix.baselineDir, variantId };
+    if (matrix.baselineVariant && matrix.baselineVariant !== variantId)
+      return dirSource(matrix.baselineVariant);
+    return undefined;
+  };
   return {
     variantIds,
     caseIds: ctx.caseIds,
@@ -63,11 +76,8 @@ async function dirPlan<T>(
     casesModuleUrl: matrix.casesModule,
     caseData: await inlineCaseDataMap(matrix, ctx.caseIds),
     plan: variantId => ({
-      source: { variantDir: matrix.variantDir!, variantId },
-      baselineSource:
-        matrix.baselineDir && ctx.baselineIds.includes(variantId)
-          ? { variantDir: matrix.baselineDir, variantId }
-          : undefined,
+      source: dirSource(variantId),
+      baselineSource: baselineFor(variantId),
     }),
     runnerOpts: ctx.runnerOpts,
     batches: ctx.batches,

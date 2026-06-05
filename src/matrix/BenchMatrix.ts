@@ -143,14 +143,12 @@ export async function runMatrix<T>(
     throw new Error("BenchMatrix requires either 'variants' or 'variantDir'");
 
   const effectiveOptions = { ...matrix.defaults, ...options };
-  const result = matrix.variantDir
-    ? await runMatrixWithDir(matrix, effectiveOptions)
-    : await runMatrixInline(matrix, effectiveOptions);
-
-  if (matrix.baselineVariant) {
-    applyBaselineVariant(result.variants, matrix.baselineVariant);
-  }
-  return result;
+  // baselineVariant is interleaved per-variant inside the runners (like
+  // baselineDir), so each variant is paired against its own measurement of the
+  // reference rather than compared post-hoc against a single shared run.
+  return matrix.variantDir
+    ? runMatrixWithDir(matrix, effectiveOptions)
+    : runMatrixInline(matrix, effectiveOptions);
 }
 
 /** Prepare a benchmark function from a variant, calling setup if stateful. */
@@ -170,29 +168,6 @@ export function isStatefulVariant<T, S>(
   v: Variant<T, S>,
 ): v is StatefulVariant<T, S> {
   return typeof v === "object" && "setup" in v && "run" in v;
-}
-
-/** Apply baselineVariant comparison: one variant is the reference for all others. */
-export function applyBaselineVariant(
-  variants: VariantResult[],
-  baselineVariantId: string,
-): void {
-  const baselineVariant = variants.find(v => v.id === baselineVariantId);
-  if (!baselineVariant) return;
-
-  const baselineByCase = new Map(
-    baselineVariant.cases.map(c => [c.caseId, c.measured]),
-  );
-
-  for (const variant of variants) {
-    if (variant.id === baselineVariantId) continue;
-    for (const cr of variant.cases) {
-      const base = baselineByCase.get(cr.caseId);
-      if (!base) continue;
-      cr.baseline = base;
-      cr.deltaPercent = computeDeltaPercent(base, cr.measured);
-    }
-  }
 }
 
 /** Load cases module and resolve filtered case IDs. Inline caseData keys take
