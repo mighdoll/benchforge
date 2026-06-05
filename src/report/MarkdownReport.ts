@@ -17,6 +17,7 @@ import {
 import type { GcByBatchSummary, Spread } from "./GcByBatch.ts";
 import { formatGitVersion, type GitVersion } from "./GitUtils.ts";
 import { verdictWord } from "./Verdict.ts";
+import type { WarmupShape } from "./WarmupShape.ts";
 
 /** Render a ReportData as a self-contained markdown report for agents and other
  *  text consumers that cannot open the HTML viewer. Re-renders the shift-function
@@ -58,8 +59,30 @@ function benchmarkMarkdown(entry: BenchmarkEntry): string {
   const meta = runs ? [`runs: ${runs}`] : [];
   const parts = sections.flatMap(s => sectionMarkdown(s));
   const gc = entry.gcByBatch ? gcByBatchMarkdown(entry.gcByBatch) : [];
-  if (!parts.length && !meta.length && !gc.length) return "";
-  return [`### ${entry.name}`, ...meta, ...parts, ...gc].join("\n\n");
+  const warmup = entry.warmupShape ? warmupShapeMarkdown(entry.warmupShape) : [];
+  if (!parts.length && !meta.length && !gc.length && !warmup.length) return "";
+  return [`### ${entry.name}`, ...meta, ...parts, ...warmup, ...gc].join("\n\n");
+}
+
+/** Time-by-position table: how much each batch's early iterations run above the
+ *  plateau (the JIT/heap warmup ramp). Descriptive -- names the warmup region and
+ *  the --warmup lever without recommending trimming, since the default includes
+ *  warmup on purpose. */
+function warmupShapeMarkdown(w: WarmupShape): string[] {
+  const header = "| region | median | vs plateau |\n|---|---|---|";
+  const last = w.regions.length - 1;
+  const rows = w.regions.map((r, i) => {
+    const vs = i === last ? "plateau" : formatSignedPercent(r.pctVsPlateau * 100);
+    return `| ${r.label} | ${timeMs(r.medianMs)} | ${vs} |`;
+  });
+  const note =
+    "Early-region cost is JIT/heap warmup. The measured window includes it by " +
+    "default; `--warmup N` runs N iterations before measurement to exclude it.";
+  return [
+    `#### time by region (per batch, ${w.batches} batches)`,
+    [header, ...rows].join("\n"),
+    note,
+  ];
 }
 
 /** Per-batch full-GC diagnostic: how much full-collection cost and placement
