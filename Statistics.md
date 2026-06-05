@@ -340,7 +340,7 @@ Because each violin holds the same number of resamples, the two trade off: a
 uncertain. The hollow circle is the point estimate; the zero line and the
 hatched +/- equivalence band are reference zones.
 
-**Color is a per-percentile reliability flag, not part of the shape.** A
+**Color is a per-percentile reliability flag** A
 percentile is colored (blue/green/red by direction) only when enough samples lie
 beyond it across enough distinct batches to pin it down; otherwise it is greyed.
 Greying gates *whether you can trust where the violin sits* (its position and
