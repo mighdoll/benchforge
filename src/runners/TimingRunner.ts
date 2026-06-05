@@ -110,38 +110,36 @@ function buildMeasuredResults(
 }
 
 /**
- * Run warmup iterations with gc + settle time for V8 optimization. Returns warmup timings.
+ * Run warmup iterations so V8 tiers the hot code up to its optimized steady state
+ * (Ignition ==> Sparkplug ==> Maglev ==> TurboFan) before measurement. Returns
+ * warmup timings.
  *
- * V8 has 4 compilation tiers: Ignition (interpreter) ==> Sparkplug (baseline) ==>
- * Maglev (mid-tier optimizer) ==> TurboFan (full optimizer). Tiering thresholds:
- *   - Ignition ==> Sparkplug: 8 invocations
- *   - Sparkplug ==> Maglev: 500 invocations
- *   - Maglev ==> TurboFan: 6000 invocations
+ * The gc runs BEFORE the warmup loop, not after, so measurement starts on a warm
+ * heap. What carries across is NOT the heap contents (each call drops its objects
+ * as garbage) -- it is the optimized code AND the allocation-site pretenuring
+ * assumptions that code was compiled against (new-gen vs old-gen per alloc site,
+ * baked into the machine code). A gc placed AFTER warmup re-evaluates pretenuring
+ * on a just-collected heap; a flipped decision invalidates the dependent optimized
+ * code (V8: "dependent allocation site tenuring changed"), deopting the parser hot
+ * set so the first measured iterations run un-optimized. Refill scavenges add
+ * single-iteration pauses on top. Both are heap-state transients, not object reuse,
+ * and gc-before avoids both -- the ramp survives even a long warmup with gc-after.
+ * With warmup=0 this is just a clean-heap gc before measurement (unchanged).
  *
- * Optimization compilation happens on background threads and requires idle time
- * on the main thread to complete. Without sufficient warmup + settle time,
- * benchmarks exhibit bimodal timing: slow Sparkplug samples (~30% slower) mixed
- * with fast optimized samples.
- *
- * The warmup iterations trigger the optimization decision, then settle time
- * provides idle time for background compilation to finish before measurement.
- *
- * @see https://v8.dev/blog/sparkplug
- * @see https://v8.dev/blog/maglev
- * @see https://v8.dev/blog/background-compilation
+ * Tiering is invocation-gated (it needs enough calls, not main-thread idle time),
+ * so a settle pause does not speed it up; bevy/link needs ~40-50 warmup iters to
+ * reach plateau. pauseWarmup is kept as an optional settle delay only.
  */
 async function runWarmup<T>(config: CollectParams<T>): Promise<number[]> {
-  const gc = gcFunction();
+  gcFunction()();
   const samples = new Array<number>(config.warmup);
   for (let i = 0; i < config.warmup; i++) {
     const start = performance.now();
     executeBenchmark(config.benchmark, config.params);
     samples[i] = performance.now() - start;
   }
-  gc();
   if (config.pauseWarmup) {
     await new Promise(r => setTimeout(r, config.pauseWarmup));
-    gc();
   }
   return samples;
 }
