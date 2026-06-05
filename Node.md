@@ -1,35 +1,38 @@
 # Node.js Benchmarking
 
 Node benchmarks run in isolated child processes (workers) by default. Pass a
-TypeScript file exporting a default function or `BenchSuite`, and benchforge
+TypeScript file exporting a default function or `MatrixSuite`, and benchforge
 handles the rest.
 
 ```bash
 benchforge my-bench.ts --gc-stats
 ```
 
-## BenchSuite
+## MatrixSuite
 
-For multiple benchmarks with groups, setup data, and baseline comparison, export
-a `BenchSuite`:
+A benchmark is a matrix of **cases** (input data) x **variants** (the functions
+under test). For shared input and several functions compared against a baseline,
+export a `MatrixSuite`:
 
 ```typescript
 // sorting.ts
-import type { BenchGroup, BenchSuite } from 'benchforge';
+import type { BenchMatrix, MatrixSuite } from 'benchforge';
 
-const sortingGroup: BenchGroup<number[]> = {
+const sorting: BenchMatrix<number[]> = {
   name: "Array Sorting (1000 numbers)",
-  setup: () => Array.from({ length: 1000 }, () => Math.random()),
-  baseline: { name: "native sort", fn: (arr) => [...arr].sort((a, b) => a - b) },
-  benchmarks: [
-    { name: "quicksort", fn: quickSort },
-    { name: "insertion sort", fn: insertionSort },
-  ],
+  // one case named "numbers"; the thunk runs once to make the shared input
+  caseData: { numbers: () => Array.from({ length: 1000 }, () => Math.random()) },
+  variants: {
+    quicksort: quickSort,
+    "insertion sort": insertionSort,
+    "native sort": (arr) => [...arr].sort((a, b) => a - b),
+  },
+  baselineVariant: "native sort",
 };
 
-const suite: BenchSuite = {
+const suite: MatrixSuite = {
   name: "Performance Tests",
-  groups: [sortingGroup],
+  matrices: [sorting],
 };
 
 export default suite;
@@ -38,6 +41,17 @@ export default suite;
 ```bash
 benchforge sorting.ts --gc-stats
 ```
+
+Each variant is called once per iteration with the case data as its argument.
+`baselineVariant` names one variant as the reference; every other variant is
+interleaved against it per batch and reported with a `Δ%` verdict. Use multiple
+keys in `caseData` (or a `casesModule`) to run the variants across several
+inputs; the report groups one card per case.
+
+Inline variant functions are serialized and reconstructed in the worker, so they
+must be self-contained (no captured closure variables). For variants that need
+imports or shared state, point `variantDir` at a directory of `.ts` files each
+exporting `run` (and optionally `setup`), or use `--no-worker`.
 
 ## Custom Metrics
 
@@ -53,12 +67,11 @@ minimal `lines/sec` section:
 
 ```typescript
 import {
-  type BenchSuite,
-  benchExports,
+  type MatrixSuite,
   integer,
   type MeasuredResults,
-  parseBenchArgs,
   type ReportSection,
+  runBenchCli,
   runsSection,
   timeSection,
 } from "benchforge";
@@ -90,19 +103,24 @@ const locSection: ReportSection = {
   ],
 };
 
-const suite: BenchSuite = {
+const suite: MatrixSuite = {
   name: "Parser",
-  groups: [{
+  matrices: [{
     name: "parse",
-    metadata: { linesOfCode: 500 },
-    benchmarks: [{ name: "my-parser", fn: () => parseSource(source) }],
+    variants: { "my-parser": () => parseSource(source) },
   }],
 };
 
-await benchExports(suite, parseBenchArgs(), {
-  sections: [locSection, timeSection, runsSection],
+await runBenchCli({
+  build: () => ({
+    suite,
+    sections: [locSection, timeSection, runsSection],
+  }),
 });
 ```
+
+(Per-benchmark `metadata` like `linesOfCode` comes from the case data or a
+`casesModule`'s `loadCase` returning `{ data, metadata }`.)
 
 When `sections` is passed, it **replaces** the CLI-derived defaults; include
 `timeSection`, `runsSection`, or `gcSections(args)` explicitly if you still want
@@ -125,8 +143,8 @@ list).
 - `value`: accessor for non-sample data (metadata fields, run count, etc.).
   Columns with `value` don't participate in bootstrap.
 
-Matrix suites accept the same `sections` option via `matrixBenchExports` or
-`reportMatrixResults({ sections })`.
+Pass `sections` from your `runBenchCli({ build })` result to apply them to any
+matrix suite.
 
 ## Profiling with External Debuggers
 
@@ -149,29 +167,33 @@ ideal for debugging and performance profiling.
 Workers provide process-level isolation: each benchmark runs in a fresh child
 process with its own heap. This is the default (`--no-worker` to disable).
 
-Since functions can't be serialized across process boundaries, worker mode uses
-`modulePath` + `exportName` to re-import benchmark functions in the worker:
+Inline variant functions are serialized (via `fn.toString()`) and reconstructed
+in the worker, so they must be self-contained: a closure that captures a local
+variable won't have it in the worker. Two ways to use code that needs imports or
+shared state across iterations:
+
+- **Variant directory** (`variantDir`): a directory of `.ts` files, each
+  exporting `run` (called per iteration) and optionally `setup` (called once
+  with the case data; its result is passed to `run`). Each file is re-imported
+  fresh in its worker, so it can `import` whatever it needs.
 
 ```typescript
-const group: BenchGroup = {
+// variants/parse.ts
+import { parseSource } from "../parser.ts";
+export function setup(caseData) { return loadTestData(caseData); }
+export function run(state) { parseSource(state); }
+```
+
+```typescript
+const matrix: BenchMatrix = {
   name: "Parser Benchmark",
-  setup: () => loadTestData(),
-  benchmarks: [{
-    name: "parse",
-    fn: () => {},  // placeholder - not used in worker mode
-    modulePath: new URL("./benchmarks.ts", import.meta.url).href,
-    exportName: "parse",
-    setupExportName: "setup",  // optional: called once, result passed to fn
-  }],
+  variantDir: new URL("./variants/", import.meta.url).href,
+  casesModule: new URL("./cases.ts", import.meta.url).href,
 };
 ```
 
-When `setupExportName` is provided, the worker:
-1. Imports the module
-2. Calls `setup(params)` once (where params comes from `BenchGroup.setup()`)
-3. Passes the setup result to each benchmark iteration
-
-This eliminates manual caching boilerplate in worker modules.
+- **`--no-worker`**: run in-process, where inline closures work but there is no
+  heap isolation between variants.
 
 ## Requirements
 

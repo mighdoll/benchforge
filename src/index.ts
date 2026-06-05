@@ -1,11 +1,9 @@
 export type { DefaultCliArgs } from "./cli/CliArgs.ts";
 export type { ExportOptions, MatrixExportOptions } from "./cli/CliExport.ts";
 export {
-  type BenchBuildResult,
   type BenchCliConfig,
   type BuildResult,
   dispatchCli,
-  type MatrixBuildResult,
   runBenchCli,
 } from "./cli/RunBenchCLI.ts";
 export { buildSpeedscopeFile } from "./export/AllocExport.ts";
@@ -65,11 +63,6 @@ export type { PrepareHtmlOptions } from "./report/HtmlReport.ts";
 export { prepareHtmlData } from "./report/HtmlReport.ts";
 export { markdownReport } from "./report/MarkdownReport.ts";
 export { runsSection, timeSection } from "./report/StandardSections.ts";
-export type {
-  BenchGroup,
-  BenchmarkSpec,
-  BenchSuite,
-} from "./runners/BenchmarkSpec.ts";
 export type { RunnerOptions } from "./runners/BenchRunner.ts";
 export type { MeasuredResults } from "./runners/MeasuredResults.ts";
 export {

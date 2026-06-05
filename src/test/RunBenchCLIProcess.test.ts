@@ -37,13 +37,13 @@ test("e2e: runs user script", { timeout: 30000 }, () => {
 });
 
 test("e2e: filter flag", { timeout: 30000 }, () => {
-  const output = executeTestScript('--filter "plus" --duration 0.1');
+  const output = executeTestScript('--filter "/plus" --duration 0.1');
 
   expect(output).toContain("plus");
   expect(output).not.toContain("multiply");
 });
 
-test("file mode: BenchSuite export", { timeout: 30000 }, () => {
+test("file mode: MatrixSuite export", { timeout: 30000 }, () => {
   const output = executeBenchforgeFile(
     "suite-export-bench.ts",
     "--iterations 5",
