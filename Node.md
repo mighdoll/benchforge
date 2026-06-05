@@ -55,96 +55,91 @@ exporting `run` (and optionally `setup`), or use `--no-worker`.
 
 ## Custom Metrics
 
-The built-in report columns (mean, p50, p99, runs, gc, ...) cover typical timing
-needs. For throughput metrics or domain-specific counts ("lines per second",
-"tokens parsed", "cost per request"), define a `ReportSection` and hand it to
-`benchExports`.
+The built-in sections (`timeSection`, `runsSection`, `gcSections(args)`) cover
+typical timing needs. For throughput metrics or domain-specific counts ("lines
+per second", "tokens parsed", "cost per request"), define your own sections and
+pass them from `runBenchCli({ build })`.
 
-A `ReportSection` is a plain object with a `title` and an array of `columns`.
-Each column either has a `statKind` (the framework computes it from raw samples)
-or a `value` accessor (for non-sample data like metadata fields). Here is a
-minimal `lines/sec` section:
+A `ReportSection` is one of two shapes:
+
+- **`metricSection`** -- one comparable metric that drives the verdict, the
+  console headline Δ%, and the HTML shift-function fan. It has a `formatter`, an
+  optional `statKind` (the statistic computed from raw samples, default
+  `"mean"`), `higherIsBetter`, `toDisplay`, and `extras` (scalar cells shown
+  alongside the metric).
+- **`scalarSection`** -- a bag of named `rows` pulled from results/metadata (gc,
+  run counts, etc.), no bootstrap.
+
+Here is a `lines/sec` throughput metric, with the line count riding along as an
+extra scalar cell:
 
 ```typescript
 import {
-  type MatrixSuite,
   integer,
-  type MeasuredResults,
-  type ReportSection,
+  type MetricSection,
+  metricSection,
   runBenchCli,
   runsSection,
   timeSection,
 } from "benchforge";
 
+/** Convert timing ms to lines/sec using the case's lineCount metadata. */
 function msToLocSec(ms: number, meta?: Record<string, unknown>): number {
   const lines = (meta?.linesOfCode ?? 0) as number;
   return lines / (ms / 1000);
 }
 
-const locSection: ReportSection = {
-  title: "throughput",
-  columns: [
-    {
-      key: "locPerSec",
-      title: "lines/sec",
-      formatter: integer,
-      comparable: true,
-      higherIsBetter: true,
-      statKind: "mean",
-      toDisplay: msToLocSec,
-    },
+const locSection: MetricSection = metricSection({
+  title: "lines / sec",
+  higherIsBetter: true,
+  toDisplay: msToLocSec,
+  formatter: integer,
+  extras: [
     {
       key: "lines",
       title: "lines",
       formatter: integer,
-      value: (_r: MeasuredResults, meta?: Record<string, unknown>) =>
-        meta?.linesOfCode ?? 0,
+      value: (_r, meta) => meta?.linesOfCode ?? 0,
     },
   ],
-};
-
-const suite: MatrixSuite = {
-  name: "Parser",
-  matrices: [{
-    name: "parse",
-    variants: { "my-parser": () => parseSource(source) },
-  }],
-};
+});
 
 await runBenchCli({
   build: () => ({
-    suite,
+    suite: {
+      name: "Parser",
+      matrices: [{
+        name: "parse",
+        casesModule: new URL("./cases.ts", import.meta.url).href,
+        variantDir: new URL("./variants/", import.meta.url).href,
+      }],
+    },
     sections: [locSection, timeSection, runsSection],
   }),
 });
 ```
 
-(Per-benchmark `metadata` like `linesOfCode` comes from the case data or a
-`casesModule`'s `loadCase` returning `{ data, metadata }`.)
+Per-benchmark `metadata` (like `linesOfCode`) comes from the case: a
+`casesModule`'s `loadCase(id)` returns `{ data, metadata }`, and that metadata is
+passed to `toDisplay` / a scalar row's `value`.
 
 When `sections` is passed, it **replaces** the CLI-derived defaults; include
 `timeSection`, `runsSection`, or `gcSections(args)` explicitly if you still want
-them. Built-in sections you can compose with your own: `timeSection`,
-`runsSection`, `totalTimeSection`, `adaptiveSections`, `optSection`, `gcSection`,
-`gcStatsSection`, and `gcSections(args)` (the last returns a CLI-flag-driven
-list).
+them.
 
-**Column options that matter for comparisons:**
+**`MetricSection` fields that matter for comparisons:**
 
-- `comparable`: adds a `Δ%` column after this one when a baseline is present.
+- `statKind`: which statistic to compute from raw timing samples (`"mean"`,
+  `"min"`, `"max"`, `"p50"`, ...), default `"mean"`. The bootstrap CI runs on it.
 - `higherIsBetter`: for throughput metrics; flips the sign so a 2x faster
   variant shows `+100%` instead of `-50%`.
-- `statKind`: which statistic to compute from raw timing samples (`"mean"`,
-  `"min"`, `"max"`, or `{ percentile: 0.5 }`). The bootstrap CI runs on these.
 - `toDisplay`: converts a timing-domain value to the **display domain** (ms ==>
   lines/sec, etc.). Used only for rendering point estimates and CI bounds, not
   for the bootstrap itself. This split is what lets benchforge compute a
   statistically valid CI on ms samples while showing the user lines/sec.
-- `value`: accessor for non-sample data (metadata fields, run count, etc.).
-  Columns with `value` don't participate in bootstrap.
-
-Pass `sections` from your `runBenchCli({ build })` result to apply them to any
-matrix suite.
+- `extras`: scalar cells (each a `{ key, title, formatter, value }` row, with
+  `value` reading results/metadata) shown next to the metric; they don't
+  participate in the bootstrap.
 
 ## Profiling with External Debuggers
 
