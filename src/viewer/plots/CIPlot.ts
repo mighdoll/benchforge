@@ -87,7 +87,7 @@ export function createDistributionPlot(
   const { margin, plot } = layout;
   const ptX = scales.x(pointEstimate);
 
-  drawTitles(svg, opts, margin, ptX);
+  drawTitles(svg, opts, layout, ptX);
 
   if (equivMargin && includeZero)
     drawMarginZone(svg, equivMargin, scales, layout);
@@ -175,17 +175,19 @@ function buildScales(
 function drawTitles(
   svg: SVGSVGElement,
   opts: DistributionPlotOptions,
-  margin: Layout["margin"],
+  layout: Layout,
   pointX: number,
 ): void {
+  const { margin, width } = layout;
   if (opts.title)
     svg.appendChild(
       text(margin.left, 14, opts.title, "start", "13", "currentColor", "600"),
     );
-  if (opts.pointLabel)
+  if (opts.pointLabel) {
+    const x = clampLabelX(pointX, opts.pointLabel, "middle", width, 8);
     svg.appendChild(
       text(
-        pointX,
+        x,
         margin.top - 6,
         opts.pointLabel,
         "middle",
@@ -194,6 +196,25 @@ function drawTitles(
         "700",
       ),
     );
+  }
+}
+
+/** Keep a text label inside [pad, width-pad] given its anchor, so labels at the
+ *  data edges aren't clipped by the SVG viewport. Width is estimated from the
+ *  character count (~6px at the 11px label size, ~8px for the larger point). */
+function clampLabelX(
+  x: number,
+  label: string,
+  anchor: "start" | "middle" | "end",
+  width: number,
+  charW: number,
+): number {
+  const w = label.length * charW;
+  const left = anchor === "start" ? 0 : anchor === "middle" ? w / 2 : w;
+  const right = anchor === "end" ? 0 : anchor === "middle" ? w / 2 : w;
+  const lo = 2 + left;
+  const hi = width - 2 - right;
+  return Math.max(lo, Math.min(hi, x));
 }
 
 /** Draw equivalence margin zone: hatched band centered vertically */
@@ -332,15 +353,40 @@ function drawCILabels(
 
   // Absolute plots: a tight CI collapses to one centered label (identical
   // bounds) or a "lo - hi" range; otherwise anchor each label outward so the
-  // two never encroach on each other.
+  // two never encroach on each other. Clamp so edge labels aren't clipped.
+  const { width } = layout;
   if (tight) {
     const mid = (loX + hiX) / 2;
     const merged = loLabel === hiLabel ? loLabel : `${loLabel} - ${hiLabel}`;
-    svg.appendChild(text(mid, labelY, merged, "middle", "11"));
+    svg.appendChild(
+      text(
+        clampLabelX(mid, merged, "middle", width, 6),
+        labelY,
+        merged,
+        "middle",
+        "11",
+      ),
+    );
     return;
   }
-  svg.appendChild(text(loX, labelY, loLabel, "end", "11"));
-  svg.appendChild(text(hiX, labelY, hiLabel, "start", "11"));
+  svg.appendChild(
+    text(
+      clampLabelX(loX, loLabel, "end", width, 6),
+      labelY,
+      loLabel,
+      "end",
+      "11",
+    ),
+  );
+  svg.appendChild(
+    text(
+      clampLabelX(hiX, hiLabel, "start", width, 6),
+      labelY,
+      hiLabel,
+      "start",
+      "11",
+    ),
+  );
 }
 
 /** Top margin: room for the point-label, else the title, else a thin band. */

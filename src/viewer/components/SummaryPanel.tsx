@@ -569,10 +569,12 @@ function ShiftPopup({ point, metric, equivMargin, onClose }: {
           <h3>{metric} &middot; {point.label}</h3>
           <ShiftVerdict point={point} />
         </div>
-        <ShiftPopupDiff ci={diff} equivMargin={equivMargin} />
-        {point.runs.map((run, i) => (
-          <ShiftPopupAbsolute key={i} runName={run.runName} ci={run.bootstrapCI} domain={domain} />
-        ))}
+        <div class="shift-charts">
+          <ShiftPopupDiff ci={diff} equivMargin={equivMargin} />
+          {point.runs.map((run, i) => (
+            <ShiftPopupAbsolute key={i} runName={run.runName} ci={run.bootstrapCI} domain={domain} />
+          ))}
+        </div>
       </div>
     </div>
   );
