@@ -9,7 +9,11 @@ import {
   type HeapReportOptions,
 } from "../profiling/node/HeapSampleReport.ts";
 import { resolveProfile } from "../profiling/node/ResolvedProfile.ts";
-import type { ReportGroup, ReportSection } from "../report/BenchmarkReport.ts";
+import type {
+  BenchmarkReport,
+  ReportGroup,
+  ReportSection,
+} from "../report/BenchmarkReport.ts";
 import { groupReports } from "../report/BenchmarkReport.ts";
 import colors from "../report/Colors.ts";
 import { gcStatsSection } from "../report/GcSections.ts";
@@ -92,13 +96,44 @@ export function defaultMatrixReport(data: ReportData): string {
   return reportMatrixResults(data);
 }
 
-/** Convert MatrixResults to ReportGroup[] for the standard export pipeline. */
+/** Convert MatrixResults to ReportGroup[]: one group per case, with each
+ *  variant a report in it. Variants compared against a baseline carry their own
+ *  paired (interleaved) baseline, so each variant is measured against its own
+ *  reference rather than a single shared one. */
 export function matrixToReportGroups(results: MatrixResults[]): ReportGroup[] {
-  return results.flatMap(matrix =>
-    matrix.variants.flatMap(variant =>
-      variant.cases.map(c => caseToReportGroup(variant.id, c)),
-    ),
-  );
+  return results.flatMap(caseGroups);
+}
+
+/** One ReportGroup per case in a matrix, preserving case order across variants. */
+function caseGroups(matrix: MatrixResults): ReportGroup[] {
+  const order: string[] = [];
+  const byCase = new Map<string, BenchmarkReport[]>();
+  for (const variant of matrix.variants) {
+    for (const c of variant.cases) {
+      if (!byCase.has(c.caseId)) {
+        byCase.set(c.caseId, []);
+        order.push(c.caseId);
+      }
+      byCase.get(c.caseId)!.push(variantReport(variant.id, c));
+    }
+  }
+  const single = order.length === 1;
+  return order.map(caseId => {
+    const reports = byCase.get(caseId)!;
+    const name = single ? matrix.name : `${matrix.name} / ${caseId}`;
+    // No group-level baseline: each variant carries its own (a single shared
+    // baseline would mislabel "vs <one variant>" for the others).
+    return { name, reports };
+  });
+}
+
+/** One variant's report for a case, carrying its own interleaved baseline. */
+function variantReport(variantId: string, c: CaseResult): BenchmarkReport {
+  const { metadata, baseline: baselineMeasured } = c;
+  const baseline = baselineMeasured
+    ? { name: `${variantId} (baseline)`, measuredResults: baselineMeasured, metadata }
+    : undefined;
+  return { name: variantId, measuredResults: c.measured, metadata, baseline };
 }
 
 /** Assemble report sections from CLI flags (time/gc/runs). */
@@ -114,18 +149,4 @@ export function buildReportSections(gcStats: boolean): ReportSection[] {
 function cliDefaultSections(args: DefaultCliArgs): ReportSection[] {
   const { "gc-stats": gcStats } = args;
   return buildReportSections(gcStats);
-}
-
-/** Wrap a single matrix case and its optional baseline into a ReportGroup. */
-function caseToReportGroup(variantId: string, c: CaseResult): ReportGroup {
-  const { metadata, baseline: baselineMeasured } = c;
-  const report = { name: variantId, measuredResults: c.measured, metadata };
-  const baseline = baselineMeasured
-    ? {
-        name: `${variantId} (baseline)`,
-        measuredResults: baselineMeasured,
-        metadata,
-      }
-    : undefined;
-  return { name: `${variantId} / ${c.caseId}`, reports: [report], baseline };
 }
