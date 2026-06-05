@@ -8,7 +8,11 @@ import type { BenchmarkFunction, BenchmarkSpec } from "./BenchmarkSpec.ts";
 import type { RunnerOptions } from "./BenchRunner.ts";
 import { aggregateGcStats, type GcEvent, parseGcLine } from "./GcStats.ts";
 import type { MeasuredResults } from "./MeasuredResults.ts";
-import { importBenchFn, resolveVariantFn } from "./RunnerUtils.ts";
+import {
+  importBenchFn,
+  resolveVariantFn,
+  type VariantSource,
+} from "./RunnerUtils.ts";
 import { TimingRunner } from "./TimingRunner.ts";
 import type {
   ErrorMessage,
@@ -18,8 +22,7 @@ import type {
 
 /** Parameters for running a matrix variant */
 export interface RunMatrixVariantParams {
-  variantDir: string;
-  variantId: string;
+  source: VariantSource;
   caseId: string;
   caseData?: unknown;
   casesModule?: string;
@@ -56,21 +59,28 @@ export async function runBenchmark<T = unknown>({
 export async function runMatrixVariant(
   params: RunMatrixVariantParams,
 ): Promise<MeasuredResults[]> {
-  const { variantId, caseId, options, useWorker = true } = params;
-  const name = `${variantId}/${caseId}`;
+  const {
+    source,
+    caseId,
+    caseData,
+    casesModule,
+    options,
+    useWorker = true,
+  } = params;
+  const name = `${source.variantId}/${caseId}`;
 
   if (!useWorker) return runMatrixVariantDirect(params, name);
 
-  const { variantDir, caseData, casesModule } = params;
   const message: RunMessage = {
     type: "run",
     spec: { name } as BenchmarkSpec,
     options,
-    variantDir,
-    variantId,
     caseId,
     caseData,
     casesModule,
+    ...("variantDir" in source
+      ? { variantDir: source.variantDir, variantId: source.variantId }
+      : { variantRunCode: source.runCode, variantSetupCode: source.setupCode }),
   };
   return runWorkerWithMessage(name, options, message);
 }
@@ -175,8 +185,13 @@ async function runMatrixVariantDirect(
   params: RunMatrixVariantParams,
   name: string,
 ): Promise<MeasuredResults[]> {
-  const { options } = params;
-  const { fn } = await resolveVariantFn(params);
+  const { source, caseId, caseData, casesModule, options } = params;
+  const { fn } = await resolveVariantFn({
+    source,
+    caseId,
+    caseData,
+    casesModule,
+  });
   return new TimingRunner().runBench({ name, fn }, options);
 }
 

@@ -1,18 +1,19 @@
-import { TimingRunner } from "../runners/TimingRunner.ts";
-import type {
-  BenchMatrix,
-  CaseResult,
-  RunMatrixOptions,
-  VariantResult,
-} from "./BenchMatrix.ts";
+import type { VariantSource } from "../runners/RunnerUtils.ts";
 import {
+  type BenchMatrix,
   buildRunnerOptions,
-  prepareBenchFn,
+  isStatefulVariant,
+  type RunMatrixOptions,
   resolveCases,
+  type Variant,
+  type VariantResult,
 } from "./BenchMatrix.ts";
-import { loadCaseData } from "./CaseLoader.ts";
+import { type MatrixPlan, runMatrixPlan } from "./MatrixRun.ts";
 
-/** Run matrix with in-memory variant functions (no worker isolation) */
+/** Run a matrix with in-memory variant functions. Variants are serialized to
+ *  source and reconstructed in a worker (like directory variants), so inline
+ *  matrices get the same batching and isolation -- at the cost that an inline
+ *  variant must be self-contained (no captured closure variables). */
 export async function runMatrixInline<T>(
   matrix: BenchMatrix<T>,
   options: RunMatrixOptions,
@@ -23,28 +24,42 @@ export async function runMatrixInline<T>(
     );
 
   const { casesModule, caseIds } = await resolveCases(matrix, options);
-  const runner = new TimingRunner();
   const runnerOpts = buildRunnerOptions(options);
+  const { batches = 1, warmupBatch = false, useWorker = true } = options;
 
-  const allEntries = Object.entries(matrix.variants!);
+  const all = Object.entries(matrix.variants!);
   const { filteredVariants } = options;
-  const variantEntries = filteredVariants
-    ? allEntries.filter(([id]) => filteredVariants.includes(id))
-    : allEntries;
+  const entries = filteredVariants
+    ? all.filter(([id]) => filteredVariants.includes(id))
+    : all;
+  const sources = new Map(entries.map(([id, v]) => [id, inlineSource(id, v)]));
+  const inlineCaseData = !matrix.casesModule;
 
-  const variants: VariantResult[] = [];
-  for (const [variantId, variant] of variantEntries) {
-    const cases: CaseResult[] = [];
-    for (const caseId of caseIds) {
-      const loaded = await loadCaseData(casesModule, caseId);
-      const data = casesModule || matrix.cases ? loaded.data : (undefined as T);
-      const fn = await prepareBenchFn(variant, data);
-      const spec = { name: variantId, fn };
-      const [measured] = await runner.runBench(spec, runnerOpts);
-      cases.push({ caseId, measured, metadata: loaded.metadata });
-    }
-    variants.push({ id: variantId, cases });
-  }
+  const plan: MatrixPlan<T> = {
+    variantIds: [...sources.keys()],
+    caseIds,
+    casesModule,
+    casesModuleUrl: matrix.casesModule,
+    caseData: inlineCaseData ? caseId => caseId : undefined,
+    plan: variantId => ({ source: sources.get(variantId)! }),
+    runnerOpts,
+    batches,
+    warmupBatch,
+    useWorker,
+  };
+  return runMatrixPlan(matrix.name, plan);
+}
 
-  return { name: matrix.name, variants };
+/** Serialize an inline variant to a worker-reconstructable source. */
+function inlineSource<T>(
+  variantId: string,
+  variant: Variant<T>,
+): VariantSource {
+  if (isStatefulVariant(variant))
+    return {
+      variantId,
+      runCode: variant.run.toString(),
+      setupCode: variant.setup.toString(),
+    };
+  return { variantId, runCode: variant.toString() };
 }

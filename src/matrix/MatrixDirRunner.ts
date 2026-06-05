@@ -4,25 +4,19 @@ import {
   type RunProgress,
   runCalibration,
 } from "../runners/Calibration.ts";
-import type { MeasuredResults } from "../runners/MeasuredResults.ts";
-import { runBatched } from "../runners/MergeBatches.ts";
-import { runMatrixVariant } from "../runners/RunnerOrchestrator.ts";
+import {
+  type RunMatrixVariantParams,
+  runMatrixVariant,
+} from "../runners/RunnerOrchestrator.ts";
 import type {
   BenchMatrix,
-  CaseResult,
   RunMatrixOptions,
   VariantResult,
 } from "./BenchMatrix.ts";
-import {
-  buildRunnerOptions,
-  computeDeltaPercent,
-  resolveCases,
-} from "./BenchMatrix.ts";
+import { buildRunnerOptions, resolveCases } from "./BenchMatrix.ts";
 import type { CasesModule } from "./CaseLoader.ts";
-import { loadCaseData } from "./CaseLoader.ts";
+import { type MatrixPlan, runMatrixPlan } from "./MatrixRun.ts";
 import { discoverVariants } from "./VariantLoader.ts";
-
-type VariantArgs = Parameters<typeof runMatrixVariant>[0];
 
 /** Shared state for directory-based matrix execution */
 interface DirMatrixContext<T> {
@@ -48,8 +42,35 @@ export async function runMatrixWithDir<T>(
   const variantIds = options.filteredVariants ?? allVariantIds;
 
   const ctx = await createDirContext(matrix, options);
-  const variants = await runDirVariants(variantIds, ctx);
-  return { name: matrix.name, variants };
+  return runMatrixPlan(matrix.name, dirPlan(matrix, variantIds, ctx));
+}
+
+/** Build a source-agnostic plan that loads each variant (and its baseline, when
+ *  baselineDir is set) from a directory by id. */
+function dirPlan<T>(
+  matrix: BenchMatrix<T>,
+  variantIds: string[],
+  ctx: DirMatrixContext<T>,
+): MatrixPlan<T> {
+  const inlineCaseData = matrix.cases && !matrix.casesModule;
+  return {
+    variantIds,
+    caseIds: ctx.caseIds,
+    casesModule: ctx.casesModule,
+    casesModuleUrl: matrix.casesModule,
+    caseData: inlineCaseData ? caseId => caseId : undefined,
+    plan: variantId => ({
+      source: { variantDir: matrix.variantDir!, variantId },
+      baselineSource:
+        matrix.baselineDir && ctx.baselineIds.includes(variantId)
+          ? { variantDir: matrix.baselineDir, variantId }
+          : undefined,
+    }),
+    runnerOpts: ctx.runnerOpts,
+    batches: ctx.batches,
+    warmupBatch: ctx.warmupBatch,
+    useWorker: ctx.useWorker,
+  };
 }
 
 /** Measure the harness noise floor for one variant/case (current vs current).
@@ -67,8 +88,15 @@ export async function runMatrixCalibration<T>(
   const ctx = await createDirContext(matrix, options);
   const caseId = ctx.caseIds[0];
   const label = `${variantId}/${caseId}`;
-  const variantArgs = buildVariantArgs(matrix, variantId, caseId, ctx);
-  const current = () => runVariantOnce(variantArgs);
+  const variantArgs: RunMatrixVariantParams = {
+    source: { variantDir: matrix.variantDir!, variantId },
+    caseId,
+    caseData: matrix.cases && !matrix.casesModule ? caseId : undefined,
+    casesModule: matrix.casesModule,
+    options: ctx.runnerOpts,
+    useWorker: ctx.useWorker,
+  };
+  const current = async () => (await runMatrixVariant(variantArgs))[0];
 
   return runCalibration({
     current,
@@ -100,97 +128,4 @@ async function createDirContext<T>(
     warmupBatch,
     useWorker,
   };
-}
-
-/** Run all variants sequentially, collecting per-case results */
-async function runDirVariants<T>(
-  variantIds: string[],
-  ctx: DirMatrixContext<T>,
-): Promise<VariantResult[]> {
-  const variants: VariantResult[] = [];
-  for (const id of variantIds) {
-    const cases = await runDirVariantCases(id, ctx);
-    variants.push({ id, cases });
-  }
-  return variants;
-}
-
-/** Build the args to run one variant/case, directly or in a worker. */
-function buildVariantArgs<T>(
-  matrix: BenchMatrix<T>,
-  variantId: string,
-  caseId: string,
-  ctx: DirMatrixContext<T>,
-): VariantArgs {
-  return {
-    variantDir: matrix.variantDir!,
-    variantId,
-    caseId,
-    caseData: matrix.cases && !matrix.casesModule ? caseId : undefined,
-    casesModule: matrix.casesModule,
-    options: ctx.runnerOpts,
-    useWorker: ctx.useWorker,
-  };
-}
-
-/** Run one variant/case, returning its single MeasuredResults. */
-async function runVariantOnce(args: VariantArgs): Promise<MeasuredResults> {
-  return (await runMatrixVariant(args))[0];
-}
-
-/** Run all cases for a single variant */
-async function runDirVariantCases<T>(
-  variantId: string,
-  ctx: DirMatrixContext<T>,
-): Promise<CaseResult[]> {
-  const { matrix, casesModule, caseIds, batches } = ctx;
-  const cases: CaseResult[] = [];
-
-  for (const caseId of caseIds) {
-    const variantArgs = buildVariantArgs(matrix, variantId, caseId, ctx);
-    const baselineArgs =
-      matrix.baselineDir && ctx.baselineIds.includes(variantId)
-        ? { ...variantArgs, variantDir: matrix.baselineDir! }
-        : undefined;
-
-    const { metadata } = await loadCaseData(casesModule, caseId);
-    const { measured, baseline } =
-      batches > 1
-        ? await runCaseBatched(variantArgs, baselineArgs, ctx)
-        : await runCaseSingle(variantArgs, baselineArgs);
-    const deltaPercent = baseline
-      ? computeDeltaPercent(baseline, measured)
-      : undefined;
-    cases.push({ caseId, measured, metadata, baseline, deltaPercent });
-  }
-  return cases;
-}
-
-/** Run a batched measurement for a case, alternating current/baseline order. */
-async function runCaseBatched<T>(
-  variantArgs: VariantArgs,
-  baselineArgs: VariantArgs | undefined,
-  ctx: DirMatrixContext<T>,
-): Promise<{ measured: MeasuredResults; baseline?: MeasuredResults }> {
-  const runCurrent = () => runVariantOnce(variantArgs);
-  const runBase = baselineArgs ? () => runVariantOnce(baselineArgs) : undefined;
-  const { results, baseline } = await runBatched(
-    [runCurrent],
-    runBase,
-    ctx.batches,
-    ctx.warmupBatch,
-  );
-  return { measured: results[0], baseline };
-}
-
-/** Run a single unbatched measurement for a case. */
-async function runCaseSingle(
-  variantArgs: VariantArgs,
-  baselineArgs: VariantArgs | undefined,
-): Promise<{ measured: MeasuredResults; baseline?: MeasuredResults }> {
-  const measured = await runVariantOnce(variantArgs);
-  const baseline = baselineArgs
-    ? await runVariantOnce(baselineArgs)
-    : undefined;
-  return { measured, baseline };
 }
