@@ -1,6 +1,6 @@
 import { signal } from "@preact/signals";
 import type { DataProvider } from "./Providers.ts";
-import type { ReportData } from "./ReportData.ts";
+import type { ReportData, ShiftPercentile } from "./ReportData.ts";
 
 /** Tracked state for an open source-code tab in the viewer. */
 export interface SourceTabState {
@@ -36,6 +36,16 @@ export const urlError = signal<{ url: string; detail: string } | null>(null);
 /** Open source-code tabs. */
 export const sourceTabs = signal<SourceTabState[]>([]);
 export const trimMode = signal<TrimMode>("trim");
+
+/** Payload for the shift-detail popup: one point plus its display context. */
+export interface ShiftDetail {
+  point: ShiftPercentile;
+  metric: string;
+  equivMargin?: number;
+}
+
+/** Open detail popup for a shift-function point (verdict or percentile). Null = closed. */
+export const shiftDetail = signal<ShiftDetail | null>(null);
 
 const cookieTheme = document.cookie.match(/(?:^|; )theme=(light|dark)/);
 
