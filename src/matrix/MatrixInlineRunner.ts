@@ -37,6 +37,7 @@ export async function runMatrixInline<T>(
     ? all.filter(([id]) => filteredVariants.includes(id))
     : all;
   const sources = new Map(entries.map(([id, v]) => [id, inlineSource(id, v)]));
+  const baselineId = matrix.baselineVariant;
 
   const plan: MatrixPlan<T> = {
     variantIds: [...sources.keys()],
@@ -44,7 +45,13 @@ export async function runMatrixInline<T>(
     casesModule,
     casesModuleUrl: matrix.casesModule,
     caseData: await inlineCaseDataMap(matrix, caseIds),
-    plan: variantId => ({ source: sources.get(variantId)! }),
+    plan: variantId => ({
+      source: sources.get(variantId)!,
+      baselineSource:
+        baselineId && baselineId !== variantId
+          ? sources.get(baselineId)
+          : undefined,
+    }),
     runnerOpts,
     batches,
     warmupBatch,
