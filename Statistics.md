@@ -197,27 +197,32 @@ result gets stuck at "slower" or "faster" when comparing identical code. The
 test detects real differences but can never confirm equivalence.
 
 The equivalence margin (`--equiv-margin`, default 2%) defines the smallest
-difference that matters. The CI is compared against both zero and the margin:
+difference that matters. With a margin set, the only thresholds are `-margin`
+and `+margin`; each verdict is a whole-CI test on where the entire interval
+sits relative to that band:
 
 ```
          -margin       0       +margin
             |          |          |
-    [---]   |          |          |         ==> FASTER  (beyond margin)
-            |          |          |  [---]  ==> SLOWER  (beyond margin)
-            |   [----------]      |         ==> EQUIVALENT (CI within margin)
-            |      [--]           |         ==> EQUIVALENT (excludes zero, but trivial)
-   [------------]  |              |         ==> INCONCLUSIVE (need more data)
+    [---]   |          |          |         ==> FASTER  (entire CI beyond margin)
+            |          |          |  [---]  ==> SLOWER  (entire CI beyond margin)
+            |          | [-----]  |         ==> EQUIVALENT (entire CI within margin)
+            |          |     [--------]     ==> INCONCLUSIVE (straddles the margin)
 ```
 
 **Equivalent** means the entire CI fits within the margin. The difference is
 provably smaller than what matters, whether or not it's statistically
-significant.
+significant: a CI that excludes zero but stays inside the band (above) is
+equivalent, because the band, not zero, is the bar that matters.
 
-**Faster / Slower** means the CI excludes zero and extends beyond the margin. A
-real, meaningful change.
+**Faster / Slower** means the entire CI lies beyond the margin. A real,
+meaningful change, confidently past the noise floor.
 
-**Inconclusive** means the CI is too wide to decide. More batches would narrow
-it.
+**Inconclusive** means the CI straddles a margin edge, so the result is neither
+proven-equivalent nor proven-different. More batches would narrow it. (Gating on
+the whole CI rather than the point estimate is what makes this stable: with
+margin 0 the test reduces to the plain CI-excludes-zero check, and adding a
+small margin doesn't suddenly flip verdicts on point-estimate noise.)
 
 #### Calibrating the Margin
 

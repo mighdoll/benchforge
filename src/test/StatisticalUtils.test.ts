@@ -145,31 +145,38 @@ test("blockDifferenceCI shows uncertainty for noise", () => {
 });
 
 test("classifyDirection without a margin colors any CI excluding zero", () => {
-  expect(classifyDirection([-3, -1], -2)).toBe("faster");
-  expect(classifyDirection([1, 3], 2)).toBe("slower");
-  expect(classifyDirection([-1, 2], 0.5)).toBe("uncertain");
+  expect(classifyDirection([-3, -1])).toBe("faster");
+  expect(classifyDirection([1, 3])).toBe("slower");
+  expect(classifyDirection([-1, 2])).toBe("uncertain");
 });
 
 test("classifyDirection: CI fully inside the margin is equivalent", () => {
-  expect(classifyDirection([-0.5, 0.4], 0.1, 2)).toBe("equivalent");
+  expect(classifyDirection([-0.5, 0.4], 2)).toBe("equivalent");
 });
 
-test("classifyDirection: CI straddling zero and exceeding the margin is uncertain", () => {
-  // Straddles zero AND pokes outside the band, so it is neither proven-equivalent
-  // nor proven-different: inconclusive.
-  expect(classifyDirection([-3, 2.5], -0.6, 2)).toBe("uncertain");
+test("classifyDirection: CI straddling a margin edge is uncertain", () => {
+  // One bound sits inside the noise band, so the effect is not provably beyond
+  // noise: inconclusive, not faster/slower. Whether the CI also crosses zero is
+  // irrelevant -- only the margin band matters.
+  expect(classifyDirection([-2.5, -0.2], 2)).toBe("uncertain");
+  expect(classifyDirection([0.2, 2.5], 2)).toBe("uncertain");
+  expect(classifyDirection([-3, 2.5], 2)).toBe("uncertain"); // crosses zero too
+  // The viewer p10 case: CI [+0.5, +5.0] straddles the +2 edge.
+  expect(classifyDirection([0.5, 5], 2)).toBe("uncertain");
+  expect(classifyDirection([-5, -0.5], 2)).toBe("uncertain");
 });
 
-test("classifyDirection: excludes zero but point estimate within margin is equivalent", () => {
-  // The straddler: CI clears zero (a real effect) but its center sits inside the
-  // noise band, so it is "real but within noise" -> equivalent, not slower.
-  expect(classifyDirection([-2.5, -0.2], -1, 2)).toBe("equivalent");
-  expect(classifyDirection([0.2, 2.5], 1, 2)).toBe("equivalent");
+test("classifyDirection: whole CI clearing the margin is faster/slower", () => {
+  expect(classifyDirection([-4, -2.5], 2)).toBe("faster");
+  expect(classifyDirection([2.5, 4], 2)).toBe("slower");
 });
 
-test("classifyDirection: effect clearing the margin is faster/slower", () => {
-  expect(classifyDirection([-4, -2.5], -3, 2)).toBe("faster");
-  expect(classifyDirection([2.5, 4], 3, 2)).toBe("slower");
+test("classifyDirection: margin 0 falls out as the CI-excludes-zero test", () => {
+  // No special case for margin 0: a CI excluding zero is faster/slower, a CI
+  // straddling zero is uncertain. A small margin can't suddenly flip this.
+  expect(classifyDirection([0.05, 3.5], 0)).toBe("slower");
+  expect(classifyDirection([-3.5, -0.05], 0)).toBe("faster");
+  expect(classifyDirection([-0.05, 3.5], 0)).toBe("uncertain");
 });
 
 test("blockPoolBootstrap CI brackets the pooled estimate", () => {
