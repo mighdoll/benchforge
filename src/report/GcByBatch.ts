@@ -21,11 +21,6 @@ export interface GcByBatchSummary {
   /** Total scavenges and full GCs (context for "is GC even happening"). */
   scavenges: number;
   fullGCs: number;
-
-  /** Post-full-GC cache-effect probe: mean iteration time in the K iterations
-   *  immediately after each full GC vs the overall sample mean. Undefined when
-   *  too few full GCs land mid-loop to measure. */
-  cacheProbe?: CacheProbe;
 }
 
 /** min / max / mean / coefficient-of-variation for a value across observations. */
@@ -37,23 +32,6 @@ export interface Spread {
   /** Coefficient of variation (stdev/mean); 0 when fewer than 2 observations. */
   cv: number;
 }
-
-/** Mean iteration time right after full GCs vs the loop mean (cache-penalty probe). */
-export interface CacheProbe {
-  /** Iterations sampled immediately after each full GC. */
-  windowK: number;
-  /** Number of full GCs that had a measurable post-GC window. */
-  events: number;
-  /** Mean iteration time (ms) in the post-GC windows. */
-  postGcMean: number;
-  /** Mean iteration time (ms) across all samples. */
-  overallMean: number;
-  /** postGcMean / overallMean - 1 (positive == post-GC iterations run slower). */
-  penaltyRatio: number;
-}
-
-/** Iterations sampled after a full GC for the cache-effect probe. */
-const cacheWindowK = 20;
 
 /** Build a per-batch full-GC summary, or undefined when there is no per-event
  *  GC data with offsets and batch structure to analyze. */
@@ -78,7 +56,6 @@ export function gcByBatch(r: MeasuredResults): GcByBatchSummary | undefined {
     fullCollected: spread(full.map(p => p.event.collected)),
     scavenges,
     fullGCs: full.length,
-    cacheProbe: cacheProbe(full, samples),
   };
 }
 
@@ -134,34 +111,5 @@ function spread(values: number[]): Spread {
     max: Math.max(...values),
     mean: average(values),
     cv: values.length > 1 ? coefficientOfVariation(values) : 0,
-  };
-}
-
-/** Probe whether iterations right after a full GC run slower than the loop
- *  mean (a cache/compaction penalty not captured by the pause time). */
-function cacheProbe(
-  full: PlacedEvent[],
-  samples: number[],
-): CacheProbe | undefined {
-  const postGc: number[] = [];
-  let events = 0;
-  for (const p of full) {
-    const start = p.sampleIndex + 1;
-    const end = Math.min(start + cacheWindowK, samples.length);
-    if (end <= start) continue;
-    events++;
-    for (let i = start; i < end; i++) postGc.push(samples[i]);
-  }
-  if (!postGc.length) return undefined;
-
-  const overallMean = average(samples);
-  const postGcMean = average(postGc);
-  const penaltyRatio = overallMean > 0 ? postGcMean / overallMean - 1 : 0;
-  return {
-    windowK: cacheWindowK,
-    events,
-    postGcMean,
-    overallMean,
-    penaltyRatio,
   };
 }

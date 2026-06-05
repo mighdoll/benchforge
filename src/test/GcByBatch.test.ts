@@ -74,22 +74,3 @@ test("gcByBatch ignores pre-loop (negative offset) events", () => {
   const s = gcByBatch(r)!;
   expect(s.fullGCs).toBe(1); // only the in-loop one
 });
-
-test("cacheProbe measures post-GC iterations against the loop mean", () => {
-  // 100 samples all 1ms except 5 slow (10ms) iterations right after a full GC.
-  const samples = new Array<number>(100).fill(1);
-  const gcSampleIndex = 30; // offset 31 maps to sample 31 (>= cumulative)
-  for (let i = gcSampleIndex + 1; i <= gcSampleIndex + 5; i++) samples[i] = 10;
-  const r: MeasuredResults = {
-    name: "t",
-    samples,
-    batchOffsets: [0],
-    gcEvents: [full(31, 1, 100)],
-    time: { min: 1, max: 10, avg: 1, p50: 1, p75: 1, p99: 1, p999: 1 },
-  };
-  const probe = gcByBatch(r)!.cacheProbe!;
-  expect(probe.events).toBe(1);
-  // post-GC window includes the 5 slow iters, so its mean exceeds the loop mean
-  expect(probe.penaltyRatio).toBeGreaterThan(0);
-  expect(probe.postGcMean).toBeGreaterThan(probe.overallMean);
-});
