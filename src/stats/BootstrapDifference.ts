@@ -101,7 +101,7 @@ export function multiSampleDifferenceCI(
     results[op.origIndex] = {
       percent: observedPcts[j],
       ci,
-      direction: classifyDirection(ci, observedPcts[j], options.equivMargin),
+      direction: classifyDirection(ci, options.equivMargin),
       histogram: binValues(allDiffs[j]),
       ciLevel: "sample",
       ...(capped && { subsampled: Math.max(a.length, b.length) }),
@@ -187,22 +187,21 @@ export function binBootstrapResult(result: BootstrapResult): BinnedCI {
   return { estimate, ci, histogram: binValues(samples) };
 }
 
-/** @return CI direction, with optional equivalence margin (in percent).
- *  faster/slower require the effect to clear the margin (the calibrated noise
- *  floor), not merely exclude zero: a CI that excludes zero but whose point
- *  estimate sits inside +/-margin is "real but within noise", reported as
- *  equivalent. Without a margin, any CI excluding zero is faster/slower. */
+/** @return CI direction against an equivalence margin (in percent, default 0).
+ *  Both verdicts are whole-CI tests (TOST): faster/slower require the entire CI
+ *  beyond +/-margin (the calibrated noise floor), equivalent requires it wholly
+ *  inside. A CI straddling a margin edge is "uncertain": not provably beyond
+ *  noise, so it needs more data. Margin 0 is not special -- it falls out as the
+ *  plain CI-excludes-zero test, which is why a small margin can't flip verdicts
+ *  on point-estimate noise the way point gating would. */
 export function classifyDirection(
   ci: [number, number],
-  observed: number,
-  margin?: number,
+  margin = 0,
 ): CIDirection {
-  const hasMargin = margin != null && margin > 0;
-  if (hasMargin && ci[0] >= -margin && ci[1] <= margin) return "equivalent";
-  const excludesZero = ci[0] > 0 || ci[1] < 0;
-  if (!excludesZero) return "uncertain";
-  if (hasMargin && Math.abs(observed) <= margin) return "equivalent";
-  return observed < 0 ? "faster" : "slower";
+  if (ci[1] < -margin) return "faster"; // whole CI below -margin
+  if (ci[0] > margin) return "slower"; // whole CI above +margin
+  if (ci[0] >= -margin && ci[1] <= margin) return "equivalent"; // whole CI inside
+  return "uncertain"; // CI straddles a margin edge -> need more data
 }
 
 /** @return values binned into histogram for compact visualization */
@@ -292,7 +291,7 @@ function blockDiffCI(
   return {
     percent: observedPct,
     ci,
-    direction: classifyDirection(ci, observedPct, options.equivMargin),
+    direction: classifyDirection(ci, options.equivMargin),
     histogram: binValues(diffs),
     trimmed: [sideA.trimCount, sideB.trimCount],
     ciLevel: "block",
