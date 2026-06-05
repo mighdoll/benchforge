@@ -15,7 +15,11 @@ import type {
 } from "./BenchMatrix.ts";
 import { buildRunnerOptions, resolveCases } from "./BenchMatrix.ts";
 import type { CasesModule } from "./CaseLoader.ts";
-import { type MatrixPlan, runMatrixPlan } from "./MatrixRun.ts";
+import {
+  inlineCaseDataMap,
+  type MatrixPlan,
+  runMatrixPlan,
+} from "./MatrixRun.ts";
 import { discoverVariants } from "./VariantLoader.ts";
 
 /** Shared state for directory-based matrix execution */
@@ -42,23 +46,22 @@ export async function runMatrixWithDir<T>(
   const variantIds = options.filteredVariants ?? allVariantIds;
 
   const ctx = await createDirContext(matrix, options);
-  return runMatrixPlan(matrix.name, dirPlan(matrix, variantIds, ctx));
+  return runMatrixPlan(matrix.name, await dirPlan(matrix, variantIds, ctx));
 }
 
 /** Build a source-agnostic plan that loads each variant (and its baseline, when
  *  baselineDir is set) from a directory by id. */
-function dirPlan<T>(
+async function dirPlan<T>(
   matrix: BenchMatrix<T>,
   variantIds: string[],
   ctx: DirMatrixContext<T>,
-): MatrixPlan<T> {
-  const inlineCaseData = matrix.cases && !matrix.casesModule;
+): Promise<MatrixPlan<T>> {
   return {
     variantIds,
     caseIds: ctx.caseIds,
     casesModule: ctx.casesModule,
     casesModuleUrl: matrix.casesModule,
-    caseData: inlineCaseData ? caseId => caseId : undefined,
+    caseData: await inlineCaseDataMap(matrix, ctx.caseIds),
     plan: variantId => ({
       source: { variantDir: matrix.variantDir!, variantId },
       baselineSource:

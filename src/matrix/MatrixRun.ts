@@ -6,8 +6,8 @@ import {
   runMatrixVariant,
 } from "../runners/RunnerOrchestrator.ts";
 import type { VariantSource } from "../runners/RunnerUtils.ts";
-import type { CaseResult, VariantResult } from "./BenchMatrix.ts";
-import { computeDeltaPercent } from "./BenchMatrix.ts";
+import type { BenchMatrix, CaseResult, VariantResult } from "./BenchMatrix.ts";
+import { computeDeltaPercent, resolveInlineCase } from "./BenchMatrix.ts";
 import type { CasesModule } from "./CaseLoader.ts";
 import { loadCaseData } from "./CaseLoader.ts";
 
@@ -30,12 +30,33 @@ export interface MatrixPlan<T> {
   casesModuleUrl?: string;
   /** Resolve the run + baseline sources for one variant/case. */
   plan: (variantId: string, caseId: string) => VariantPlan;
-  /** Inline case data (used when there is no cases module). */
-  caseData?: (caseId: string) => unknown;
+  /** Pre-resolved inline case data by case id (used when there is no cases
+   *  module); passed to the worker as the variant's argument. */
+  caseData?: Map<string, unknown>;
   runnerOpts: RunnerOptions;
   batches: number;
   warmupBatch: boolean;
   useWorker: boolean;
+}
+
+/** Pre-resolve the per-case data passed to the worker as the variant argument:
+ *  inline caseData (thunks invoked once here), else the caseId string when there
+ *  is no cases module, else nothing (the worker loads from the module). */
+export async function inlineCaseDataMap<T>(
+  matrix: BenchMatrix<T>,
+  caseIds: string[],
+): Promise<Map<string, unknown> | undefined> {
+  if (matrix.caseData) {
+    const entries = await Promise.all(
+      caseIds.map(
+        async id =>
+          [id, await resolveInlineCase(matrix.caseData!, id)] as const,
+      ),
+    );
+    return new Map(entries);
+  }
+  if (matrix.casesModule) return undefined;
+  return new Map(caseIds.map(id => [id, id]));
 }
 
 /** Run every variant over every case, batching and interleaving each variant
@@ -62,7 +83,7 @@ async function runVariantCases<T>(
   const cases: CaseResult[] = [];
   for (const caseId of plan.caseIds) {
     const { source, baselineSource } = plan.plan(variantId, caseId);
-    const caseData = plan.caseData?.(caseId);
+    const caseData = plan.caseData?.get(caseId);
     const variantArgs = caseArgs(source, caseId, caseData, plan);
     const baselineArgs = baselineSource
       ? caseArgs(baselineSource, caseId, caseData, plan)
