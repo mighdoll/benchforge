@@ -110,38 +110,31 @@ function buildMeasuredResults(
 }
 
 /**
- * Run warmup iterations with gc + settle time for V8 optimization. Returns warmup timings.
+ * Run warmup iterations so V8 tiers the hot code up to its optimized steady state
+ * (Ignition ==> Sparkplug ==> Maglev ==> TurboFan) before measurement. Returns
+ * warmup timings.
  *
- * V8 has 4 compilation tiers: Ignition (interpreter) ==> Sparkplug (baseline) ==>
- * Maglev (mid-tier optimizer) ==> TurboFan (full optimizer). Tiering thresholds:
- *   - Ignition ==> Sparkplug: 8 invocations
- *   - Sparkplug ==> Maglev: 500 invocations
- *   - Maglev ==> TurboFan: 6000 invocations
+ * The gc runs BEFORE the warmup loop, not after: warmup allocations then refill
+ * the heap to its working set, so measurement starts on a warm heap. A gc placed
+ * AFTER warmup would reset the heap to its post-collection floor, and the first
+ * measured iterations would re-pay the heap-fill / allocation-site retenuring
+ * transient -- leaving a residual ramp even after a long warmup. With warmup=0
+ * this is just a clean-heap gc before measurement (unchanged from before).
  *
- * Optimization compilation happens on background threads and requires idle time
- * on the main thread to complete. Without sufficient warmup + settle time,
- * benchmarks exhibit bimodal timing: slow Sparkplug samples (~30% slower) mixed
- * with fast optimized samples.
- *
- * The warmup iterations trigger the optimization decision, then settle time
- * provides idle time for background compilation to finish before measurement.
- *
- * @see https://v8.dev/blog/sparkplug
- * @see https://v8.dev/blog/maglev
- * @see https://v8.dev/blog/background-compilation
+ * Tiering is invocation-gated (it needs enough calls, not main-thread idle time),
+ * so a settle pause does not speed it up; bevy/link needs ~40-50 warmup iters to
+ * reach plateau. pauseWarmup is kept as an optional settle delay only.
  */
 async function runWarmup<T>(config: CollectParams<T>): Promise<number[]> {
-  const gc = gcFunction();
+  gcFunction()();
   const samples = new Array<number>(config.warmup);
   for (let i = 0; i < config.warmup; i++) {
     const start = performance.now();
     executeBenchmark(config.benchmark, config.params);
     samples[i] = performance.now() - start;
   }
-  gc();
   if (config.pauseWarmup) {
     await new Promise(r => setTimeout(r, config.pauseWarmup));
-    gc();
   }
   return samples;
 }
