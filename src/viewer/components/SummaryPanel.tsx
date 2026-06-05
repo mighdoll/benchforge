@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "preact/hooks";
+import { useEffect, useMemo, useState } from "preact/hooks";
 import { useLazyPlot } from "./LazyPlot.ts";
 import type { GitVersion } from "../../report/GitUtils.ts";
 import { verdictWord } from "../../report/Verdict.ts";
@@ -205,15 +205,11 @@ function ComparisonBadge({ ci, compact }: { ci: DifferenceCI; compact?: boolean 
   );
 }
 
-/** A group's panels (sections, heap, coverage), aligning run columns after layout. */
+/** A group's panels: sections, heap allocation, coverage. */
 function GroupContent({ current }: { current: BenchmarkEntry }) {
-  const ref = useRef<HTMLDivElement>(null);
   const sections = activeView(current).sections;
-  useEffect(() => {
-    if (ref.current) alignRunColumns(ref.current);
-  });
   return (
-    <div class="panel-grid" ref={ref}>
+    <div class="panel-grid">
       {sections?.map((s, i) => <SectionPanel key={i} section={s} />)}
       <HeapPanel entry={current} />
       <CoveragePanel entry={current} />
@@ -235,16 +231,6 @@ function CIPlotMount({ ci, compact }: { ci: DifferenceCI; compact?: boolean }) {
     return createCIPlot(ci, opts);
   }, [ci, compact], "CI plot");
   return <div class="ci-plot-container" ref={ref} />;
-}
-
-/** Set CSS vars so run-name and run-value columns align across all sections. */
-function alignRunColumns(panel: HTMLElement): void {
-  const maxW = (sel: string) =>
-    Math.max(0, ...[...panel.querySelectorAll<HTMLElement>(sel)].map(el => el.scrollWidth));
-  const maxName = maxW(".run-name");
-  const maxValue = maxW(".run-value");
-  if (maxName) panel.style.setProperty("--run-name-width", `${maxName}px`);
-  if (maxValue) panel.style.setProperty("--run-value-width", `${maxValue}px`);
 }
 
 /** One section panel, dispatching to the shift, matrix, or plain stat-row layout. */
@@ -353,8 +339,7 @@ function ShiftSection(
 }
 
 /** Dense table for scalar metrics: rows = metrics, columns = a value per run
- *  then the delta badge. Run names appear once as headers. Uses its own cell
- *  classes so it stays out of the global alignRunColumns width calc. */
+ *  then the delta badge. Run names appear once as headers, in its own grid. */
 function MatrixSection(
   { section, titleEl }:
   { section: ViewerSection; titleEl: preact.JSX.Element },
