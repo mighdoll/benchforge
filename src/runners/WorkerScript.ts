@@ -6,7 +6,11 @@ import type { TimeProfile } from "../profiling/node/TimeSampler.ts";
 import type { BenchmarkFunction, BenchmarkSpec } from "./BenchmarkSpec.ts";
 import type { BenchRunner, RunnerOptions } from "./BenchRunner.ts";
 import type { MeasuredResults } from "./MeasuredResults.ts";
-import { importBenchFn, resolveVariantFn } from "./RunnerUtils.ts";
+import {
+  importBenchFn,
+  resolveVariantFn,
+  type VariantSource,
+} from "./RunnerUtils.ts";
 import { TimingRunner } from "./TimingRunner.ts";
 
 /** Message sent to worker process to start a benchmark run. */
@@ -27,6 +31,10 @@ export interface RunMessage {
   variantDir?: string;
   /** Variant filename without .ts extension */
   variantId?: string;
+  /** Inline variant run fn source (BenchMatrix inline mode) */
+  variantRunCode?: string;
+  /** Inline variant setup fn source (stateful inline variant) */
+  variantSetupCode?: string;
   caseData?: unknown;
   caseId?: string;
   /** Module URL exporting cases[] and loadCase() */
@@ -78,12 +86,14 @@ function sendAndExit(msg: ResultMessage | ErrorMessage, exitCode: number) {
   });
 }
 
-/** Resolve benchmark function from message (variant dir, module path, or fnCode) */
+/** Resolve benchmark function from message (matrix variant, module path, or fnCode) */
 async function resolveBenchmarkFn(
   message: RunMessage,
 ): Promise<BenchmarkImportResult> {
-  if (message.variantDir && message.variantId) {
-    return importVariantModule(message);
+  const source = variantSource(message);
+  if (source) {
+    const { caseId, caseData, casesModule } = message;
+    return resolveVariantFn({ source, caseId, caseData, casesModule });
   }
   if (message.modulePath) {
     const { modulePath, exportName, setupExportName, params } = message;
@@ -92,16 +102,17 @@ async function resolveBenchmarkFn(
   return { fn: reconstructFunction(message.fnCode!), params: message.params };
 }
 
-/** Import variant from directory and prepare benchmark function */
-async function importVariantModule(
-  message: RunMessage,
-): Promise<BenchmarkImportResult> {
-  const { variantDir, variantId } = message;
-  return resolveVariantFn({
-    ...message,
-    variantDir: variantDir!,
-    variantId: variantId!,
-  });
+/** The matrix variant source carried by a run message, if any (dir or inline). */
+function variantSource(message: RunMessage): VariantSource | undefined {
+  const { variantDir, variantId, variantRunCode, variantSetupCode } = message;
+  if (variantDir && variantId) return { variantDir, variantId };
+  if (variantRunCode)
+    return {
+      runCode: variantRunCode,
+      setupCode: variantSetupCode,
+      variantId: variantId ?? "",
+    };
+  return undefined;
 }
 
 /** Eval serialized function body back into a callable */
