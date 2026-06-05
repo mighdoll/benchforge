@@ -40,6 +40,7 @@ import {
   minBatches,
   type SectionCICache,
 } from "./ViewerSections.ts";
+import { warmupShape } from "./WarmupShape.ts";
 
 /** Options for prepareHtmlData: report sections, git versions, and CLI args */
 export interface PrepareHtmlOptions extends ComparisonOptions {
@@ -160,6 +161,7 @@ function prepareBenchmarkData(
     pausePoints: m.pausePoints,
     batchOffsets: m.batchOffsets,
     gcByBatch: gcByBatch(m),
+    warmupShape: warmupShape(m),
     stats: m.time,
     heapSize: m.heapSize,
     totalTime: m.totalTime,

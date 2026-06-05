@@ -1,5 +1,6 @@
 import type { GcByBatchSummary } from "../report/GcByBatch.ts";
 import type { GitVersion } from "../report/GitUtils.ts";
+import type { WarmupShape } from "../report/WarmupShape.ts";
 import type { PausePoint } from "../runners/MeasuredResults.ts";
 import type {
   CILevel,
@@ -52,6 +53,8 @@ export interface BenchmarkEntry {
   batchOffsets?: number[];
   /** Per-batch full-GC diagnostic summary (worker-mode --gc-stats runs). */
   gcByBatch?: GcByBatchSummary;
+  /** Per-batch time-by-position summary surfacing the JIT/heap warmup ramp. */
+  warmupShape?: WarmupShape;
   stats: BenchmarkStats;
   heapSize?: { min: number; max: number; avg: number };
   totalTime?: number;
