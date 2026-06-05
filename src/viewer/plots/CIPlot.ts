@@ -319,10 +319,28 @@ function drawCILabels(
   const loX = scales.x(ci[0]);
   const hiX = scales.x(ci[1]);
   const minGap = Math.max(loLabel.length, hiLabel.length) * 6;
-  if (!opts.includeZero || hiX - loX >= minGap) {
+  const tight = hiX - loX < minGap;
+
+  // Diff plots (includeZero): keep both labels centered, or hide both when the
+  // CI is too tight to fit -- the zero line and point label carry the reading.
+  if (opts.includeZero) {
+    if (tight) return;
     svg.appendChild(text(loX, labelY, loLabel, "middle", "11"));
     svg.appendChild(text(hiX, labelY, hiLabel, "middle", "11"));
+    return;
   }
+
+  // Absolute plots: a tight CI collapses to one centered label (identical
+  // bounds) or a "lo - hi" range; otherwise anchor each label outward so the
+  // two never encroach on each other.
+  if (tight) {
+    const mid = (loX + hiX) / 2;
+    const merged = loLabel === hiLabel ? loLabel : `${loLabel} - ${hiLabel}`;
+    svg.appendChild(text(mid, labelY, merged, "middle", "11"));
+    return;
+  }
+  svg.appendChild(text(loX, labelY, loLabel, "end", "11"));
+  svg.appendChild(text(hiX, labelY, hiLabel, "start", "11"));
 }
 
 /** Top margin: room for the point-label, else the title, else a thin band. */

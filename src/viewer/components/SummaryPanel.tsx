@@ -170,27 +170,52 @@ function TrimToggle() {
   );
 }
 
-/** Expandable benchmark group with comparison badge and section panels. */
+/** Expandable benchmark group. A single-benchmark group (incl. matrix
+ *  variant/case) keeps the verdict badge in the header and renders its panels
+ *  directly; a multi-benchmark group renders one BenchmarkBlock per benchmark,
+ *  each with its own name and verdict. The baseline name, when present, is
+ *  named once in the header (per-run rows still label it "baseline"). */
 function CollapsibleGroup({ group }: { group: BenchmarkGroup }) {
   const [open, setOpen] = useState(true);
-  const current = group.benchmarks?.[0];
-  if (!current) return <div class="error">No benchmark data for this group</div>;
+  const benchmarks = group.benchmarks ?? [];
+  if (!benchmarks.length)
+    return <div class="error">No benchmark data for this group</div>;
 
-  const ci = activeView(current).comparisonCI;
-  const headerOpen = shiftDetailOpener(entryShift(current));
+  const single = benchmarks.length === 1;
+  const headerCi = single ? activeView(benchmarks[0]).comparisonCI : undefined;
+  const headerOpen = single ? shiftDetailOpener(entryShift(benchmarks[0])) : undefined;
   return (
     <div class="benchmark-group">
       <div class="group-header" onClick={() => setOpen(o => !o)}>
         <span class="group-toggle">{open ? "\u25be" : "\u25b8"}</span>
         <h2>{group.name}</h2>
-        {ci && <ComparisonBadge ci={ci} onOpen={headerOpen} />}
+        {headerCi && <ComparisonBadge ci={headerCi} onOpen={headerOpen} />}
+        {group.baseline && <span class="group-baseline">vs {group.baseline.name}</span>}
         {group.warnings && (
           <span class="batch-warnings">
             {group.warnings.map(w => <span class="batch-warning">{w}</span>)}
           </span>
         )}
       </div>
-      {open && <GroupContent current={current} />}
+      {open && (single
+        ? <GroupContent current={benchmarks[0]} />
+        : benchmarks.map((b, i) => <BenchmarkBlock key={i} entry={b} />))}
+    </div>
+  );
+}
+
+/** One benchmark within a multi-benchmark group: its name, verdict badge, and
+ *  section/heap/coverage panels. Reuses ComparisonBadge + GroupContent. */
+function BenchmarkBlock({ entry }: { entry: BenchmarkEntry }) {
+  const ci = activeView(entry).comparisonCI;
+  const open = shiftDetailOpener(entryShift(entry));
+  return (
+    <div class="benchmark-block">
+      <div class="benchmark-block-head">
+        <h3>{entry.name}</h3>
+        {ci && <ComparisonBadge ci={ci} onOpen={open} />}
+      </div>
+      <GroupContent current={entry} />
     </div>
   );
 }
