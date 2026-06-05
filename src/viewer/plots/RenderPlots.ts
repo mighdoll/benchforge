@@ -96,18 +96,20 @@ export function filterToBatch(
     arr
       .filter(d => inBatch(d.benchmark, d.iteration))
       .map(d => ({ ...d, iteration: reindex(d.benchmark, d.iteration) }));
+  const sliceSample = <T extends { benchmark: string; sampleIndex: number }>(
+    arr: T[],
+  ) =>
+    arr
+      .filter(d => inBatch(d.benchmark, d.sampleIndex))
+      .map(d => ({ ...d, sampleIndex: reindex(d.benchmark, d.sampleIndex) }));
 
   return {
     allSamples: sliceIter(flat.allSamples),
     timeSeries: sliceIter(flat.timeSeries.filter(d => !d.isWarmup)),
     heapSeries: sliceIter(flat.heapSeries),
     baselineHeapSeries: sliceIter(flat.baselineHeapSeries),
-    allGcEvents: flat.allGcEvents.filter(d =>
-      inBatch(d.benchmark, d.sampleIndex),
-    ),
-    allPausePoints: flat.allPausePoints.filter(d =>
-      inBatch(d.benchmark, d.sampleIndex),
-    ),
+    allGcEvents: sliceSample(flat.allGcEvents),
+    allPausePoints: sliceSample(flat.allPausePoints),
   };
 }
 
@@ -165,7 +167,9 @@ function flattenSamplesAndHeap(
   });
 }
 
-/** Map GC events to sample indices using cumulative sample durations */
+/** Map full GCs (mark-compact) to sample indices using cumulative sample
+ *  durations. Scavenges are skipped: they're the periodic texture, not the
+ *  locatable spikes we mark individually. */
 function flattenGcEvents(
   b: PreparedBenchmark,
   name: string,
@@ -174,12 +178,14 @@ function flattenGcEvents(
   if (!b.gcEvents?.length) return;
   const endTimes = cumulativeSum(b.samples);
   for (const gc of b.gcEvents) {
+    if (gc.type !== "mark-compact") continue;
     const idx = endTimes.findIndex(t => t >= gc.offset);
     const sampleIndex = idx >= 0 ? idx : b.samples.length - 1;
     out.allGcEvents.push({
       benchmark: name,
       sampleIndex,
       duration: gc.duration,
+      bytes: gc.collected,
     });
   }
 }

@@ -29,11 +29,14 @@ export interface HeapPoint {
   value: number;
 }
 
-/** GcEvent flattened with benchmark name for multi-series plots */
+/** Full-GC (mark-compact) event flattened with benchmark name for multi-series
+ *  plots. Scavenges are filtered out upstream (they're periodic texture, not
+ *  locatable spikes). `duration` is the pause in ms; `bytes` is collected. */
 export interface FlatGcEvent {
   benchmark: string;
   sampleIndex: number;
   duration: number;
+  bytes: number;
 }
 
 /** PausePoint flattened with benchmark name for multi-series plots */
