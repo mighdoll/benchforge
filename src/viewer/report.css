@@ -158,13 +158,20 @@
 
 /* --- Stat rows --- */
 
+/* Grid so run names/values line up within a stat row. Each .run-entry is a
+ * subgrid row, so the name column sizes to the widest name *in this card's
+ * stat row* with no cross-card coupling and no JS measure pass. Name capped
+ * (minmax) so a long name can't starve the value/chart column. */
 .report-panel .stat-row {
+  display: grid;
+  grid-template-columns: minmax(0, max-content) max-content 1fr;
   margin-bottom: 8px;
 }
 
 .report-panel .stat-row:last-child { margin-bottom: 0; }
 
 .report-panel .row-header {
+  grid-column: 1 / -1;
   display: flex;
   align-items: center;
   gap: 8px;
@@ -199,16 +206,19 @@
 /* --- Run entries --- */
 
 .report-panel .run-entry {
-  display: flex;
+  display: grid;
+  grid-column: 1 / -1;
+  grid-template-columns: subgrid;
   align-items: center;
-  gap: 8px;
-  padding: 1px 0 1px 16px;
+  column-gap: 14px;
+  padding: 1px 0;
 }
 
 .report-panel .run-name {
   font-size: 12px;
   color: #999;
-  flex: 0 0 var(--run-name-width, 80px);
+  padding-left: 16px;
+  overflow-wrap: anywhere;
 }
 
 .report-panel .run-value {
@@ -217,7 +227,6 @@
   color: #333;
   font-variant-numeric: tabular-nums;
   text-align: right;
-  flex: 0 0 var(--run-value-width, 80px);
 }
 
 /* --- Plot areas (kept for SamplesPanel) --- */
