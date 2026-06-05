@@ -1,48 +1,43 @@
 import { expect, test } from "vitest";
-import { filterBenchmarks } from "../cli/FilterBenchmarks.ts";
-import type { BenchSuite } from "../runners/BenchmarkSpec.ts";
+import type { MatrixSuite } from "../matrix/BenchMatrix.ts";
 import { runBenchCLITest } from "./TestUtils.ts";
 
-const testSuite: BenchSuite = {
+const testSuite: MatrixSuite = {
   name: "Test Suite",
-  groups: [
+  matrices: [
     {
       name: "String Operations",
-      benchmarks: [
-        { name: "concatenation", fn: () => "a" + "b" },
-        { name: "template literal", fn: () => `a${"b"}` },
-      ],
+      variants: {
+        concatenation: () => "a" + "b",
+        "template literal": () => `a${"b"}`,
+      },
     },
     {
       name: "Math Operations",
-      benchmarks: [
-        { name: "addition", fn: () => 1 + 1 },
-        { name: "multiplication", fn: () => 2 * 2 },
-      ],
+      variants: {
+        addition: () => 1 + 1,
+        multiplication: () => 2 * 2,
+      },
     },
   ],
 };
 
-const suiteWithSetup: BenchSuite = {
+const suiteWithSetup: MatrixSuite = {
   name: "Array Suite",
-  groups: [
+  matrices: [
     {
       name: "Array Operations",
-      setup: () => ({
-        numbers: Array.from({ length: 100 }, (_, i) => i),
-        strings: Array.from({ length: 100 }, (_, i) => `item${i}`),
-      }),
-      benchmarks: [
-        {
-          name: "sum numbers",
-          fn: ({ numbers }: any) =>
-            numbers.reduce((a: number, b: number) => a + b, 0),
-        },
-        {
-          name: "join strings",
-          fn: ({ strings }: any) => strings.join(","),
-        },
-      ],
+      caseData: {
+        data: () => ({
+          numbers: Array.from({ length: 100 }, (_, i) => i),
+          strings: Array.from({ length: 100 }, (_, i) => `item${i}`),
+        }),
+      },
+      variants: {
+        "sum numbers": ({ numbers }: any) =>
+          numbers.reduce((a: number, b: number) => a + b, 0),
+        "join strings": ({ strings }: any) => strings.join(","),
+      },
     },
   ],
 };
@@ -57,37 +52,26 @@ test("runs all benchmarks", { timeout: 30000 }, async () => {
   expect(output).toContain("(mean)");
 });
 
-test("filters by substring", { timeout: 15000 }, async () => {
+test("filters by variant substring", { timeout: 15000 }, async () => {
   const output = await runBenchCLITest(
     testSuite,
-    "--filter concat --duration 0.1 --no-worker",
+    "--filter /concat --duration 0.1 --no-worker",
   );
 
   expect(output).toContain("concatenation");
   expect(output).not.toContain("addition");
 });
 
-test("filters by regex", { timeout: 15000 }, async () => {
+test("filters by another variant substring", { timeout: 15000 }, async () => {
   const output = await runBenchCLITest(
     testSuite,
-    "--filter ^template --duration 0.1 --no-worker",
+    "--filter /template --duration 0.1 --no-worker",
   );
   expect(output).toContain("template literal");
   expect(output).not.toContain("addition");
 });
 
-test("filter preserves suite structure", () => {
-  const filtered = filterBenchmarks(testSuite, "concatenation", false);
-
-  expect(filtered.name).toBe("Test Suite");
-  expect(filtered.groups).toHaveLength(2);
-  expect(filtered.groups[0].name).toBe("String Operations");
-  expect(filtered.groups[0].benchmarks).toHaveLength(1);
-  expect(filtered.groups[0].benchmarks[0].name).toBe("concatenation");
-  expect(filtered.groups[1].benchmarks).toHaveLength(0);
-});
-
-test("runs benchmarks with setup function", { timeout: 30000 }, async () => {
+test("runs benchmarks with shared case data", { timeout: 30000 }, async () => {
   const output = await runBenchCLITest(
     suiteWithSetup,
     "--duration 0.1 --no-worker",
@@ -101,24 +85,19 @@ test("runs benchmarks with setup function", { timeout: 30000 }, async () => {
 test("runs benchmarks with baseline comparison", {
   timeout: 30000,
 }, async () => {
-  const suiteWithBaseline: BenchSuite = {
+  const suiteWithBaseline: MatrixSuite = {
     name: "Baseline Test",
-    groups: [
+    matrices: [
       {
         name: "Sort Comparison",
-        setup: () => ({
-          data: Array.from({ length: 10 }, () => Math.random()),
-        }),
-        baseline: {
-          name: "baseline sort",
-          fn: ({ data }: any) => [...data].sort(),
+        caseData: {
+          data: () => Array.from({ length: 10 }, () => Math.random()),
         },
-        benchmarks: [
-          {
-            name: "optimized sort",
-            fn: ({ data }: any) => [...data].sort((a, b) => a - b),
-          },
-        ],
+        variants: {
+          "baseline sort": (data: number[]) => [...data].sort(),
+          "optimized sort": (data: number[]) => [...data].sort((a, b) => a - b),
+        },
+        baselineVariant: "baseline sort",
       },
     ],
   };

@@ -3,6 +3,7 @@ import { pathToFileURL } from "node:url";
 import type { Argv } from "yargs";
 import { hideBin } from "yargs/helpers";
 import {
+  type BenchMatrix,
   type MatrixResults,
   type MatrixSuite,
   runMatrix,
@@ -20,7 +21,6 @@ import {
 import type { ReportSection } from "../report/BenchmarkReport.ts";
 import { consoleSummary } from "../report/ConsoleSummary.ts";
 import type { GitVersion } from "../report/GitUtils.ts";
-import type { BenchSuite } from "../runners/BenchmarkSpec.ts";
 import { browserBenchExports } from "./BrowserBench.ts";
 import { formatCalibration, reportCalibrateRun } from "./CalibrateRunner.ts";
 import {
@@ -36,21 +36,13 @@ import {
   matrixToReportGroups,
   withStatus,
 } from "./CliReport.ts";
-import { runBench } from "./SuiteRunner.ts";
 
-export interface BenchBuildResult {
-  suite: BenchSuite;
-  sections?: ReportSection[];
-}
-
-export interface MatrixBuildResult {
+export interface BuildResult {
   suite: MatrixSuite;
   sections?: ReportSection[];
   currentVersion?: GitVersion;
   baselineVersion?: GitVersion;
 }
-
-export type BuildResult = BenchBuildResult | MatrixBuildResult;
 
 export interface BenchCliConfig<Extra = Record<string, never>> {
   /** Augment yargs with custom options. Receives yargs already configured with defaults. */
@@ -59,7 +51,7 @@ export interface BenchCliConfig<Extra = Record<string, never>> {
   build: (args: DefaultCliArgs & Extra) => Promise<BuildResult> | BuildResult;
 }
 
-/** Single entry point: parse args, run the user's build, dispatch to bench or matrix pipeline. */
+/** Single entry point: parse args, run the user's build, run the matrix pipeline. */
 export async function runBenchCli<Extra = Record<string, never>>(
   config: BenchCliConfig<Extra>,
 ): Promise<void> {
@@ -68,7 +60,7 @@ export async function runBenchCli<Extra = Record<string, never>>(
   const args = parseCliArgs(y => configure(defaultCliArgs(y)));
   const result = await config.build(args);
   if (args.list) return listResult(result.suite);
-  return dispatchResult(result, args);
+  return runMatrixPipeline(result, args);
 }
 
 /** Top-level CLI dispatch: route to view, analyze, or run a benchmark file/url. */
@@ -91,19 +83,9 @@ export async function dispatchCli(): Promise<void> {
   throw new Error("Provide a benchmark file or --url for browser mode.");
 }
 
-/** Print available benchmarks for --list, dispatched by suite shape. */
-async function listResult(suite: BenchSuite | MatrixSuite): Promise<void> {
-  if ("matrices" in suite) await listMatrixSuite(suite);
-  else listSuite(suite);
-}
-
-/** Route a build result to the bench or matrix pipeline. */
-function dispatchResult(
-  result: BuildResult,
-  args: DefaultCliArgs,
-): Promise<void> {
-  if (isMatrixResult(result)) return runMatrixPipeline(result, args);
-  return runBenchPipeline(result, args);
+/** Print available cases and variants for --list. */
+async function listResult(suite: MatrixSuite): Promise<void> {
+  await listMatrixSuite(suite);
 }
 
 /** Require a file argument for a subcommand, exiting with usage on missing. */
@@ -121,7 +103,7 @@ async function runFileBench(
   const result = await resolveFileResult(filePath);
   if (!result) return;
   if (args.list) return listResult(result.suite);
-  await dispatchResult(result, args);
+  await runMatrixPipeline(result, args);
 }
 
 /** Print available cases and variants in a matrix suite. */
@@ -139,24 +121,11 @@ async function listMatrixSuite(suite: MatrixSuite): Promise<void> {
   }
 }
 
-/** Print available benchmarks in a bench suite. */
-function listSuite(suite: BenchSuite): void {
-  for (const group of suite.groups) {
-    console.log(group.name);
-    for (const bench of group.benchmarks) console.log(`  ${bench.name}`);
-    if (group.baseline) console.log(`  ${group.baseline.name} (baseline)`);
-  }
-}
-
-function isMatrixResult(result: BuildResult): result is MatrixBuildResult {
-  return "matrices" in result.suite;
-}
-
 /** Matrix end-to-end: filter, run, build the report data once, print the
  *  per-benchmark console summary plus the matrix verdict tally, then reuse the
  *  same data for markdown/viewer exports. */
 async function runMatrixPipeline(
-  m: MatrixBuildResult,
+  m: BuildResult,
   args: DefaultCliArgs,
 ): Promise<void> {
   if (args.calibrate) return runMatrixCalibratePipeline(m.suite, args);
@@ -179,21 +148,9 @@ async function runMatrixPipeline(
   });
 }
 
-/** Bench end-to-end: run, build the report data once, print the console summary,
- *  then reuse the same data for markdown/viewer exports. */
-async function runBenchPipeline(
-  b: BenchBuildResult,
-  args: DefaultCliArgs,
-): Promise<void> {
-  const groups = await runBench(b.suite, args);
-  const reportData = withStatus("computing report", () =>
-    defaultReportData(groups, args, { sections: b.sections }),
-  );
-  console.log(consoleSummary(reportData));
-  await finishReports(groups, args, { sections: b.sections, reportData });
-}
-
-/** Load a benchmark file and shape its default export into a BuildResult. */
+/** Load a benchmark file and shape its default export into a BuildResult. A
+ *  default-exported function becomes a one-variant matrix; a MatrixSuite (has
+ *  `matrices`) is used directly. */
 async function resolveFileResult(
   filePath: string,
 ): Promise<BuildResult | undefined> {
@@ -203,13 +160,10 @@ async function resolveFileResult(
   if (candidate && Array.isArray(candidate.matrices)) {
     return { suite: candidate as MatrixSuite };
   }
-  if (candidate && Array.isArray(candidate.groups)) {
-    return { suite: candidate as BenchSuite };
-  }
   if (typeof candidate === "function") {
     const name = basename(filePath).replace(/\.[^.]+$/, "");
-    const bench = { name, fn: candidate };
-    return { suite: { name, groups: [{ name, benchmarks: [bench] }] } };
+    const matrix: BenchMatrix = { name, variants: { [name]: candidate } };
+    return { suite: { name, matrices: [matrix] } };
   }
   return undefined;
 }
@@ -241,8 +195,11 @@ async function runMatrixCalibratePipeline(
   console.log(formatCalibration(result));
 }
 
-/** Run every matrix in a suite, applying default cases/variants or --filter. */
-async function runFilteredMatrices(
+/** Run every matrix in a suite, applying default cases/variants or --filter.
+ *  A filter that matches no case/variant in a given matrix skips that matrix
+ *  (so a variant filter can target one matrix in a multi-matrix suite); it is
+ *  only an error when the filter matches nothing across the whole suite. */
+export async function runFilteredMatrices(
   suite: MatrixSuite,
   args: DefaultCliArgs,
 ): Promise<MatrixResults[]> {
@@ -251,8 +208,16 @@ async function runFilteredMatrices(
   const options = cliToMatrixOptions(args);
 
   const results: MatrixResults[] = [];
+  let lastFilterError: Error | undefined;
   for (const matrix of suite.matrices) {
-    const filtered = await applyMatrixFilters(matrix, args.all, filter);
+    let filtered: FilteredMatrix<any>;
+    try {
+      filtered = await applyMatrixFilters(matrix, args.all, filter);
+    } catch (err) {
+      if (suite.matrices.length === 1) throw err;
+      lastFilterError = err as Error;
+      continue;
+    }
     const { filteredCases, filteredVariants } = filtered;
     results.push(
       await runMatrix(filtered, {
@@ -262,6 +227,7 @@ async function runFilteredMatrices(
       }),
     );
   }
+  if (!results.length && lastFilterError) throw lastFilterError;
   return results;
 }
 

@@ -59,8 +59,8 @@ export default function (): string {
 benchforge my-bench.ts --gc-stats
 ```
 
-For suites with multiple benchmarks, groups, and baseline comparison, see
-[Node.md](Node.md).
+For multiple functions across shared inputs, with baseline comparison (a
+`MatrixSuite` of cases x variants), see [Node.md](Node.md).
 
 ## Quick Start: Browser
 

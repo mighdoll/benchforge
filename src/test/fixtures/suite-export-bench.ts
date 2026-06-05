@@ -1,14 +1,14 @@
-import type { BenchSuite } from "../../index.ts";
+import type { MatrixSuite } from "../../index.ts";
 
-const suite: BenchSuite = {
+const suite: MatrixSuite = {
   name: "Suite Export Test",
-  groups: [
+  matrices: [
     {
       name: "Math",
-      benchmarks: [
-        { name: "plus", fn: () => 1 + 1 },
-        { name: "multiply", fn: () => 2 * 2 },
-      ],
+      variants: {
+        plus: () => 1 + 1,
+        multiply: () => 2 * 2,
+      },
     },
   ],
 };

@@ -1,18 +1,21 @@
-import type { BenchGroup, BenchSuite } from "../src/index.ts";
+import type { BenchMatrix, MatrixSuite } from "../src/index.ts";
 
-const sortingGroup: BenchGroup<number[]> = {
+const sorting: BenchMatrix<number[]> = {
   name: "Array Sorting (1000 numbers)",
-  setup: () => Array.from({ length: 1000 }, () => Math.random()),
-  baseline: { name: "native sort", fn: nativeSort },
-  benchmarks: [
-    { name: "quicksort", fn: quickSort },
-    { name: "insertion sort", fn: insertionSort },
-  ],
+  caseData: {
+    numbers: () => Array.from({ length: 1000 }, () => Math.random()),
+  },
+  variants: {
+    quicksort: quickSort,
+    "insertion sort": insertionSort,
+    "native sort": nativeSort,
+  },
+  baselineVariant: "native sort",
 };
 
-const suite: BenchSuite = {
+const suite: MatrixSuite = {
   name: "Performance Tests",
-  groups: [sortingGroup],
+  matrices: [sorting],
 };
 
 export default suite;

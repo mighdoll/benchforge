@@ -1,10 +1,10 @@
 import type { Configure, DefaultCliArgs } from "../cli/CliArgs.ts";
 import { parseCliArgs } from "../cli/CliArgs.ts";
-import { defaultReportData } from "../cli/CliReport.ts";
-import { runBench } from "../cli/SuiteRunner.ts";
+import { defaultReportData, matrixToReportGroups } from "../cli/CliReport.ts";
+import { runFilteredMatrices } from "../cli/RunBenchCLI.ts";
+import type { MatrixSuite } from "../matrix/BenchMatrix.ts";
 import type { BenchmarkReport } from "../report/BenchmarkReport.ts";
 import { consoleSummary } from "../report/ConsoleSummary.ts";
-import type { BenchSuite } from "../runners/BenchmarkSpec.ts";
 import type { MeasuredResults } from "../runners/MeasuredResults.ts";
 import { average, percentile } from "../stats/StatisticalUtils.ts";
 import { bevy30SamplesMs } from "./fixtures/bevy30-samples.ts";
@@ -39,14 +39,15 @@ export const assertValid: {
 
 /** @return formatted benchmark output for CLI testing */
 export async function runBenchCLITest<T = DefaultCliArgs>(
-  suite: BenchSuite,
+  suite: MatrixSuite,
   args: string,
   configureArgs?: Configure<T>,
 ): Promise<string> {
   const argv = args.split(/\s+/).filter(arg => arg.length > 0);
   const parsedArgs = parseCliArgs(configureArgs, argv) as T & DefaultCliArgs;
-  const results = await runBench(suite, parsedArgs);
-  return consoleSummary(defaultReportData(results, parsedArgs));
+  const matrixResults = await runFilteredMatrices(suite, parsedArgs);
+  const groups = matrixToReportGroups(matrixResults);
+  return consoleSummary(defaultReportData(groups, parsedArgs));
 }
 
 /** @return slice of bevy30 samples for consistent test data */
