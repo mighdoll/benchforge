@@ -74,24 +74,7 @@ function gcByBatchMarkdown(gc: GcByBatchSummary): string[] {
     `| bytes collected / full GC | ${spreadBytes(gc.fullCollected)} |`,
     `| totals | ${gc.fullGCs} full, ${gc.scavenges} scavenge, ${gc.batches} batches |`,
   ];
-  return [
-    "#### full GC by batch",
-    [header, ...rows].join("\n"),
-    ...cacheProbeLine(gc),
-  ];
-}
-
-/** One-line cache-penalty readout, or nothing when unmeasurable. */
-function cacheProbeLine(gc: GcByBatchSummary): string[] {
-  const p = gc.cacheProbe;
-  if (!p) return [];
-  const post = timeMs(p.postGcMean);
-  const all = timeMs(p.overallMean);
-  const pen = formatSignedPercent(p.penaltyRatio * 100);
-  return [
-    `post-GC cache probe: first ${p.windowK} iters after each full GC ` +
-      `average ${post} vs loop mean ${all} (${pen}), n=${p.events} full GCs`,
-  ];
+  return ["#### full GC by batch", [header, ...rows].join("\n")];
 }
 
 function spreadCounts(s: Spread): string {
