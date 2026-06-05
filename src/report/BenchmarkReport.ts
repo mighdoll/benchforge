@@ -26,6 +26,10 @@ export interface BenchmarkReport {
   name: string;
   measuredResults: MeasuredResults;
   metadata?: UnknownRecord;
+  /** Per-report baseline, interleaved with this report specifically. Overrides
+   *  the group baseline for this report's comparison (matrix variants each have
+   *  their own baseline; suite groups share one group-level baseline instead). */
+  baseline?: BenchmarkReport;
 }
 
 export type UnknownRecord = Record<string, unknown>;
@@ -110,9 +114,23 @@ export function scalarValues(
   );
 }
 
-/** All reports in a group, including the baseline if present */
+/** All reports in a group, including each report's own baseline and the
+ *  group baseline, de-duplicated (per-report baselines may repeat the group
+ *  baseline, or share measured results across reports). */
 export function groupReports(group: ReportGroup): BenchmarkReport[] {
-  return group.baseline ? [...group.reports, group.baseline] : group.reports;
+  const seen = new Set<MeasuredResults>();
+  const out: BenchmarkReport[] = [];
+  const add = (r?: BenchmarkReport) => {
+    if (!r || seen.has(r.measuredResults)) return;
+    seen.add(r.measuredResults);
+    out.push(r);
+  };
+  for (const report of group.reports) {
+    add(report);
+    add(report.baseline);
+  }
+  add(group.baseline);
+  return out;
 }
 
 /** True if any result in the groups has the specified field with a defined value */

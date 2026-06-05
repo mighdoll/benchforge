@@ -50,13 +50,13 @@ export interface PrepareHtmlOptions extends ComparisonOptions {
   baselineVersion?: GitVersion;
 }
 
-/** Context shared across reports in a group */
+/** Context shared across reports in a group. The group baseline is the fallback
+ *  for reports without their own paired baseline. */
 interface GroupContext {
   baseM?: MeasuredResults;
   baseMeta?: UnknownRecord;
   sections?: ReportSection[];
   comparison?: ComparisonOptions;
-  lowBatches: boolean;
 }
 
 /** Viewer sections plus the per-section bootstrap caches that produced them. */
@@ -121,28 +121,41 @@ function prepareGroupData(
   comparison?: ComparisonOptions,
 ): BenchmarkGroup {
   const base = group.baseline;
-  const baseM = base?.measuredResults;
   const baseline = base
     ? { ...prepareBenchmarkData(base), comparisonCI: undefined }
     : undefined;
-  const curM = group.reports[0]?.measuredResults;
-  const singleBatch = isSingleBatch(baseM, curM);
-  const lowBatches = hasLowBatchCount(baseM, curM, comparison?.noBatchTrim);
-  const baseMeta = base?.metadata;
   const ctx: GroupContext = {
-    baseM,
-    baseMeta,
+    baseM: base?.measuredResults,
+    baseMeta: base?.metadata,
     sections,
     comparison,
-    lowBatches,
   };
 
+  const benchmarks = group.reports.map(r => prepareReportEntry(r, ctx));
   return {
     name: group.name,
     baseline,
-    warnings: buildWarnings(singleBatch, lowBatches),
-    benchmarks: group.reports.map(r => prepareReportEntry(r, ctx)),
+    warnings: groupWarnings(group, ctx),
+    benchmarks,
   };
+}
+
+/** Worst-case batch-reliability warnings across the group, using each report's
+ *  effective baseline (its own paired baseline, else the group baseline). */
+function groupWarnings(
+  group: ReportGroup,
+  ctx: GroupContext,
+): string[] | undefined {
+  const noTrim = ctx.comparison?.noBatchTrim;
+  let singleBatch = false;
+  let lowBatches = false;
+  for (const report of group.reports) {
+    const baseM = (report.baseline ?? group.baseline)?.measuredResults;
+    const curM = report.measuredResults;
+    singleBatch ||= isSingleBatch(baseM, curM);
+    lowBatches ||= hasLowBatchCount(baseM, curM, noTrim);
+  }
+  return buildWarnings(singleBatch, lowBatches);
 }
 
 /** @return benchmark data with samples, stats, and profiling summaries */
@@ -209,11 +222,12 @@ function prepareReportEntry(
   report: BenchmarkReport,
   ctx: GroupContext,
 ): BenchmarkEntry {
+  const base = report.baseline;
   const baseCtx = {
     current: report.measuredResults,
-    baseline: ctx.baseM,
+    baseline: base?.measuredResults ?? ctx.baseM,
     currentMeta: report.metadata,
-    baselineMeta: ctx.baseMeta,
+    baselineMeta: base?.metadata ?? ctx.baseMeta,
   };
   const trimmedView = ctx.sections
     ? buildViewerSections(ctx.sections, {
@@ -223,12 +237,16 @@ function prepareReportEntry(
     : undefined;
   const rawView = buildRawView(ctx, baseCtx, trimmedView);
 
+  const baseline = base
+    ? { ...prepareBenchmarkData(base), comparisonCI: undefined }
+    : undefined;
   return {
     ...prepareBenchmarkData(report),
     sections: trimmedView?.sections,
     rawSections: rawView?.sections,
     comparisonCI: findPrimarySectionCI(trimmedView?.sections),
     rawComparisonCI: findPrimarySectionCI(rawView?.sections),
+    baseline,
   };
 }
 
@@ -264,7 +282,7 @@ function buildRawView(
       ? 0
       : trimOutlierBatches(mr.samples, mr.batchOffsets).trimCount;
   const curTrimCount = trimCount(baseCtx.current);
-  const baseTrimCount = trimCount(ctx.baseM);
+  const baseTrimCount = trimCount(baseCtx.baseline);
   if (curTrimCount === 0 && baseTrimCount === 0) return undefined;
 
   const reuse = trimmedView?.caches.map(c => ({

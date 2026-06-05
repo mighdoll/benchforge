@@ -37,9 +37,8 @@ export async function analyzeArchive(filePath: string): Promise<void> {
 function analyzeGroup(group: BenchmarkGroup, batchCount?: number): void {
   console.log(bold(`\n=== ${group.name} ===\n`));
 
-  const baseline = group.baseline;
   for (const bench of group.benchmarks) {
-    analyzeBenchmark(bench, baseline, batchCount);
+    analyzeBenchmark(bench, bench.baseline ?? group.baseline, batchCount);
   }
 }
 

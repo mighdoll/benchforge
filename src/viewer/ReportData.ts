@@ -64,6 +64,10 @@ export interface BenchmarkEntry {
   heapSummary?: HeapSummary;
   comparisonCI?: DifferenceCI;
   rawComparisonCI?: DifferenceCI;
+  /** This benchmark's own paired baseline (matrix variants each compare against
+   *  their own), for diagnostics. The group baseline is the shared-baseline
+   *  (suite) case; one of the two is present when a comparison was made. */
+  baseline?: BenchmarkEntry;
 }
 
 /** Summary percentile statistics for a benchmark's samples. */

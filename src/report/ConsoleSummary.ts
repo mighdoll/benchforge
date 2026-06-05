@@ -19,10 +19,11 @@ export function consoleSummary(data: ReportData): string {
   return data.groups.flatMap(groupLines).join("\n");
 }
 
-/** @return a label that names the benchmark without repeating segments. */
+/** @return a label that names the benchmark without repeating segments. The
+ *  group name (matrix name, or "matrix / case") prefixes the benchmark name,
+ *  unless a segment already is that name (avoids "X / X"). */
 export function benchLabel(name: string, groupName: string): string {
   if (!groupName || groupName === name) return name;
-  // matrix group names are "variant / case"; the entry name repeats the variant.
   if (groupName.split(" / ").includes(name)) return groupName;
   return `${groupName} / ${name}`;
 }
