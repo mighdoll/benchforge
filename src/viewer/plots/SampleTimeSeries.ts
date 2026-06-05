@@ -28,6 +28,7 @@ export interface SeriesVisibility {
   heap: boolean;
   baselineHeap: boolean;
   rejected: boolean;
+  fullGc: boolean;
 }
 
 type HeapPlotPoint = { sample: number; y: number };
@@ -48,6 +49,7 @@ const defaultVisibility: SeriesVisibility = {
   heap: true,
   baselineHeap: false,
   rejected: true,
+  fullGc: false,
 };
 
 /** Time series plot with samples, GC events, heap overlay, and opt tiers */
@@ -63,12 +65,13 @@ export function createSampleTimeSeries(
     ? timeSeries
     : timeSeries.filter(d => !d.isBaseline);
   const ctx = buildPlotContext(filtered);
+  const gc = visibility.fullGc ? gcEvents : [];
   const series = prepareSeriesData(
     ctx,
     heapSeries,
     baselineHeapSeries,
     visibility,
-    gcEvents,
+    gc,
     pausePoints,
   );
 
@@ -90,7 +93,7 @@ export function createSampleTimeSeries(
       tickFormat: ctx.formatValue,
     },
     color: { legend: false, scheme: "observable10" },
-    marks: buildMarks({ ctx, ...series, gcEvents, pausePoints }),
+    marks: buildMarks({ ctx, ...series, gcEvents: gc, pausePoints }),
   });
 }
 
@@ -185,7 +188,7 @@ function buildMarks(p: MarkParams): Plot.Markish[] {
     ...heapMarks(heapData, yMin, "#93c5fd"),
     ...heapAxisMarks(heapScale, xMax, xMin),
     ...warmupRule,
-    gcMark(gcEvents, yMin, ctx.convertValue),
+    ...gcMark(gcEvents, yMin, yMax),
     ...pauseMarks(pausePoints, yMin, yMax),
     ...sampleDotMarks(ctx, showRejected, lttb),
     Plot.ruleY([yMin], { stroke: "black", strokeWidth: 1 }),

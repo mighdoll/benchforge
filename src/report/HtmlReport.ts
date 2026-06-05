@@ -181,7 +181,12 @@ function viewerGcEvents(
 ): ViewerGcEvent[] | undefined {
   const placed = events?.filter(e => e.offset !== undefined);
   if (!placed?.length) return undefined;
-  return placed.map(e => ({ offset: e.offset!, duration: e.pauseMs }));
+  return placed.map(e => ({
+    offset: e.offset!,
+    duration: e.pauseMs,
+    type: e.type,
+    collected: e.collected,
+  }));
 }
 
 /** @return user-facing warning strings about CI reliability, or undefined if none apply */

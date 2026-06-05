@@ -192,4 +192,9 @@ export interface HeapSummary {
 export interface GcEvent {
   offset: number;
   duration: number;
+  /** GC kind, so the viewer can mark full GCs (mark-compact) distinctly from
+   *  the periodic scavenge texture. */
+  type: "scavenge" | "mark-compact" | "minor-ms" | "unknown";
+  /** Bytes freed by this collection (for the tooltip). */
+  collected: number;
 }

@@ -61,6 +61,7 @@ function SamplesGroup({ group, index }: { group: BenchmarkGroup; index: number }
     heap: true,
     baselineHeap: false,
     rejected: true,
+    fullGc: false,
   });
 
   if (!group.benchmarks?.length) return null;
@@ -78,6 +79,7 @@ function SamplesGroup({ group, index }: { group: BenchmarkGroup; index: number }
   const hasBaseline = !!group.baseline;
   const hasHeap = flat.heapSeries.length > 0, hasBaselineHeap = flat.baselineHeapSeries.length > 0;
   const hasRejected = flat.timeSeries.some(d => d.isRejected);
+  const hasFullGc = flat.allGcEvents.length > 0;
   const totalPoints = viewFlat.timeSeries.length, sampled = totalPoints > 1000;
 
   const toggle = (key: keyof SeriesVisibility) =>
@@ -102,6 +104,7 @@ function SamplesGroup({ group, index }: { group: BenchmarkGroup; index: number }
               hasHeap={hasHeap}
               hasBaselineHeap={hasBaselineHeap}
               hasRejected={hasRejected}
+              hasFullGc={hasFullGc}
               visibility={visibility}
               onToggle={toggle}
             />
@@ -133,6 +136,7 @@ interface ToggleProps {
   hasHeap: boolean;
   hasBaselineHeap: boolean;
   hasRejected: boolean;
+  hasFullGc: boolean;
   visibility: SeriesVisibility;
   onToggle: (key: keyof SeriesVisibility) => void;
 }
@@ -148,16 +152,17 @@ function TogglePill(
   );
 }
 
-/** Visibility toggles for optional series (baseline, heap, rejected). */
+/** Visibility toggles for optional series (baseline, heap, rejected, full GC). */
 function SeriesToggles(props: ToggleProps) {
-  const { hasBaseline, hasHeap, hasBaselineHeap, hasRejected, visibility, onToggle } = props;
-  if (!hasBaseline && !hasHeap && !hasRejected) return null;
+  const { hasBaseline, hasHeap, hasBaselineHeap, hasRejected, hasFullGc, visibility, onToggle } = props;
+  if (!hasBaseline && !hasHeap && !hasRejected && !hasFullGc) return null;
   return (
     <div class="series-toggles">
       {hasBaseline && <TogglePill label="baseline" active={visibility.baseline} onClick={() => onToggle("baseline")} />}
       {hasHeap && <TogglePill label="heap" active={visibility.heap} onClick={() => onToggle("heap")} />}
       {hasBaselineHeap && <TogglePill label="heap (baseline)" active={visibility.baselineHeap} onClick={() => onToggle("baselineHeap")} />}
       {hasRejected && <TogglePill label="rejected" active={visibility.rejected} onClick={() => onToggle("rejected")} />}
+      {hasFullGc && <TogglePill label="full GC" active={visibility.fullGc} onClick={() => onToggle("fullGc")} />}
     </div>
   );
 }

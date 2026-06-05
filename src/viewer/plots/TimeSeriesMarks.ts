@@ -1,5 +1,6 @@
 import * as Plot from "@observablehq/plot";
 import * as d3 from "d3";
+import { formatBytes } from "../../report/Formatters.ts";
 import type { LegendItem } from "./LegendUtils.ts";
 import type { FlatGcEvent, FlatPausePoint } from "./PlotTypes.ts";
 
@@ -77,12 +78,12 @@ export function buildLegendItems(p: LegendParams): LegendItem[] {
   const items: LegendItem[] = [];
   if (hasWarmup)
     items.push({ color: "#dc3545", label: "warmup", style: "hollow-dot" });
-  if (gcCount > 0)
-    items.push({
-      color: "#22c55e",
-      label: `gc (${gcCount})`,
-      style: "vertical-line",
-    });
+  items.push(...seriesLegendItems(optTiers, benchmarks, baselineNames));
+  if (hasRejected)
+    items.push({ color: "#999", label: "rejected", style: "hollow-dot" });
+  if (hasHeap) items.push({ color: "#93c5fd", label: "heap", style: "rect" });
+  if (hasBaselineHeap)
+    items.push({ color: "#fcd34d", label: "heap (baseline)", style: "rect" });
   if (pauseCount > 0)
     items.push({
       color: "#888",
@@ -90,12 +91,8 @@ export function buildLegendItems(p: LegendParams): LegendItem[] {
       style: "vertical-line",
       strokeDash: "4,4",
     });
-  if (hasHeap) items.push({ color: "#93c5fd", label: "heap", style: "rect" });
-  if (hasBaselineHeap)
-    items.push({ color: "#fcd34d", label: "heap (baseline)", style: "rect" });
-  items.push(...seriesLegendItems(optTiers, benchmarks, baselineNames));
-  if (hasRejected)
-    items.push({ color: "#999", label: "rejected", style: "hollow-dot" });
+  if (gcCount > 0)
+    items.push({ color: gcViolet, label: "full GC", style: "vertical-line" });
   return items;
 }
 
@@ -159,29 +156,30 @@ export function heapAxisMarks(
   ];
 }
 
-/** Vertical line marks for GC events rising from the X axis */
+/** Full-height violet rules marking full GCs (mark-compact) across the Y range.
+ *  Scavenges are filtered upstream; these are the locatable spikes. */
 export function gcMark(
   gcEvents: FlatGcEvent[],
   yMin: number,
-  convertValue: (ms: number) => number,
-): any {
-  const data = gcEvents.map(gc => ({
-    x1: gc.sampleIndex,
-    y1: yMin,
-    x2: gc.sampleIndex,
-    y2: yMin + convertValue(gc.duration),
-    duration: gc.duration,
-  }));
-  return Plot.link(data, {
-    x1: "x1",
-    y1: "y1",
-    x2: "x2",
-    y2: "y2",
-    stroke: "#22c55e",
-    strokeWidth: 2,
-    strokeOpacity: 0.8,
-    title: (d: { duration: number }) => `GC: ${d.duration.toFixed(2)}ms`,
-  });
+  yMax: number,
+): any[] {
+  return gcEvents.map(gc =>
+    Plot.ruleX([gc.sampleIndex], {
+      y1: yMin,
+      y2: yMax,
+      stroke: gcViolet,
+      strokeWidth: 1,
+      strokeOpacity: 0.25,
+      title: gcTooltip(gc),
+    }),
+  );
+}
+
+const gcViolet = "#7c3aed";
+
+function gcTooltip(gc: FlatGcEvent): string {
+  const bytes = formatBytes(gc.bytes) ?? "0B";
+  return `Full GC @ iter ${gc.sampleIndex}: ${gc.duration.toFixed(2)}ms, ${bytes} collected`;
 }
 
 /** Dashed vertical rules marking pause points across the full Y range */
