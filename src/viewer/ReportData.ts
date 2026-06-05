@@ -48,7 +48,6 @@ export interface BenchmarkEntry {
   allocationSamples?: number[];
   heapSamples?: number[];
   gcEvents?: GcEvent[];
-  optSamples?: number[];
   pausePoints?: PausePoint[];
   batchOffsets?: number[];
   /** Per-batch full-GC diagnostic summary (worker-mode --gc-stats runs). */

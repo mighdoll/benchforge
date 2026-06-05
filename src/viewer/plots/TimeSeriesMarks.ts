@@ -13,7 +13,6 @@ export interface SampleData {
   isBaseline: boolean;
   isWarmup: boolean;
   isRejected: boolean;
-  optTier: string | null;
 }
 
 /** Computed scales, ranges, and metadata for rendering the time series plot */
@@ -29,7 +28,6 @@ export interface PlotContext {
   hasWarmup: boolean;
   hasRejected: boolean;
   baselineNames: Set<string>;
-  optTiers: string[];
   benchmarks: string[];
 }
 
@@ -48,7 +46,6 @@ interface LegendParams {
   hasHeap: boolean;
   hasBaselineHeap: boolean;
   hasRejected: boolean;
-  optTiers: string[];
   benchmarks: string[];
   baselineNames: Set<string>;
 }
@@ -60,25 +57,16 @@ type Downsample = <T>(
   getY: (d: T) => number,
 ) => T[];
 
-const optTierColors: Record<string, string> = {
-  turbofan: "#22c55e",
-  optimized: "#22c55e",
-  "turbofan+maglev": "#22c55e",
-  maglev: "#eab308",
-  sparkplug: "#f97316",
-  interpreted: "#dc3545",
-};
-
 const maxDots = 1000;
 
 /** Build legend items based on which data series are present in the plot */
 export function buildLegendItems(p: LegendParams): LegendItem[] {
   const { hasWarmup, gcCount, pauseCount, hasHeap, hasBaselineHeap } = p;
-  const { hasRejected, optTiers, benchmarks, baselineNames } = p;
+  const { hasRejected, benchmarks, baselineNames } = p;
   const items: LegendItem[] = [];
   if (hasWarmup)
     items.push({ color: "#dc3545", label: "warmup", style: "hollow-dot" });
-  items.push(...seriesLegendItems(optTiers, benchmarks, baselineNames));
+  items.push(...seriesLegendItems(benchmarks, baselineNames));
   if (hasRejected)
     items.push({ color: "#999", label: "rejected", style: "hollow-dot" });
   if (hasHeap) items.push({ color: "#93c5fd", label: "heap", style: "rect" });
@@ -211,9 +199,7 @@ export function sampleDotMarks(
   const fmtVal = (d: SampleData) =>
     `${formatValue(d.displayValue)}${unitSuffix}`;
   const tipTitle = (d: SampleData) =>
-    d.optTier
-      ? `Iteration ${d.sample}: ${fmtVal(d)} [${d.optTier}]`
-      : `Iteration ${d.sample}: ${fmtVal(d)}`;
+    `Iteration ${d.sample}: ${fmtVal(d)}`;
   const xy = { x: "sample" as const, y: "displayValue" as const, r: 3 };
   const { warmup, baseline, measured, rejected } = partitionSamples(
     ctx.convertedData,
@@ -241,25 +227,17 @@ export function sampleDotMarks(
       ...xy,
       opacity: 0.8,
       title: tipTitle,
-      fill: (d: SampleData) =>
-        (d.optTier && optTierColors[d.optTier]) || "#4682b4",
+      fill: "#4682b4",
     }),
     ...rejectedDotMark(rejected, xy, tipTitle),
   ];
 }
 
-/** Legend items for opt tiers (when present) or benchmark names */
+/** Legend items for benchmark names */
 function seriesLegendItems(
-  optTiers: string[],
   benchmarks: string[],
   baselineNames: Set<string>,
 ): LegendItem[] {
-  if (optTiers.length > 0)
-    return optTiers.map(tier => ({
-      color: optTierColors[tier] || "#4682b4",
-      label: tier,
-      style: "filled-dot" as const,
-    }));
   // sort baselines last so current benchmarks appear first in legend
   const sorted = [...benchmarks].sort(
     (a, b) => Number(baselineNames.has(a)) - Number(baselineNames.has(b)),

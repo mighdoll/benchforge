@@ -22,18 +22,17 @@ import type {
   GcEvent as ViewerGcEvent,
   ViewerSection,
 } from "../viewer/ReportData.ts";
-import {
-  type BenchmarkReport,
-  type ComparisonOptions,
-  hasField,
-  type ReportGroup,
-  type ReportSection,
-  type UnknownRecord,
+import type {
+  BenchmarkReport,
+  ComparisonOptions,
+  ReportGroup,
+  ReportSection,
+  UnknownRecord,
 } from "./BenchmarkReport.ts";
 import { gcByBatch } from "./GcByBatch.ts";
 import { gcStatsSection } from "./GcSections.ts";
 import type { GitVersion } from "./GitUtils.ts";
-import { optSection, runsSection, timeSection } from "./StandardSections.ts";
+import { runsSection, timeSection } from "./StandardSections.ts";
 import {
   buildViewerSections,
   hasLowBatchCount,
@@ -82,7 +81,7 @@ export function prepareHtmlData(
     noBatchTrim,
     resamples: options.resamples,
   };
-  const sections = options.sections ?? defaultSections(groups, cliArgs);
+  const sections = options.sections ?? defaultSections(cliArgs);
   return {
     groups: groups.map(g => prepareGroupData(g, sections, comparison)),
     metadata: {
@@ -104,15 +103,12 @@ export function prepareHtmlData(
 
 /** Build default sections when caller doesn't provide custom ones */
 function defaultSections(
-  groups: ReportGroup[],
   cliArgs?: Record<string, unknown>,
 ): ReportSection[] {
   const hasGc = cliArgs?.["gc-stats"] === true;
-  const hasOpt = hasField(groups, "optStatus");
   return [
     timeSection,
     hasGc ? gcStatsSection : undefined,
-    hasOpt ? optSection : undefined,
     runsSection,
   ].filter((s): s is ReportSection => s !== undefined);
 }
@@ -161,7 +157,6 @@ function prepareBenchmarkData(
     allocationSamples: m.allocationSamples,
     heapSamples: m.heapSamples,
     gcEvents: viewerGcEvents(m.gcEvents),
-    optSamples: m.optSamples,
     pausePoints: m.pausePoints,
     batchOffsets: m.batchOffsets,
     gcByBatch: gcByBatch(m),

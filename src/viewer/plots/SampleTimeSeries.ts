@@ -1,6 +1,5 @@
 import * as Plot from "@observablehq/plot";
 import * as d3 from "d3";
-import { optStatusNames } from "../../runners/MeasuredResults.ts";
 import { buildLegend, type LegendItem } from "./LegendUtils.ts";
 import {
   type FlatGcEvent,
@@ -52,7 +51,7 @@ const defaultVisibility: SeriesVisibility = {
   fullGc: false,
 };
 
-/** Time series plot with samples, GC events, heap overlay, and opt tiers */
+/** Time series plot with samples, GC events, and heap overlay */
 export function createSampleTimeSeries(
   timeSeries: TimeSeriesPoint[],
   gcEvents: FlatGcEvent[] = [],
@@ -119,11 +118,6 @@ function buildPlotContext(timeSeries: TimeSeriesPoint[]): PlotContext {
   const baselineNames = new Set(
     convertedData.filter(d => d.isBaseline).map(d => d.benchmark),
   );
-  const optTiers = [
-    ...new Set(
-      convertedData.filter(d => d.optTier && !d.isWarmup).map(d => d.optTier!),
-    ),
-  ];
   return {
     convertedData,
     xMin,
@@ -136,7 +130,6 @@ function buildPlotContext(timeSeries: TimeSeriesPoint[]): PlotContext {
     hasWarmup,
     hasRejected,
     baselineNames,
-    optTiers,
     benchmarks,
   };
 }
@@ -169,7 +162,6 @@ function prepareSeriesData(
     hasHeap: heapData.length > 0,
     hasBaselineHeap: baselineHeapData.length > 0,
     hasRejected: showRejected,
-    optTiers: ctx.optTiers,
     benchmarks: ctx.benchmarks,
     baselineNames: ctx.baselineNames,
   });
@@ -196,7 +188,7 @@ function buildMarks(p: MarkParams): Plot.Markish[] {
   ];
 }
 
-/** Convert TimeSeriesPoint data to SampleData with opt tier names */
+/** Convert TimeSeriesPoint data to SampleData */
 function buildSampleData(
   timeSeries: TimeSeriesPoint[],
 ): Omit<SampleData, "displayValue">[] {
@@ -207,10 +199,6 @@ function buildSampleData(
     isBaseline: d.isBaseline || false,
     isWarmup: d.isWarmup || false,
     isRejected: d.isRejected || false,
-    optTier:
-      d.optStatus !== undefined
-        ? optStatusNames[d.optStatus] || "unknown"
-        : null,
   }));
 }
 

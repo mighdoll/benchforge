@@ -64,11 +64,7 @@ export {
 export type { PrepareHtmlOptions } from "./report/HtmlReport.ts";
 export { prepareHtmlData } from "./report/HtmlReport.ts";
 export { markdownReport } from "./report/MarkdownReport.ts";
-export {
-  optSection,
-  runsSection,
-  timeSection,
-} from "./report/StandardSections.ts";
+export { runsSection, timeSection } from "./report/StandardSections.ts";
 export type {
   BenchGroup,
   BenchmarkSpec,

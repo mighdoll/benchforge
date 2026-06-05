@@ -150,7 +150,6 @@ function flattenSamplesAndHeap(
     const isRejected = rejected?.has(i) || undefined;
     if (!isRejected)
       out.allSamples.push({ benchmark: name, value, iteration: i });
-    const optStatus = b.optSamples?.[i];
     out.timeSeries.push({
       benchmark: name,
       iteration: i,
@@ -158,7 +157,6 @@ function flattenSamplesAndHeap(
       isWarmup: false,
       isBaseline: isBase,
       isRejected,
-      optStatus,
     });
     if (b.heapSamples?.[i] !== undefined) {
       const target = b.isBaseline ? out.baselineHeapSeries : out.heapSeries;

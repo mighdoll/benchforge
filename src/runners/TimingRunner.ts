@@ -2,17 +2,8 @@ import { getHeapStatistics } from "node:v8";
 import type { BenchmarkSpec } from "./BenchmarkSpec.ts";
 import type { BenchRunner, RunnerOptions } from "./BenchRunner.ts";
 import { executeBenchmark } from "./BenchRunner.ts";
-import type {
-  MeasuredResults,
-  OptStatusInfo,
-  PausePoint,
-} from "./MeasuredResults.ts";
-import {
-  analyzeOptStatus,
-  computeStats,
-  createOptStatusGetter,
-  gcFunction,
-} from "./SampleStats.ts";
+import type { MeasuredResults, PausePoint } from "./MeasuredResults.ts";
+import { computeStats, gcFunction } from "./SampleStats.ts";
 
 type CollectParams<T = unknown> = RunnerOptions &
   Required<Pick<RunnerOptions, "maxTime" | "maxIterations" | "warmup">> & {
@@ -30,32 +21,28 @@ type CollectResult = {
   /** performance.now() at loop start, sharing the clock of --trace-gc-nvp
    *  offsets, so GC events can be rebased to loop-relative time. */
   loopStartTime: number;
-  optStatus?: OptStatusInfo;
-  optSamples?: number[];
   pausePoints: PausePoint[];
 };
 
 type SampleArrays = {
   samples: number[];
   heapSamples: number[];
-  optStatuses: number[];
   pausePoints: PausePoint[];
 };
 
 const defaultCollectOptions: Required<
   Pick<RunnerOptions, "maxTime" | "maxIterations" | "warmup">
 > &
-  Pick<RunnerOptions, "traceOpt" | "pauseWarmup"> = {
+  Pick<RunnerOptions, "pauseWarmup"> = {
   maxTime: 5000,
   maxIterations: 1000000,
   warmup: 0,
-  traceOpt: false,
   pauseWarmup: 0,
 };
 
 /**
  * Timing-based runner that collects samples within time/iteration limits.
- * Handles warmup, heap tracking, V8 optimization tracing, and periodic pauses.
+ * Handles warmup, heap tracking, and periodic pauses.
  */
 export class TimingRunner implements BenchRunner {
   async runBench<T = unknown>(
@@ -69,7 +56,7 @@ export class TimingRunner implements BenchRunner {
   }
 }
 
-/** Collect timing samples with warmup, heap tracking, and optional V8 opt tracing. */
+/** Collect timing samples with warmup and heap tracking. */
 async function collectSamples<T>(
   config: CollectParams<T>,
 ): Promise<CollectResult> {
@@ -79,7 +66,7 @@ async function collectSamples<T>(
   const warmupSamples = config.skipWarmup ? [] : await runWarmup(config);
   const heapBefore = process.memoryUsage().heapUsed;
   const loop = await runSampleLoop(config);
-  const { samples, heapSamples, optStatuses, pausePoints } = loop;
+  const { samples, heapSamples, pausePoints } = loop;
   const { startTime, loopStartTime } = loop;
   if (samples.length === 0)
     throw new Error(
@@ -88,11 +75,6 @@ async function collectSamples<T>(
   const heapAfter = process.memoryUsage().heapUsed;
   const heapGrowth =
     Math.max(0, heapAfter - heapBefore) / 1024 / samples.length;
-  const optStatus = config.traceOpt
-    ? analyzeOptStatus(samples, optStatuses)
-    : undefined;
-  const optSamples =
-    config.traceOpt && optStatuses.length > 0 ? optStatuses : undefined;
   return {
     samples,
     warmupSamples,
@@ -100,8 +82,6 @@ async function collectSamples<T>(
     heapSamples,
     startTime,
     loopStartTime,
-    optStatus,
-    optSamples,
     pausePoints,
   };
 }
@@ -112,7 +92,7 @@ function buildMeasuredResults(
   collected: CollectResult,
 ): MeasuredResults {
   const { samples, warmupSamples, heapSamples } = collected;
-  const { optStatus, optSamples, pausePoints, heapGrowth } = collected;
+  const { pausePoints, heapGrowth } = collected;
   const { startTime, loopStartTime } = collected;
   const time = computeStats(samples);
   const heapSize = { avg: heapGrowth, min: heapGrowth, max: heapGrowth };
@@ -125,8 +105,6 @@ function buildMeasuredResults(
     heapSize,
     startTime,
     loopStartTime,
-    optStatus,
-    optSamples,
     pausePoints,
   };
 }
@@ -174,11 +152,9 @@ async function runSampleLoop<T>(
 ): Promise<SampleArrays & { startTime: number; loopStartTime: number }> {
   const { maxTime, maxIterations, pauseFirst } = config;
   const { pauseInterval = 0, pauseDuration = 100 } = config;
-  const getOptStatus = config.traceOpt ? createOptStatusGetter() : undefined;
-  const trackOpt = !!getOptStatus;
   const forceGc = config.gcForce ? gcFunction() : () => {};
   const estimated = maxIterations || Math.ceil(maxTime / 0.1);
-  const arrays = createSampleArrays(estimated, trackOpt);
+  const arrays = createSampleArrays(estimated);
 
   let count = 0;
   let elapsed = 0;
@@ -195,8 +171,6 @@ async function runSampleLoop<T>(
     const end = performance.now();
     arrays.samples[count] = end - start;
     arrays.heapSamples[count] = getHeapStatistics().used_heap_size;
-    if (getOptStatus)
-      arrays.optStatuses[count] = getOptStatus(config.benchmark.fn);
     count++;
     forceGc();
 
@@ -210,17 +184,16 @@ async function runSampleLoop<T>(
     elapsed = performance.now() - loopStart - totalPauseTime;
   }
 
-  trimArrays(arrays, count, trackOpt);
+  trimArrays(arrays, count);
   return { ...arrays, startTime, loopStartTime: loopStart };
 }
 
 /** Pre-allocate sample arrays to reduce GC pressure during measurement. */
-function createSampleArrays(n: number, trackOpt: boolean): SampleArrays {
+function createSampleArrays(n: number): SampleArrays {
   const arr = () => new Array<number>(n);
   return {
     samples: arr(),
     heapSamples: arr(),
-    optStatuses: trackOpt ? arr() : [],
     pausePoints: [],
   };
 }
@@ -238,11 +211,6 @@ function shouldPause(
 }
 
 /** Trim pre-allocated arrays to the actual sample count. */
-function trimArrays(
-  arrays: SampleArrays,
-  count: number,
-  trackOpt: boolean,
-): void {
+function trimArrays(arrays: SampleArrays, count: number): void {
   arrays.samples.length = arrays.heapSamples.length = count;
-  if (trackOpt) arrays.optStatuses.length = count;
 }

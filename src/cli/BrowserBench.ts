@@ -72,7 +72,6 @@ export async function browserBenchExports(args: DefaultCliArgs): Promise<void> {
 function warnBrowserFlags(args: DefaultCliArgs): void {
   const checks: [boolean, string][] = [
     [!args.worker, "--no-worker"],
-    [!!args["trace-opt"], "--trace-opt"],
     [!!args["gc-force"], "--gc-force"],
   ];
   const ignored = checks.filter(([active]) => active).map(([, flag]) => flag);
