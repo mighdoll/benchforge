@@ -18,7 +18,7 @@ import type {
   ViewerSection,
 } from "../ReportData.ts";
 import { formatPct } from "../plots/PlotTypes.ts";
-import { activeTabId, provider, reportData, trimMode } from "../State.ts";
+import { activeTabId, provider, reportData, shiftDetail, trimMode } from "../State.ts";
 
 const skipArgs = new Set(["_", "$0", "view", "file"]);
 
@@ -66,8 +66,58 @@ export function SummaryPanel() {
           <CollapsibleGroup key={i} group={group} />
         ))}
       </div>
+      <ShiftDetailPopup />
     </>
   );
+}
+
+/** The single shared shift-detail popup, opened from any CI chart or violin. */
+function ShiftDetailPopup() {
+  const detail = shiftDetail.value;
+  useEffect(() => {
+    function onKey(e: KeyboardEvent) {
+      if (e.key === "Escape") shiftDetail.value = null;
+    }
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, []);
+  if (!detail) return null;
+  return (
+    <ShiftPopup
+      point={detail.point}
+      metric={detail.metric}
+      equivMargin={detail.equivMargin}
+      onClose={() => (shiftDetail.value = null)}
+    />
+  );
+}
+
+/** Open the shared detail popup for one point of a shift function. */
+function openShiftDetail(shift: ShiftFunction, point: ShiftPercentile) {
+  shiftDetail.value = { point, metric: shift.metric, equivMargin: shift.equivMargin };
+}
+
+/** A thunk opening the popup for a shift function's verdict point, or undefined
+ *  when there's no usable target (the CI chart then stays non-interactive). */
+function shiftDetailOpener(shift?: ShiftFunction): (() => void) | undefined {
+  if (!shift) return undefined;
+  const point = verdictPoint(shift);
+  if (!point) return undefined;
+  return () => openShiftDetail(shift, point);
+}
+
+/** Verdict point of a shift function: the selected verdict stat, else the mean,
+ *  else the first point. Drives the CI-chart click target (header + metric row). */
+function verdictPoint(shift: ShiftFunction): ShiftPercentile | undefined {
+  return shift.points.find(p => p.isPrimary)
+    ?? shift.points.find(p => p.isMean)
+    ?? shift.points[0];
+}
+
+/** The shift function on an entry's active (trimmed/raw) sections, if any. */
+function entryShift(entry: BenchmarkEntry): ShiftFunction | undefined {
+  const rows = activeView(entry).sections?.flatMap(s => s.rows);
+  return rows?.find(r => r.shiftFunction)?.shiftFunction;
 }
 
 /** Report header: the reconstructed CLI command, run date, and git versions. */
@@ -127,12 +177,13 @@ function CollapsibleGroup({ group }: { group: BenchmarkGroup }) {
   if (!current) return <div class="error">No benchmark data for this group</div>;
 
   const ci = activeView(current).comparisonCI;
+  const headerOpen = shiftDetailOpener(entryShift(current));
   return (
     <div class="benchmark-group">
       <div class="group-header" onClick={() => setOpen(o => !o)}>
         <span class="group-toggle">{open ? "\u25be" : "\u25b8"}</span>
         <h2>{group.name}</h2>
-        {ci && <ComparisonBadge ci={ci} />}
+        {ci && <ComparisonBadge ci={ci} onOpen={headerOpen} />}
         {group.warnings && (
           <span class="batch-warnings">
             {group.warnings.map(w => <span class="batch-warning">{w}</span>)}
@@ -190,8 +241,12 @@ function activeView(entry: BenchmarkEntry): {
   return { sections: entry.sections, comparisonCI: entry.comparisonCI };
 }
 
-/** Comparison verdict: a colored chip (group header) or plain delta text (compact). */
-function ComparisonBadge({ ci, compact }: { ci: DifferenceCI; compact?: boolean }) {
+/** Comparison verdict: a colored chip (group header) or plain delta text (compact).
+ *  When `onOpen` is set, the CI chart becomes a click target for the detail popup. */
+function ComparisonBadge(
+  { ci, compact, onOpen }:
+  { ci: DifferenceCI; compact?: boolean; onOpen?: () => void },
+) {
   // Colored chip is reserved for the main verdict; per-row (compact) comparisons
   // render as plain bold text regardless of direction.
   const cls = compact ? "comparison-plain" : `badge badge-${ci.direction}`;
@@ -200,7 +255,7 @@ function ComparisonBadge({ ci, compact }: { ci: DifferenceCI; compact?: boolean 
       <span class={cls}>
         {compact ? formatPct(ci.percent) : directionLabels[ci.direction]}
       </span>
-      {ci.histogram && <CIPlotMount ci={ci} compact={compact} />}
+      {ci.histogram && <CIPlotMount ci={ci} compact={compact} onOpen={onOpen} />}
     </span>
   );
 }
@@ -222,15 +277,28 @@ function safeGlobal<T>(v: T, fallback: T): T {
   return typeof v !== "undefined" ? v : fallback;
 }
 
-/** Lazy-imports CIPlot and renders a confidence interval chart inline. */
-function CIPlotMount({ ci, compact }: { ci: DifferenceCI; compact?: boolean }) {
+/** Lazy-imports CIPlot and renders a confidence interval chart inline. When
+ *  `onOpen` is set the chart is clickable; the click is stopped from bubbling so
+ *  it doesn't also toggle the enclosing group's collapse. */
+function CIPlotMount(
+  { ci, compact, onOpen }:
+  { ci: DifferenceCI; compact?: boolean; onOpen?: () => void },
+) {
   const ref = useLazyPlot(async () => {
     const { createCIPlot } = await import("../plots/CIPlot.ts");
     const equivMargin = (reportData.value?.metadata.cliArgs?.["equiv-margin"] as number) || undefined;
     const opts = compact ? { width: 200, height: 70, title: "", equivMargin } : { equivMargin };
     return createCIPlot(ci, opts);
   }, [ci, compact], "CI plot");
-  return <div class="ci-plot-container" ref={ref} />;
+  const clickable = !!onOpen;
+  return (
+    <div
+      class={`ci-plot-container${clickable ? " ci-clickable" : ""}`}
+      ref={ref}
+      title={clickable ? "click for current vs baseline detail" : undefined}
+      onClick={onOpen ? (e => { e.stopPropagation(); onOpen(); }) : undefined}
+    />
+  );
 }
 
 /** One section panel, dispatching to the shift, matrix, or plain stat-row layout. */
@@ -382,7 +450,13 @@ function StatRow(
     <div class={`stat-row${row.primary ? " primary-row" : ""}`}>
       <div class="row-header">
         <span class="row-label">{row.label}</span>
-        {row.comparisonCI && <ComparisonBadge ci={row.comparisonCI} compact />}
+        {row.comparisonCI && (
+          <ComparisonBadge
+            ci={row.comparisonCI}
+            compact
+            onOpen={shiftDetailOpener(row.shiftFunction)}
+          />
+        )}
       </div>
       {!chartOnly && row.entries.map((entry, i) => (
         <RunEntry key={i} entry={entry} estimateRange={estimateRange} />
@@ -400,13 +474,12 @@ function SharedStat({ label, value }: { label: string; value: string }) {
   );
 }
 
-/** Always-visible per-percentile shift function below the section's stat rows,
- *  with a click-to-detail popup for any percentile. */
+/** Always-visible per-percentile shift function below the section's stat rows.
+ *  Clicking any violin opens the shared detail popup for that percentile. */
 function ShiftPanel({ shift }: { shift: ShiftFunction }) {
-  const [selected, setSelected] = useState<ShiftPercentile | null>(null);
   const ref = useLazyPlot(async () => {
     const { createShiftPlot } = await import("../plots/ShiftPlot.ts");
-    return createShiftPlot(shift, { onSelect: p => setSelected(p) });
+    return createShiftPlot(shift, { onSelect: p => openShiftDetail(shift, p) });
   }, [shift], "Shift plot");
   return (
     <div class="shift-panel">
@@ -414,14 +487,6 @@ function ShiftPanel({ shift }: { shift: ShiftFunction }) {
         change by percentile
       </div>
       <div class="shift-plot" ref={ref} title="click a percentile for current vs baseline detail" />
-      {selected && (
-        <ShiftPopup
-          point={selected}
-          metric={shift.metric}
-          equivMargin={shift.equivMargin}
-          onClose={() => setSelected(null)}
-        />
-      )}
     </div>
   );
 }

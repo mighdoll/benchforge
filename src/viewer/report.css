@@ -115,6 +115,8 @@
 
 .report-panel .ci-plot-container { display: inline-block; vertical-align: middle; }
 .report-panel .ci-plot-container svg { display: block; }
+.report-panel .ci-clickable { cursor: pointer; transition: opacity 0.1s; }
+.report-panel .ci-clickable:hover { opacity: 0.8; }
 .report-panel .ci-plot-inline { display: inline-block; vertical-align: middle; margin-left: 6px; }
 .report-panel .ci-plot-inline svg { display: block; }
 
