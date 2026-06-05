@@ -8,7 +8,11 @@ import {
   type Variant,
   type VariantResult,
 } from "./BenchMatrix.ts";
-import { type MatrixPlan, runMatrixPlan } from "./MatrixRun.ts";
+import {
+  inlineCaseDataMap,
+  type MatrixPlan,
+  runMatrixPlan,
+} from "./MatrixRun.ts";
 
 /** Run a matrix with in-memory variant functions. Variants are serialized to
  *  source and reconstructed in a worker (like directory variants), so inline
@@ -33,14 +37,13 @@ export async function runMatrixInline<T>(
     ? all.filter(([id]) => filteredVariants.includes(id))
     : all;
   const sources = new Map(entries.map(([id, v]) => [id, inlineSource(id, v)]));
-  const inlineCaseData = !matrix.casesModule;
 
   const plan: MatrixPlan<T> = {
     variantIds: [...sources.keys()],
     caseIds,
     casesModule,
     casesModuleUrl: matrix.casesModule,
-    caseData: inlineCaseData ? caseId => caseId : undefined,
+    caseData: await inlineCaseDataMap(matrix, caseIds),
     plan: variantId => ({ source: sources.get(variantId)! }),
     runnerOpts,
     batches,

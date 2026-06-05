@@ -36,12 +36,19 @@ export interface MatrixDefaults {
   iterations?: number;
 }
 
+/** Inline case data: each value is the case's data, or a thunk producing it
+ *  (called once in the parent, like a shared setup). Use instead of casesModule
+ *  for self-contained data that needs no module/dir. */
+export type InlineCases<T> = Record<string, T | (() => T | Promise<T>)>;
+
 /** Configuration for a cases x variants benchmark matrix */
 export interface BenchMatrix<T = unknown> {
   name: string;
   variantDir?: string;
   variants?: Record<string, AnyVariant<T>>;
   cases?: string[];
+  /** Inline case data keyed by case id (alternative to cases/casesModule). */
+  caseData?: InlineCases<T>;
   casesModule?: string;
   baselineDir?: string;
   baselineVariant?: string;
@@ -188,7 +195,8 @@ export function applyBaselineVariant(
   }
 }
 
-/** Load cases module and resolve filtered case IDs */
+/** Load cases module and resolve filtered case IDs. Inline caseData keys take
+ *  precedence over cases[] / the casesModule's case list. */
 export async function resolveCases<T>(
   matrix: BenchMatrix<T>,
   options: RunMatrixOptions,
@@ -196,9 +204,23 @@ export async function resolveCases<T>(
   const casesModule = matrix.casesModule
     ? await loadCasesModule<T>(matrix.casesModule)
     : undefined;
-  const allCaseIds = casesModule?.cases ?? matrix.cases ?? ["default"];
+  const inlineIds = matrix.caseData ? Object.keys(matrix.caseData) : undefined;
+  const allCaseIds = inlineIds ??
+    casesModule?.cases ??
+    matrix.cases ?? ["default"];
   const caseIds = options.filteredCases ?? allCaseIds;
   return { casesModule, caseIds };
+}
+
+/** Resolve one inline case's data, invoking it if it's a thunk. */
+export async function resolveInlineCase<T>(
+  caseData: InlineCases<T>,
+  caseId: string,
+): Promise<T> {
+  const value = caseData[caseId];
+  return typeof value === "function"
+    ? (value as () => T | Promise<T>)()
+    : value;
 }
 
 /** Map matrix options to runner options, applying defaults for maxTime and warmup */
