@@ -310,3 +310,62 @@ narrows the interval. Aim for 40+ batches for reliable results.
 **Median and mean tell different stories?** Check whether GC overhead changed.
 If mean regressed but median didn't, allocation patterns likely shifted. Both
 numbers matter: median for algorithmic cost, mean for real-world throughput.
+
+## Reading the Change-by-Percentile Chart
+
+The HTML viewer's "change by percentile" chart (a shift function) shows one
+violin per statistic (mean, then p1, p5, p10, ... p99). It answers "did the
+change land evenly across the distribution, or only in part of it?" The leftmost
+mean violin matches the headline number; the percentile violins show the same
+comparison at each point of the distribution.
+
+**Each violin is a bootstrap distribution of the *difference*, not of your raw
+timings.** Every block-bootstrap resample (whole batches, see above) recomputes
+the percent change at that percentile; the violin is the spread of those
+resampled changes. So a violin describes *how confidently we know the change
+here*, not how the underlying samples are spread.
+
+Two dimensions encode the same uncertainty from different angles:
+
+- **Vertical extent** is the range of percent-change values the resamples
+  produced. A taller violin means the estimate moved more when different batches
+  were drawn, which means it is less certain.
+- **Horizontal width** is density: how many resamples landed at that change
+  value (mirrored for shape, so left and right carry no meaning). A fatter violin
+  means more resamples piled there. Width is shared across all violins, so a
+  fatter one genuinely means more concentrated, not just rescaled.
+
+Because each violin holds the same number of resamples, the two trade off: a
+**short, fat** violin is well-pinned (confident), a **tall, thin** one is
+uncertain. The hollow circle is the point estimate; the zero line and the
+hatched +/- equivalence band are reference zones.
+
+**Color is a per-percentile reliability flag, not part of the shape.** A
+percentile is colored (blue/green/red by direction) only when enough samples lie
+beyond it across enough distinct batches to pin it down; otherwise it is greyed.
+Greying gates *whether you can trust where the violin sits* (its position and
+direction), per percentile. It does not change the violin's shape, and it is not
+a verdict on the whole run: a single run routinely has reliable middle
+percentiles and greyed extreme tails (the 1% tail rarely spans enough batches).
+
+What to take from it:
+
+- **Trust the position of colored violins, not greyed ones.** A greyed violin's
+  point estimate could swing on a different draw; read it only as "not enough
+  coverage here," not as evidence about the data.
+- **A lone colored violin in a field of grey is usually noise**, not a real
+  per-percentile effect. With nine percentiles shown at once, expect one to roll
+  the dice and color spuriously fairly often; nothing makes that percentile
+  special.
+- **Color cannot tell you whether a shape reflects your code or your test
+  setup.** A reliably-colored violin faithfully measures whatever your sampling
+  produced, which may be a measurement artifact. Short batches that fire a GC in
+  only some batches, for example, can split the slow tail into two regimes and
+  make a mid-tail percentile look unusually spread, even while it passes the
+  reliability gate. Distinguishing data structure from sampling artifact needs a
+  second run that changes one knob at a time. More **batches** narrows every
+  violin (roughly as one over the square root of the batch count) and improves
+  tail coverage, but it preserves any real structure. More **duration** changes
+  what each batch measures, for instance by giving every batch enough full GCs to
+  behave alike. If a feature survives more batches but dissolves with more
+  duration, it was a batch-length artifact, not your code.
