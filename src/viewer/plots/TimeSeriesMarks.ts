@@ -59,6 +59,29 @@ type Downsample = <T>(
 
 const maxDots = 1000;
 
+/** Distinct color per benchmark series, keyed by name (Observable 10 palette,
+ *  shared by the dots and the legend so swatches match). Baselines are sorted
+ *  last so current benchmarks take the leading palette colors. */
+function seriesColorMap(
+  benchmarks: string[],
+  baselineNames: Set<string>,
+): Map<string, string> {
+  const scheme = (d3 as unknown as { schemeObservable10: string[] })
+    .schemeObservable10;
+  const ordered = orderSeries(benchmarks, baselineNames);
+  return new Map(ordered.map((name, i) => [name, scheme[i % scheme.length]]));
+}
+
+/** Current benchmarks first, baselines last (stable within each group). */
+function orderSeries(
+  benchmarks: string[],
+  baselineNames: Set<string>,
+): string[] {
+  return [...benchmarks].sort(
+    (a, b) => Number(baselineNames.has(a)) - Number(baselineNames.has(b)),
+  );
+}
+
 /** Build legend items based on which data series are present in the plot */
 export function buildLegendItems(p: LegendParams): LegendItem[] {
   const { hasWarmup, gcCount, pauseCount, hasHeap, hasBaselineHeap } = p;
@@ -198,14 +221,15 @@ export function sampleDotMarks(
   const { unitSuffix, formatValue } = ctx;
   const fmtVal = (d: SampleData) =>
     `${formatValue(d.displayValue)}${unitSuffix}`;
-  const tipTitle = (d: SampleData) =>
-    `Iteration ${d.sample}: ${fmtVal(d)}`;
+  const tipTitle = (d: SampleData) => `Iteration ${d.sample}: ${fmtVal(d)}`;
   const xy = { x: "sample" as const, y: "displayValue" as const, r: 3 };
   const { warmup, baseline, measured, rejected } = partitionSamples(
     ctx.convertedData,
     showRejected,
     lttb,
   );
+  const colors = seriesColorMap(ctx.benchmarks, ctx.baselineNames);
+  const colorOf = (d: SampleData) => colors.get(d.benchmark) ?? "#4682b4";
   return [
     Plot.dot(warmup, {
       ...xy,
@@ -215,9 +239,10 @@ export function sampleDotMarks(
       opacity: 0.7,
       title: (d: SampleData) => `Warmup ${d.sample}: ${fmtVal(d)}`,
     }),
+    // baselines: series color outline (hollow) to distinguish from current dots
     Plot.dot(baseline, {
       ...xy,
-      stroke: "#ffa500",
+      stroke: colorOf,
       fill: "none",
       strokeWidth: 2,
       opacity: 0.8,
@@ -227,25 +252,22 @@ export function sampleDotMarks(
       ...xy,
       opacity: 0.8,
       title: tipTitle,
-      fill: "#4682b4",
+      fill: colorOf,
     }),
     ...rejectedDotMark(rejected, xy, tipTitle),
   ];
 }
 
-/** Legend items for benchmark names */
+/** Legend items for benchmark names, colored to match the dots. */
 function seriesLegendItems(
   benchmarks: string[],
   baselineNames: Set<string>,
 ): LegendItem[] {
-  // sort baselines last so current benchmarks appear first in legend
-  const sorted = [...benchmarks].sort(
-    (a, b) => Number(baselineNames.has(a)) - Number(baselineNames.has(b)),
-  );
-  return sorted.map(bm => {
+  const colors = seriesColorMap(benchmarks, baselineNames);
+  return orderSeries(benchmarks, baselineNames).map(bm => {
     const isBase = baselineNames.has(bm);
     return {
-      color: isBase ? "#ffa500" : "#4682b4",
+      color: colors.get(bm) ?? "#4682b4",
       label: bm,
       style: (isBase ? "hollow-dot" : "filled-dot") as LegendItem["style"],
     };
