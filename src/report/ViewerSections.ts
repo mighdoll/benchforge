@@ -138,6 +138,7 @@ export function buildViewerSections(
     const ctx: RowContext = { ...base };
     const cache: SectionCICache = {};
     const layout = section.kind === "scalar" ? section.layout : undefined;
+    const placement = section.kind === "scalar" ? section.placement : undefined;
     const rows =
       section.kind === "metric"
         ? metricRows(
@@ -151,7 +152,7 @@ export function buildViewerSections(
         : scalarRows(section, ctx);
     caches[i] = cache;
     if (rows.length)
-      viewerSections.push({ title: section.title, rows, layout });
+      viewerSections.push({ title: section.title, rows, layout, placement });
   });
   return { sections: viewerSections, caches };
 }

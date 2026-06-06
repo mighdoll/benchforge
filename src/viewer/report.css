@@ -88,6 +88,20 @@
 .report-panel .benchmark-block-head h3 { margin: 0; font-size: 15px; color: #555; }
 .report-panel .benchmark-vs { font-size: 12px; color: #999; }
 
+/* Footer-placed sections (e.g. runs), once per group below the variant cards */
+.report-panel .group-footer {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 24px;
+  margin-top: 14px;
+  padding-top: 10px;
+  border-top: 1px solid #e0e0e0;
+}
+.report-panel .footer-stat { display: flex; gap: 8px; align-items: baseline; font-size: 12px; }
+.report-panel .footer-stat .row-label { color: #999; }
+.report-panel .footer-stat .row-value { font-weight: 600; color: #555; }
+.report-panel .footer-per-variant { display: flex; gap: 14px; color: #888; }
+
 /* --- Badges --- */
 
 .report-panel .badge {
@@ -520,12 +534,16 @@
 .shift-verdict-pct { font-size: 14px; font-weight: 700; color: #555; }
 
 :root[data-theme="dark"] .report-panel .shift-panel { border-top-color: #3a3a3a; }
+:root[data-theme="dark"] .report-panel .group-footer { border-top-color: #3a3a3a; }
+:root[data-theme="dark"] .report-panel .footer-stat .row-value { color: #ccc; }
 :root[data-theme="dark"] .report-panel .shift-caption { color: #bbb; }
 :root[data-theme="dark"] .shift-popup { background: #252525; border-color: #3a3a3a; }
 :root[data-theme="dark"] .shift-popup h3 { color: #ddd; }
 :root[data-theme="dark"] .shift-verdict-pct { color: #ccc; }
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) .report-panel .shift-panel { border-top-color: #3a3a3a; }
+  :root:not([data-theme="light"]) .report-panel .group-footer { border-top-color: #3a3a3a; }
+  :root:not([data-theme="light"]) .report-panel .footer-stat .row-value { color: #ccc; }
   :root:not([data-theme="light"]) .report-panel .shift-caption { color: #bbb; }
   :root:not([data-theme="light"]) .shift-popup { background: #252525; border-color: #3a3a3a; }
   :root:not([data-theme="light"]) .shift-popup h3 { color: #ddd; }

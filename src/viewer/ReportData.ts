@@ -102,6 +102,9 @@ export interface ViewerSection {
 
   /** Rendering layout hint; "matrix" packs scalar metrics into a dense table. */
   layout?: "matrix";
+
+  /** Placement hint; "footer" renders once per group in a bottom strip. */
+  placement?: "footer";
 }
 
 /** A stat row with per-run values and optional comparison CI. */
