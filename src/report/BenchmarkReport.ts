@@ -19,6 +19,11 @@ export interface ReportGroup {
   name: string;
   reports: BenchmarkReport[];
   baseline?: BenchmarkReport;
+
+  /** Id of a sibling report used as the shared baseline (matrix baselineVariant
+   *  mode), so the viewer can name it. Undefined when the baseline is a separate
+   *  version (baselineDir) or absent. */
+  baselineVariantId?: string;
 }
 
 /** Results from a single benchmark run */

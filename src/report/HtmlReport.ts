@@ -58,6 +58,9 @@ interface GroupContext {
   baseName?: string;
   sections?: ReportSection[];
   comparison?: ComparisonOptions;
+  /** Sibling variant serving as the shared baseline, so its entry is marked
+   *  and the others name it (matrix baselineVariant mode). */
+  baselineVariantId?: string;
 }
 
 /** Viewer sections plus the per-section bootstrap caches that produced them. */
@@ -132,6 +135,7 @@ function prepareGroupData(
     baseName: base?.name,
     sections,
     comparison,
+    baselineVariantId: group.baselineVariantId,
   };
 
   const benchmarks = group.reports.map(r => prepareReportEntry(r, ctx));
@@ -244,8 +248,15 @@ function prepareReportEntry(
   const baseline = base
     ? { ...prepareBenchmarkData(base), comparisonCI: undefined }
     : undefined;
+  const isBaselineVariant = report.name === ctx.baselineVariantId;
+  const baselineLabel =
+    ctx.baselineVariantId && !isBaselineVariant && base
+      ? ctx.baselineVariantId
+      : undefined;
   return {
     ...prepareBenchmarkData(report),
+    baselineLabel,
+    isBaselineVariant,
     sections: trimmedView?.sections,
     rawSections: rawView?.sections,
     comparisonCI: findPrimarySectionCI(trimmedView?.sections),
