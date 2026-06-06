@@ -34,7 +34,7 @@
     "deploy:viewer": "run-s build:viewer pages:viewer:deploy",
     "dev:viewer": "vite --config vite.viewer.config.ts",
     "example:node": "bin/benchforge examples/simple-cli.ts --gc-stats --alloc --batches 5 --iterations 100 --view",
-    "example:time": "bin/benchforge examples/simple-cli.ts --alloc --time-sample --batches 5 --iterations 100 --view --filter quicksort",
+    "example:time": "bin/benchforge examples/simple-cli.ts --alloc --time-sample --batches 5 --iterations 100 --view --filter slice",
     "example:bench": "bin/benchforge --url file://$PWD/examples/browser-bench/index.html --gc-stats --headless --alloc --view",
     "example:counts": "bin/benchforge examples/simple-cli.ts --alloc --time-sample --call-counts --view --iterations 5",
     "example:heap": "bin/benchforge --url file://$PWD/examples/browser-heap/index.html --gc-stats --headless --view",
