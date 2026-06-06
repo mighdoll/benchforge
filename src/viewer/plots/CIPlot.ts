@@ -184,7 +184,7 @@ function drawTitles(
       text(margin.left, 14, opts.title, "start", "13", "currentColor", "600"),
     );
   if (opts.pointLabel) {
-    const x = clampLabelX(pointX, opts.pointLabel, "middle", width, 8);
+    const x = clampLabelX(pointX, opts.pointLabel, "middle", width, 10);
     svg.appendChild(
       text(
         x,
@@ -201,7 +201,7 @@ function drawTitles(
 
 /** Keep a text label inside [pad, width-pad] given its anchor, so labels at the
  *  data edges aren't clipped by the SVG viewport. Width is estimated from the
- *  character count (~6px at the 11px label size, ~8px for the larger point). */
+ *  character count (~6px at the 11px label size, ~10px for the 15px point). */
 function clampLabelX(
   x: number,
   label: string,
@@ -342,19 +342,28 @@ function drawCILabels(
   const minGap = Math.max(loLabel.length, hiLabel.length) * 6;
   const tight = hiX - loX < minGap;
 
-  // Diff plots (includeZero): keep both labels centered, or hide both when the
-  // CI is too tight to fit -- the zero line and point label carry the reading.
+  // Diff plots (includeZero): when the CI spans enough pixels, center each
+  // bound label; when it's too tight to fit both, merge them into one clamped
+  // "lo / hi" label at the CI midpoint so the bounds stay readable.
+  const { width } = layout;
   if (opts.includeZero) {
-    if (tight) return;
-    svg.appendChild(text(loX, labelY, loLabel, "middle", "11"));
-    svg.appendChild(text(hiX, labelY, hiLabel, "middle", "11"));
+    if (tight) {
+      const mid = (loX + hiX) / 2;
+      const merged = loLabel === hiLabel ? loLabel : `${loLabel} / ${hiLabel}`;
+      const x = clampLabelX(mid, merged, "middle", width, 6);
+      svg.appendChild(text(x, labelY, merged, "middle", "11"));
+      return;
+    }
+    const lo = clampLabelX(loX, loLabel, "middle", width, 6);
+    const hi = clampLabelX(hiX, hiLabel, "middle", width, 6);
+    svg.appendChild(text(lo, labelY, loLabel, "middle", "11"));
+    svg.appendChild(text(hi, labelY, hiLabel, "middle", "11"));
     return;
   }
 
   // Absolute plots: a tight CI collapses to one centered label (identical
   // bounds) or a "lo - hi" range; otherwise anchor each label outward so the
   // two never encroach on each other. Clamp so edge labels aren't clipped.
-  const { width } = layout;
   if (tight) {
     const mid = (loX + hiX) / 2;
     const merged = loLabel === hiLabel ? loLabel : `${loLabel} - ${hiLabel}`;

@@ -58,6 +58,7 @@ interface RowContext {
   baseline?: MeasuredResults;
   currentMeta?: UnknownRecord;
   baselineMeta?: UnknownRecord;
+  baselineName?: string;
   comparison?: ComparisonOptions;
 }
 
@@ -318,6 +319,7 @@ function metricRow(
     ctx.currentMeta,
     ctx.baselineMeta,
     ctx.comparison,
+    ctx.baselineName,
   );
   return row;
 }
