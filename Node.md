@@ -15,31 +15,31 @@ under test). For shared input and several functions compared against a baseline,
 export a `MatrixSuite`:
 
 ```typescript
-// sorting.ts
+// copy.ts
 import type { BenchMatrix, MatrixSuite } from 'benchforge';
 
-const sorting: BenchMatrix<number[]> = {
-  name: "Array Sorting (1000 numbers)",
+const copying: BenchMatrix<number[]> = {
+  name: "Array Copy (50,000 numbers)",
   // one case named "numbers"; the thunk runs once to make the shared input
-  caseData: { numbers: () => Array.from({ length: 1000 }, () => Math.random()) },
+  caseData: { numbers: () => Array.from({ length: 50_000 }, () => Math.random()) },
   variants: {
-    quicksort: quickSort,
-    "insertion sort": insertionSort,
-    "native sort": (arr) => [...arr].sort((a, b) => a - b),
+    slice: arr => arr.slice(),
+    spread: arr => [...arr],
+    from: arr => Array.from(arr),
   },
-  baselineVariant: "native sort",
+  baselineVariant: "spread",
 };
 
 const suite: MatrixSuite = {
   name: "Performance Tests",
-  matrices: [sorting],
+  matrices: [copying],
 };
 
 export default suite;
 ```
 
 ```bash
-benchforge sorting.ts --gc-stats
+benchforge copy.ts --gc-stats
 ```
 
 Each variant is called once per iteration with the case data as its argument.
