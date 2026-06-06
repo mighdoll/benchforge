@@ -199,6 +199,14 @@ function drawTitles(
   }
 }
 
+/** Merge two CI bound labels into one compact range, or a single label when the
+ *  bounds are identical at display precision. Uses "/" rather than "-" so the
+ *  separator stays unambiguous for signed diff bounds (e.g. "-65% / -55%"), and
+ *  so diff and absolute charts read consistently. */
+function rangeLabel(loLabel: string, hiLabel: string): string {
+  return loLabel === hiLabel ? loLabel : `${loLabel} / ${hiLabel}`;
+}
+
 /** Keep a text label inside [pad, width-pad] given its anchor, so labels at the
  *  data edges aren't clipped by the SVG viewport. Width is estimated from the
  *  character count (~6px at the 11px label size, ~10px for the 15px point). */
@@ -344,13 +352,12 @@ function drawCILabels(
 
   // Diff plots (includeZero): when the CI spans enough pixels, center each
   // bound label; when it's too tight to fit both, merge them into one clamped
-  // "lo / hi" label at the CI midpoint so the bounds stay readable.
+  // range label at the CI midpoint so the bounds stay readable.
   const { width } = layout;
   if (opts.includeZero) {
     if (tight) {
-      const mid = (loX + hiX) / 2;
-      const merged = loLabel === hiLabel ? loLabel : `${loLabel} / ${hiLabel}`;
-      const x = clampLabelX(mid, merged, "middle", width, 6);
+      const merged = rangeLabel(loLabel, hiLabel);
+      const x = clampLabelX((loX + hiX) / 2, merged, "middle", width, 6);
       svg.appendChild(text(x, labelY, merged, "middle", "11"));
       return;
     }
@@ -361,21 +368,13 @@ function drawCILabels(
     return;
   }
 
-  // Absolute plots: a tight CI collapses to one centered label (identical
-  // bounds) or a "lo - hi" range; otherwise anchor each label outward so the
-  // two never encroach on each other. Clamp so edge labels aren't clipped.
+  // Absolute plots: a tight CI collapses to one centered range label; otherwise
+  // anchor each label outward so the two never encroach on each other. Clamp so
+  // edge labels aren't clipped.
   if (tight) {
-    const mid = (loX + hiX) / 2;
-    const merged = loLabel === hiLabel ? loLabel : `${loLabel} - ${hiLabel}`;
-    svg.appendChild(
-      text(
-        clampLabelX(mid, merged, "middle", width, 6),
-        labelY,
-        merged,
-        "middle",
-        "11",
-      ),
-    );
+    const merged = rangeLabel(loLabel, hiLabel);
+    const x = clampLabelX((loX + hiX) / 2, merged, "middle", width, 6);
+    svg.appendChild(text(x, labelY, merged, "middle", "11"));
     return;
   }
   svg.appendChild(

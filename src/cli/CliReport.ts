@@ -127,11 +127,18 @@ function caseGroups(matrix: MatrixResults): ReportGroup[] {
   });
 }
 
-/** One variant's report for a case, carrying its own interleaved baseline. */
+/** One variant's report for a case, carrying its own interleaved baseline. The
+ *  baseline is named for the variant that produced it (the reference variant for
+ *  baselineVariant, this variant's own id for a baselineDir comparison), not the
+ *  current variant. */
 function variantReport(variantId: string, c: CaseResult): BenchmarkReport {
-  const { metadata, baseline: baselineMeasured } = c;
+  const { metadata, baseline: baselineMeasured, baselineId } = c;
   const baseline = baselineMeasured
-    ? { name: `${variantId} (baseline)`, measuredResults: baselineMeasured, metadata }
+    ? {
+        name: `${baselineId ?? variantId} (baseline)`,
+        measuredResults: baselineMeasured,
+        metadata,
+      }
     : undefined;
   return { name: variantId, measuredResults: c.measured, metadata, baseline };
 }
