@@ -60,9 +60,9 @@ type Downsample = <T>(
 const maxDots = 1000;
 
 /** Distinct color per benchmark series, keyed by name (Observable 10 palette,
- *  shared by the dots and the legend so swatches match). Baselines are sorted
- *  last so current benchmarks take the leading palette colors. */
-function seriesColorMap(
+ *  shared by the dots, the legend, and the toggle pills so swatches match).
+ *  Baselines are sorted last so current benchmarks take the leading colors. */
+export function seriesColorMap(
   benchmarks: string[],
   baselineNames: Set<string>,
 ): Map<string, string> {
@@ -107,9 +107,11 @@ export function buildLegendItems(p: LegendParams): LegendItem[] {
   return items;
 }
 
-/** Area fill marks for heap usage overlay on the time series chart */
+/** Area fill marks for heap usage overlay on the time series chart. `z` groups
+ *  by benchmark so each series is its own area (no line across the gap between
+ *  one benchmark's last iteration and the next benchmark's first). */
 export function heapMarks(
-  heapData: { sample: number; y: number }[],
+  heapData: { benchmark: string; sample: number; y: number }[],
   yMin: number,
   color: string,
 ): any[] {
@@ -119,6 +121,7 @@ export function heapMarks(
       x: "sample",
       y: "y",
       y1: yMin,
+      z: "benchmark",
       fill: color,
       fillOpacity: 0.15,
       stroke: color,
@@ -136,8 +139,9 @@ export function heapAxisMarks(
 ): any[] {
   if (!hs) return [];
   const xRange = xMax - xMin;
-  const tickX = xMax + xRange * 0.01;
-  const labelX = xMax + xRange * 0.06;
+  // tick values sit clear of the chart; "MB" sits clear of the value text
+  const tickX = xMax + xRange * 0.04;
+  const labelX = xMax + xRange * 0.13;
   const minMB = hs.heapMinBytes / 1024 / 1024;
   const maxMB = (hs.heapMinBytes + hs.heapRangeBytes) / 1024 / 1024;
   const ticks = d3.ticks(minMB, maxMB, 3);

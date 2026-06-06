@@ -21,16 +21,18 @@ import {
   sampleDotMarks,
 } from "./TimeSeriesMarks.ts";
 
-/** Controls which data series are visible in the time series plot */
+/** Controls which data series are visible in the time series plot.
+ *  `hidden` holds benchmark names toggled off (the baseline is just one of
+ *  them, so the baseline pill and the per-variant pills share one mechanism). */
 export interface SeriesVisibility {
-  baseline: boolean;
+  hidden: Set<string>;
   heap: boolean;
   baselineHeap: boolean;
   rejected: boolean;
   fullGc: boolean;
 }
 
-type HeapPlotPoint = { sample: number; y: number };
+type HeapPlotPoint = { benchmark: string; sample: number; y: number };
 
 interface MarkParams {
   ctx: PlotContext;
@@ -44,7 +46,7 @@ interface MarkParams {
 }
 
 const defaultVisibility: SeriesVisibility = {
-  baseline: true,
+  hidden: new Set(),
   heap: true,
   baselineHeap: false,
   rejected: true,
@@ -60,15 +62,14 @@ export function createSampleTimeSeries(
   baselineHeapSeries: HeapPoint[] = [],
   visibility: SeriesVisibility = defaultVisibility,
 ): SVGSVGElement | HTMLElement {
-  const filtered = visibility.baseline
-    ? timeSeries
-    : timeSeries.filter(d => !d.isBaseline);
+  const shown = (b: string) => !visibility.hidden.has(b);
+  const filtered = timeSeries.filter(d => shown(d.benchmark));
   const ctx = buildPlotContext(filtered);
   const gc = visibility.fullGc ? gcEvents : [];
   const series = prepareSeriesData(
     ctx,
-    heapSeries,
-    baselineHeapSeries,
+    heapSeries.filter(d => shown(d.benchmark)),
+    baselineHeapSeries.filter(d => shown(d.benchmark)),
     visibility,
     gc,
     pausePoints,
@@ -231,22 +232,27 @@ function computeHeapScale(
   };
 }
 
-/** Map heap byte values to the time-series Y scale and downsample via LTTB */
+/** Map heap byte values to the time-series Y scale and downsample via LTTB,
+ *  per benchmark so the area mark never connects across series boundaries. */
 function prepareHeapData(
   heapSeries: HeapPoint[],
   hs: HeapScale,
 ): HeapPlotPoint[] {
   if (heapSeries.length === 0) return [];
-  const mapped = heapSeries.map(d => ({
-    sample: d.iteration,
-    y: hs.yMin + (d.value - hs.heapMinBytes) * hs.scale,
-  }));
-  return lttb(
-    mapped,
-    500,
-    d => d.sample,
-    d => d.y,
-  );
+  const byBench = d3.group(heapSeries, d => d.benchmark);
+  return [...byBench.values()].flatMap(points => {
+    const mapped = points.map(d => ({
+      benchmark: d.benchmark,
+      sample: d.iteration,
+      y: hs.yMin + (d.value - hs.heapMinBytes) * hs.scale,
+    }));
+    return lttb(
+      mapped,
+      500,
+      d => d.sample,
+      d => d.y,
+    );
+  });
 }
 
 /** LTTB downsampling: select n points that best preserve visual shape */
