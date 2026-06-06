@@ -197,9 +197,73 @@ function CollapsibleGroup({ group }: { group: BenchmarkGroup }) {
           </span>
         )}
       </div>
-      {open && (single
-        ? <GroupContent current={benchmarks[0]} />
-        : benchmarks.map((b, i) => <BenchmarkBlock key={i} entry={b} />))}
+      {open && (
+        <>
+          {single
+            ? <GroupContent current={benchmarks[0]} />
+            : benchmarks.map((b, i) => <BenchmarkBlock key={i} entry={b} />)}
+          <GroupFooter benchmarks={benchmarks} />
+        </>
+      )}
+    </div>
+  );
+}
+
+/** A footer row collected across the group's variants: one value per variant,
+ *  deduped to a single value when they all agree. */
+interface FooterRow {
+  label: string;
+  values: { name: string; value: string }[];
+  uniform: boolean;
+}
+
+/** Footer-placed sections rendered once per group in a bottom strip. Each row's
+ *  value is shown once when all variants agree (e.g. runs, identical across a
+ *  case), else per-variant. */
+function GroupFooter({ benchmarks }: { benchmarks: BenchmarkEntry[] }) {
+  const rows = footerRows(benchmarks);
+  if (!rows.length) return null;
+  return (
+    <div class="group-footer">
+      {rows.map((row, i) => <FooterStat key={i} row={row} />)}
+    </div>
+  );
+}
+
+/** Collect footer-section rows across all variants, keyed by row label,
+ *  preserving first-seen order; mark a row uniform when every variant agrees. */
+function footerRows(benchmarks: BenchmarkEntry[]): FooterRow[] {
+  const byLabel = new Map<string, { name: string; value: string }[]>();
+  const order: string[] = [];
+  for (const b of benchmarks) {
+    const footers = activeView(b).sections?.filter(s => s.placement === "footer");
+    for (const section of footers ?? [])
+      for (const row of section.rows) {
+        if (!byLabel.has(row.label)) {
+          byLabel.set(row.label, []);
+          order.push(row.label);
+        }
+        byLabel.get(row.label)!.push({ name: b.name, value: row.entries[0]?.value ?? "" });
+      }
+  }
+  return order.map(label => {
+    const values = byLabel.get(label)!;
+    return { label, values, uniform: values.every(v => v.value === values[0].value) };
+  });
+}
+
+/** One footer row: a single value when variants agree, else per-variant. */
+function FooterStat({ row }: { row: FooterRow }) {
+  return (
+    <div class="footer-stat">
+      <span class="row-label">{row.label}</span>
+      {row.uniform
+        ? <span class="row-value">{row.values[0].value}</span>
+        : <span class="footer-per-variant">
+            {row.values.map((v, i) => (
+              <span key={i}>{v.name} <b>{v.value}</b></span>
+            ))}
+          </span>}
     </div>
   );
 }
@@ -289,9 +353,10 @@ function ComparisonBadge(
   );
 }
 
-/** A group's panels: sections, heap allocation, coverage. */
+/** A group's panels: sections, heap allocation, coverage. Footer-placed
+ *  sections are excluded here -- they render once per group in GroupFooter. */
 function GroupContent({ current }: { current: BenchmarkEntry }) {
-  const sections = activeView(current).sections;
+  const sections = activeView(current).sections?.filter(s => s.placement !== "footer");
   return (
     <div class="panel-grid">
       {sections?.map((s, i) => <SectionPanel key={i} section={s} />)}

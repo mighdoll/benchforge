@@ -16,9 +16,11 @@ export const timeSection: MetricSection = metricSection({
   formatter: timeMs,
 });
 
-/** Report section: number of sample iterations. */
+/** Report section: number of sample iterations. Footer-placed -- it's run
+ *  metadata, not a headline result, so it sits once at the bottom of a case. */
 export const runsSection: ScalarSection = scalarSection({
   title: "",
+  placement: "footer",
   rows: [
     {
       key: "runs",

@@ -68,6 +68,10 @@ export interface ScalarSection {
   rows: ScalarRow[];
   /** Rendering layout hint; "matrix" packs scalar metrics into a dense table. */
   layout?: "matrix";
+  /** Placement hint: "footer" renders the section once per case in a bottom
+   *  strip (deduped when variants agree) rather than as a per-variant card.
+   *  For run metadata (e.g. iteration count) that isn't a headline result. */
+  placement?: "footer";
 }
 
 /** A single scalar value pulled from results/metadata. */
