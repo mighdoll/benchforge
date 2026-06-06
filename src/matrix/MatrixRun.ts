@@ -97,7 +97,8 @@ async function runVariantCases<T>(
     const deltaPercent = baseline
       ? computeDeltaPercent(baseline, measured)
       : undefined;
-    cases.push({ caseId, measured, metadata, baseline, deltaPercent });
+    const baselineId = baselineSource?.variantId;
+    cases.push({ caseId, measured, metadata, baseline, baselineId, deltaPercent });
   }
   return cases;
 }

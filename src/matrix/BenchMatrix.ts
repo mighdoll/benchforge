@@ -73,6 +73,9 @@ export interface CaseResult {
   measured: MeasuredResults;
   metadata?: Record<string, unknown>;
   baseline?: MeasuredResults;
+  /** Variant id that produced `baseline` (the reference variant for
+   *  baselineVariant, or this variant's own id for a baselineDir comparison). */
+  baselineId?: string;
   deltaPercent?: number;
 }
 
