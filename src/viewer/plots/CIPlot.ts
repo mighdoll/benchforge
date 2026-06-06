@@ -200,11 +200,10 @@ function drawTitles(
 }
 
 /** Merge two CI bound labels into one compact range, or a single label when the
- *  bounds are identical at display precision. Uses "/" rather than "-" so the
- *  separator stays unambiguous for signed diff bounds (e.g. "-65% / -55%"), and
- *  so diff and absolute charts read consistently. */
+ *  bounds are identical at display precision. Shared by the diff and absolute
+ *  charts so they read consistently. */
 function rangeLabel(loLabel: string, hiLabel: string): string {
-  return loLabel === hiLabel ? loLabel : `${loLabel} / ${hiLabel}`;
+  return loLabel === hiLabel ? loLabel : `${loLabel} - ${hiLabel}`;
 }
 
 /** Keep a text label inside [pad, width-pad] given its anchor, so labels at the
