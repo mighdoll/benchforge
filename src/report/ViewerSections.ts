@@ -345,11 +345,13 @@ function scalarRow(scalar: ScalarRow, ctx: RowContext): ViewerRow | undefined {
     };
   }
 
-  const entries: ViewerEntry[] = [
-    { runName: current.name, value: format(curRaw) },
-  ];
-  if (baseline && baseRaw !== undefined)
-    entries.push({ runName: "baseline", value: format(baseRaw) });
+  // With a baseline run, always emit both columns so the matrix stays aligned;
+  // a side with no value reads "n/a" rather than a blank cell (e.g. a fast loop
+  // whose in-loop GC events were all filtered out). Borrowing the other side's
+  // value would be inaccurate, so the missing side stays explicitly absent.
+  const na = (v: unknown) => (v === undefined ? "n/a" : format(v));
+  const entries: ViewerEntry[] = [{ runName: current.name, value: na(curRaw) }];
+  if (baseline) entries.push({ runName: "baseline", value: na(baseRaw) });
   return {
     label: scalar.title,
     entries,
