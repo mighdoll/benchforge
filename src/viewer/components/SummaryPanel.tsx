@@ -209,10 +209,14 @@ function CollapsibleGroup({ group }: { group: BenchmarkGroup }) {
 function BenchmarkBlock({ entry }: { entry: BenchmarkEntry }) {
   const ci = activeView(entry).comparisonCI;
   const open = shiftDetailOpener(entryShift(entry));
+  const heading = entry.isBaselineVariant ? `${entry.name} (baseline)` : entry.name;
   return (
     <div class="benchmark-block">
       <div class="benchmark-block-head">
-        <h3>{entry.name}</h3>
+        <h3>{heading}</h3>
+        {entry.baselineLabel && (
+          <span class="benchmark-vs">vs {entry.baselineLabel} (baseline)</span>
+        )}
         {ci && <ComparisonBadge ci={ci} onOpen={open} />}
       </div>
       <GroupContent current={entry} />

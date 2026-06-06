@@ -41,6 +41,16 @@ export interface BenchmarkGroup {
  *  trimming had any effect (otherwise the two views are identical). */
 export interface BenchmarkEntry {
   name: string;
+
+  /** Display name of the sibling variant used as this case's shared baseline
+   *  (matrix baselineVariant mode), for the "vs <name> (baseline)" header. Set
+   *  on the compared variants; undefined in version (baselineDir) comparisons. */
+  baselineLabel?: string;
+
+  /** True for the variant that serves as the case's shared baseline, so its
+   *  header reads "<name> (baseline)" rather than carrying a verdict. */
+  isBaselineVariant?: boolean;
+
   /** Per-benchmark metadata (e.g. linesOfCode) for display transforms and for
    *  agents reading the archive without recomputing stats. */
   metadata?: Record<string, unknown>;

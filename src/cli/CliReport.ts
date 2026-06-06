@@ -122,9 +122,27 @@ function caseGroups(matrix: MatrixResults): ReportGroup[] {
     const reports = byCase.get(caseId)!;
     const name = single ? matrix.name : `${matrix.name} / ${caseId}`;
     // No group-level baseline: each variant carries its own (a single shared
-    // baseline would mislabel "vs <one variant>" for the others).
-    return { name, reports };
+    // baseline would mislabel "vs <one variant>" for the others). The shared
+    // baseline variant is named instead, so the viewer can label it.
+    return { name, reports, baselineVariantId: baselineVariantId(matrix, caseId) };
   });
+}
+
+/** @return the sibling variant id used as the shared baseline for a case, when
+ *  there is exactly one (baselineVariant mode). Undefined when each variant is
+ *  its own baseline (baselineDir version comparison) or there is no baseline. */
+function baselineVariantId(
+  matrix: MatrixResults,
+  caseId: string,
+): string | undefined {
+  const variantIds = new Set(matrix.variants.map(v => v.id));
+  const refs = new Set<string>();
+  for (const variant of matrix.variants) {
+    const baselineId = variant.cases.find(c => c.caseId === caseId)?.baselineId;
+    if (baselineId && baselineId !== variant.id && variantIds.has(baselineId))
+      refs.add(baselineId);
+  }
+  return refs.size === 1 ? [...refs][0] : undefined;
 }
 
 /** One variant's report for a case, carrying its own interleaved baseline. The
