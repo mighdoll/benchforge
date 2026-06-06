@@ -150,6 +150,20 @@ test("each point carries current and baseline absolute distributions", () => {
   }
 });
 
+test("baseline run shows its name, suffixed (baseline) when not already", () => {
+  const named = buildShiftFunction(
+    timeMetric, batched(30, 50, 0.1), batched(30, 50), {}, {}, fast,
+    "native sort",
+  )!;
+  expect(named.points[0].runs[1].runName).toBe("native sort (baseline)");
+
+  const preSuffixed = buildShiftFunction(
+    timeMetric, batched(30, 50, 0.1), batched(30, 50), {}, {}, fast,
+    "native sort (baseline)",
+  )!;
+  expect(preSuffixed.points[0].runs[1].runName).toBe("native sort (baseline)");
+});
+
 test("extreme tail percentiles are unreliable with too few samples", () => {
   // 30 x 5 = 150 samples: p1 has ~2 sparse-side samples => unreliable; p50 ok.
   const sf = buildShiftFunction(

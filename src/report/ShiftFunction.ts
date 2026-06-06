@@ -37,6 +37,7 @@ interface PointArgs {
   baseline: MeasuredResults;
   currentMeta: UnknownRecord | undefined;
   baselineMeta: UnknownRecord | undefined;
+  baselineName: string | undefined;
   lowBatches: boolean;
   noBatchTrim: boolean | undefined;
   verdict: StatKind;
@@ -65,6 +66,7 @@ export function buildShiftFunction(
   currentMeta: UnknownRecord | undefined,
   baselineMeta: UnknownRecord | undefined,
   comparison: ComparisonOptions | undefined,
+  baselineName?: string,
 ): ShiftFunction | undefined {
   if (!baseline?.samples?.length || !current.samples?.length) return undefined;
 
@@ -78,6 +80,7 @@ export function buildShiftFunction(
     baseline,
     currentMeta,
     baselineMeta,
+    baselineName,
     lowBatches,
     noBatchTrim,
     verdict,
@@ -241,11 +244,18 @@ function buildPointBase(
       bootstrapCI: runCI(curResult, current, currentMeta),
     },
     {
-      runName: "baseline",
+      runName: baselineLabel(args.baselineName),
       bootstrapCI: runCI(baseResult, baseline, baselineMeta),
     },
   ];
   return { diff: annotated, runs };
+}
+
+/** Label the baseline run with its real name, suffixed "(baseline)" unless the
+ *  name already carries that suffix; falls back to "baseline" when unnamed. */
+function baselineLabel(name: string | undefined): string {
+  if (!name) return "baseline";
+  return name.endsWith("(baseline)") ? name : `${name} (baseline)`;
 }
 
 /** @return how many samples lie on the sparse side of the p-th percentile and

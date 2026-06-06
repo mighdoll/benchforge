@@ -509,6 +509,9 @@
 .shift-charts { display: grid; grid-template-columns: max-content 1fr; }
 .shift-chart { display: grid; grid-template-columns: subgrid; grid-column: 1 / -1;
   align-items: center; gap: 10px; margin: 12px 0 0; }
+/* Let the chart paint its distribution tail and edge CI labels into the
+   surrounding padding/gap instead of clipping at the SVG box. */
+.shift-chart svg { overflow: visible; }
 .shift-chart-label { font-size: 13px; font-weight: 600; color: #555; white-space: nowrap; }
 .shift-verdict { display: inline-flex; align-items: baseline; gap: 8px; }
 .shift-verdict-pct { font-size: 14px; font-weight: 700; color: #555; }

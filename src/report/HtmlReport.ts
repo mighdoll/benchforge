@@ -55,6 +55,7 @@ export interface PrepareHtmlOptions extends ComparisonOptions {
 interface GroupContext {
   baseM?: MeasuredResults;
   baseMeta?: UnknownRecord;
+  baseName?: string;
   sections?: ReportSection[];
   comparison?: ComparisonOptions;
 }
@@ -68,6 +69,7 @@ interface BaseContext {
   baseline?: MeasuredResults;
   currentMeta?: UnknownRecord;
   baselineMeta?: UnknownRecord;
+  baselineName?: string;
 }
 
 /** Convert benchmark results into a ReportData payload for the HTML viewer */
@@ -127,6 +129,7 @@ function prepareGroupData(
   const ctx: GroupContext = {
     baseM: base?.measuredResults,
     baseMeta: base?.metadata,
+    baseName: base?.name,
     sections,
     comparison,
   };
@@ -228,6 +231,7 @@ function prepareReportEntry(
     baseline: base?.measuredResults ?? ctx.baseM,
     currentMeta: report.metadata,
     baselineMeta: base?.metadata ?? ctx.baseMeta,
+    baselineName: base?.name ?? ctx.baseName,
   };
   const trimmedView = ctx.sections
     ? buildViewerSections(ctx.sections, {
