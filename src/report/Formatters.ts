@@ -1,8 +1,13 @@
-/** Format time in milliseconds with appropriate units */
+/** Format a time in milliseconds, picking ns/μs/ms/s and a precision that keeps
+ *  ~2-3 significant figures. Sub-millisecond values read in μs so a tight CI
+ *  stays distinguishable (e.g. "94μs", not a rounded-flat "0.09ms"). */
 export function timeMs(ms: unknown): string | null {
   if (typeof ms !== "number") return null;
   if (ms < 0.001) return `${(ms * 1000000).toFixed(0)}ns`;
-  if (ms < 0.01) return `${(ms * 1000).toFixed(1)}μs`;
+  if (ms < 1) {
+    const us = ms * 1000;
+    return `${us.toFixed(us < 10 ? 1 : 0)}μs`;
+  }
   if (ms >= 1000) return `${(ms / 1000).toFixed(2)}s`;
   if (ms >= 10) return `${ms.toFixed(0)}ms`;
   return `${ms.toFixed(2)}ms`;
