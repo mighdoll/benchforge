@@ -15,18 +15,11 @@ import type {
   VariantResult,
 } from "./BenchMatrix.ts";
 import { buildRunnerOptions, resolveCases } from "./BenchMatrix.ts";
-import type { CasesModule } from "./CaseLoader.ts";
-import {
-  inlineCaseDataMap,
-  type MatrixPlan,
-  runMatrixPlan,
-} from "./MatrixRun.ts";
+import { buildMatrixPlan, runMatrixPlan } from "./MatrixRun.ts";
 import { discoverVariants } from "./VariantLoader.ts";
 
-/** Shared state for directory-based matrix execution */
-interface DirMatrixContext<T> {
-  casesModule?: CasesModule<T>;
-  baselineIds: string[];
+/** Resolved options for a single calibration benchmark from a variant dir. */
+interface DirMatrixContext {
   caseIds: string[];
   runnerOpts: RunnerOptions;
   batches: number;
@@ -44,45 +37,39 @@ export async function runMatrixWithDir<T>(
     throw new Error(`No variants found in ${matrix.variantDir}`);
   }
   const variantIds = options.filteredVariants ?? allVariantIds;
+  const baselineIds = matrix.baselineDir
+    ? await discoverVariants(matrix.baselineDir)
+    : [];
 
-  const ctx = await createDirContext(matrix, options);
-  return runMatrixPlan(matrix.name, await dirPlan(matrix, variantIds, ctx));
+  const plan = await buildMatrixPlan(
+    matrix,
+    options,
+    variantIds,
+    dirPlan(matrix, baselineIds),
+  );
+  return runMatrixPlan(matrix.name, plan);
 }
 
-/** Build a source-agnostic plan that loads each variant from a directory by id,
- *  with its interleaved baseline from baselineDir (same id, baseline directory)
- *  or baselineVariant (the named reference variant from the same directory). */
-async function dirPlan<T>(
-  matrix: BenchMatrix<T>,
-  variantIds: string[],
-  ctx: DirMatrixContext<T>,
-): Promise<MatrixPlan<T>> {
+/** Per-variant source resolver for a directory matrix: load each variant from
+ *  the directory by id, with its interleaved baseline from baselineDir (same id,
+ *  baseline directory) or baselineVariant (the named reference variant from the
+ *  same directory). */
+function dirPlan<T>(matrix: BenchMatrix<T>, baselineIds: string[]) {
   const dirSource = (id: string) => ({
     variantDir: matrix.variantDir!,
     variantId: id,
   });
   const baselineFor = (variantId: string): VariantSource | undefined => {
-    if (matrix.baselineDir && ctx.baselineIds.includes(variantId))
+    if (matrix.baselineDir && baselineIds.includes(variantId))
       return { variantDir: matrix.baselineDir, variantId };
     if (matrix.baselineVariant && matrix.baselineVariant !== variantId)
       return dirSource(matrix.baselineVariant);
     return undefined;
   };
-  return {
-    variantIds,
-    caseIds: ctx.caseIds,
-    casesModule: ctx.casesModule,
-    casesModuleUrl: matrix.casesModule,
-    caseData: await inlineCaseDataMap(matrix, ctx.caseIds),
-    plan: variantId => ({
-      source: dirSource(variantId),
-      baselineSource: baselineFor(variantId),
-    }),
-    runnerOpts: ctx.runnerOpts,
-    batches: ctx.batches,
-    warmupBatch: ctx.warmupBatch,
-    useWorker: ctx.useWorker,
-  };
+  return (variantId: string) => ({
+    source: dirSource(variantId),
+    baselineSource: baselineFor(variantId),
+  });
 }
 
 /** Measure the harness noise floor for one variant/case (current vs current).
@@ -119,24 +106,13 @@ export async function runMatrixCalibration<T>(
   });
 }
 
-/** Create context for directory-based matrix execution */
+/** Resolve cases, runner options, and batching for a calibration benchmark. */
 async function createDirContext<T>(
   matrix: BenchMatrix<T>,
   options: RunMatrixOptions,
-): Promise<DirMatrixContext<T>> {
-  const baselineIds = matrix.baselineDir
-    ? await discoverVariants(matrix.baselineDir)
-    : [];
-  const { casesModule, caseIds } = await resolveCases(matrix, options);
+): Promise<DirMatrixContext> {
+  const { caseIds } = await resolveCases(matrix, options);
   const runnerOpts = buildRunnerOptions(options);
   const { batches = 1, warmupBatch = false, useWorker = true } = options;
-  return {
-    casesModule,
-    baselineIds,
-    caseIds,
-    runnerOpts,
-    batches,
-    warmupBatch,
-    useWorker,
-  };
+  return { caseIds, runnerOpts, batches, warmupBatch, useWorker };
 }

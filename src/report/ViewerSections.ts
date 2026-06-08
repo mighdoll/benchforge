@@ -11,10 +11,9 @@ import {
   type DifferenceCI,
   flipCI,
   isBootstrappable,
+  prepareBlocks,
   type StatKind,
-  splitByOffsets,
   trimOutlierBatches,
-  tukeyKeep,
 } from "../stats/StatisticalUtils.ts";
 import type {
   BootstrapCIData,
@@ -185,9 +184,17 @@ function effectiveBatchCount(
 ): number {
   const offsets = m?.batchOffsets;
   if (!m || !offsets || offsets.length < 2) return offsets?.length ?? 0;
-  if (noTrim) return offsets.length;
-  const means = splitByOffsets(m.samples, offsets).map(average);
-  return tukeyKeep(means).length;
+  return keptBatchCount(m, noTrim);
+}
+
+/** @return distinct batches the bootstrap keeps after Tukey trimming (all when
+ *  noTrim). Assumes batch structure exists (2+ offsets). */
+export function keptBatchCount(
+  m: MeasuredResults,
+  noTrim: boolean | undefined,
+): number {
+  return prepareBlocks(m.samples, m.batchOffsets!, average, noTrim).keptSplits
+    .length;
 }
 
 function batchCount(m?: MeasuredResults): number {

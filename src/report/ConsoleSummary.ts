@@ -19,6 +19,11 @@ export function consoleSummary(data: ReportData): string {
   return data.groups.flatMap(groupLines).join("\n");
 }
 
+/** @return the group's primary (verdict-driving) metric row, if any. */
+export function primaryMetricRow(group: BenchmarkGroup): ViewerRow | undefined {
+  return group.sections?.flatMap(s => s.rows).find(r => r.primary);
+}
+
 /** @return a label that names the benchmark without repeating segments. The
  *  group name (matrix name, or "matrix / case") prefixes the benchmark name,
  *  unless a segment already is that name (avoids "X / X"). */
@@ -31,7 +36,7 @@ export function benchLabel(name: string, groupName: string): string {
 /** Each comparison track's headline (+ verdict) for one group; no group header.
  *  Baseline tracks are skipped -- the verdict lines already read "vs baseline". */
 function groupLines(group: BenchmarkGroup): string[] {
-  const metric = group.sections?.flatMap(s => s.rows).find(r => r.primary);
+  const metric = primaryMetricRow(group);
   if (!metric) return [];
   return metric.entries
     .filter(e => !e.isBaseline)

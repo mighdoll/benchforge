@@ -7,6 +7,7 @@ import type { BenchmarkFunction, BenchmarkSpec } from "./BenchmarkSpec.ts";
 import type { BenchRunner, RunnerOptions } from "./BenchRunner.ts";
 import type { MeasuredResults } from "./MeasuredResults.ts";
 import {
+  evalFn,
   importBenchFn,
   resolveVariantFn,
   type VariantSource,
@@ -99,7 +100,10 @@ async function resolveBenchmarkFn(
     const { modulePath, exportName, setupExportName, params } = message;
     return importBenchFn(modulePath, exportName, setupExportName, params);
   }
-  return { fn: reconstructFunction(message.fnCode!), params: message.params };
+  return {
+    fn: evalFn(message.fnCode!) as BenchmarkFunction,
+    params: message.params,
+  };
 }
 
 /** The matrix variant source carried by a run message, if any (dir or inline). */
@@ -113,16 +117,6 @@ function variantSource(message: RunMessage): VariantSource | undefined {
       variantId: variantId ?? "",
     };
   return undefined;
-}
-
-/** Eval serialized function body back into a callable */
-function reconstructFunction(fnCode: string): BenchmarkFunction {
-  // biome-ignore lint/security/noGlobalEval: Necessary for worker process isolation, code is from trusted source
-  const fn = eval(`(${fnCode})`); // eslint-disable-line no-eval
-  if (typeof fn !== "function") {
-    throw new Error("Reconstructed code is not a function");
-  }
-  return fn;
 }
 
 /** Run benchmark with optional heap, time, and coverage profiling */

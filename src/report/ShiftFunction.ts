@@ -25,6 +25,7 @@ import {
   annotateCI,
   formatBootstrapCI,
   hasLowBatchCount,
+  keptBatchCount,
 } from "./ViewerSections.ts";
 
 interface PointArgs {
@@ -295,8 +296,7 @@ function effectiveBatches(
   m: MeasuredResults,
   noTrim: boolean | undefined,
 ): number {
-  const { samples, batchOffsets } = m;
+  const { batchOffsets } = m;
   if (!batchOffsets || batchOffsets.length < 2) return 1;
-  return prepareBlocks(samples, batchOffsets, average, noTrim).keptSplits
-    .length;
+  return keptBatchCount(m, noTrim);
 }
