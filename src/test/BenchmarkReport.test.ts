@@ -21,7 +21,9 @@ test("produces a comparison CI and verdict for a baseline", () => {
     },
   ];
   const data = prepareHtmlData(groups, { sections: [timeSection] });
-  const metric = data.groups[0].sections?.flatMap(s => s.rows).find(r => r.primary);
+  const metric = data.groups[0].sections
+    ?.flatMap(s => s.rows)
+    .find(r => r.primary);
   const comparison = metric?.entries.find(e => e.comparisonCI);
   expect(comparison?.comparisonCI).toBeDefined();
   expect(consoleSummary(data)).toContain("vs baseline");
@@ -46,18 +48,26 @@ test("baselineVariant mode consolidates variants into one track-columned row", (
     },
   ];
   const data = prepareHtmlData(groups, { sections: [timeSection] });
-  const metric = data.groups[0].sections!
-    .flatMap(s => s.rows)
+  const metric = data.groups[0]
+    .sections!.flatMap(s => s.rows)
     .find(r => r.primary)!;
 
   // one cell per track, the baseline variant flagged in place (report order)
-  expect(metric.entries.map(e => e.runName)).toEqual(["slice", "spread", "from"]);
+  expect(metric.entries.map(e => e.runName)).toEqual([
+    "slice",
+    "spread",
+    "from",
+  ]);
   const spread = metric.entries.find(e => e.runName === "spread")!;
   expect(spread.isBaseline).toBe(true);
   expect(spread.comparisonCI).toBeUndefined();
   // comparison variants each carry their own Δ% vs the shared baseline
-  expect(metric.entries.find(e => e.runName === "slice")!.comparisonCI).toBeDefined();
-  expect(metric.entries.find(e => e.runName === "from")!.comparisonCI).toBeDefined();
+  expect(
+    metric.entries.find(e => e.runName === "slice")!.comparisonCI,
+  ).toBeDefined();
+  expect(
+    metric.entries.find(e => e.runName === "from")!.comparisonCI,
+  ).toBeDefined();
 });
 
 test("report uses custom sections when provided", () => {

@@ -230,39 +230,6 @@ function drawViolin(
   svg.appendChild(group);
 }
 
-/** SVG path for a smoothed violin mirrored around cx (width encodes density). */
-function violinPath(
-  point: ShiftPercentile,
-  cx: number,
-  halfMax: number,
-  maxCount: number,
-  yScale: Scale,
-): string {
-  const sorted = [...point.diff.histogram!].sort((a, b) => a.x - b.x);
-  // light smoothing (small sigma) rounds jagged bins without merging modes,
-  // since violin width here encodes uncertainty
-  const smoothed = gaussianSmooth(sorted, 0.8);
-  const widthOf = (count: number) => (count / maxCount) * halfMax;
-  const rightEdge = smoothed.map(
-    b => `${cx + widthOf(b.count)},${yScale(b.x)}`,
-  );
-  const leftEdge = smoothed
-    .slice()
-    .reverse()
-    .map(b => `${cx - widthOf(b.count)},${yScale(b.x)}`);
-  return `M${rightEdge.join("L")}L${leftEdge.join("L")}Z`;
-}
-
-/** Native hover tooltip: verdict word + diff for a reliable percentile, or the
- *  tail-sample count when there is too little data to trust it. */
-function violinTitle(point: ShiftPercentile): SVGTitleElement {
-  const node = document.createElementNS(svgNS, "title");
-  node.textContent = point.reliable
-    ? `${point.label} - ${verdictWord(point.diff.direction)} - ${formatPct(point.diff.percent)}`
-    : `${point.label} - insufficient data (n=${point.tailCount})`;
-  return node;
-}
-
 /** Point-estimate marker: hollow circle, grey when unreliable. */
 function drawMarker(
   svg: SVGSVGElement,
@@ -354,6 +321,39 @@ function niceStep(raw: number): number {
   if (mantissa < 3) return 2 * mag;
   if (mantissa < 7) return 5 * mag;
   return 10 * mag;
+}
+
+/** SVG path for a smoothed violin mirrored around cx (width encodes density). */
+function violinPath(
+  point: ShiftPercentile,
+  cx: number,
+  halfMax: number,
+  maxCount: number,
+  yScale: Scale,
+): string {
+  const sorted = [...point.diff.histogram!].sort((a, b) => a.x - b.x);
+  // light smoothing (small sigma) rounds jagged bins without merging modes,
+  // since violin width here encodes uncertainty
+  const smoothed = gaussianSmooth(sorted, 0.8);
+  const widthOf = (count: number) => (count / maxCount) * halfMax;
+  const rightEdge = smoothed.map(
+    b => `${cx + widthOf(b.count)},${yScale(b.x)}`,
+  );
+  const leftEdge = smoothed
+    .slice()
+    .reverse()
+    .map(b => `${cx - widthOf(b.count)},${yScale(b.x)}`);
+  return `M${rightEdge.join("L")}L${leftEdge.join("L")}Z`;
+}
+
+/** Native hover tooltip: verdict word + diff for a reliable percentile, or the
+ *  tail-sample count when there is too little data to trust it. */
+function violinTitle(point: ShiftPercentile): SVGTitleElement {
+  const node = document.createElementNS(svgNS, "title");
+  node.textContent = point.reliable
+    ? `${point.label} - ${verdictWord(point.diff.direction)} - ${formatPct(point.diff.percent)}`
+    : `${point.label} - insufficient data (n=${point.tailCount})`;
+  return node;
 }
 
 /** Label color: dark for the primary mean, mid-grey when reliable, weak otherwise. */

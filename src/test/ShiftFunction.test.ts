@@ -43,6 +43,15 @@ function batched(
   return { name: "x", samples, batchOffsets } as MeasuredResults;
 }
 
+/** Build batched samples where the last batch is a slow outlier (so trimming
+ *  by per-batch mean drops it). */
+function withSlowBatch(batches: number, perBatch: number): MeasuredResults {
+  const m = batched(batches, perBatch);
+  const lastStart = (batches - 1) * perBatch;
+  for (let i = lastStart; i < m.samples.length; i++) m.samples[i] += 100;
+  return m;
+}
+
 test("returns undefined without a baseline", () => {
   const sf = buildShiftFunction(
     timeMetric,
@@ -152,13 +161,23 @@ test("each point carries current and baseline absolute distributions", () => {
 
 test("baseline run shows its name, suffixed (baseline) when not already", () => {
   const named = buildShiftFunction(
-    timeMetric, batched(30, 50, 0.1), batched(30, 50), {}, {}, fast,
+    timeMetric,
+    batched(30, 50, 0.1),
+    batched(30, 50),
+    {},
+    {},
+    fast,
     "native sort",
   )!;
   expect(named.points[0].runs[1].runName).toBe("native sort (baseline)");
 
   const preSuffixed = buildShiftFunction(
-    timeMetric, batched(30, 50, 0.1), batched(30, 50), {}, {}, fast,
+    timeMetric,
+    batched(30, 50, 0.1),
+    batched(30, 50),
+    {},
+    {},
+    fast,
     "native sort (baseline)",
   )!;
   expect(preSuffixed.points[0].runs[1].runName).toBe("native sort (baseline)");
@@ -189,15 +208,6 @@ test("equivMargin is recorded for the plot band", () => {
   )!;
   expect(sf.equivMargin).toBe(2);
 });
-
-/** Build batched samples where the last batch is a slow outlier (so trimming
- *  by per-batch mean drops it). */
-function withSlowBatch(batches: number, perBatch: number): MeasuredResults {
-  const m = batched(batches, perBatch);
-  const lastStart = (batches - 1) * perBatch;
-  for (let i = lastStart; i < m.samples.length; i++) m.samples[i] += 100;
-  return m;
-}
 
 test("tail coverage counts only the batches the bootstrap kept", () => {
   // The upper tail's support lives in the slow outlier batch. With trimming on

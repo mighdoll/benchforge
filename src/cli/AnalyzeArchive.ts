@@ -198,19 +198,19 @@ function printTrimmedBlocks(
   printSideTrim(name, benchMeans);
 }
 
+/** Percent delta between two medians. */
+function medianDelta(samples: number[], baseSamples: number[]): number {
+  const med = median(samples);
+  const baseMed = median(baseSamples);
+  return ((med - baseMed) / baseMed) * 100;
+}
+
 /** Color a percent delta: red if >1%, green if <-1%. */
 function formatDelta(pct: number): string {
   const str = formatSignedPercent(pct);
   if (pct > 1) return red(str);
   if (pct < -1) return green(str);
   return str;
-}
-
-/** Percent delta between two medians. */
-function medianDelta(samples: number[], baseSamples: number[]): number {
-  const med = median(samples);
-  const baseMed = median(baseSamples);
-  return ((med - baseMed) / baseMed) * 100;
 }
 
 /** Print trimming info for one side using 3x IQR fences. */

@@ -20,7 +20,10 @@ function sortingMatrix(): MatrixResults {
           },
         ],
       },
-      { id: "native sort", cases: [{ caseId: "numbers", measured: measured() }] },
+      {
+        id: "native sort",
+        cases: [{ caseId: "numbers", measured: measured() }],
+      },
     ],
   };
 }

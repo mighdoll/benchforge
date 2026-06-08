@@ -257,13 +257,6 @@ function buildPointBase(
   return { diff: annotated, runs };
 }
 
-/** Label the baseline run with its real name, suffixed "(baseline)" unless the
- *  name already carries that suffix; falls back to "baseline" when unnamed. */
-function baselineLabel(name: string | undefined): string {
-  if (!name) return "baseline";
-  return name.endsWith("(baseline)") ? name : `${name} (baseline)`;
-}
-
 /** @return how many samples lie on the sparse side of the p-th percentile and
  *  how many distinct batches contribute them. The sparse side is whichever end
  *  is closer (lower tail for p<=0.5, upper tail for p>0.5); that count is what
@@ -299,4 +292,11 @@ function effectiveBatches(
   const { batchOffsets } = m;
   if (!batchOffsets || batchOffsets.length < 2) return 1;
   return keptBatchCount(m, noTrim);
+}
+
+/** Label the baseline run with its real name, suffixed "(baseline)" unless the
+ *  name already carries that suffix; falls back to "baseline" when unnamed. */
+function baselineLabel(name: string | undefined): string {
+  if (!name) return "baseline";
+  return name.endsWith("(baseline)") ? name : `${name} (baseline)`;
 }

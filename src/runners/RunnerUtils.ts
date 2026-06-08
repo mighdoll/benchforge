@@ -67,16 +67,6 @@ export async function resolveVariantFn(params: {
   return { fn, params: undefined };
 }
 
-/** A variant from a directory module, or reconstructed from inline code. */
-async function resolveVariant(source: VariantSource): Promise<Variant> {
-  if ("variantDir" in source) {
-    return loadVariant(source.variantDir, source.variantId);
-  }
-  const run = evalFn(source.runCode);
-  if (!source.setupCode) return run as Variant;
-  return { setup: evalFn(source.setupCode), run } as Variant;
-}
-
 /** Eval serialized function source back into a callable. Used for both inline
  *  matrix variants and serialized bench functions reconstructed in the worker. */
 export function evalFn(code: string): (...args: unknown[]) => unknown {
@@ -85,4 +75,14 @@ export function evalFn(code: string): (...args: unknown[]) => unknown {
   if (typeof fn !== "function")
     throw new Error("Variant code is not a function");
   return fn;
+}
+
+/** A variant from a directory module, or reconstructed from inline code. */
+async function resolveVariant(source: VariantSource): Promise<Variant> {
+  if ("variantDir" in source) {
+    return loadVariant(source.variantDir, source.variantId);
+  }
+  const run = evalFn(source.runCode);
+  if (!source.setupCode) return run as Variant;
+  return { setup: evalFn(source.setupCode), run } as Variant;
 }

@@ -33,6 +33,8 @@ export interface Spread {
   cv: number;
 }
 
+type PlacedEvent = { event: GcEvent; sampleIndex: number };
+
 /** Build a per-batch full-GC summary, or undefined when there is no per-event
  *  GC data with offsets and batch structure to analyze. */
 export function gcByBatch(r: MeasuredResults): GcByBatchSummary | undefined {
@@ -76,21 +78,11 @@ function mapToSample(offset: number, endTimes: number[]): number {
   return idx >= 0 ? idx : endTimes.length - 1;
 }
 
-type PlacedEvent = { event: GcEvent; sampleIndex: number };
-
 /** Count full GCs falling in each batch's sample range. */
 function countFullPerBatch(full: PlacedEvent[], offsets: number[]): number[] {
   const counts = new Array<number>(offsets.length).fill(0);
   for (const p of full) counts[batchOf(p.sampleIndex, offsets)]++;
   return counts;
-}
-
-/** @return the batch index whose sample range contains sampleIndex. Batches are
- *  contiguous ([offsets[b], offsets[b+1])), so the containing batch is the last
- *  one whose start is at or before sampleIndex. */
-function batchOf(sampleIndex: number, offsets: number[]): number {
-  const b = offsets.findLastIndex(start => sampleIndex >= start);
-  return b >= 0 ? b : 0;
 }
 
 /** min/max/mean/cv over values; zero-filled when empty. */
@@ -103,4 +95,12 @@ function spread(values: number[]): Spread {
     mean: average(values),
     cv: values.length > 1 ? coefficientOfVariation(values) : 0,
   };
+}
+
+/** @return the batch index whose sample range contains sampleIndex. Batches are
+ *  contiguous ([offsets[b], offsets[b+1])), so the containing batch is the last
+ *  one whose start is at or before sampleIndex. */
+function batchOf(sampleIndex: number, offsets: number[]): number {
+  const b = offsets.findLastIndex(start => sampleIndex >= start);
+  return b >= 0 ? b : 0;
 }

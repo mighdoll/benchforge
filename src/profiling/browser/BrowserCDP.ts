@@ -94,6 +94,20 @@ export async function startInstruments(
   if (opts.callCounts) await startCoverageCollection(cdp);
 }
 
+/** Stop CDP CPU sampling and return the profile. */
+async function stopTimeProfiling(cdp: CdpClient): Promise<TimeProfile> {
+  const { profile } = await cdp.send("Profiler.stop");
+  return profile as unknown as TimeProfile;
+}
+
+/** Collect precise coverage, filtering out browser-internal scripts. */
+async function collectCoverage(cdp: CdpClient): Promise<CoverageData> {
+  const { result } = await cdp.send("Profiler.takePreciseCoverage");
+  await cdp.send("Profiler.stopPreciseCoverage");
+  const scripts = (result as unknown as ScriptCoverage[]).filter(isPageScript);
+  return { scripts };
+}
+
 /** Start CDP Profiler for CPU time sampling (caller manages Profiler.enable/disable) */
 async function startTimeProfiling(
   cdp: CdpClient,
@@ -103,26 +117,12 @@ async function startTimeProfiling(
   await cdp.send("Profiler.start");
 }
 
-/** Stop CDP CPU sampling and return the profile. */
-async function stopTimeProfiling(cdp: CdpClient): Promise<TimeProfile> {
-  const { profile } = await cdp.send("Profiler.stop");
-  return profile as unknown as TimeProfile;
-}
-
 /** Start precise coverage (caller manages Profiler.enable/disable). */
 async function startCoverageCollection(cdp: CdpClient): Promise<void> {
   await cdp.send("Profiler.startPreciseCoverage", {
     callCount: true,
     detailed: true,
   });
-}
-
-/** Collect precise coverage, filtering out browser-internal scripts. */
-async function collectCoverage(cdp: CdpClient): Promise<CoverageData> {
-  const { result } = await cdp.send("Profiler.takePreciseCoverage");
-  await cdp.send("Profiler.stopPreciseCoverage");
-  const scripts = (result as unknown as ScriptCoverage[]).filter(isPageScript);
-  return { scripts };
 }
 
 /** Exclude chrome:// and devtools:// internal scripts. */

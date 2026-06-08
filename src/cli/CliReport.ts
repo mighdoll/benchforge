@@ -96,6 +96,17 @@ export function matrixToReportGroups(results: MatrixResults[]): ReportGroup[] {
   return results.flatMap(caseGroups);
 }
 
+/** Assemble report sections from CLI flags (time/gc/runs). */
+export function buildReportSections(gcStats: boolean): ReportSection[] {
+  return [timeSection, ...(gcStats ? [gcStatsSection] : []), runsSection];
+}
+
+/** Build sections from CLI feature flags (time/gc/runs). */
+function cliDefaultSections(args: DefaultCliArgs): ReportSection[] {
+  const { "gc-stats": gcStats } = args;
+  return buildReportSections(gcStats);
+}
+
 /** One ReportGroup per case in a matrix, preserving case order across variants. */
 function caseGroups(matrix: MatrixResults): ReportGroup[] {
   const order: string[] = [];
@@ -124,23 +135,6 @@ function caseGroups(matrix: MatrixResults): ReportGroup[] {
   });
 }
 
-/** @return the sibling variant id used as the shared baseline for a case, when
- *  there is exactly one (baselineVariant mode). Undefined when each variant is
- *  its own baseline (baselineDir version comparison) or there is no baseline. */
-function baselineVariantId(
-  matrix: MatrixResults,
-  caseId: string,
-): string | undefined {
-  const variantIds = new Set(matrix.variants.map(v => v.id));
-  const refs = new Set<string>();
-  for (const variant of matrix.variants) {
-    const baselineId = variant.cases.find(c => c.caseId === caseId)?.baselineId;
-    if (baselineId && baselineId !== variant.id && variantIds.has(baselineId))
-      refs.add(baselineId);
-  }
-  return refs.size === 1 ? [...refs][0] : undefined;
-}
-
 /** One variant's report for a case, carrying its own interleaved baseline. The
  *  baseline is named for the variant that produced it (the reference variant for
  *  baselineVariant, this variant's own id for a baselineDir comparison), not the
@@ -157,13 +151,19 @@ function variantReport(variantId: string, c: CaseResult): BenchmarkReport {
   return { name: variantId, measuredResults: c.measured, metadata, baseline };
 }
 
-/** Assemble report sections from CLI flags (time/gc/runs). */
-export function buildReportSections(gcStats: boolean): ReportSection[] {
-  return [timeSection, ...(gcStats ? [gcStatsSection] : []), runsSection];
-}
-
-/** Build sections from CLI feature flags (time/gc/runs). */
-function cliDefaultSections(args: DefaultCliArgs): ReportSection[] {
-  const { "gc-stats": gcStats } = args;
-  return buildReportSections(gcStats);
+/** @return the sibling variant id used as the shared baseline for a case, when
+ *  there is exactly one (baselineVariant mode). Undefined when each variant is
+ *  its own baseline (baselineDir version comparison) or there is no baseline. */
+function baselineVariantId(
+  matrix: MatrixResults,
+  caseId: string,
+): string | undefined {
+  const variantIds = new Set(matrix.variants.map(v => v.id));
+  const refs = new Set<string>();
+  for (const variant of matrix.variants) {
+    const baselineId = variant.cases.find(c => c.caseId === caseId)?.baselineId;
+    if (baselineId && baselineId !== variant.id && variantIds.has(baselineId))
+      refs.add(baselineId);
+  }
+  return refs.size === 1 ? [...refs][0] : undefined;
 }

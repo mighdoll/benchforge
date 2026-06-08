@@ -176,6 +176,16 @@ export function formatBootstrapCI(
   };
 }
 
+/** @return distinct batches the bootstrap keeps after Tukey trimming (all when
+ *  noTrim). Assumes batch structure exists (2+ offsets). */
+export function keptBatchCount(
+  m: MeasuredResults,
+  noTrim: boolean | undefined,
+): number {
+  return prepareBlocks(m.samples, m.batchOffsets!, average, noTrim).keptSplits
+    .length;
+}
+
 /** @return number of batches that survive Tukey trimming (or raw count if
  *  trimming is off / there are too few batches to split). */
 function effectiveBatchCount(
@@ -185,16 +195,6 @@ function effectiveBatchCount(
   const offsets = m?.batchOffsets;
   if (!m || !offsets || offsets.length < 2) return offsets?.length ?? 0;
   return keptBatchCount(m, noTrim);
-}
-
-/** @return distinct batches the bootstrap keeps after Tukey trimming (all when
- *  noTrim). Assumes batch structure exists (2+ offsets). */
-export function keptBatchCount(
-  m: MeasuredResults,
-  noTrim: boolean | undefined,
-): number {
-  return prepareBlocks(m.samples, m.batchOffsets!, average, noTrim).keptSplits
-    .length;
 }
 
 function batchCount(m?: MeasuredResults): number {
@@ -267,48 +267,6 @@ function metricRow(
   };
 }
 
-/** The value cell for one track: formatted metric plus its own bootstrap CI. */
-function baseEntry(
-  section: MetricSection,
-  track: CaseContext["tracks"][number],
-  boot: BootstrapResult | undefined,
-  noTrim: boolean | undefined,
-): ViewerEntry {
-  const { measured, meta } = track;
-  const offsets = measured.batchOffsets;
-  const trimmed = trimOutlierBatches(measured.samples, offsets, noTrim).samples;
-  const value = metricValue(section, measured, meta, trimmed);
-  const entry: ViewerEntry = {
-    runName: track.name,
-    value: section.formatter(value) ?? "",
-  };
-  if (track.isBaseline) entry.isBaseline = true;
-  if (boot) entry.bootstrapCI = formatBootstrapCI(section, boot, offsets, meta);
-  return entry;
-}
-
-/** Attach the diff CI and shift function comparing a track to its baseline. */
-function addComparison(
-  entry: ViewerEntry,
-  diff: DifferenceCI | undefined,
-  section: MetricSection,
-  track: CaseContext["tracks"][number],
-  ctx: CaseContext,
-): void {
-  const base = track.baseline!;
-  if (diff) entry.comparisonCI = diff;
-  const shift = buildShiftFunction(
-    section,
-    track.measured,
-    base.measured,
-    track.meta,
-    base.meta,
-    ctx.comparison,
-    base.name,
-  );
-  if (shift) entry.shiftFunction = shift;
-}
-
 /** A viewer row for one scalar row: a shared single value (non-comparable), or
  *  one cell per track with a point-ratio delta on comparison tracks. A missing
  *  comparable cell reads "n/a" so the matrix stays aligned. */
@@ -358,6 +316,26 @@ function bootstrapTrack(
   return bootstrapCIs(m.samples, m.batchOffsets, [stat], { noTrim })[0];
 }
 
+/** The value cell for one track: formatted metric plus its own bootstrap CI. */
+function baseEntry(
+  section: MetricSection,
+  track: CaseContext["tracks"][number],
+  boot: BootstrapResult | undefined,
+  noTrim: boolean | undefined,
+): ViewerEntry {
+  const { measured, meta } = track;
+  const offsets = measured.batchOffsets;
+  const trimmed = trimOutlierBatches(measured.samples, offsets, noTrim).samples;
+  const value = metricValue(section, measured, meta, trimmed);
+  const entry: ViewerEntry = {
+    runName: track.name,
+    value: section.formatter(value) ?? "",
+  };
+  if (track.isBaseline) entry.isBaseline = true;
+  if (boot) entry.bootstrapCI = formatBootstrapCI(section, boot, offsets, meta);
+  return entry;
+}
+
 /** One comparison track's difference CI: diff vs its baseline, higher-is-better
  *  flip, and low-batch annotation. */
 function trackDiffCI(
@@ -387,6 +365,28 @@ function trackDiffCI(
     noBatchTrim,
   );
   return annotateCI(adjusted, section.title, lowBatches);
+}
+
+/** Attach the diff CI and shift function comparing a track to its baseline. */
+function addComparison(
+  entry: ViewerEntry,
+  diff: DifferenceCI | undefined,
+  section: MetricSection,
+  track: CaseContext["tracks"][number],
+  ctx: CaseContext,
+): void {
+  const base = track.baseline!;
+  if (diff) entry.comparisonCI = diff;
+  const shift = buildShiftFunction(
+    section,
+    track.measured,
+    base.measured,
+    track.meta,
+    base.meta,
+    ctx.comparison,
+    base.name,
+  );
+  if (shift) entry.shiftFunction = shift;
 }
 
 /** @return a CI-less DifferenceCI for comparable scalar rows. Direction is

@@ -135,22 +135,6 @@ export function diffCIs(
   );
 }
 
-/** Block-bootstrap difference CI for one stat: mean uses per-batch means,
- *  percentiles pool the resampled batches. */
-function blockDiff(
-  a: number[],
-  aOffsets: number[],
-  b: number[],
-  bOffsets: number[],
-  stat: StatKind,
-  options: BlockDiffOptions,
-): DifferenceCI {
-  const fn = statKindToFn(stat);
-  const diffOpts = { ...options, blocksB: bOffsets };
-  if (stat === "mean") return blockDifferenceCI(a, aOffsets, b, fn, diffOpts);
-  return blockPoolDifferenceCI(a, aOffsets, b, fn, diffOpts);
-}
-
 /** @return block bootstrap CI for percentage difference between baseline (a) and current (b).
  *  Tukey-trims outlier batches, then resamples per-block statFn values. Requires 2+ blocks.
  *  Like {@link blockBootstrap}, the per-iteration readout is `mean(per-batch statFn)`,
@@ -214,25 +198,6 @@ export function classifyDirection(
   return "uncertain"; // CI straddles a margin edge -> need more data
 }
 
-/** @return values binned into histogram for compact visualization */
-function binValues(values: number[], binCount = 30): HistogramBin[] {
-  let min = values[0];
-  let max = values[0];
-  for (let i = 1; i < values.length; i++) {
-    if (values[i] < min) min = values[i];
-    if (values[i] > max) max = values[i];
-  }
-  if (min === max) return [{ x: min, count: values.length }];
-
-  const step = (max - min) / binCount;
-  const counts = new Array(binCount).fill(0);
-  for (const v of values) {
-    const bin = Math.min(Math.floor((v - min) / step), binCount - 1);
-    counts[bin]++;
-  }
-  return counts.map((count, i) => ({ x: min + (i + 0.5) * step, count }));
-}
-
 /** Build diff operations: mean/min/max first (non-destructive), then percentiles ascending.
  *  Each side (A, B) gets its own quickSelect k since sample sizes may differ. */
 function buildDiffOps(stats: StatKind[], nA: number, nB: number): DiffOp[] {
@@ -267,6 +232,41 @@ function buildDiffOps(stats: StatKind[], nA: number, nB: number): DiffOp[] {
   entries.sort((a, b) => a.order - b.order);
   for (let i = 0; i < entries.length; i++) entries[i].execIndex = i;
   return entries;
+}
+
+/** @return values binned into histogram for compact visualization */
+function binValues(values: number[], binCount = 30): HistogramBin[] {
+  let min = values[0];
+  let max = values[0];
+  for (let i = 1; i < values.length; i++) {
+    if (values[i] < min) min = values[i];
+    if (values[i] > max) max = values[i];
+  }
+  if (min === max) return [{ x: min, count: values.length }];
+
+  const step = (max - min) / binCount;
+  const counts = new Array(binCount).fill(0);
+  for (const v of values) {
+    const bin = Math.min(Math.floor((v - min) / step), binCount - 1);
+    counts[bin]++;
+  }
+  return counts.map((count, i) => ({ x: min + (i + 0.5) * step, count }));
+}
+
+/** Block-bootstrap difference CI for one stat: mean uses per-batch means,
+ *  percentiles pool the resampled batches. */
+function blockDiff(
+  a: number[],
+  aOffsets: number[],
+  b: number[],
+  bOffsets: number[],
+  stat: StatKind,
+  options: BlockDiffOptions,
+): DifferenceCI {
+  const fn = statKindToFn(stat);
+  const diffOpts = { ...options, blocksB: bOffsets };
+  if (stat === "mean") return blockDifferenceCI(a, aOffsets, b, fn, diffOpts);
+  return blockPoolDifferenceCI(a, aOffsets, b, fn, diffOpts);
 }
 
 /** Shared block difference-CI core: prepare/trim both sides, then resample the

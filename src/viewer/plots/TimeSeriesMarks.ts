@@ -59,6 +59,8 @@ type Downsample = <T>(
 
 const maxDots = 1000;
 
+const gcViolet = "#7c3aed";
+
 /** Distinct color per benchmark series, keyed by name (Observable 10 palette,
  *  shared by the dots, the legend, and the toggle pills so swatches match).
  *  Baselines are sorted last so current benchmarks take the leading colors. */
@@ -70,16 +72,6 @@ export function seriesColorMap(
     .schemeObservable10;
   const ordered = orderSeries(benchmarks, baselineNames);
   return new Map(ordered.map((name, i) => [name, scheme[i % scheme.length]]));
-}
-
-/** Current benchmarks first, baselines last (stable within each group). */
-function orderSeries(
-  benchmarks: string[],
-  baselineNames: Set<string>,
-): string[] {
-  return [...benchmarks].sort(
-    (a, b) => Number(baselineNames.has(a)) - Number(baselineNames.has(b)),
-  );
 }
 
 /** Build legend items based on which data series are present in the plot */
@@ -190,14 +182,6 @@ export function gcMark(
   );
 }
 
-const gcViolet = "#7c3aed";
-
-/** Hover text for a full-GC rule: iteration, pause duration, bytes collected. */
-function gcTooltip(gc: FlatGcEvent): string {
-  const bytes = formatBytes(gc.bytes) ?? "0B";
-  return `Full GC @ iter ${gc.sampleIndex}: ${gc.duration.toFixed(2)}ms, ${bytes} collected`;
-}
-
 /** Dashed vertical rules marking pause points across the full Y range */
 export function pauseMarks(
   pausePoints: FlatPausePoint[],
@@ -263,6 +247,16 @@ export function sampleDotMarks(
   ];
 }
 
+/** Current benchmarks first, baselines last (stable within each group). */
+function orderSeries(
+  benchmarks: string[],
+  baselineNames: Set<string>,
+): string[] {
+  return [...benchmarks].sort(
+    (a, b) => Number(baselineNames.has(a)) - Number(baselineNames.has(b)),
+  );
+}
+
 /** Legend items for benchmark names, colored to match the dots. */
 function seriesLegendItems(
   benchmarks: string[],
@@ -277,6 +271,12 @@ function seriesLegendItems(
       style: (isBase ? "hollow-dot" : "filled-dot") as LegendItem["style"],
     };
   });
+}
+
+/** Hover text for a full-GC rule: iteration, pause duration, bytes collected. */
+function gcTooltip(gc: FlatGcEvent): string {
+  const bytes = formatBytes(gc.bytes) ?? "0B";
+  return `Full GC @ iter ${gc.sampleIndex}: ${gc.duration.toFixed(2)}ms, ${bytes} collected`;
 }
 
 /** Split samples into warmup/baseline/measured/rejected and downsample each */

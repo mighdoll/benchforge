@@ -50,28 +50,6 @@ export async function runMatrixWithDir<T>(
   return runMatrixPlan(matrix.name, plan);
 }
 
-/** Per-variant source resolver for a directory matrix: load each variant from
- *  the directory by id, with its interleaved baseline from baselineDir (same id,
- *  baseline directory) or baselineVariant (the named reference variant from the
- *  same directory). */
-function dirPlan<T>(matrix: BenchMatrix<T>, baselineIds: string[]) {
-  const dirSource = (id: string) => ({
-    variantDir: matrix.variantDir!,
-    variantId: id,
-  });
-  const baselineFor = (variantId: string): VariantSource | undefined => {
-    if (matrix.baselineDir && baselineIds.includes(variantId))
-      return { variantDir: matrix.baselineDir, variantId };
-    if (matrix.baselineVariant && matrix.baselineVariant !== variantId)
-      return dirSource(matrix.baselineVariant);
-    return undefined;
-  };
-  return (variantId: string) => ({
-    source: dirSource(variantId),
-    baselineSource: baselineFor(variantId),
-  });
-}
-
 /** Measure the harness noise floor for one variant/case (current vs current).
  *  Uses the first filtered variant + case so calibration runs a single
  *  representative benchmark rather than the whole matrix. */
@@ -103,6 +81,28 @@ export async function runMatrixCalibration<T>(
     runs: options.calibrateRuns ?? 15,
     warmupBatch: ctx.warmupBatch,
     onRun: onRun ? p => onRun(p, label) : undefined,
+  });
+}
+
+/** Per-variant source resolver for a directory matrix: load each variant from
+ *  the directory by id, with its interleaved baseline from baselineDir (same id,
+ *  baseline directory) or baselineVariant (the named reference variant from the
+ *  same directory). */
+function dirPlan<T>(matrix: BenchMatrix<T>, baselineIds: string[]) {
+  const dirSource = (id: string) => ({
+    variantDir: matrix.variantDir!,
+    variantId: id,
+  });
+  const baselineFor = (variantId: string): VariantSource | undefined => {
+    if (matrix.baselineDir && baselineIds.includes(variantId))
+      return { variantDir: matrix.baselineDir, variantId };
+    if (matrix.baselineVariant && matrix.baselineVariant !== variantId)
+      return dirSource(matrix.baselineVariant);
+    return undefined;
+  };
+  return (variantId: string) => ({
+    source: dirSource(variantId),
+    baselineSource: baselineFor(variantId),
   });
 }
 

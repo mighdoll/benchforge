@@ -83,22 +83,35 @@ export async function dispatchCli(): Promise<void> {
   throw new Error("Provide a benchmark file or --url for browser mode.");
 }
 
-/** Require a file argument for a subcommand, exiting with usage on missing. */
-function requireFile(filePath: string | undefined, subcommand: string): string {
-  if (filePath) return filePath;
-  console.error(`Usage: benchforge ${subcommand} <file.benchforge>`);
-  process.exit(1);
-}
-
-/** Import a file and run it as a benchmark based on what it exports. */
-async function runFileBench(
-  filePath: string,
+/** Run every matrix in a suite, applying default cases/variants or --filter.
+ *  A filter that matches no case/variant in a given matrix skips that matrix
+ *  (so a variant filter can target one matrix in a multi-matrix suite); it is
+ *  only an error when the filter matches nothing across the whole suite. */
+export async function runFilteredMatrices(
+  suite: MatrixSuite,
   args: DefaultCliArgs,
-): Promise<void> {
-  const result = await resolveFileResult(filePath);
-  if (!result) return;
-  if (args.list) return listMatrixSuite(result.suite);
-  await runMatrixPipeline(result, args);
+): Promise<MatrixResults[]> {
+  validateArgs(args);
+  const filter = args.filter ? parseMatrixFilter(args.filter) : undefined;
+  const options = cliToMatrixOptions(args);
+
+  const results: MatrixResults[] = [];
+  let lastFilterError: Error | undefined;
+  for (const matrix of suite.matrices) {
+    let filtered: FilteredMatrix<any>;
+    try {
+      filtered = await applyMatrixFilters(matrix, args.all, filter);
+    } catch (err) {
+      if (suite.matrices.length === 1) throw err;
+      lastFilterError = err as Error;
+      continue;
+    }
+    const { filteredCases, filteredVariants } = filtered;
+    const runOpts = { ...options, filteredCases, filteredVariants };
+    results.push(await runMatrix(filtered, runOpts));
+  }
+  if (!results.length && lastFilterError) throw lastFilterError;
+  return results;
 }
 
 /** Print available cases and variants in a matrix suite. */
@@ -143,24 +156,40 @@ async function runMatrixPipeline(
   });
 }
 
-/** Load a benchmark file and shape its default export into a BuildResult. A
- *  default-exported function becomes a one-variant matrix; a MatrixSuite (has
- *  `matrices`) is used directly. */
-async function resolveFileResult(
-  filePath: string,
-): Promise<BuildResult | undefined> {
-  const fileUrl = pathToFileURL(resolve(filePath)).href;
-  const { default: candidate } = await import(fileUrl);
+/** Require a file argument for a subcommand, exiting with usage on missing. */
+function requireFile(filePath: string | undefined, subcommand: string): string {
+  if (filePath) return filePath;
+  console.error(`Usage: benchforge ${subcommand} <file.benchforge>`);
+  process.exit(1);
+}
 
-  if (candidate && Array.isArray(candidate.matrices)) {
-    return { suite: candidate as MatrixSuite };
+/** Import a file and run it as a benchmark based on what it exports. */
+async function runFileBench(
+  filePath: string,
+  args: DefaultCliArgs,
+): Promise<void> {
+  const result = await resolveFileResult(filePath);
+  if (!result) return;
+  if (args.list) return listMatrixSuite(result.suite);
+  await runMatrixPipeline(result, args);
+}
+
+/** --filter bypasses defaults (implies --all for the filtered dimension). */
+async function applyMatrixFilters(
+  matrix: FilteredMatrix<any>,
+  runAll: boolean,
+  filter?: MatrixFilter,
+): Promise<FilteredMatrix<any>> {
+  const mod = matrix.casesModule
+    ? await loadCasesModule(matrix.casesModule)
+    : undefined;
+  let withDefaults = matrix;
+  if (!runAll && !filter && mod) {
+    const { defaultCases: filteredCases, defaultVariants: filteredVariants } =
+      mod;
+    withDefaults = { ...matrix, filteredCases, filteredVariants };
   }
-  if (typeof candidate === "function") {
-    const name = basename(filePath).replace(/\.[^.]+$/, "");
-    const matrix: BenchMatrix = { name, variants: { [name]: candidate } };
-    return { suite: { name, matrices: [matrix] } };
-  }
-  return undefined;
+  return filter ? filterMatrix(withDefaults, filter) : withDefaults;
 }
 
 /** Calibrate: measure the noise floor on one matrix/variant/case, print summary. */
@@ -188,51 +217,22 @@ async function runMatrixCalibratePipeline(
   console.log(formatCalibration(result));
 }
 
-/** Run every matrix in a suite, applying default cases/variants or --filter.
- *  A filter that matches no case/variant in a given matrix skips that matrix
- *  (so a variant filter can target one matrix in a multi-matrix suite); it is
- *  only an error when the filter matches nothing across the whole suite. */
-export async function runFilteredMatrices(
-  suite: MatrixSuite,
-  args: DefaultCliArgs,
-): Promise<MatrixResults[]> {
-  validateArgs(args);
-  const filter = args.filter ? parseMatrixFilter(args.filter) : undefined;
-  const options = cliToMatrixOptions(args);
+/** Load a benchmark file and shape its default export into a BuildResult. A
+ *  default-exported function becomes a one-variant matrix; a MatrixSuite (has
+ *  `matrices`) is used directly. */
+async function resolveFileResult(
+  filePath: string,
+): Promise<BuildResult | undefined> {
+  const fileUrl = pathToFileURL(resolve(filePath)).href;
+  const { default: candidate } = await import(fileUrl);
 
-  const results: MatrixResults[] = [];
-  let lastFilterError: Error | undefined;
-  for (const matrix of suite.matrices) {
-    let filtered: FilteredMatrix<any>;
-    try {
-      filtered = await applyMatrixFilters(matrix, args.all, filter);
-    } catch (err) {
-      if (suite.matrices.length === 1) throw err;
-      lastFilterError = err as Error;
-      continue;
-    }
-    const { filteredCases, filteredVariants } = filtered;
-    const runOpts = { ...options, filteredCases, filteredVariants };
-    results.push(await runMatrix(filtered, runOpts));
+  if (candidate && Array.isArray(candidate.matrices)) {
+    return { suite: candidate as MatrixSuite };
   }
-  if (!results.length && lastFilterError) throw lastFilterError;
-  return results;
-}
-
-/** --filter bypasses defaults (implies --all for the filtered dimension). */
-async function applyMatrixFilters(
-  matrix: FilteredMatrix<any>,
-  runAll: boolean,
-  filter?: MatrixFilter,
-): Promise<FilteredMatrix<any>> {
-  const mod = matrix.casesModule
-    ? await loadCasesModule(matrix.casesModule)
-    : undefined;
-  let withDefaults = matrix;
-  if (!runAll && !filter && mod) {
-    const { defaultCases: filteredCases, defaultVariants: filteredVariants } =
-      mod;
-    withDefaults = { ...matrix, filteredCases, filteredVariants };
+  if (typeof candidate === "function") {
+    const name = basename(filePath).replace(/\.[^.]+$/, "");
+    const matrix: BenchMatrix = { name, variants: { [name]: candidate } };
+    return { suite: { name, matrices: [matrix] } };
   }
-  return filter ? filterMatrix(withDefaults, filter) : withDefaults;
+  return undefined;
 }

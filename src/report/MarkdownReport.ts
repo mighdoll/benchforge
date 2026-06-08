@@ -56,6 +56,12 @@ function groupMarkdown(group: BenchmarkGroup): string {
   return [`## ${group.name}`, ...body].join("\n\n");
 }
 
+/** @return the runs count from the runs row (first track), if any. */
+function findRunsValue(sections: ViewerSection[]): string | undefined {
+  const runsRow = sections.flatMap(s => s.rows).find(isRunsRow);
+  return runsRow ? entryValue(runsRow.entries[0]) : undefined;
+}
+
 /** A section's markdown: a metric section renders one shift table per comparison
  *  track (plus shared rows); a scalar section renders one track-columned table. */
 function sectionMarkdown(section: ViewerSection): string[] {
@@ -76,16 +82,6 @@ function sectionMarkdown(section: ViewerSection): string[] {
   return [...header, table, shared].filter((s): s is string => !!s);
 }
 
-/** One shift table per comparison track; labeled by track only when there are
- *  several comparisons in the case. */
-function shiftTables(primary: ViewerRow): string[] {
-  const comparisons = primary.entries.filter(e => e.shiftFunction);
-  const label = comparisons.length > 1;
-  return comparisons.map(e =>
-    shiftTable(e.shiftFunction!, label ? e.runName : undefined),
-  );
-}
-
 /** Per-variant diagnostics (warmup shape, full GC by batch), labeled with the
  *  variant name when a case has more than one. */
 function benchDiagnostics(entry: BenchmarkEntry, labeled: boolean): string[] {
@@ -96,6 +92,51 @@ function benchDiagnostics(entry: BenchmarkEntry, labeled: boolean): string[] {
   const parts = [...warmup, ...gc];
   if (!parts.length) return [];
   return labeled ? [`### ${entry.name}`, ...parts] : parts;
+}
+
+/** The runs row is the shared "runs" count, lifted to case metadata. */
+function isRunsRow(row: ViewerRow): boolean {
+  return row.label === "runs" && !!row.shared;
+}
+
+/** An entry's display value: its bootstrap estimate when present, else its
+ *  plain value. */
+function entryValue(entry?: ViewerEntry): string | undefined {
+  if (!entry) return undefined;
+  return entry.bootstrapCI?.estimateLabel ?? entry.value;
+}
+
+/** One shift table per comparison track; labeled by track only when there are
+ *  several comparisons in the case. */
+function shiftTables(primary: ViewerRow): string[] {
+  const comparisons = primary.entries.filter(e => e.shiftFunction);
+  const label = comparisons.length > 1;
+  return comparisons.map(e =>
+    shiftTable(e.shiftFunction!, label ? e.runName : undefined),
+  );
+}
+
+/** A track-columned table: one column per track, the metric label first.
+ *  Comparison cells append their Δ% when present. */
+function trackTable(rows: ViewerRow[]): string | undefined {
+  const usable = rows.filter(r => r.entries.some(e => entryValue(e)));
+  if (!usable.length) return undefined;
+  const head = ["metric", ...usable[0].entries.map(e => e.runName)];
+  const sep = head.map(() => "---");
+  const body = usable.map(
+    r => `| ${[r.label, ...r.entries.map(cell)].join(" | ")} |`,
+  );
+  return [`| ${head.join(" | ")} |`, `| ${sep.join(" | ")} |`, ...body].join(
+    "\n",
+  );
+}
+
+/** A two-column table for shared (case-constant) rows, e.g. the line count. */
+function sharedTable(rows: ViewerRow[]): string | undefined {
+  const usable = rows.filter(r => entryValue(r.entries[0]) !== undefined);
+  if (!usable.length) return undefined;
+  const body = usable.map(r => `| ${r.label} | ${entryValue(r.entries[0])} |`);
+  return ["| metric | value |", "|---|---|", ...body].join("\n");
 }
 
 /** Time-by-position table: how much each batch's early iterations run above the
@@ -135,6 +176,26 @@ function gcByBatchMarkdown(gc: GcByBatchSummary): string[] {
   return ["#### full GC by batch", [header, ...rows].join("\n")];
 }
 
+/** Per-percentile diff table: mean first, then percentiles in displayed order.
+ *  Δ% is current relative to baseline in the metric's own units; the verdict
+ *  column carries the good/bad reading (it accounts for metric direction). */
+function shiftTable(shift: ShiftFunction, label?: string): string {
+  const prefix = label ? `${label}: ` : "";
+  const title = `${prefix}${shift.metric} (Δ% vs baseline)`;
+  const header = "| stat | current | baseline | Δ% | 95% CI | verdict |";
+  const sep = "|---|---|---|---|---|---|";
+  const rows = shift.points.map(pointRow);
+  return [title, header, sep, ...rows].join("\n");
+}
+
+/** One track cell: its value, with the Δ% appended on comparison tracks. */
+function cell(e: ViewerEntry): string {
+  const v = entryValue(e) ?? "";
+  if (e.comparisonCI && !e.isBaseline)
+    return `${v} (${formatSignedPercent(e.comparisonCI.percent)})`;
+  return v;
+}
+
 function spreadCounts(s: Spread): string {
   const range = s.min === s.max ? `${s.min}` : `${s.min}..${s.max}`;
   return `${range} (mean ${s.mean.toFixed(1)})`;
@@ -146,67 +207,6 @@ function spreadTime(s: Spread): string {
 
 function spreadBytes(s: Spread): string {
   return `${formatBytes(s.min)}..${formatBytes(s.max)} (mean ${formatBytes(s.mean)}, CV ${integer(s.cv * 100)}%)`;
-}
-
-/** @return the runs count from the runs row (first track), if any. */
-function findRunsValue(sections: ViewerSection[]): string | undefined {
-  const runsRow = sections.flatMap(s => s.rows).find(isRunsRow);
-  return runsRow ? entryValue(runsRow.entries[0]) : undefined;
-}
-
-/** The runs row is the shared "runs" count, lifted to case metadata. */
-function isRunsRow(row: ViewerRow): boolean {
-  return row.label === "runs" && !!row.shared;
-}
-
-/** An entry's display value: its bootstrap estimate when present, else its
- *  plain value. */
-function entryValue(entry?: ViewerEntry): string | undefined {
-  if (!entry) return undefined;
-  return entry.bootstrapCI?.estimateLabel ?? entry.value;
-}
-
-/** A track-columned table: one column per track, the metric label first.
- *  Comparison cells append their Δ% when present. */
-function trackTable(rows: ViewerRow[]): string | undefined {
-  const usable = rows.filter(r => r.entries.some(e => entryValue(e)));
-  if (!usable.length) return undefined;
-  const head = ["metric", ...usable[0].entries.map(e => e.runName)];
-  const sep = head.map(() => "---");
-  const body = usable.map(
-    r => `| ${[r.label, ...r.entries.map(cell)].join(" | ")} |`,
-  );
-  return [`| ${head.join(" | ")} |`, `| ${sep.join(" | ")} |`, ...body].join(
-    "\n",
-  );
-}
-
-/** One track cell: its value, with the Δ% appended on comparison tracks. */
-function cell(e: ViewerEntry): string {
-  const v = entryValue(e) ?? "";
-  if (e.comparisonCI && !e.isBaseline)
-    return `${v} (${formatSignedPercent(e.comparisonCI.percent)})`;
-  return v;
-}
-
-/** A two-column table for shared (case-constant) rows, e.g. the line count. */
-function sharedTable(rows: ViewerRow[]): string | undefined {
-  const usable = rows.filter(r => entryValue(r.entries[0]) !== undefined);
-  if (!usable.length) return undefined;
-  const body = usable.map(r => `| ${r.label} | ${entryValue(r.entries[0])} |`);
-  return ["| metric | value |", "|---|---|", ...body].join("\n");
-}
-
-/** Per-percentile diff table: mean first, then percentiles in displayed order.
- *  Δ% is current relative to baseline in the metric's own units; the verdict
- *  column carries the good/bad reading (it accounts for metric direction). */
-function shiftTable(shift: ShiftFunction, label?: string): string {
-  const prefix = label ? `${label}: ` : "";
-  const title = `${prefix}${shift.metric} (Δ% vs baseline)`;
-  const header = "| stat | current | baseline | Δ% | 95% CI | verdict |";
-  const sep = "|---|---|---|---|---|---|";
-  const rows = shift.points.map(pointRow);
-  return [title, header, sep, ...rows].join("\n");
 }
 
 /** One shift point as a table row. runs[0] is current, runs[1] is baseline. */
