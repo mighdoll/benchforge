@@ -16,7 +16,7 @@ import {
   defaultArchiveName,
   fetchSource,
 } from "../export/ArchiveExport.ts";
-import { archiveSchemaVersion } from "../export/ArchiveFormat.ts";
+import { archiveSchemaError } from "../export/ArchiveFormat.ts";
 import type { LineCoverage } from "../export/CoverageExport.ts";
 import type { SpeedscopeFile } from "../export/SpeedscopeTypes.ts";
 import type { ReportData } from "../viewer/ReportData.ts";
@@ -72,17 +72,12 @@ export async function startViewerServer(
 
 /** Open a .benchforge archive in the viewer. */
 export async function viewArchive(filePath: string): Promise<void> {
-  const absPath = resolve(filePath);
-  const content = await readFile(absPath, "utf-8");
+  const content = await readFile(resolve(filePath), "utf-8");
   const raw = JSON.parse(content);
 
-  const schema = raw.schema ?? 0;
-  if (schema !== archiveSchemaVersion) {
-    const rel = schema > archiveSchemaVersion ? "newer than" : "older than";
-    console.error(
-      `Archive schema version ${schema} is ${rel} supported (${archiveSchemaVersion}). ` +
-        "Regenerate the .benchforge archive with this version of benchforge.",
-    );
+  const schemaError = archiveSchemaError(raw.schema ?? 0);
+  if (schemaError) {
+    console.error(schemaError);
     process.exit(1);
   }
 

@@ -9,7 +9,7 @@ import {
   prepareBenchmarks,
 } from "../plots/RenderPlots.ts";
 import type { SeriesVisibility } from "../plots/SampleTimeSeries.ts";
-import { seriesColorMap } from "../plots/TimeSeriesMarks.ts";
+import { defaultSeriesColor, seriesColorMap } from "../plots/TimeSeriesMarks.ts";
 import { reportData, samplesLoaded } from "../State.ts";
 import { useLazyPlot } from "./LazyPlot.ts";
 
@@ -167,7 +167,7 @@ function benchmarkPills(
   const colors = seriesColorMap(benchmarks.map(b => b.name), baselineNames);
   return benchmarks.map(b => ({
     name: b.name,
-    color: colors.get(b.name) ?? "#4682b4",
+    color: colors.get(b.name) ?? defaultSeriesColor,
     active: !hidden.has(b.name),
   }));
 }

@@ -139,21 +139,14 @@ async function runMatrixPipeline(
   if (args.calibrate) return runMatrixCalibratePipeline(m.suite, args);
   const results = await runFilteredMatrices(m.suite, args);
   const groups = matrixToReportGroups(results);
+  const { sections, currentVersion, baselineVersion } = m;
+  const reportMeta = { sections, currentVersion, baselineVersion };
   const reportData = withStatus("computing report", () =>
-    defaultReportData(groups, args, {
-      sections: m.sections,
-      currentVersion: m.currentVersion,
-      baselineVersion: m.baselineVersion,
-    }),
+    defaultReportData(groups, args, reportMeta),
   );
   const tally = reportMatrixResults(reportData);
   console.log([consoleSummary(reportData), tally].filter(Boolean).join("\n\n"));
-  await finishReports(groups, args, {
-    sections: m.sections,
-    currentVersion: m.currentVersion,
-    baselineVersion: m.baselineVersion,
-    reportData,
-  });
+  await finishReports(groups, args, { ...reportMeta, reportData });
 }
 
 /** Require a file argument for a subcommand, exiting with usage on missing. */

@@ -330,11 +330,15 @@ export function standardDeviation(samples: number[]): number {
   return Math.sqrt(variance);
 }
 
+/** @return 0-based index of percentile p (0-1) in an n-element sorted array. */
+export function percentileIndex(n: number, p: number): number {
+  return Math.max(0, Math.ceil(n * p) - 1);
+}
+
 /** @return value at percentile p (0-1), using O(N) quickselect */
 export function percentile(values: number[], p: number): number {
   const copy = values.slice();
-  const k = Math.max(0, Math.ceil(copy.length * p) - 1);
-  return quickSelect(copy, k);
+  return quickSelect(copy, percentileIndex(copy.length, p));
 }
 
 /** Hoare's selection: O(N) average k-th smallest element. Mutates arr. */
@@ -489,7 +493,7 @@ function buildStatOps(stats: StatKind[], n: number): StatOp[] {
     if (s === "min") return nonDestructive(-2, i, minOf);
     if (s === "max") return nonDestructive(-1, i, maxOf);
     const p = s.percentile;
-    const k = Math.max(0, Math.ceil(n * p) - 1);
+    const k = percentileIndex(n, p);
     return {
       order: p,
       origIndex: i,

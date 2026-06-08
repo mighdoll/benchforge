@@ -1,4 +1,4 @@
-import type { GcEvent, GcStats } from "./GcStats.ts";
+import { type GcEvent, type GcStats, shiftGcOffset } from "./GcStats.ts";
 import type { MeasuredResults } from "./MeasuredResults.ts";
 import { computeStats } from "./SampleStats.ts";
 
@@ -177,9 +177,7 @@ function mergeTimelines(batches: MeasuredResults[]): MergedTimelines {
         durationMs: p.durationMs,
       });
     for (const e of r.gcEvents ?? [])
-      mergedGcEvents.push(
-        e.offset === undefined ? e : { ...e, offset: e.offset + prefixTime },
-      );
+      mergedGcEvents.push(shiftGcOffset(e, prefixTime));
     offset += r.samples.length;
     prefixTime += r.samples.reduce((sum, s) => sum + s, 0);
   }

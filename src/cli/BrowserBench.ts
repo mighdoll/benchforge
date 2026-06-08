@@ -54,18 +54,31 @@ export async function browserBenchExports(args: DefaultCliArgs): Promise<void> {
     !!baselineUrl ||
     (args.iterations ?? 0) > 1 ||
     params.pageLoad;
-  if (!needsBatching) {
-    const result = await profileBrowser(params);
-    const results = browserResultGroups(name, result);
+  const { raw, results } = await collectBrowserResults(
+    needsBatching,
+    params,
+    name,
+    args,
+  );
 
-    const reportData = printBrowserReport(result, results, args);
-    await exportReports({ results, args, reportData });
-    return;
-  }
-
-  const { lastRaw, results } = await runBrowserBatches(params, name, args);
-  const reportData = printBrowserReport(lastRaw, results, args);
+  const reportData = printBrowserReport(raw, results, args);
   await exportReports({ results, args, reportData });
+}
+
+/** Profile the browser once or in batches, returning the last raw result plus
+ *  the report groups for the standard export pipeline. */
+async function collectBrowserResults(
+  needsBatching: boolean,
+  params: ReturnType<typeof buildBrowserParams>,
+  name: string,
+  args: DefaultCliArgs,
+): Promise<{ raw: BrowserProfileResult; results: ReportGroup[] }> {
+  if (needsBatching) {
+    const { lastRaw, results } = await runBrowserBatches(params, name, args);
+    return { raw: lastRaw, results };
+  }
+  const raw = await profileBrowser(params);
+  return { raw, results: browserResultGroups(name, raw) };
 }
 
 /** Warn about Node-only flags ignored in browser mode. */

@@ -1,6 +1,7 @@
+import { formatSignedPercent } from "../../report/Formatters.ts";
 import { verdictWord } from "../../report/Verdict.ts";
 import type { ShiftFunction, ShiftPercentile } from "../ReportData.ts";
-import { directionColors, formatPct, gaussianSmooth } from "./PlotTypes.ts";
+import { directionColors, gaussianSmooth } from "./PlotTypes.ts";
 import {
   createSvg,
   ensureHatchPattern,
@@ -181,7 +182,13 @@ function drawYAxis(
     );
     const decimals = tick % 1 ? 1 : 0;
     svg.appendChild(
-      text(margin.left - 7, y + 3.5, formatPct(tick, decimals), "end", "10"),
+      text(
+        margin.left - 7,
+        y + 3.5,
+        formatSignedPercent(tick, decimals),
+        "end",
+        "10",
+      ),
     );
   }
 }
@@ -275,7 +282,7 @@ function drawPercentileLabel(
       text(
         cx,
         height - margin.bottom + 29,
-        formatPct(point.diff.percent),
+        formatSignedPercent(point.diff.percent),
         "middle",
         "11",
         directionColors[point.diff.direction].stroke,
@@ -351,7 +358,7 @@ function violinPath(
 function violinTitle(point: ShiftPercentile): SVGTitleElement {
   const node = document.createElementNS(svgNS, "title");
   node.textContent = point.reliable
-    ? `${point.label} - ${verdictWord(point.diff.direction)} - ${formatPct(point.diff.percent)}`
+    ? `${point.label} - ${verdictWord(point.diff.direction)} - ${formatSignedPercent(point.diff.percent)}`
     : `${point.label} - insufficient data (n=${point.tailCount})`;
   return node;
 }

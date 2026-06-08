@@ -1,5 +1,5 @@
 import {
-  archiveSchemaVersion,
+  archiveSchemaError,
   type BenchforgeArchive,
 } from "../export/ArchiveFormat.ts";
 import type { LineCoverage } from "../export/CoverageExport.ts";
@@ -56,6 +56,7 @@ export class ServerProvider implements DataProvider {
     string,
     Promise<ViewerSpeedscopeFile | null>
   >();
+  private coverageCache?: Promise<ViewerCoverageData | null>;
 
   readonly config: ViewerConfig;
   constructor(config: ViewerConfig) {
@@ -94,8 +95,6 @@ export class ServerProvider implements DataProvider {
     return cached;
   }
 
-  private coverageCache?: Promise<ViewerCoverageData | null>;
-
   fetchCoverageData(): Promise<ViewerCoverageData | null> {
     if (!this.config.hasCoverage) return Promise.resolve(null);
     this.coverageCache ??= fetch("/api/coverage").then(r =>
@@ -127,12 +126,10 @@ export class ArchiveProvider implements DataProvider {
   private archive: ArchiveData;
 
   constructor(archive: ArchiveData | Record<string, unknown>) {
-    const schema = (archive as { schema?: number }).schema ?? 0;
-    if (schema !== archiveSchemaVersion)
-      throw new Error(
-        `Unsupported archive schema ${schema} (expected ${archiveSchemaVersion}). ` +
-          "Regenerate the .benchforge archive.",
-      );
+    const schemaError = archiveSchemaError(
+      (archive as { schema?: number }).schema ?? 0,
+    );
+    if (schemaError) throw new Error(schemaError);
     this.archive = archive as ArchiveData;
     this.config = {
       editorUri: null,

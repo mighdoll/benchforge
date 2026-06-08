@@ -8,6 +8,7 @@ import type {
   ViewerRow,
   ViewerSection,
 } from "../viewer/ReportData.ts";
+import { entryValue } from "./ConsoleSummary.ts";
 import {
   formatBytes,
   formatSignedPercent,
@@ -97,13 +98,6 @@ function benchDiagnostics(entry: BenchmarkEntry, labeled: boolean): string[] {
 /** The runs row is the shared "runs" count, lifted to case metadata. */
 function isRunsRow(row: ViewerRow): boolean {
   return row.label === "runs" && !!row.shared;
-}
-
-/** An entry's display value: its bootstrap estimate when present, else its
- *  plain value. */
-function entryValue(entry?: ViewerEntry): string | undefined {
-  if (!entry) return undefined;
-  return entry.bootstrapCI?.estimateLabel ?? entry.value;
 }
 
 /** One shift table per comparison track; labeled by track only when there are
@@ -196,15 +190,18 @@ function cell(e: ViewerEntry): string {
   return v;
 }
 
+/** A count spread as "min..max (mean N)". */
 function spreadCounts(s: Spread): string {
   const range = s.min === s.max ? `${s.min}` : `${s.min}..${s.max}`;
   return `${range} (mean ${s.mean.toFixed(1)})`;
 }
 
+/** A time spread as "min..max (mean, CV%)". */
 function spreadTime(s: Spread): string {
   return `${timeMs(s.min)}..${timeMs(s.max)} (mean ${timeMs(s.mean)}, CV ${integer(s.cv * 100)}%)`;
 }
 
+/** A byte spread as "min..max (mean, CV%)". */
 function spreadBytes(s: Spread): string {
   return `${formatBytes(s.min)}..${formatBytes(s.max)} (mean ${formatBytes(s.mean)}, CV ${integer(s.cv * 100)}%)`;
 }
@@ -214,7 +211,7 @@ function pointRow(point: ShiftPercentile): string {
   const { diff, runs, label, reliable, tailCount } = point;
   const cur = runs[0]?.bootstrapCI.estimateLabel ?? "";
   const base = runs[1]?.bootstrapCI.estimateLabel ?? "";
-  const [lo, hi] = diff.ci.map(formatSignedPercent);
+  const [lo, hi] = diff.ci.map(v => formatSignedPercent(v));
   const word = verdictWord(diff.direction);
   const verdict = reliable ? word : `${word} (unreliable, n=${tailCount})`;
   return `| ${label} | ${cur} | ${base} | ${formatSignedPercent(diff.percent)} | [${lo}, ${hi}] | ${verdict} |`;

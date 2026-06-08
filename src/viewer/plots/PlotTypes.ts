@@ -76,12 +76,6 @@ export const directionColors: Record<
   equivalent: { fill: "#dbeafe", stroke: "#3b82f6" },
 };
 
-/** Format a number as a signed percentage string (e.g. "+1.2%", "-3.4%") */
-export function formatPct(v: number, precision = 1): string {
-  const sign = v >= 0 ? "+" : "";
-  return `${sign}${v.toFixed(precision)}%`;
-}
-
 /** Gaussian kernel smoothing over histogram bins (sigma in bin units). */
 export function gaussianSmooth(
   bins: HistogramBin[],

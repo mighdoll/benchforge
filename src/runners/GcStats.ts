@@ -33,6 +33,13 @@ export interface GcEvent {
   survived?: number;
 }
 
+/** Shift a GC event's loop-relative offset by `delta` ms. Events without an
+ *  offset (browser CDP events) pass through unchanged. */
+export function shiftGcOffset(event: GcEvent, delta: number): GcEvent {
+  if (event.offset === undefined) return event;
+  return { ...event, offset: event.offset + delta };
+}
+
 /** Parse a single --trace-gc-nvp stderr line into a GcEvent. */
 export function parseGcLine(line: string): GcEvent | undefined {
   if (!line.includes("pause=")) return undefined;

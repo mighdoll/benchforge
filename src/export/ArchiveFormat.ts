@@ -36,3 +36,14 @@ export interface ArchiveMetadata {
 }
 
 export const archiveSchemaVersion = 3;
+
+/** Validate an archive's schema field against the supported version.
+ *  @return an explanatory error message, or undefined when the schema matches. */
+export function archiveSchemaError(schema: number): string | undefined {
+  if (schema === archiveSchemaVersion) return undefined;
+  const rel = schema > archiveSchemaVersion ? "newer than" : "older than";
+  return (
+    `Archive schema version ${schema} is ${rel} supported (${archiveSchemaVersion}). ` +
+    "Regenerate the .benchforge archive with this version of benchforge."
+  );
+}
