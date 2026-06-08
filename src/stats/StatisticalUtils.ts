@@ -316,6 +316,17 @@ export function average(values: number[]): number {
   return sum / values.length;
 }
 
+/** Tally how often each distinct integer appears, sorted by value ascending. */
+export function integerCounts(
+  values: number[],
+): { value: number; count: number }[] {
+  const counts = new Map<number, number>();
+  for (const v of values) counts.set(v, (counts.get(v) ?? 0) + 1);
+  return [...counts]
+    .sort((a, b) => a[0] - b[0])
+    .map(([value, count]) => ({ value, count }));
+}
+
 /** @return median (50th percentile) of values */
 export function median(values: number[]): number {
   return percentile(values, 0.5);

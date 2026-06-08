@@ -11,6 +11,7 @@ import {
   blockPoolBootstrap,
   coefficientOfVariation,
   findOutliers,
+  integerCounts,
   median,
   medianAbsoluteDeviation,
   percentile,
@@ -228,4 +229,24 @@ test("diffCIs routes percentile through the pool variant", () => {
     expect(p50CI.ci[0]).toBeLessThanOrEqual(p50CI.percent);
     expect(p50CI.ci[1]).toBeGreaterThanOrEqual(p50CI.percent);
   }
+});
+
+test("integerCounts tallies and sorts by value ascending", () => {
+  expect(integerCounts([2, 2, 3, 2, 3])).toEqual([
+    { value: 2, count: 3 },
+    { value: 3, count: 2 },
+  ]);
+});
+
+test("integerCounts sorts numerically, not lexically", () => {
+  const hist = integerCounts([10, 2, 10, 2, 2]);
+  expect(hist.map(b => b.value)).toEqual([2, 10]);
+});
+
+test("integerCounts on a single plateau yields one bucket", () => {
+  expect(integerCounts([2, 2, 2, 2])).toEqual([{ value: 2, count: 4 }]);
+});
+
+test("integerCounts on empty input yields empty", () => {
+  expect(integerCounts([])).toEqual([]);
 });

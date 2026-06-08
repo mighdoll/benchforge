@@ -3,7 +3,11 @@ import {
   type CalibrationSummary,
   summarizeCalibration,
 } from "../stats/CalibrationSummary.ts";
-import { average, type StatKind } from "../stats/StatisticalUtils.ts";
+import {
+  average,
+  integerCounts,
+  type StatKind,
+} from "../stats/StatisticalUtils.ts";
 import type { MeasuredResults } from "./MeasuredResults.ts";
 import { runBatched } from "./MergeBatches.ts";
 
@@ -43,6 +47,11 @@ export interface CalibrationResult {
    *  timing variance: the batch mean is dominated by where the lone collection
    *  lands. Increase --duration so each batch averages over several GCs. */
   fullGcsPerBatch?: number;
+  /** Distribution of full GCs per batch, pooled across all runs and sorted by
+   *  count. A single bucket means every batch is on the same GC plateau; spread
+   *  across buckets means batches straddle a collection-count step, where the
+   *  per-batch mean jumps by a whole major GC. Undefined without --gc-stats. */
+  gcHistogram?: { value: number; count: number }[];
 }
 
 /** Measure the harness noise floor by comparing the current build against an
@@ -55,7 +64,8 @@ export async function runCalibration(
   const statKind: StatKind = params.statKind ?? "mean";
   const pointEstimates: number[] = [];
   const ciHalfWidths: number[] = [];
-  const fullGcs: number[] = [];
+  const perBatchGcs: number[] = [];
+  let runsWithGc = 0;
 
   for (let i = 0; i < runs; i++) {
     const { results, baseline } = await runBatched(
@@ -69,14 +79,18 @@ export async function runCalibration(
     const ciHalfWidth = (ci.ci[1] - ci.ci[0]) / 2;
     pointEstimates.push(point);
     ciHalfWidths.push(ciHalfWidth);
-    const fullGc = fullGcsForRun(results[0]);
-    if (fullGc !== undefined) fullGcs.push(fullGc);
+    const batchGcs = perBatchFullGcs(results[0]);
+    if (batchGcs !== undefined) {
+      perBatchGcs.push(...batchGcs);
+      runsWithGc++;
+    }
     onRun?.({ run: i + 1, runs, point, ciHalfWidth });
   }
 
   const summary = summarizeCalibration(pointEstimates, ciHalfWidths);
-  const fullGcsPerBatch =
-    fullGcs.length === runs ? average(fullGcs) / batches : undefined;
+  const haveGc = runsWithGc === runs && perBatchGcs.length > 0;
+  const fullGcsPerBatch = haveGc ? average(perBatchGcs) : undefined;
+  const gcHistogram = haveGc ? integerCounts(perBatchGcs) : undefined;
   return {
     runs,
     batches,
@@ -84,6 +98,7 @@ export async function runCalibration(
     ciHalfWidths,
     summary,
     fullGcsPerBatch,
+    gcHistogram,
   };
 }
 
@@ -101,9 +116,8 @@ function currentVsCurrentCI(
   return ci;
 }
 
-/** Full (major) GCs in one run's merged results, or undefined without gc stats. */
-function fullGcsForRun(r: MeasuredResults): number | undefined {
-  if (r.batchGcStats)
-    return r.batchGcStats.reduce((sum, g) => sum + g.markCompacts, 0);
-  return r.gcStats?.markCompacts;
+/** Per-batch full (major) GC counts for one run, or undefined without per-batch
+ *  gc stats (no --gc-stats). One entry per batch. */
+function perBatchFullGcs(r: MeasuredResults): number[] | undefined {
+  return r.batchGcStats?.map(g => g.markCompacts);
 }
