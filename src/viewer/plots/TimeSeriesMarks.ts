@@ -57,12 +57,12 @@ type Downsample = <T>(
   getY: (d: T) => number,
 ) => T[];
 
+/** Fallback swatch for a series name absent from the color map (steel blue). */
+export const defaultSeriesColor = "#4682b4";
+
 const maxDots = 1000;
 
 const gcViolet = "#7c3aed";
-
-/** Fallback swatch for a series name absent from the color map (steel blue). */
-export const defaultSeriesColor = "#4682b4";
 
 /** Distinct color per benchmark series, keyed by name (Observable 10 palette,
  *  shared by the dots, the legend, and the toggle pills so swatches match).

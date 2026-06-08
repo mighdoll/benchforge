@@ -65,22 +65,6 @@ export async function browserBenchExports(args: DefaultCliArgs): Promise<void> {
   await exportReports({ results, args, reportData });
 }
 
-/** Profile the browser once or in batches, returning the last raw result plus
- *  the report groups for the standard export pipeline. */
-async function collectBrowserResults(
-  needsBatching: boolean,
-  params: ReturnType<typeof buildBrowserParams>,
-  name: string,
-  args: DefaultCliArgs,
-): Promise<{ raw: BrowserProfileResult; results: ReportGroup[] }> {
-  if (needsBatching) {
-    const { lastRaw, results } = await runBrowserBatches(params, name, args);
-    return { raw: lastRaw, results };
-  }
-  const raw = await profileBrowser(params);
-  return { raw, results: browserResultGroups(name, raw) };
-}
-
 /** Warn about Node-only flags ignored in browser mode. */
 function warnBrowserFlags(args: DefaultCliArgs): void {
   const checks: [boolean, string][] = [
@@ -127,13 +111,20 @@ function nameFromUrl(url: string): string {
   return new URL(url).pathname.split("/").pop() || "browser";
 }
 
-/** Wrap browser profile result as ReportGroup[] for the standard export pipeline. */
-function browserResultGroups(
+/** Profile the browser once or in batches, returning the last raw result plus
+ *  the report groups for the standard export pipeline. */
+async function collectBrowserResults(
+  needsBatching: boolean,
+  params: ReturnType<typeof buildBrowserParams>,
   name: string,
-  result: BrowserProfileResult,
-): ReportGroup[] {
-  const measuredResults = toBrowserMeasured(name, result);
-  return [{ name, reports: [{ name, measuredResults }] }];
+  args: DefaultCliArgs,
+): Promise<{ raw: BrowserProfileResult; results: ReportGroup[] }> {
+  if (needsBatching) {
+    const { lastRaw, results } = await runBrowserBatches(params, name, args);
+    return { raw: lastRaw, results };
+  }
+  const raw = await profileBrowser(params);
+  return { raw, results: browserResultGroups(name, raw) };
 }
 
 /** Build the report data, print the console summary and optional heap profile
@@ -168,6 +159,12 @@ function printBrowserReport(
   return reportData;
 }
 
+/** Strip surrounding quotes from a chrome-args token. */
+function stripQuotes(s: string): string {
+  const bare = s.replace(/^(['"])(.*)\1$/s, "$2");
+  return bare.replace(/^(-[^=]+=)(['"])(.*)\2$/s, "$1$3");
+}
+
 /** Launch Chrome, run batched fresh tabs, merge results. */
 async function runBrowserBatches(
   params: ReturnType<typeof buildBrowserParams>,
@@ -189,35 +186,13 @@ async function runBrowserBatches(
   }
 }
 
-/** Strip surrounding quotes from a chrome-args token. */
-function stripQuotes(s: string): string {
-  const bare = s.replace(/^(['"])(.*)\1$/s, "$2");
-  return bare.replace(/^(-[^=]+=)(['"])(.*)\2$/s, "$1$3");
-}
-
-/** Convert a browser profile result into a MeasuredResults for the report pipeline. */
-function toBrowserMeasured(
+/** Wrap browser profile result as ReportGroup[] for the standard export pipeline. */
+function browserResultGroups(
   name: string,
   result: BrowserProfileResult,
-): MeasuredResults {
-  const { gcStats, heapProfile, timeProfile, coverage, navTiming, samples } =
-    result;
-  const navTimings = navTiming ? [navTiming] : undefined;
-  const base = {
-    name,
-    gcStats,
-    heapProfile,
-    timeProfile,
-    coverage,
-    navTimings,
-  };
-
-  if (samples?.length) {
-    const totalTime = result.wallTimeMs ? result.wallTimeMs / 1000 : undefined;
-    return { ...base, samples, time: computeStats(samples), totalTime };
-  }
-  const wallTime = result.wallTimeMs ?? 0;
-  return { ...base, samples: [wallTime], time: computeStats([wallTime]) };
+): ReportGroup[] {
+  const measuredResults = toBrowserMeasured(name, result);
+  return [{ name, reports: [{ name, measuredResults }] }];
 }
 
 /** Execute batched browser tabs within an already-launched Chrome instance. */
@@ -268,6 +243,31 @@ async function runBatchedTabs(
     lastRaw: state.lastRaw!,
     results: [{ name, reports, baseline: baselineEntry }],
   };
+}
+
+/** Convert a browser profile result into a MeasuredResults for the report pipeline. */
+function toBrowserMeasured(
+  name: string,
+  result: BrowserProfileResult,
+): MeasuredResults {
+  const { gcStats, heapProfile, timeProfile, coverage, navTiming, samples } =
+    result;
+  const navTimings = navTiming ? [navTiming] : undefined;
+  const base = {
+    name,
+    gcStats,
+    heapProfile,
+    timeProfile,
+    coverage,
+    navTimings,
+  };
+
+  if (samples?.length) {
+    const totalTime = result.wallTimeMs ? result.wallTimeMs / 1000 : undefined;
+    return { ...base, samples, time: computeStats(samples), totalTime };
+  }
+  const wallTime = result.wallTimeMs ?? 0;
+  return { ...base, samples: [wallTime], time: computeStats([wallTime]) };
 }
 
 /** Create a batch runner closure for a single URL (current or baseline). */
