@@ -1,3 +1,4 @@
+import { formatSignedPercent } from "../../report/Formatters.ts";
 import type { CIDirection, DifferenceCI } from "../../stats/StatisticalUtils.ts";
 import type {
   BootstrapCIData,
@@ -5,7 +6,6 @@ import type {
   ShiftPercentile,
 } from "../ReportData.ts";
 import type { DistributionPlotOptions } from "../plots/CIPlot.ts";
-import { formatPct } from "../plots/PlotTypes.ts";
 import { reportData, shiftDetail } from "../State.ts";
 import { useLazyPlot } from "./LazyPlot.ts";
 
@@ -71,10 +71,10 @@ export function ComparisonBadge(
   return (
     <span class="comparison-badge">
       <span class={cls}>
-        {compact ? formatPct(ci.percent) : directionLabels[ci.direction]}
+        {compact ? formatSignedPercent(ci.percent) : directionLabels[ci.direction]}
       </span>
       {ci.histogram && <CIPlotMount ci={ci} compact={compact} onOpen={onOpen} />}
-      {!compact && <span class="comparison-pct">{formatPct(ci.percent)}</span>}
+      {!compact && <span class="comparison-pct">{formatSignedPercent(ci.percent)}</span>}
     </span>
   );
 }

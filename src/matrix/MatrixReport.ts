@@ -1,5 +1,5 @@
 import colors from "../report/Colors.ts";
-import { benchLabel } from "../report/ConsoleSummary.ts";
+import { benchLabel, primaryMetricRow } from "../report/ConsoleSummary.ts";
 import type { CIDirection } from "../stats/StatisticalUtils.ts";
 import type { BenchmarkGroup, ReportData } from "../viewer/ReportData.ts";
 
@@ -22,7 +22,7 @@ export function reportMatrixResults(data: ReportData): string {
 
 /** A labeled verdict per comparison track in a group's case-level metric row. */
 function labeledDiffs(group: BenchmarkGroup): LabeledDiff[] {
-  const metric = group.sections?.flatMap(s => s.rows).find(r => r.primary);
+  const metric = primaryMetricRow(group);
   if (!metric) return [];
   return metric.entries.flatMap(e => {
     const ci = e.comparisonCI;

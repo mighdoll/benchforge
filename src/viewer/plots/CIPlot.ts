@@ -1,10 +1,11 @@
+import { formatSignedPercent } from "../../report/Formatters.ts";
 import type {
   CIDirection,
   CILevel,
   DifferenceCI,
   HistogramBin,
 } from "../../stats/StatisticalUtils.ts";
-import { directionColors, formatPct, gaussianSmooth } from "./PlotTypes.ts";
+import { directionColors, gaussianSmooth } from "./PlotTypes.ts";
 import {
   createSvg,
   ensureHatchPattern,
@@ -21,7 +22,7 @@ export interface DistributionPlotOptions {
   title?: string;
   smooth?: boolean;
   direction?: CIDirection;
-  /** Pre-formatted CI bound labels (overrides default formatPct) */
+  /** Pre-formatted CI bound labels (overrides the default signed-percent) */
   ciLabels?: [string, string];
   /** Include zero in x scale (default true, set false for absolute-value plots) */
   includeZero?: boolean;
@@ -317,8 +318,8 @@ function drawCILabels(
 ): void {
   if (layout.margin.bottom < 15) return;
   const labelY = layout.height - 4;
-  const loLabel = opts.ciLabels?.[0] ?? formatPct(ci[0]);
-  const hiLabel = opts.ciLabels?.[1] ?? formatPct(ci[1]);
+  const loLabel = opts.ciLabels?.[0] ?? formatSignedPercent(ci[0]);
+  const hiLabel = opts.ciLabels?.[1] ?? formatSignedPercent(ci[1]);
   const loX = scales.x(ci[0]);
   const hiX = scales.x(ci[1]);
   const minGap = Math.max(loLabel.length, hiLabel.length) * 6;

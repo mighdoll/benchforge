@@ -3,6 +3,7 @@ import {
   median,
   medianAbsoluteDeviation,
   percentile,
+  percentileIndex,
 } from "../stats/StatisticalUtils.ts";
 import type { MeasuredResults } from "./MeasuredResults.ts";
 
@@ -17,8 +18,7 @@ export function computeStats(samples: number[]): MeasuredResults["time"] {
     sum += s;
   }
   const sorted = [...samples].sort((a, b) => a - b);
-  const pct = (p: number) =>
-    sorted[Math.max(0, Math.ceil(sorted.length * p) - 1)];
+  const pct = (p: number) => sorted[percentileIndex(sorted.length, p)];
   return {
     min,
     max,

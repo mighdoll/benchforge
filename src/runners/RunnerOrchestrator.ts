@@ -6,7 +6,12 @@ import type { HeapProfile } from "../profiling/node/HeapSampler.ts";
 import type { TimeProfile } from "../profiling/node/TimeSampler.ts";
 import type { BenchmarkFunction, BenchmarkSpec } from "./BenchmarkSpec.ts";
 import type { RunnerOptions } from "./BenchRunner.ts";
-import { aggregateGcStats, type GcEvent, parseGcLine } from "./GcStats.ts";
+import {
+  aggregateGcStats,
+  type GcEvent,
+  parseGcLine,
+  shiftGcOffset,
+} from "./GcStats.ts";
 import type { MeasuredResults } from "./MeasuredResults.ts";
 import {
   importBenchFn,
@@ -266,9 +271,7 @@ function loopGcEvents(
   loopStartTime: number | undefined,
 ): GcEvent[] {
   if (loopStartTime === undefined) return gcEvents.map(stripOffset);
-  const rebased = gcEvents.map(e =>
-    e.offset === undefined ? e : { ...e, offset: e.offset - loopStartTime },
-  );
+  const rebased = gcEvents.map(e => shiftGcOffset(e, -loopStartTime));
   return rebased.filter(e => e.offset === undefined || e.offset >= 0);
 }
 

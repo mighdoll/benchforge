@@ -24,6 +24,13 @@ export function primaryMetricRow(group: BenchmarkGroup): ViewerRow | undefined {
   return group.sections?.flatMap(s => s.rows).find(r => r.primary);
 }
 
+/** An entry's display value: its bootstrap estimate when present, else its
+ *  plain value. Undefined when there is no entry. */
+export function entryValue(entry?: ViewerEntry): string | undefined {
+  if (!entry) return undefined;
+  return entry.bootstrapCI?.estimateLabel ?? entry.value;
+}
+
 /** @return a label that names the benchmark without repeating segments. The
  *  group name (matrix name, or "matrix / case") prefixes the benchmark name,
  *  unless a segment already is that name (avoids "X / X"). */
@@ -57,7 +64,7 @@ function trackLines(
 
 /** The headline value with its unit and stat, e.g. "285,200 lines / sec (mean)". */
 function headline(entry: ViewerEntry, metric: ViewerRow): string {
-  const value = entry.bootstrapCI?.estimateLabel ?? entry.value ?? "";
+  const value = entryValue(entry) ?? "";
   const stat = metric.statLabel ? ` ${dim(`(${metric.statLabel})`)}` : "";
   return `${value} ${metric.label}${stat}`.trim();
 }
@@ -65,7 +72,7 @@ function headline(entry: ViewerEntry, metric: ViewerRow): string {
 /** The verdict line body: colored direction word, Δ%, CI, "vs baseline". */
 function verdict(ci: DifferenceCI): string {
   const word = colorVerdict(ci.direction);
-  const [lo, hi] = ci.ci.map(formatSignedPercent);
+  const [lo, hi] = ci.ci.map(v => formatSignedPercent(v));
   return `${word} ${formatSignedPercent(ci.percent)} [${lo}, ${hi}] vs baseline`;
 }
 

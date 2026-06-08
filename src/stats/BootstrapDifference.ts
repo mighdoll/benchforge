@@ -18,6 +18,7 @@ import {
   maxOf,
   minOf,
   percentile,
+  percentileIndex,
   poolResampleStat,
   prepareBlocks,
   quickSelect,
@@ -218,8 +219,8 @@ function buildDiffOps(stats: StatKind[], nA: number, nB: number): DiffOp[] {
     if (s === "min") return sameBothSides(-2, i, minOf);
     if (s === "max") return sameBothSides(-1, i, maxOf);
     const p = s.percentile;
-    const kA = Math.max(0, Math.ceil(nA * p) - 1);
-    const kB = Math.max(0, Math.ceil(nB * p) - 1);
+    const kA = percentileIndex(nA, p);
+    const kB = percentileIndex(nB, p);
     return {
       order: p,
       origIndex: i,

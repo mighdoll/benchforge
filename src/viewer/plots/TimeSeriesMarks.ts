@@ -61,6 +61,9 @@ const maxDots = 1000;
 
 const gcViolet = "#7c3aed";
 
+/** Fallback swatch for a series name absent from the color map (steel blue). */
+export const defaultSeriesColor = "#4682b4";
+
 /** Distinct color per benchmark series, keyed by name (Observable 10 palette,
  *  shared by the dots, the legend, and the toggle pills so swatches match).
  *  Baselines are sorted last so current benchmarks take the leading colors. */
@@ -218,7 +221,8 @@ export function sampleDotMarks(
     lttb,
   );
   const colors = seriesColorMap(ctx.benchmarks, ctx.baselineNames);
-  const colorOf = (d: SampleData) => colors.get(d.benchmark) ?? "#4682b4";
+  const colorOf = (d: SampleData) =>
+    colors.get(d.benchmark) ?? defaultSeriesColor;
   return [
     Plot.dot(warmup, {
       ...xy,
@@ -266,7 +270,7 @@ function seriesLegendItems(
   return orderSeries(benchmarks, baselineNames).map(bm => {
     const isBase = baselineNames.has(bm);
     return {
-      color: colors.get(bm) ?? "#4682b4",
+      color: colors.get(bm) ?? defaultSeriesColor,
       label: bm,
       style: (isBase ? "hollow-dot" : "filled-dot") as LegendItem["style"],
     };

@@ -1,4 +1,5 @@
 import { useEffect, useState } from "preact/hooks";
+import { formatSignedPercent } from "../../report/Formatters.ts";
 import type { GitVersion } from "../../report/GitUtils.ts";
 import { verdictWord } from "../../report/Verdict.ts";
 import type { DifferenceCI } from "../../stats/StatisticalUtils.ts";
@@ -9,7 +10,6 @@ import type {
   ReportData,
   ShiftPercentile,
 } from "../ReportData.ts";
-import { formatPct } from "../plots/PlotTypes.ts";
 import { provider, reportData, shiftDetail, trimMode } from "../State.ts";
 import { activeGroupView, CaseCard, caseHeaderCI } from "./CaseCard.tsx";
 import {
@@ -250,7 +250,7 @@ function ShiftVerdict({ point }: { point: ShiftPercentile }) {
   return (
     <span class="shift-verdict">
       <span class={`badge badge-${direction}`}>{cap(verdictWord(direction))}</span>
-      <span class="shift-verdict-pct">{formatPct(percent)}</span>
+      <span class="shift-verdict-pct">{formatSignedPercent(percent)}</span>
     </span>
   );
 }
@@ -260,7 +260,7 @@ function ShiftVerdict({ point }: { point: ShiftPercentile }) {
 function ShiftPopupDiff({ ci, equivMargin }: { ci: DifferenceCI; equivMargin?: number }) {
   const ref = useLazyPlot(async () => {
     const { createCIPlot } = await import("../plots/CIPlot.ts");
-    const opts = { width: 320, height: 90, title: "", pointLabel: formatPct(ci.percent), equivMargin };
+    const opts = { width: 320, height: 90, title: "", pointLabel: formatSignedPercent(ci.percent), equivMargin };
     return createCIPlot(ci, opts);
   }, [ci], "Shift diff plot");
   return (

@@ -8,6 +8,7 @@ import type {
   ViewerRow,
   ViewerSection,
 } from "../viewer/ReportData.ts";
+import { entryValue } from "./ConsoleSummary.ts";
 import {
   formatBytes,
   formatSignedPercent,
@@ -97,13 +98,6 @@ function benchDiagnostics(entry: BenchmarkEntry, labeled: boolean): string[] {
 /** The runs row is the shared "runs" count, lifted to case metadata. */
 function isRunsRow(row: ViewerRow): boolean {
   return row.label === "runs" && !!row.shared;
-}
-
-/** An entry's display value: its bootstrap estimate when present, else its
- *  plain value. */
-function entryValue(entry?: ViewerEntry): string | undefined {
-  if (!entry) return undefined;
-  return entry.bootstrapCI?.estimateLabel ?? entry.value;
 }
 
 /** One shift table per comparison track; labeled by track only when there are
@@ -217,7 +211,7 @@ function pointRow(point: ShiftPercentile): string {
   const { diff, runs, label, reliable, tailCount } = point;
   const cur = runs[0]?.bootstrapCI.estimateLabel ?? "";
   const base = runs[1]?.bootstrapCI.estimateLabel ?? "";
-  const [lo, hi] = diff.ci.map(formatSignedPercent);
+  const [lo, hi] = diff.ci.map(v => formatSignedPercent(v));
   const word = verdictWord(diff.direction);
   const verdict = reliable ? word : `${word} (unreliable, n=${tailCount})`;
   return `| ${label} | ${cur} | ${base} | ${formatSignedPercent(diff.percent)} | [${lo}, ${hi}] | ${verdict} |`;

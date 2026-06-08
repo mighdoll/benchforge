@@ -1,5 +1,6 @@
 import { Fragment } from "preact";
 import { useState } from "preact/hooks";
+import { formatSignedPercent } from "../../report/Formatters.ts";
 import type { DifferenceCI } from "../../stats/StatisticalUtils.ts";
 import { formatCount, formatDecimalBytes } from "../LineData.ts";
 import type {
@@ -9,7 +10,6 @@ import type {
   ViewerRow,
   ViewerSection,
 } from "../ReportData.ts";
-import { formatPct } from "../plots/PlotTypes.ts";
 import { activeTabId, trimMode } from "../State.ts";
 import {
   BootstrapCIMount,
@@ -158,7 +158,7 @@ function ScalarSection({ section }: { section: ViewerSection }) {
                   <span class="m-val">{e.value}</span>
                   {delta && (
                     <span class="m-delta m-val">
-                      {e.comparisonCI ? formatPct(e.comparisonCI.percent) : ""}
+                      {e.comparisonCI ? formatSignedPercent(e.comparisonCI.percent) : ""}
                     </span>
                   )}
                 </Fragment>
