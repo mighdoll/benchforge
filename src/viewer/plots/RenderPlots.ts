@@ -166,7 +166,7 @@ function flattenSamplesAndHeap(
 }
 
 /** Map full GCs (mark-compact) to sample indices using cumulative sample
- *  durations. Scavenges are skipped: they're the periodic texture, not the
+ *  durations. Scavenges are skipped: they're periodic texture, not the
  *  locatable spikes we mark individually. */
 function flattenGcEvents(
   b: PreparedBenchmark,

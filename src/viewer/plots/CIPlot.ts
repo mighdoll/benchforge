@@ -199,16 +199,15 @@ function drawTitles(
   }
 }
 
-/** Merge two CI bound labels into one compact range, or a single label when the
- *  bounds are identical at display precision. Shared by the diff and absolute
- *  charts so they read consistently. */
+/** Merge two CI bound labels into a range, or one label when they're identical
+ *  at display precision. */
 function rangeLabel(loLabel: string, hiLabel: string): string {
   return loLabel === hiLabel ? loLabel : `${loLabel} - ${hiLabel}`;
 }
 
 /** Keep a text label inside [pad, width-pad] given its anchor, so labels at the
  *  data edges aren't clipped by the SVG viewport. Width is estimated from the
- *  character count (~6px at the 11px label size, ~10px for the 15px point). */
+ *  character count (charW ~6px at the 11px label size, ~10px for the 15px point). */
 function clampLabelX(
   x: number,
   label: string,

@@ -90,10 +90,8 @@ export function printHeapReports(
   }
 }
 
-/** Convert MatrixResults to ReportGroup[]: one group per case, with each
- *  variant a report in it. Variants compared against a baseline carry their own
- *  paired (interleaved) baseline, so each variant is measured against its own
- *  reference rather than a single shared one. */
+/** Convert MatrixResults to ReportGroup[]: one group per case, each variant a
+ *  report in it carrying its own paired baseline (see caseGroups). */
 export function matrixToReportGroups(results: MatrixResults[]): ReportGroup[] {
   return results.flatMap(caseGroups);
 }

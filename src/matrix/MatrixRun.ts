@@ -11,8 +11,7 @@ import { computeDeltaPercent, resolveInlineCase } from "./BenchMatrix.ts";
 import type { CasesModule } from "./CaseLoader.ts";
 import { loadCaseData } from "./CaseLoader.ts";
 
-/** A variant's code source for a case, plus its optional paired baseline source.
- *  Returning undefined for a (variantId, caseId) skips that case. */
+/** A variant's code source for a case, plus its optional paired baseline source. */
 export interface VariantPlan {
   source: VariantSource;
   baselineSource?: VariantSource;

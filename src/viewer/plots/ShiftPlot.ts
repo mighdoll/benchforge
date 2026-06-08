@@ -283,7 +283,7 @@ function drawMarker(
 }
 
 /** Percentile label, with the verdict point enlarged and its Δ% value captioned
- *  below (this is the same number shown elsewhere as the headline delta), and a
+ *  below (the same number shown elsewhere as the headline delta), and a
  *  tail-count caption for unreliable percentiles. */
 function drawPercentileLabel(
   svg: SVGSVGElement,

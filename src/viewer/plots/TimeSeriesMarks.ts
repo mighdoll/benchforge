@@ -192,6 +192,7 @@ export function gcMark(
 
 const gcViolet = "#7c3aed";
 
+/** Hover text for a full-GC rule: iteration, pause duration, bytes collected. */
 function gcTooltip(gc: FlatGcEvent): string {
   const bytes = formatBytes(gc.bytes) ?? "0B";
   return `Full GC @ iter ${gc.sampleIndex}: ${gc.duration.toFixed(2)}ms, ${bytes} collected`;
