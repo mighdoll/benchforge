@@ -4,6 +4,7 @@ import { defaultReportData } from "../cli/CliReport.ts";
 import {
   type BenchmarkReport,
   metricSection,
+  type ReportGroup,
 } from "../report/BenchmarkReport.ts";
 import { consoleSummary } from "../report/ConsoleSummary.ts";
 import { integer } from "../report/Formatters.ts";
@@ -20,8 +21,43 @@ test("produces a comparison CI and verdict for a baseline", () => {
     },
   ];
   const data = prepareHtmlData(groups, { sections: [timeSection] });
-  expect(data.groups[0].benchmarks[0].comparisonCI).toBeDefined();
+  const metric = data.groups[0].sections?.flatMap(s => s.rows).find(r => r.primary);
+  const comparison = metric?.entries.find(e => e.comparisonCI);
+  expect(comparison?.comparisonCI).toBeDefined();
   expect(consoleSummary(data)).toContain("vs baseline");
+});
+
+test("baselineVariant mode consolidates variants into one track-columned row", () => {
+  const groups: ReportGroup[] = [
+    {
+      name: "case",
+      baselineVariantId: "spread",
+      reports: [
+        {
+          ...createBenchmarkReport("slice", [0, 60]),
+          baseline: createBenchmarkReport("spread", [60, 120]),
+        },
+        createBenchmarkReport("spread", [60, 120]),
+        {
+          ...createBenchmarkReport("from", [120, 180]),
+          baseline: createBenchmarkReport("spread", [60, 120]),
+        },
+      ],
+    },
+  ];
+  const data = prepareHtmlData(groups, { sections: [timeSection] });
+  const metric = data.groups[0].sections!
+    .flatMap(s => s.rows)
+    .find(r => r.primary)!;
+
+  // one cell per track, the baseline variant flagged in place (report order)
+  expect(metric.entries.map(e => e.runName)).toEqual(["slice", "spread", "from"]);
+  const spread = metric.entries.find(e => e.runName === "spread")!;
+  expect(spread.isBaseline).toBe(true);
+  expect(spread.comparisonCI).toBeUndefined();
+  // comparison variants each carry their own Δ% vs the shared baseline
+  expect(metric.entries.find(e => e.runName === "slice")!.comparisonCI).toBeDefined();
+  expect(metric.entries.find(e => e.runName === "from")!.comparisonCI).toBeDefined();
 });
 
 test("report uses custom sections when provided", () => {

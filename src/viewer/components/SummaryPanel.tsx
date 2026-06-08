@@ -1,24 +1,20 @@
-import { useEffect, useMemo, useState } from "preact/hooks";
-import { useLazyPlot, useResponsivePlot } from "./LazyPlot.ts";
+import { useEffect, useState } from "preact/hooks";
 import type { GitVersion } from "../../report/GitUtils.ts";
 import { verdictWord } from "../../report/Verdict.ts";
-import type { CIDirection, DifferenceCI } from "../../stats/StatisticalUtils.ts";
+import type { DifferenceCI } from "../../stats/StatisticalUtils.ts";
 import { formatRelativeTime } from "../DateFormat.ts";
-import { formatCount, formatDecimalBytes } from "../LineData.ts";
 import type {
-  BenchmarkEntry,
   BenchmarkGroup,
   BootstrapCIData,
   ReportData,
-  ShiftFunction,
   ShiftPercentile,
   ShiftRun,
-  ViewerEntry,
-  ViewerRow,
-  ViewerSection,
 } from "../ReportData.ts";
 import { formatPct } from "../plots/PlotTypes.ts";
-import { activeTabId, provider, reportData, shiftDetail, trimMode } from "../State.ts";
+import { provider, reportData, shiftDetail, trimMode } from "../State.ts";
+import { activeGroupView, CaseCard, caseHeaderCI } from "./CaseCard.tsx";
+import { ciDomain, ComparisonBadge, shiftDetailOpener } from "./CIWidgets.tsx";
+import { useLazyPlot } from "./LazyPlot.ts";
 
 const skipArgs = new Set(["_", "$0", "view", "file"]);
 
@@ -26,14 +22,8 @@ declare const __BENCHFORGE_GIT_HASH__: string;
 declare const __BENCHFORGE_GIT_DIRTY__: boolean;
 declare const __BENCHFORGE_BUILD_DATE__: string;
 
-/** Proportional horizontal offset range for aligning bootstrap CI plots. */
-const maxCIShift = 80;
-
-const directionLabels: Record<CIDirection, string> = {
-  faster: "Faster", slower: "Slower", uncertain: "Inconclusive", equivalent: "Equivalent",
-};
-
-/** Main summary view: fetches report data, shows CLI args header and collapsible benchmark groups. */
+/** Main summary view: fetches report data, shows CLI args header and collapsible
+ *  benchmark groups (one consolidated card per case). */
 export function SummaryPanel() {
   const dataProvider = provider.value!;
   const data = reportData.value;
@@ -92,34 +82,6 @@ function ShiftDetailPopup() {
   );
 }
 
-/** Open the shared detail popup for one point of a shift function. */
-function openShiftDetail(shift: ShiftFunction, point: ShiftPercentile) {
-  shiftDetail.value = { point, metric: shift.metric, equivMargin: shift.equivMargin };
-}
-
-/** A thunk opening the popup for a shift function's verdict point, or undefined
- *  when there's no usable target (the CI chart then stays non-interactive). */
-function shiftDetailOpener(shift?: ShiftFunction): (() => void) | undefined {
-  if (!shift) return undefined;
-  const point = verdictPoint(shift);
-  if (!point) return undefined;
-  return () => openShiftDetail(shift, point);
-}
-
-/** Verdict point of a shift function: the selected verdict stat, else the mean,
- *  else the first point. Drives the CI-chart click target (header + metric row). */
-function verdictPoint(shift: ShiftFunction): ShiftPercentile | undefined {
-  return shift.points.find(p => p.isPrimary)
-    ?? shift.points.find(p => p.isMean)
-    ?? shift.points[0];
-}
-
-/** The shift function on an entry's active (trimmed/raw) sections, if any. */
-function entryShift(entry: BenchmarkEntry): ShiftFunction | undefined {
-  const rows = activeView(entry).sections?.flatMap(s => s.rows);
-  return rows?.find(r => r.shiftFunction)?.shiftFunction;
-}
-
 /** Report header: the reconstructed CLI command, run date, and git versions. */
 function ReportHeader({ data }: { data: ReportData }) {
   const { metadata } = data;
@@ -143,11 +105,9 @@ function ReportHeader({ data }: { data: ReportData }) {
   );
 }
 
-/** True if any entry in the report carries an alternate (raw) view. */
+/** True if any case in the report carries an alternate (raw) view. */
 function hasRawView(data: ReportData): boolean {
-  return data.groups.some(g =>
-    g.benchmarks.some(b => !!b.rawSections) || !!g.baseline?.rawSections,
-  );
+  return data.groups.some(g => !!g.rawSections);
 }
 
 /** Single pill: when active, batches dominated by environmental noise
@@ -170,120 +130,30 @@ function TrimToggle() {
   );
 }
 
-/** Expandable benchmark group. A single-benchmark group (incl. matrix
- *  variant/case) keeps the verdict badge in the header and renders its panels
- *  directly; a multi-benchmark group renders one BenchmarkBlock per benchmark,
- *  each with its own name and verdict. The baseline name, when present, is
- *  named once in the header (per-run rows still label it "baseline"). */
+/** Expandable case card: the case name, its verdict badge (only with a single
+ *  comparison; otherwise the per-row deltas carry verdicts), and the
+ *  consolidated panels. */
 function CollapsibleGroup({ group }: { group: BenchmarkGroup }) {
   const [open, setOpen] = useState(true);
-  const benchmarks = group.benchmarks ?? [];
-  if (!benchmarks.length)
+  if (!group.benchmarks?.length)
     return <div class="error">No benchmark data for this group</div>;
 
-  const single = benchmarks.length === 1;
-  const headerCi = single ? activeView(benchmarks[0]).comparisonCI : undefined;
-  const headerOpen = single ? shiftDetailOpener(entryShift(benchmarks[0])) : undefined;
+  const header = caseHeaderCI(activeGroupView(group));
   return (
     <div class="benchmark-group">
       <div class="group-header" onClick={() => setOpen(o => !o)}>
-        <span class="group-toggle">{open ? "\u25be" : "\u25b8"}</span>
+        <span class="group-toggle">{open ? "▾" : "▸"}</span>
         <h2>{group.name}</h2>
-        {headerCi && <ComparisonBadge ci={headerCi} onOpen={headerOpen} />}
-        {group.baseline && <span class="group-baseline">vs {group.baseline.name}</span>}
+        {header && (
+          <ComparisonBadge ci={header.ci} onOpen={shiftDetailOpener(header.shift)} />
+        )}
         {group.warnings && (
           <span class="batch-warnings">
-            {group.warnings.map(w => <span class="batch-warning">{w}</span>)}
+            {group.warnings.map((w, i) => <span key={i} class="batch-warning">{w}</span>)}
           </span>
         )}
       </div>
-      {open && (
-        <>
-          {single
-            ? <GroupContent current={benchmarks[0]} />
-            : benchmarks.map((b, i) => <BenchmarkBlock key={i} entry={b} />)}
-          <GroupFooter benchmarks={benchmarks} />
-        </>
-      )}
-    </div>
-  );
-}
-
-/** A footer row collected across the group's variants: one value per variant,
- *  deduped to a single value when they all agree. */
-interface FooterRow {
-  label: string;
-  values: { name: string; value: string }[];
-  uniform: boolean;
-}
-
-/** Footer-placed sections rendered once per group in a bottom strip. Each row's
- *  value is shown once when all variants agree (e.g. runs, identical across a
- *  case), else per-variant. */
-function GroupFooter({ benchmarks }: { benchmarks: BenchmarkEntry[] }) {
-  const rows = footerRows(benchmarks);
-  if (!rows.length) return null;
-  return (
-    <div class="group-footer">
-      {rows.map((row, i) => <FooterStat key={i} row={row} />)}
-    </div>
-  );
-}
-
-/** Collect footer-section rows across all variants, keyed by row label,
- *  preserving first-seen order; mark a row uniform when every variant agrees. */
-function footerRows(benchmarks: BenchmarkEntry[]): FooterRow[] {
-  const byLabel = new Map<string, { name: string; value: string }[]>();
-  const order: string[] = [];
-  for (const b of benchmarks) {
-    const footers = activeView(b).sections?.filter(s => s.placement === "footer");
-    for (const section of footers ?? [])
-      for (const row of section.rows) {
-        if (!byLabel.has(row.label)) {
-          byLabel.set(row.label, []);
-          order.push(row.label);
-        }
-        byLabel.get(row.label)!.push({ name: b.name, value: row.entries[0]?.value ?? "" });
-      }
-  }
-  return order.map(label => {
-    const values = byLabel.get(label)!;
-    return { label, values, uniform: values.every(v => v.value === values[0].value) };
-  });
-}
-
-/** One footer row: a single value when variants agree, else per-variant. */
-function FooterStat({ row }: { row: FooterRow }) {
-  return (
-    <div class="footer-stat">
-      <span class="row-label">{row.label}</span>
-      {row.uniform
-        ? <span class="row-value">{row.values[0].value}</span>
-        : <span class="footer-per-variant">
-            {row.values.map((v, i) => (
-              <span key={i}>{v.name} <b>{v.value}</b></span>
-            ))}
-          </span>}
-    </div>
-  );
-}
-
-/** One benchmark within a multi-benchmark group: its name, verdict badge, and
- *  section/heap/coverage panels. Reuses ComparisonBadge + GroupContent. */
-function BenchmarkBlock({ entry }: { entry: BenchmarkEntry }) {
-  const ci = activeView(entry).comparisonCI;
-  const open = shiftDetailOpener(entryShift(entry));
-  const heading = entry.isBaselineVariant ? `${entry.name} (baseline)` : entry.name;
-  return (
-    <div class="benchmark-block">
-      <div class="benchmark-block-head">
-        <h3>{heading}</h3>
-        {entry.baselineLabel && (
-          <span class="benchmark-vs">vs {entry.baselineLabel} (baseline)</span>
-        )}
-        {ci && <ComparisonBadge ci={ci} onOpen={open} />}
-      </div>
-      <GroupContent current={entry} />
+      {open && <CaseCard group={group} />}
     </div>
   );
 }
@@ -324,298 +194,9 @@ function benchforgeLabel(): string {
   return date ? `${label} ${formatRelativeTime(date)}` : label;
 }
 
-/** Pick the trimmed or raw view of an entry based on the current trimMode. */
-function activeView(entry: BenchmarkEntry): {
-  sections?: ViewerSection[];
-  comparisonCI?: DifferenceCI;
-} {
-  if (trimMode.value === "raw" && entry.rawSections)
-    return { sections: entry.rawSections, comparisonCI: entry.rawComparisonCI };
-  return { sections: entry.sections, comparisonCI: entry.comparisonCI };
-}
-
-/** Comparison verdict: a colored chip (group header) or plain delta text (compact).
- *  When `onOpen` is set, the CI chart becomes a click target for the detail popup. */
-function ComparisonBadge(
-  { ci, compact, onOpen }:
-  { ci: DifferenceCI; compact?: boolean; onOpen?: () => void },
-) {
-  // Colored chip is reserved for the main verdict; per-row (compact) comparisons
-  // render as plain bold text regardless of direction.
-  const cls = compact ? "comparison-plain" : `badge badge-${ci.direction}`;
-  return (
-    <span class="comparison-badge">
-      <span class={cls}>
-        {compact ? formatPct(ci.percent) : directionLabels[ci.direction]}
-      </span>
-      {ci.histogram && <CIPlotMount ci={ci} compact={compact} onOpen={onOpen} />}
-    </span>
-  );
-}
-
-/** A group's panels: sections, heap allocation, coverage. Footer-placed
- *  sections are excluded here -- they render once per group in GroupFooter. */
-function GroupContent({ current }: { current: BenchmarkEntry }) {
-  const sections = activeView(current).sections?.filter(s => s.placement !== "footer");
-  return (
-    <div class="panel-grid">
-      {sections?.map((s, i) => <SectionPanel key={i} section={s} />)}
-      <HeapPanel entry={current} />
-      <CoveragePanel entry={current} />
-    </div>
-  );
-}
-
 /** Fallback for dev/unbundled builds where compile-time globals are absent. */
 function safeGlobal<T>(v: T, fallback: T): T {
   return typeof v !== "undefined" ? v : fallback;
-}
-
-/** Lazy-imports CIPlot and renders a confidence interval chart inline. When
- *  `onOpen` is set the chart is clickable; the click is stopped from bubbling so
- *  it doesn't also toggle the enclosing group's collapse. */
-function CIPlotMount(
-  { ci, compact, onOpen }:
-  { ci: DifferenceCI; compact?: boolean; onOpen?: () => void },
-) {
-  const ref = useLazyPlot(async () => {
-    const { createCIPlot } = await import("../plots/CIPlot.ts");
-    const equivMargin = (reportData.value?.metadata.cliArgs?.["equiv-margin"] as number) || undefined;
-    const opts = compact ? { width: 200, height: 70, title: "", equivMargin } : { equivMargin };
-    return createCIPlot(ci, opts);
-  }, [ci, compact], "CI plot");
-  const clickable = !!onOpen;
-  return (
-    <div
-      class={`ci-plot-container${clickable ? " ci-clickable" : ""}`}
-      ref={ref}
-      title={clickable ? "click for current vs baseline detail" : undefined}
-      onClick={onOpen ? (e => { e.stopPropagation(); onOpen(); }) : undefined}
-    />
-  );
-}
-
-/** One section panel, dispatching to the shift, matrix, or plain stat-row layout. */
-function SectionPanel({ section }: { section: ViewerSection }) {
-  if (!section.rows.length) return null;
-  const range = useMemo(() => sectionEstimateRange(section), [section]);
-  const shift = section.rows.find(r => r.shiftFunction)?.shiftFunction;
-  const titleEl = section.tabLink
-    ? <a class="panel-title-link" onClick={() => (activeTabId.value = section.tabLink!)}>{section.title}</a>
-    : <span>{section.title}</span>;
-
-  if (shift) return <ShiftSection section={section} shift={shift} titleEl={titleEl} />;
-  if (section.layout === "matrix") return <MatrixSection section={section} titleEl={titleEl} />;
-
-  return (
-    <div class="section-panel">
-      <div class="panel-header">{titleEl}</div>
-      <div class="panel-body">
-        {section.rows.map((row, i) => (
-          <StatRow key={i} row={row} estimateRange={range} />
-        ))}
-      </div>
-    </div>
-  );
-}
-
-function HeapPanel({ entry }: { entry: BenchmarkEntry }) {
-  const { heapSummary: heap, allocationSamples: allocSamples } = entry;
-  if (!heap && !allocSamples?.length) return null;
-
-  return (
-    <div class="section-panel">
-      <div class="panel-header">
-        <a class="panel-title-link" onClick={() => (activeTabId.value = "flamechart")}>
-          heap allocation
-        </a>
-      </div>
-      <div class="panel-body">
-        {heap && (
-          <>
-            <SharedStat label="total bytes" value={formatDecimalBytes(heap.totalBytes)} />
-            <SharedStat label="user bytes" value={formatDecimalBytes(heap.userBytes)} />
-          </>
-        )}
-        {allocSamples && allocSamples.length > 0 && (
-          <SharedStat label="alloc samples" value={allocSamples.length.toLocaleString()} />
-        )}
-      </div>
-    </div>
-  );
-}
-
-function CoveragePanel({ entry }: { entry: BenchmarkEntry }) {
-  const cov = entry.coverageSummary;
-  if (!cov) return null;
-
-  return (
-    <div class="section-panel">
-      <div class="panel-header">
-        <span>calls</span>
-      </div>
-      <div class="panel-body">
-        <SharedStat label="functions tracked" value={cov.functionCount.toLocaleString()} />
-        <SharedStat label="total calls" value={formatCount(cov.totalCalls)} />
-      </div>
-    </div>
-  );
-}
-
-/** Compute min/max bootstrap estimates across a section for proportional positioning */
-function sectionEstimateRange(section: ViewerSection): [number, number] | undefined {
-  const estimates = section.rows
-    .flatMap(row => row.entries)
-    .map(e => e.bootstrapCI?.estimate)
-    .filter((v): v is number => v != null);
-  if (estimates.length < 2) return undefined;
-  const min = Math.min(...estimates), max = Math.max(...estimates);
-  return max > min ? [min, max] : undefined;
-}
-
-/** A section with a shift function: the primary row's diff chart, then the
- *  per-percentile violins, then any shared rows (e.g. the line count). The
- *  primary row's per-run absolute values are dropped here -- they live in the
- *  violins' click-to-detail popup -- and non-primary comparable rows (p50, p95)
- *  are represented by the violins, so they are omitted from the top stack. */
-function ShiftSection(
-  { section, shift, titleEl }:
-  { section: ViewerSection; shift: ShiftFunction; titleEl: preact.JSX.Element },
-) {
-  const primary = section.rows.find(r => r.primary);
-  const shared = section.rows.filter(r => r.shared);
-  return (
-    <div class="section-panel primary-section">
-      <div class="panel-header">{titleEl}</div>
-      <div class="panel-body">
-        {primary && <StatRow row={primary} chartOnly />}
-      </div>
-      <ShiftPanel shift={shift} />
-      {shared.length > 0 && (
-        <div class="panel-body shift-shared">
-          {shared.map((row, i) => <StatRow key={i} row={row} />)}
-        </div>
-      )}
-    </div>
-  );
-}
-
-/** Dense table for scalar metrics: rows = metrics, columns = a value per run
- *  then the delta badge. Run names appear once as headers, in its own grid. */
-function MatrixSection(
-  { section, titleEl }:
-  { section: ViewerSection; titleEl: preact.JSX.Element },
-) {
-  const runs = section.rows[0].entries;
-  const style = { "--runs": String(runs.length) } as Record<string, string>;
-  return (
-    <div class="section-panel matrix-section">
-      <div class="panel-header">{titleEl}</div>
-      <div class="panel-body">
-        <div class="matrix" style={style}>
-          <span class="m-label" />
-          {runs.map((run, i) => <span key={i} class="m-head">{run.runName}</span>)}
-          <span class="m-head" />
-          <span />
-          {section.rows.map((row, i) => <MatrixRow key={i} row={row} />)}
-        </div>
-      </div>
-    </div>
-  );
-}
-
-/** One metric row: header plus per-run distribution charts. `shared` rows render
- *  label/value inline; `chartOnly` drops the per-run charts (shift sections). */
-function StatRow(
-  { row, estimateRange, chartOnly = false }:
-  { row: ViewerRow; estimateRange?: [number, number]; chartOnly?: boolean },
-) {
-  if (row.shared) {
-    // single value: keep label and value on one line instead of stacking
-    return (
-      <div class="stat-row shared-row">
-        <span class="row-label">{row.label}</span>
-        <span class="row-value">{row.entries[0]?.value}</span>
-      </div>
-    );
-  }
-
-  return (
-    <div class={`stat-row${row.primary ? " primary-row" : ""}`}>
-      <div class="row-header">
-        <span class="row-label">{row.label}</span>
-        {row.comparisonCI && (
-          <ComparisonBadge
-            ci={row.comparisonCI}
-            compact
-            onOpen={shiftDetailOpener(row.shiftFunction)}
-          />
-        )}
-      </div>
-      {!chartOnly && row.entries.map((entry, i) => (
-        <RunEntry key={i} entry={entry} estimateRange={estimateRange} />
-      ))}
-    </div>
-  );
-}
-
-function SharedStat({ label, value }: { label: string; value: string }) {
-  return (
-    <div class="stat-row shared-row">
-      <span class="row-label">{label}</span>
-      <span class="row-value">{value}</span>
-    </div>
-  );
-}
-
-/** Always-visible per-percentile shift function below the section's stat rows.
- *  Clicking any violin opens the shared detail popup for that percentile. */
-function ShiftPanel({ shift }: { shift: ShiftFunction }) {
-  const ref = useResponsivePlot(async width => {
-    const { createShiftPlot } = await import("../plots/ShiftPlot.ts");
-    return createShiftPlot(shift, { width, onSelect: p => openShiftDetail(shift, p) });
-  }, [shift], "Shift plot");
-  return (
-    <div class="shift-panel">
-      <div class="shift-caption" title="click a percentile for current vs baseline detail">
-        change by percentile
-      </div>
-      <div class="shift-plot" ref={ref} title="click a percentile for current vs baseline detail" />
-    </div>
-  );
-}
-
-/** One metric line in the matrix: label, a value per run, then the delta badge. */
-function MatrixRow({ row }: { row: ViewerRow }) {
-  return (
-    <>
-      <span class="m-label">{row.label}</span>
-      {row.entries.map((entry, i) => <span key={i} class="m-val">{entry.value}</span>)}
-      {row.comparisonCI
-        ? <ComparisonBadge ci={row.comparisonCI} compact />
-        : <span class="m-val" />}
-      <span />
-    </>
-  );
-}
-
-/** One run's row: its name and either a distribution plot (shifted to position
- *  the estimate within estimateRange) or a plain value. */
-function RunEntry(
-  { entry, estimateRange }:
-  { entry: ViewerEntry; estimateRange?: [number, number] },
-) {
-  const ci = entry.bootstrapCI;
-  const [lo, hi] = estimateRange ?? [0, 0];
-  const shift = ci && hi > lo ? ((ci.estimate - lo) / (hi - lo)) * maxCIShift : undefined;
-  return (
-    <div class="run-entry">
-      <span class="run-name">{entry.runName}</span>
-      {ci
-        ? <BootstrapCIMount ci={ci} label={entry.value} shift={shift} />
-        : <span class="run-value">{entry.value}</span>}
-    </div>
-  );
 }
 
 /** Modal detailing one percentile: the diff CI chart, then each run's absolute
@@ -629,7 +210,7 @@ function ShiftPopup({ point, metric, equivMargin, onClose }: {
   const { diff } = point;
   // Shared x-domain so the per-run absolute charts use one scale: equal pixel
   // positions mean equal values, making medians and CIs comparable across runs.
-  const domain = runsDomain(point.runs);
+  const domain = ciDomain(point.runs.map(r => r.bootstrapCI));
   return (
     <div class="shift-overlay" onClick={e => e.target === e.currentTarget && onClose()}>
       <div class="shift-popup">
@@ -668,31 +249,6 @@ function ShiftVerdict({ point }: { point: ShiftPercentile }) {
       <span class="shift-verdict-pct">{formatPct(percent)}</span>
     </span>
   );
-}
-
-/** Lazy-imports CIPlot and renders a bootstrap distribution sparkline inline. */
-function BootstrapCIMount({ ci, label, shift }: {
-  ci: BootstrapCIData; label?: string; shift?: number;
-}) {
-  const ref = useLazyPlot(async () => {
-    const { createDistributionPlot } = await import("../plots/CIPlot.ts");
-    const opts = {
-      width: 240, height: 80, title: "", direction: "uncertain" as const,
-      ciLabels: ci.ciLabels, includeZero: false, smooth: true, pointLabel: label,
-      ciLevel: ci.ciLevel, ciReliable: ci.ciReliable,
-    };
-    return createDistributionPlot(ci.histogram, ci.ci, ci.estimate, opts);
-  }, [ci, label], "Bootstrap CI plot");
-  const style = shift != null ? { marginLeft: `${Math.round(shift)}px` } : undefined;
-  return <div class="ci-plot-inline" style={style} ref={ref} />;
-}
-
-/** Min/max x across every run's histogram bins and CI bounds, for a shared scale. */
-function runsDomain(runs: ShiftRun[]): [number, number] | undefined {
-  const xs = runs.flatMap(r => [...r.bootstrapCI.histogram.map(b => b.x), ...r.bootstrapCI.ci]);
-  if (xs.length < 2) return undefined;
-  const min = Math.min(...xs), max = Math.max(...xs);
-  return max > min ? [min, max] : undefined;
 }
 
 /** The diff CI chart in the popup (reuses createCIPlot). The Δ% point estimate

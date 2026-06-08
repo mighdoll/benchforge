@@ -1,6 +1,6 @@
 import {
+  archiveSchemaVersion,
   type BenchforgeArchive,
-  migrateArchive,
 } from "../export/ArchiveFormat.ts";
 import type { LineCoverage } from "../export/CoverageExport.ts";
 import type { SpeedscopeFrame } from "../export/SpeedscopeTypes.ts";
@@ -128,7 +128,13 @@ export class ArchiveProvider implements DataProvider {
   private archive: ArchiveData;
 
   constructor(archive: ArchiveData | Record<string, unknown>) {
-    this.archive = migrateArchive(archive as Record<string, unknown>);
+    const schema = (archive as { schema?: number }).schema ?? 0;
+    if (schema !== archiveSchemaVersion)
+      throw new Error(
+        `Unsupported archive schema ${schema} (expected ${archiveSchemaVersion}). ` +
+          "Regenerate the .benchforge archive.",
+      );
+    this.archive = archive as ArchiveData;
     this.config = {
       editorUri: null,
       hasReport: !!archive.report,

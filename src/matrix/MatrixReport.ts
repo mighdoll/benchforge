@@ -20,12 +20,14 @@ export function reportMatrixResults(data: ReportData): string {
   return multiVerdict(diffs);
 }
 
-/** A labeled verdict per benchmark in a group that was compared to a baseline. */
+/** A labeled verdict per comparison track in a group's case-level metric row. */
 function labeledDiffs(group: BenchmarkGroup): LabeledDiff[] {
-  return group.benchmarks.flatMap(b => {
-    const ci = b.comparisonCI;
-    if (!ci) return [];
-    return [{ label: benchLabel(b.name, group.name), direction: ci.direction }];
+  const metric = group.sections?.flatMap(s => s.rows).find(r => r.primary);
+  if (!metric) return [];
+  return metric.entries.flatMap(e => {
+    const ci = e.comparisonCI;
+    if (!ci || e.isBaseline) return [];
+    return [{ label: benchLabel(e.runName, group.name), direction: ci.direction }];
   });
 }
 

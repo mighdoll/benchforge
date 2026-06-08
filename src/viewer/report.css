@@ -162,6 +162,18 @@
   grid-column: 1 / -1;
 }
 
+/* Scalar tables (GC, time) take the full row but shrink to their content and
+   left-align, so a 2-track case stays compact instead of stretching with a gap;
+   a wide many-track table scrolls rather than overflowing the panel. */
+.report-panel .panel-grid > .section-panel.matrix-section {
+  grid-column: 1 / -1;
+  width: fit-content;
+  max-width: 100%;
+  justify-self: start;
+}
+
+.report-panel .matrix-section .panel-body { overflow-x: auto; }
+
 /* --- Section panel --- */
 
 .report-panel .section-panel {
@@ -550,22 +562,24 @@
   :root:not([data-theme="light"]) .shift-verdict-pct { color: #ccc; }
 }
 
-/* --- Matrix section: dense table of scalar metrics (e.g. GC) --- */
-.report-panel .matrix {
+/* --- Track matrix: scalar metrics with one column per track (+ optional Δ%) --- */
+.report-panel .track-matrix {
   display: grid;
-  /* label | a value per run | delta | flex spacer (absorbs slack on the right
-     so the table packs left instead of floating against the panel edge) */
-  grid-template-columns:
-    max-content repeat(var(--runs), minmax(56px, max-content)) max-content 1fr;
+  width: max-content;
   column-gap: 16px;
   row-gap: 4px;
   align-items: baseline;
 }
 
-.report-panel .matrix .m-head { font-size: 11px; color: #999; text-align: right; }
-.report-panel .matrix .m-label { font-size: 12px; font-weight: 600; color: #666; }
+.report-panel .track-matrix .m-head { font-size: 11px; color: #999; text-align: right; }
+.report-panel .track-matrix .m-label {
+  font-size: 12px;
+  font-weight: 600;
+  color: #666;
+  text-align: left;
+}
 
-.report-panel .matrix .m-val {
+.report-panel .track-matrix .m-val {
   font-size: 14px;
   font-weight: 600;
   color: #333;
@@ -573,9 +587,57 @@
   text-align: right;
 }
 
-:root[data-theme="dark"] .report-panel .matrix .m-label { color: #999; }
-:root[data-theme="dark"] .report-panel .matrix .m-val { color: #ddd; }
+.report-panel .track-matrix .m-delta { font-size: 12px; font-weight: 500; color: #999; }
+
+/* GC/scalar header carries the Δ% toggle on the right. */
+.report-panel .matrix-section .panel-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.report-panel .toggle-pill.mini {
+  padding: 0 7px;
+  font-size: 10px;
+  text-transform: none;
+  letter-spacing: 0;
+}
+
+/* --- Sparkline table: one row per track, distributions sharing an x-axis --- */
+.report-panel .sparkline-table {
+  display: grid;
+  grid-template-columns: minmax(80px, max-content) max-content max-content;
+  column-gap: 14px;
+  row-gap: 2px;
+  align-items: center;
+  padding: 8px 14px;
+}
+
+.report-panel .sparkline-row {
+  display: grid;
+  grid-column: 1 / -1;
+  grid-template-columns: subgrid;
+  align-items: center;
+}
+
+.report-panel .sparkline-cell { line-height: 0; }
+.report-panel .sparkline-cell.ci-clickable { cursor: pointer; }
+
+.report-panel .sparkline-delta {
+  text-align: right;
+  font-size: 13px;
+  font-weight: 600;
+  color: #555;
+  font-variant-numeric: tabular-nums;
+}
+
+:root[data-theme="dark"] .report-panel .track-matrix .m-label,
+:root[data-theme="dark"] .report-panel .track-matrix .m-delta { color: #999; }
+:root[data-theme="dark"] .report-panel .track-matrix .m-val { color: #ddd; }
+:root[data-theme="dark"] .report-panel .sparkline-delta { color: #ccc; }
 @media (prefers-color-scheme: dark) {
-  :root:not([data-theme="light"]) .report-panel .matrix .m-label { color: #999; }
-  :root:not([data-theme="light"]) .report-panel .matrix .m-val { color: #ddd; }
+  :root:not([data-theme="light"]) .report-panel .track-matrix .m-label,
+  :root:not([data-theme="light"]) .report-panel .track-matrix .m-delta { color: #999; }
+  :root:not([data-theme="light"]) .report-panel .track-matrix .m-val { color: #ddd; }
+  :root:not([data-theme="light"]) .report-panel .sparkline-delta { color: #ccc; }
 }

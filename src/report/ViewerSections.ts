@@ -35,13 +35,30 @@ import {
 } from "./BenchmarkReport.ts";
 import { buildShiftFunction, statLabel } from "./ShiftFunction.ts";
 
-/** Per-section reusable bootstrap results, indexed by stat-column order.
- *  Supplying cur/base/diff causes buildCIMap to skip the matching bootstrap
- *  call and reuse the provided result. Used to share computation between
- *  trim and raw views when trimming is a no-op for a side. */
+/** One display track in a case: a measured series and, for a comparison track,
+ *  the paired baseline it diffs against. The baseline track has no `baseline`. */
+export interface CaseTrack {
+  name: string;
+  measured: MeasuredResults;
+  meta?: UnknownRecord;
+  isBaseline: boolean;
+  baseline?: { measured: MeasuredResults; meta?: UnknownRecord; name: string };
+}
+
+/** The tracks of one case plus the comparison options driving its stats. */
+export interface CaseContext {
+  tracks: CaseTrack[];
+  comparison?: ComparisonOptions;
+}
+
+/** Per-section reusable bootstrap results, indexed by track order. Supplying a
+ *  cached `track[i]` / `diff[i]` causes the metric-row build to skip the matching
+ *  bootstrap and reuse it -- used to share computation between the trim and raw
+ *  views when trimming is a no-op for that track. */
 export interface SectionCICache {
-  cur?: (BootstrapResult | undefined)[];
-  base?: (BootstrapResult | undefined)[];
+  /** Per-track absolute-stat bootstrap (metric row), aligned to tracks. */
+  track?: (BootstrapResult | undefined)[];
+  /** Per-track diff vs the track's baseline (metric row); undefined on baseline. */
   diff?: (DifferenceCI | undefined)[];
 }
 
@@ -50,23 +67,6 @@ export interface SectionCICache {
 interface DisplaySpec {
   toDisplay?: (timingValue: number, metadata?: UnknownRecord) => number;
   formatter: Formatter;
-}
-
-/** Context for building viewer rows within a section */
-interface RowContext {
-  current: MeasuredResults;
-  baseline?: MeasuredResults;
-  currentMeta?: UnknownRecord;
-  baselineMeta?: UnknownRecord;
-  baselineName?: string;
-  comparison?: ComparisonOptions;
-}
-
-/** Pre-computed bootstrap results for a single column */
-interface ColCIs {
-  cur?: BootstrapResult;
-  base?: BootstrapResult;
-  diff?: DifferenceCI;
 }
 
 interface Annotatable {
@@ -115,40 +115,25 @@ export function annotateCI<T extends Annotatable | undefined>(
   return ci;
 }
 
-/** Build ViewerSections from ReportSections, with bootstrap CIs for comparable
- *  columns. When base.comparison.noBatchTrim is false (default), display values
- *  and bootstrap CIs are computed from samples with slow-outlier batches removed.
- *  Returns per-section bootstrap caches so a second call (e.g. for the raw view)
- *  can reuse results when its inputs are identical. Supply reuseCaches to skip
- *  matching bootstrap work on the second call. */
+/** Build track-columned ViewerSections from ReportSections: one ViewerEntry per
+ *  track, with bootstrap CIs and a per-comparison-track diff + shift function.
+ *  Display values use samples with slow-outlier batches removed unless
+ *  comparison.noBatchTrim. Returns per-section bootstrap caches so a second call
+ *  (the raw view) can reuse results for tracks trimming left untouched. */
 export function buildViewerSections(
   sections: ReportSection[],
-  base: RowContext,
+  ctx: CaseContext,
   reuseCaches?: SectionCICache[],
 ): { sections: ViewerSection[]; caches: SectionCICache[] } {
-  const { current, baseline, comparison } = base;
-  const noTrim = comparison?.noBatchTrim;
-  const trimmedSamples = (m: MeasuredResults) =>
-    trimOutlierBatches(m.samples, m.batchOffsets, noTrim).samples;
-  const curSamples = trimmedSamples(current);
-  const baseSamples = baseline ? trimmedSamples(baseline) : undefined;
   const caches: SectionCICache[] = [];
   const viewerSections: ViewerSection[] = [];
   sections.forEach((section, i) => {
-    const ctx: RowContext = { ...base };
     const cache: SectionCICache = {};
     const layout = section.kind === "scalar" ? section.layout : undefined;
     const placement = section.kind === "scalar" ? section.placement : undefined;
     const rows =
       section.kind === "metric"
-        ? metricRows(
-            section,
-            ctx,
-            curSamples,
-            baseSamples,
-            reuseCaches?.[i],
-            cache,
-          )
+        ? metricRows(section, ctx, reuseCaches?.[i], cache)
         : scalarRows(section, ctx);
     caches[i] = cache;
     if (rows.length)
@@ -209,202 +194,170 @@ function batchCount(m?: MeasuredResults): number {
   return m?.batchOffsets?.length ?? 0;
 }
 
-/** Build the rows for a metric section: one comparable metric row (bootstrap CI
- *  + shift fan, marked primary) followed by its scalar extras. The bootstrap
- *  result for the metric is cached in populate / reused from reuse so the trim
- *  and raw views can share work. */
+/** Build the rows for a metric section: one comparable metric row (one cell per
+ *  track, marked primary) followed by its scalar extras. */
 function metricRows(
   section: MetricSection,
-  ctx: RowContext,
-  curSamples: number[],
-  baseSamples: number[] | undefined,
-  reuse?: SectionCICache,
-  populate?: SectionCICache,
+  ctx: CaseContext,
+  reuse: SectionCICache | undefined,
+  cache: SectionCICache,
 ): ViewerRow[] {
-  const cis = metricCIs(section, ctx, reuse, populate);
-  const row = metricRow(section, ctx, curSamples, baseSamples, cis);
+  const row = metricRow(section, ctx, reuse, cache);
   const extras = (section.extras ?? []).flatMap(r => {
     const out = scalarRow(r, ctx);
     return out ? [out] : [];
   });
-  return row ? [row, ...extras] : extras;
+  return [row, ...extras];
 }
 
 /** Build the rows for a scalar section: one row per scalar row. */
-function scalarRows(section: ScalarSection, ctx: RowContext): ViewerRow[] {
+function scalarRows(section: ScalarSection, ctx: CaseContext): ViewerRow[] {
   return section.rows.flatMap(r => {
     const out = scalarRow(r, ctx);
     return out ? [out] : [];
   });
 }
 
-/** Bootstrap a metric section's single stat for current/baseline + the diff,
- *  reusing cached results when supplied and writing computed ones to populate. */
-function metricCIs(
-  section: MetricSection,
-  ctx: RowContext,
-  reuse?: SectionCICache,
-  populate?: SectionCICache,
-): ColCIs {
-  if (!isBootstrappable(metricStatKind(section))) return {};
-  const stats = [metricStatKind(section)];
-  const opts = { noTrim: ctx.comparison?.noBatchTrim };
-  const computeCIs = (s: number[] | undefined, offsets?: number[]) =>
-    s && s.length > 1 ? bootstrapCIs(s, offsets, stats, opts) : undefined;
-  const cur =
-    reuse?.cur ?? computeCIs(ctx.current.samples, ctx.current.batchOffsets);
-  const base =
-    reuse?.base ??
-    computeCIs(ctx.baseline?.samples, ctx.baseline?.batchOffsets);
-  const diff = reuse?.diff ?? buildDiffResults(section, stats, ctx);
-  if (populate) {
-    populate.cur = cur;
-    populate.base = base;
-    populate.diff = diff;
-  }
-  return { cur: cur?.[0], base: base?.[0], diff: diff?.[0] };
-}
-
-/** Build the comparable metric row: current + baseline entries (each with a
- *  bootstrap CI), the diff CI, primary marker, and the shift-function fan. */
+/** The comparable metric row: one cell per track (each with a bootstrap CI),
+ *  comparison tracks carrying a diff CI + shift function. Caches the per-track
+ *  bootstrap and diff so the raw view can reuse untrimmed tracks. */
 function metricRow(
   section: MetricSection,
-  ctx: RowContext,
-  curSamples: number[],
-  baseSamples: number[] | undefined,
-  cis: ColCIs,
-): ViewerRow | undefined {
-  const curRaw = metricValue(section, ctx.current, ctx.currentMeta, curSamples);
-  const format = (v: number) => section.formatter(v) ?? "";
+  ctx: CaseContext,
+  reuse: SectionCICache | undefined,
+  cache: SectionCICache,
+): ViewerRow {
+  const stat = metricStatKind(section);
+  const canBoot = isBootstrappable(stat);
+  const noTrim = ctx.comparison?.noBatchTrim;
+  const trackBoot: (BootstrapResult | undefined)[] = [];
+  const trackDiff: (DifferenceCI | undefined)[] = [];
 
-  const entries: ViewerEntry[] = [
-    buildEntry(
-      ctx.current.name,
-      format(curRaw),
-      section,
-      cis.cur,
-      ctx.current.batchOffsets,
-      ctx.currentMeta,
-    ),
-  ];
-  if (ctx.baseline) {
-    const baseRaw = metricValue(
-      section,
-      ctx.baseline,
-      ctx.baselineMeta,
-      baseSamples,
-    );
-    entries.push(
-      buildEntry(
-        "baseline",
-        format(baseRaw),
+  const entries = ctx.tracks.map((track, i) => {
+    const { measured, meta } = track;
+    const offsets = measured.batchOffsets;
+    const trimmed = trimOutlierBatches(measured.samples, offsets, noTrim).samples;
+    const boot = canBoot
+      ? (reuse?.track?.[i] ?? bootstrapTrack(measured, stat, noTrim))
+      : undefined;
+    trackBoot[i] = boot;
+
+    const entry: ViewerEntry = {
+      runName: track.name,
+      value: section.formatter(metricValue(section, measured, meta, trimmed)) ?? "",
+    };
+    if (track.isBaseline) entry.isBaseline = true;
+    if (boot) entry.bootstrapCI = formatBootstrapCI(section, boot, offsets, meta);
+
+    if (!track.isBaseline && track.baseline) {
+      const diff = canBoot
+        ? (reuse?.diff?.[i] ?? trackDiffCI(section, stat, track, ctx))
+        : undefined;
+      trackDiff[i] = diff;
+      if (diff) entry.comparisonCI = diff;
+      const shift = buildShiftFunction(
         section,
-        cis.base,
-        ctx.baseline.batchOffsets,
-        ctx.baselineMeta,
-      ),
-    );
-  }
+        measured,
+        track.baseline.measured,
+        meta,
+        track.baseline.meta,
+        ctx.comparison,
+        track.baseline.name,
+      );
+      if (shift) entry.shiftFunction = shift;
+    }
+    return entry;
+  });
 
-  const row: ViewerRow = {
+  cache.track = trackBoot;
+  cache.diff = trackDiff;
+  return {
     label: section.title,
     entries,
     primary: true,
-    statLabel: statLabel(metricStatKind(section)),
+    statLabel: statLabel(stat),
   };
-  if (cis.diff) row.comparisonCI = cis.diff;
-  row.shiftFunction = buildShiftFunction(
-    section,
-    ctx.current,
-    ctx.baseline,
-    ctx.currentMeta,
-    ctx.baselineMeta,
-    ctx.comparison,
-    ctx.baselineName,
-  );
-  return row;
 }
 
-/** Build a viewer row for one scalar row: a shared single value, or (when
- *  comparable with a baseline) current + baseline + a point-ratio delta. */
-function scalarRow(scalar: ScalarRow, ctx: RowContext): ViewerRow | undefined {
-  const { current, baseline, currentMeta, baselineMeta } = ctx;
-  const curRaw = scalar.value(current, currentMeta);
-  const baseRaw = baseline ? scalar.value(baseline, baselineMeta) : undefined;
-  if (curRaw === undefined && baseRaw === undefined) return undefined;
-
+/** A viewer row for one scalar row: a shared single value (non-comparable), or
+ *  one cell per track with a point-ratio delta on comparison tracks. A missing
+ *  comparable cell reads "n/a" so the matrix stays aligned. */
+function scalarRow(scalar: ScalarRow, ctx: CaseContext): ViewerRow | undefined {
   const format = (v: unknown) =>
     v === undefined ? "" : (scalar.formatter(v) ?? "");
 
   if (!scalar.comparable) {
-    const value = format(curRaw ?? baseRaw);
-    if (!value || value === "—") return undefined;
-    return {
-      label: scalar.title,
-      entries: [{ runName: current.name, value }],
-      shared: true,
-    };
+    // one cell per track, but flagged shared: case-constant rows (line counts)
+    // display once; rows that differ per variant (runs) fan out in the footer.
+    let anyValue = false;
+    const entries = ctx.tracks.map(track => {
+      const value = format(scalar.value(track.measured, track.meta));
+      if (value && value !== "—") anyValue = true;
+      return { runName: track.name, value };
+    });
+    if (!anyValue) return undefined;
+    return { label: scalar.title, entries, shared: true };
   }
 
-  // With a baseline run, always emit both columns so the matrix stays aligned;
-  // a side with no value reads "n/a" rather than a blank cell (e.g. a fast loop
-  // whose in-loop GC events were all filtered out). Borrowing the other side's
-  // value would be inaccurate, so the missing side stays explicitly absent.
   const na = (v: unknown) => (v === undefined ? "n/a" : format(v));
-  const entries: ViewerEntry[] = [{ runName: current.name, value: na(curRaw) }];
-  if (baseline) entries.push({ runName: "baseline", value: na(baseRaw) });
-  return {
-    label: scalar.title,
-    entries,
-    comparisonCI: simpleDeltaCI(curRaw, baseRaw),
-  };
-}
-
-/** Compute the metric's difference CI with annotation and higher-is-better flip. */
-function buildDiffResults(
-  section: MetricSection,
-  stats: StatKind[],
-  ctx: RowContext,
-): (DifferenceCI | undefined)[] | undefined {
-  const { baseline, current, comparison } = ctx;
-  if (!baseline?.samples?.length || !current.samples?.length) return undefined;
-
-  const opts: BlockDiffOptions = {
-    equivMargin: comparison?.equivMargin,
-    noBatchTrim: comparison?.noBatchTrim,
-  };
-  const rawCIs = diffCIs(
-    baseline.samples,
-    baseline.batchOffsets,
-    current.samples,
-    current.batchOffsets,
-    stats,
-    opts,
-  );
-  const lowBatches = hasLowBatchCount(
-    baseline,
-    current,
-    comparison?.noBatchTrim,
-  );
-  return rawCIs.map(ci => {
-    if (!ci) return undefined;
-    const adjusted = section.higherIsBetter ? flipCI(ci) : ci;
-    return annotateCI(adjusted, section.title, lowBatches);
+  let anyValue = false;
+  const entries: ViewerEntry[] = ctx.tracks.map(track => {
+    const raw = scalar.value(track.measured, track.meta);
+    if (raw !== undefined) anyValue = true;
+    const entry: ViewerEntry = { runName: track.name, value: na(raw) };
+    if (track.isBaseline) entry.isBaseline = true;
+    if (!track.isBaseline && track.baseline) {
+      const baseRaw = scalar.value(track.baseline.measured, track.baseline.meta);
+      const delta = simpleDeltaCI(raw, baseRaw);
+      if (delta) entry.comparisonCI = delta;
+    }
+    return entry;
   });
+  if (!anyValue) return undefined;
+  return { label: scalar.title, entries };
 }
 
-/** Build a ViewerEntry, attaching bootstrap CI data if available */
-function buildEntry(
-  runName: string,
-  value: string,
-  spec: DisplaySpec,
-  result: BootstrapResult | undefined,
-  batchOffsets: number[] | undefined,
-  metadata?: UnknownRecord,
-): ViewerEntry {
-  if (!result) return { runName, value };
-  const bootstrapCI = formatBootstrapCI(spec, result, batchOffsets, metadata);
-  return { runName, value, bootstrapCI };
+/** Bootstrap one track's absolute stat (undefined when too few samples). */
+function bootstrapTrack(
+  m: MeasuredResults,
+  stat: StatKind,
+  noTrim: boolean | undefined,
+): BootstrapResult | undefined {
+  if (m.samples.length <= 1) return undefined;
+  return bootstrapCIs(m.samples, m.batchOffsets, [stat], { noTrim })[0];
+}
+
+/** One comparison track's difference CI: diff vs its baseline, higher-is-better
+ *  flip, and low-batch annotation. */
+function trackDiffCI(
+  section: MetricSection,
+  stat: StatKind,
+  track: CaseTrack,
+  ctx: CaseContext,
+): DifferenceCI | undefined {
+  const base = track.baseline!;
+  if (!base.measured.samples?.length || !track.measured.samples?.length)
+    return undefined;
+  const opts: BlockDiffOptions = {
+    equivMargin: ctx.comparison?.equivMargin,
+    noBatchTrim: ctx.comparison?.noBatchTrim,
+  };
+  const ci = diffCIs(
+    base.measured.samples,
+    base.measured.batchOffsets,
+    track.measured.samples,
+    track.measured.batchOffsets,
+    [stat],
+    opts,
+  )[0];
+  if (!ci) return undefined;
+  const adjusted = section.higherIsBetter ? flipCI(ci) : ci;
+  const lowBatches = hasLowBatchCount(
+    base.measured,
+    track.measured,
+    ctx.comparison?.noBatchTrim,
+  );
+  return annotateCI(adjusted, section.title, lowBatches);
 }
 
 /** @return a CI-less DifferenceCI for comparable scalar rows. Direction is

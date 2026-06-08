@@ -4,11 +4,9 @@ import { prepareHtmlData } from "../report/HtmlReport.ts";
 import { markdownReport } from "../report/MarkdownReport.ts";
 import { timeSection } from "../report/StandardSections.ts";
 import type { MeasuredResults } from "../runners/MeasuredResults.ts";
-import type {
-  BenchmarkEntry,
-  ReportData,
-  ShiftPercentile,
-} from "../viewer/ReportData.ts";
+import type { ReportData, ShiftPercentile } from "../viewer/ReportData.ts";
+
+const zeroStats = { min: 0, max: 0, avg: 0, p50: 0, p75: 0, p99: 0, p999: 0 };
 
 function point(
   label: string,
@@ -48,7 +46,7 @@ function point(
   };
 }
 
-function entryWithShift(): BenchmarkEntry {
+test("renders a shift table with mean, percentiles, and reliability", () => {
   const points = [
     {
       ...point("mean", -2.1, [-3.8, -0.4], true, "1,240,000", "1,214,000"),
@@ -56,40 +54,41 @@ function entryWithShift(): BenchmarkEntry {
     },
     point("p99", 14.8, [7, 22], false, "980,000", "1,150,000"),
   ];
-  return {
-    name: "reduceTwo",
-    samples: [],
-    stats: { min: 0, max: 0, avg: 0, p50: 0, p75: 0, p99: 0, p999: 0 },
-    sections: [
+  const data: ReportData = {
+    groups: [
       {
-        title: "lines / sec",
-        rows: [
+        name: "WESL Parser",
+        benchmarks: [{ name: "reduceTwo", samples: [], stats: zeroStats }],
+        sections: [
           {
-            label: "mean",
-            primary: true,
-            entries: [{ runName: "current", value: "1,240,000" }],
-            shiftFunction: { metric: "lines / sec", points },
-          },
-          {
-            label: "lines",
-            shared: true,
-            entries: [{ runName: "current", value: "85,000" }],
+            title: "lines / sec",
+            rows: [
+              {
+                label: "mean",
+                primary: true,
+                entries: [
+                  {
+                    runName: "current",
+                    value: "1,240,000",
+                    shiftFunction: { metric: "lines / sec", points },
+                  },
+                ],
+              },
+              {
+                label: "lines",
+                shared: true,
+                entries: [{ runName: "current", value: "85,000" }],
+              },
+            ],
           },
         ],
       },
     ],
-  };
-}
-
-test("renders a shift table with mean, percentiles, and reliability", () => {
-  const data: ReportData = {
-    groups: [{ name: "WESL Parser", benchmarks: [entryWithShift()] }],
     metadata: { timestamp: "", bencherVersion: "0" },
   };
   const md = markdownReport(data);
 
   expect(md).toContain("## WESL Parser");
-  expect(md).toContain("### reduceTwo");
   expect(md).toContain("#### lines / sec");
   expect(md).toContain(
     "| mean | 1,240,000 | 1,214,000 | -2.1% | [-3.8%, -0.4%] | better |",
@@ -102,77 +101,80 @@ test("renders a shift table with mean, percentiles, and reliability", () => {
 });
 
 test("scalar-only section (no baseline) renders a value table, lifts runs, skips empty titles", () => {
-  const entry: BenchmarkEntry = {
-    name: "concat",
-    samples: [],
-    stats: { min: 0, max: 0, avg: 0, p50: 0, p75: 0, p99: 0, p999: 0 },
-    sections: [
+  const data: ReportData = {
+    groups: [
       {
-        title: "time",
-        rows: [
-          { label: "mean", entries: [{ runName: "current", value: "1.2us" }] },
-        ],
-      },
-      {
-        title: "",
-        rows: [
+        name: "g",
+        benchmarks: [{ name: "concat", samples: [], stats: zeroStats }],
+        sections: [
           {
-            label: "runs",
-            shared: true,
-            entries: [{ runName: "current", value: "5" }],
+            title: "time",
+            rows: [
+              { label: "mean", entries: [{ runName: "current", value: "1.2us" }] },
+            ],
+          },
+          {
+            title: "",
+            rows: [
+              {
+                label: "runs",
+                shared: true,
+                entries: [{ runName: "current", value: "5" }],
+              },
+            ],
           },
         ],
       },
     ],
-  };
-  const data: ReportData = {
-    groups: [{ name: "g", benchmarks: [entry] }],
     metadata: { timestamp: "", bencherVersion: "0" },
   };
   const md = markdownReport(data);
 
   expect(md).toContain("#### time");
   expect(md).toContain("| mean | 1.2us |");
-  // runs is lifted to a benchmark metadata line, not left in a section
-  expect(md).toMatch(/### concat\n\nruns: 5/);
+  // runs is lifted to a case metadata line, not left in a section
+  expect(md).toMatch(/## g\n\nruns: 5/);
   // empty-title runs-only section emits nothing (no bare header)
   expect(md).not.toContain("#### \n");
 });
 
-test("comparable scalar section (GC) shows current vs baseline with Δ%", () => {
-  const entry: BenchmarkEntry = {
-    name: "parse",
-    samples: [],
-    stats: { min: 0, max: 0, avg: 0, p50: 0, p75: 0, p99: 0, p999: 0 },
-    sections: [
+test("comparable scalar section (GC) shows per-track values with inline Δ%", () => {
+  const data: ReportData = {
+    groups: [
       {
-        title: "gc",
-        rows: [
+        name: "g",
+        benchmarks: [{ name: "parse", samples: [], stats: zeroStats }],
+        sections: [
           {
-            label: "alloc/iter",
-            comparisonCI: {
-              percent: -12.5,
-              ci: [-12.5, -12.5],
-              direction: "uncertain",
-            },
-            entries: [
-              { runName: "current", value: "1.2KB" },
-              { runName: "baseline", value: "1.4KB" },
+            title: "gc",
+            rows: [
+              {
+                label: "alloc/iter",
+                entries: [
+                  {
+                    runName: "current",
+                    value: "1.2KB",
+                    comparisonCI: {
+                      percent: -12.5,
+                      ci: [-12.5, -12.5],
+                      direction: "uncertain",
+                    },
+                  },
+                  { runName: "baseline", value: "1.4KB", isBaseline: true },
+                ],
+              },
             ],
           },
         ],
       },
     ],
-  };
-  const data: ReportData = {
-    groups: [{ name: "g", benchmarks: [entry] }],
     metadata: { timestamp: "", bencherVersion: "0" },
   };
   const md = markdownReport(data);
 
   expect(md).toContain("#### gc");
-  expect(md).toContain("| metric | current | baseline | Δ% |");
-  expect(md).toContain("| alloc/iter | 1.2KB | 1.4KB | -12.5% |");
+  expect(md).toContain("| metric | current | baseline |");
+  expect(md).toContain("| alloc/iter | 1.2KB (-12.5%) | 1.4KB |");
 });
 
 /** Batched samples as a global ramp, so percentile tails are genuinely sparse.

@@ -27,29 +27,28 @@ export interface ReportData {
   };
 }
 
-/** A named group of benchmarks, optionally compared against a baseline. */
+/** A named group of benchmarks (a matrix case), optionally compared against a
+ *  baseline. Its sections are track-columned: one ViewerEntry per display track
+ *  (baseline + comparison variants), built once in the prep layer. */
 export interface BenchmarkGroup {
   name: string;
   baseline?: BenchmarkEntry;
   benchmarks: BenchmarkEntry[];
   warnings?: string[];
+
+  /** Case-level report sections, one ViewerEntry per track. The trimmed
+   *  (slow-outlier-removed) view; rawSections holds the untrimmed view, present
+   *  when trimming changed something (otherwise the two views are identical). */
+  sections?: ViewerSection[];
+  rawSections?: ViewerSection[];
 }
 
-/** One benchmark's raw data, statistics, and optional comparison results.
- *  sections / comparisonCI hold the trimmed (slow-outlier-removed) view.
- *  rawSections / rawComparisonCI hold the untrimmed view, present when
- *  trimming had any effect (otherwise the two views are identical). */
+/** One benchmark's raw per-series data and statistics: the samples and
+ *  profiling streams the Samples tab, the detail modal, and the analyze command
+ *  read. Derived comparison sections live on the enclosing BenchmarkGroup
+ *  (track-columned), not here. */
 export interface BenchmarkEntry {
   name: string;
-
-  /** Display name of the sibling variant used as this case's shared baseline
-   *  (matrix baselineVariant mode), for the "vs <name> (baseline)" header. Set
-   *  on the compared variants; undefined in version (baselineDir) comparisons. */
-  baselineLabel?: string;
-
-  /** True for the variant that serves as the case's shared baseline, so its
-   *  header reads "<name> (baseline)" rather than carrying a verdict. */
-  isBaselineVariant?: boolean;
 
   /** Per-benchmark metadata (e.g. linesOfCode) for display transforms and for
    *  agents reading the archive without recomputing stats. */
@@ -68,15 +67,10 @@ export interface BenchmarkEntry {
   stats: BenchmarkStats;
   heapSize?: { min: number; max: number; avg: number };
   totalTime?: number;
-  sections?: ViewerSection[];
-  rawSections?: ViewerSection[];
   coverageSummary?: CoverageSummary;
   heapSummary?: HeapSummary;
-  comparisonCI?: DifferenceCI;
-  rawComparisonCI?: DifferenceCI;
   /** This benchmark's own paired baseline (matrix variants each compare against
-   *  their own), for diagnostics. The group baseline is the shared-baseline
-   *  (suite) case; one of the two is present when a comparison was made. */
+   *  their own), for the analyze command's per-batch diagnostics. */
   baseline?: BenchmarkEntry;
 }
 
@@ -107,11 +101,10 @@ export interface ViewerSection {
   placement?: "footer";
 }
 
-/** A stat row with per-run values and optional comparison CI. */
+/** A stat row: one ViewerEntry per track (baseline + comparison variants). */
 export interface ViewerRow {
   label: string;
   entries: ViewerEntry[];
-  comparisonCI?: DifferenceCI;
   shared?: boolean;
 
   /** The metric row of a metric section: drives the headline and shift fan. */
@@ -119,10 +112,6 @@ export interface ViewerRow {
 
   /** Short stat label for the headline, e.g. "mean", "p50". Set on metric rows. */
   statLabel?: string;
-
-  /** Per-percentile diff distribution for the shift-function plot, present on
-   *  the primary row of a comparable section when a baseline exists. */
-  shiftFunction?: ShiftFunction;
 }
 
 /** Diff across the whole distribution: one entry per displayed percentile.
@@ -169,11 +158,23 @@ export interface ShiftRun {
   bootstrapCI: BootstrapCIData;
 }
 
-/** A single run's value for a stat. */
+/** A single track's cell in a row: its value and distribution, plus (for a
+ *  comparison track) its diff vs the case baseline. */
 export interface ViewerEntry {
   runName: string;
   value: string;
   bootstrapCI?: BootstrapCIData;
+
+  /** True for the reference (baseline) track: carries no Δ% or shift. */
+  isBaseline?: boolean;
+
+  /** This track's comparison vs the case baseline. Absent on the baseline track
+   *  and on non-comparable rows. */
+  comparisonCI?: DifferenceCI;
+
+  /** This track's per-percentile diff distribution for the shift-function plot,
+   *  present on the primary metric row of a comparison track. */
+  shiftFunction?: ShiftFunction;
 }
 
 /** Bootstrap CI data for inline visualization. */
