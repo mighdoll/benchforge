@@ -15,7 +15,11 @@ import type {
   VariantResult,
 } from "./BenchMatrix.ts";
 import { buildRunnerOptions, resolveCases } from "./BenchMatrix.ts";
-import { buildMatrixPlan, runMatrixPlan } from "./MatrixRun.ts";
+import {
+  buildMatrixPlan,
+  inlineCaseDataMap,
+  runMatrixPlan,
+} from "./MatrixRun.ts";
 import { discoverVariants } from "./VariantLoader.ts";
 
 /** Resolved options for a single calibration benchmark from a variant dir. */
@@ -65,10 +69,11 @@ export async function runMatrixCalibration<T>(
   const ctx = await createDirContext(matrix, options);
   const caseId = ctx.caseIds[0];
   const label = `${variantId}/${caseId}`;
+  const caseData = await inlineCaseDataMap(matrix, [caseId]);
   const variantArgs: RunMatrixVariantParams = {
     source: { variantDir: matrix.variantDir!, variantId },
     caseId,
-    caseData: matrix.cases && !matrix.casesModule ? caseId : undefined,
+    caseData: matrix.casesModule ? undefined : caseData?.get(caseId),
     casesModule: matrix.casesModule,
     options: ctx.runnerOpts,
     useWorker: ctx.useWorker,
