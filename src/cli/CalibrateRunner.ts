@@ -33,9 +33,15 @@ function pct(n: number): string {
   return `${n.toFixed(2)}%`;
 }
 
+/** A run straddles a GC-count step when its modal batch count holds less than
+ *  this share of batches: most batches do N full GCs, the rest do N+/-1, and
+ *  the per-batch mean jumps by a whole major GC between them. Allows a few stray
+ *  batches without warning, but flags a genuine split. */
+const minModalShare = 0.9;
+
 /** Conclusion block: noise floor estimates and the suggested margin. */
 function conclusion(result: CalibrationResult): string {
-  const { runs, batches, summary: s, fullGcsPerBatch } = result;
+  const { runs, batches, summary: s, fullGcsPerBatch, gcHistogram } = result;
   const { bold, yellow } = colors;
   const lines = [
     bold(
@@ -46,6 +52,11 @@ function conclusion(result: CalibrationResult): string {
     `  within-run CI half-width ${pct(s.meanCiHalfWidth).padStart(7)}   mean`,
     bold(`  suggested --equiv-margin ${pct(s.suggestedMargin).padStart(7)}`),
   ];
+  if (gcHistogram && fullGcsPerBatch !== undefined) {
+    lines.push(
+      `  full GCs/batch           ${formatGcHistogram(gcHistogram)}   (mean ${fullGcsPerBatch.toFixed(1)})`,
+    );
+  }
   if (s.overconfident) {
     lines.push(
       "",
@@ -69,6 +80,33 @@ function conclusion(result: CalibrationResult): string {
       ),
       yellow("    timing varies between runs. Increase --duration."),
     );
+  } else if (gcHistogram && straddlesStep(gcHistogram)) {
+    lines.push(
+      "",
+      yellow(
+        `  warning: full GCs/batch varies across batches (${formatGcHistogram(gcHistogram)}) --`,
+      ),
+      yellow(
+        "    some batches do a major collection the others don't; the per-batch",
+      ),
+      yellow("    mean jumps by a whole GC. Adjust --duration so every batch"),
+      yellow("    lands on the same plateau."),
+    );
   }
   return lines.join("\n");
+}
+
+/** Render a GC-per-batch histogram as a one-line tally, e.g. "2x97  3x3". */
+function formatGcHistogram(hist: { value: number; count: number }[]): string {
+  return hist.map(b => `${b.value}x${b.count}`).join("  ");
+}
+
+/** True when batches don't share one GC plateau: the modal bucket holds less
+ *  than minModalShare of all batches, so a meaningful fraction do a different
+ *  number of full GCs. A single plateau (one bucket) never straddles. */
+function straddlesStep(hist: { value: number; count: number }[]): boolean {
+  if (hist.length < 2) return false;
+  const total = hist.reduce((sum, b) => sum + b.count, 0);
+  const modal = Math.max(...hist.map(b => b.count));
+  return modal / total < minModalShare;
 }
