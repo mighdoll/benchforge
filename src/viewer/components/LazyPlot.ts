@@ -47,7 +47,8 @@ export function useResponsivePlot(
           ref.current.replaceChildren(el);
         })
         .catch(err => {
-          if (!cancelled) showPlotError(ref.current, err, errorLabel);
+          // always log; skip the DOM write once the effect is cancelled
+          showPlotError(cancelled ? null : ref.current, err, errorLabel);
         });
     }
     const observer = new ResizeObserver(entries => {
