@@ -56,6 +56,7 @@ export class ServerProvider implements DataProvider {
     string,
     Promise<ViewerSpeedscopeFile | null>
   >();
+  private coverageCache?: Promise<ViewerCoverageData | null>;
 
   readonly config: ViewerConfig;
   constructor(config: ViewerConfig) {
@@ -93,8 +94,6 @@ export class ServerProvider implements DataProvider {
     }
     return cached;
   }
-
-  private coverageCache?: Promise<ViewerCoverageData | null>;
 
   fetchCoverageData(): Promise<ViewerCoverageData | null> {
     if (!this.config.hasCoverage) return Promise.resolve(null);
