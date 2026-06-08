@@ -79,12 +79,9 @@ export function prepareHtmlData(
 /** Build default sections when caller doesn't provide custom ones */
 function defaultSections(cliArgs?: Record<string, unknown>): ReportSection[] {
   const hasGc = cliArgs?.["gc-stats"] === true;
-  const sections = [
-    timeSection,
-    hasGc ? gcStatsSection : undefined,
-    runsSection,
-  ];
-  return sections.filter((s): s is ReportSection => s !== undefined);
+  return [timeSection, hasGc ? gcStatsSection : undefined, runsSection].filter(
+    (s): s is ReportSection => s !== undefined,
+  );
 }
 
 /** @return case data: raw per-series benchmarks plus the case-level,
