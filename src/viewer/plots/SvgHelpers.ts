@@ -126,6 +126,25 @@ export function ensureHatchPattern(svg: SVGSVGElement): string {
   return id;
 }
 
+/** Add a rectangular clipPath to the SVG defs (reusing if present) and return
+ *  its id, for clipping content to the plot rect. */
+export function ensureClipRect(
+  svg: SVGSVGElement,
+  id: string,
+  x: number,
+  y: number,
+  w: number,
+  h: number,
+): string {
+  if (!svg.querySelector(`#${id}`)) {
+    const clip = svgEl("clipPath");
+    clip.setAttribute("id", id);
+    clip.appendChild(rect(x, y, w, h, {}));
+    ensureDefs(svg).appendChild(clip);
+  }
+  return id;
+}
+
 function ensureDefs(svg: SVGSVGElement): SVGDefsElement {
   let defs = svg.querySelector("defs") as SVGDefsElement | null;
   if (!defs) {
