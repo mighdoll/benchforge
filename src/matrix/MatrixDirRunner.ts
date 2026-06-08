@@ -11,8 +11,8 @@ import {
 import type { VariantSource } from "../runners/RunnerUtils.ts";
 import type {
   BenchMatrix,
+  MatrixResults,
   RunMatrixOptions,
-  VariantResult,
 } from "./BenchMatrix.ts";
 import { buildRunnerOptions, resolveCases } from "./BenchMatrix.ts";
 import {
@@ -35,7 +35,7 @@ interface DirMatrixContext {
 export async function runMatrixWithDir<T>(
   matrix: BenchMatrix<T>,
   options: RunMatrixOptions,
-): Promise<{ name: string; variants: VariantResult[] }> {
+): Promise<MatrixResults> {
   const allVariantIds = await discoverVariants(matrix.variantDir!);
   if (allVariantIds.length === 0) {
     throw new Error(`No variants found in ${matrix.variantDir}`);
@@ -51,7 +51,7 @@ export async function runMatrixWithDir<T>(
     variantIds,
     dirPlan(matrix, baselineIds),
   );
-  return runMatrixPlan(matrix.name, plan);
+  return runMatrixPlan(matrix.name, plan, matrix.baselineVariant);
 }
 
 /** Measure the harness noise floor for one variant/case (current vs current).

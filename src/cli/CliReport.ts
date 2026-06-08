@@ -153,11 +153,23 @@ function variantReport(variantId: string, c: CaseResult): BenchmarkReport {
 
 /** @return the sibling variant id used as the shared baseline for a case, when
  *  there is exactly one (baselineVariant mode). Undefined when each variant is
- *  its own baseline (baselineDir version comparison) or there is no baseline. */
+ *  its own baseline (baselineDir version comparison) or there is no baseline.
+ *
+ *  The configured `matrix.baselineVariant` is authoritative: it selects
+ *  peer-baseline mode even when the reference variant was filtered out (the
+ *  surviving variants still diff against their own interleaved measurement of
+ *  it). Fall back to inferring the shared ref from the cases' baselineIds when
+ *  the matrix didn't carry a configured baselineVariant. */
 function baselineVariantId(
   matrix: MatrixResults,
   caseId: string,
 ): string | undefined {
+  const caseUsesBaseline = matrix.variants.some(
+    v => v.cases.find(c => c.caseId === caseId)?.baselineId,
+  );
+  if (matrix.baselineVariant)
+    return caseUsesBaseline ? matrix.baselineVariant : undefined;
+
   const variantIds = new Set(matrix.variants.map(v => v.id));
   const refs = new Set<string>();
   for (const variant of matrix.variants) {
