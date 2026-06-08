@@ -73,6 +73,7 @@ export function ComparisonBadge(
         {compact ? formatPct(ci.percent) : directionLabels[ci.direction]}
       </span>
       {ci.histogram && <CIPlotMount ci={ci} compact={compact} onOpen={onOpen} />}
+      {!compact && <span class="comparison-pct">{formatPct(ci.percent)}</span>}
     </span>
   );
 }

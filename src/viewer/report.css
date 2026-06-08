@@ -138,6 +138,18 @@
   gap: 6px;
 }
 
+/* Headline Δ% point estimate shown to the right of the verdict CI chart. */
+.report-panel .comparison-pct {
+  font-size: 14px;
+  font-weight: 700;
+  color: #444;
+  font-variant-numeric: tabular-nums;
+}
+:root[data-theme="dark"] .report-panel .comparison-pct { color: #ddd; }
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) .report-panel .comparison-pct { color: #ddd; }
+}
+
 /* --- CI plots --- */
 
 .report-panel .ci-plot-container { display: inline-block; vertical-align: middle; }
@@ -606,7 +618,7 @@
 /* --- Sparkline table: one row per track, distributions sharing an x-axis --- */
 .report-panel .sparkline-table {
   display: grid;
-  grid-template-columns: minmax(80px, max-content) max-content max-content;
+  grid-template-columns: minmax(80px, max-content) max-content;
   column-gap: 14px;
   row-gap: 2px;
   align-items: center;
@@ -623,21 +635,11 @@
 .report-panel .sparkline-cell { line-height: 0; }
 .report-panel .sparkline-cell.ci-clickable { cursor: pointer; }
 
-.report-panel .sparkline-delta {
-  text-align: right;
-  font-size: 13px;
-  font-weight: 600;
-  color: #555;
-  font-variant-numeric: tabular-nums;
-}
-
 :root[data-theme="dark"] .report-panel .track-matrix .m-label,
 :root[data-theme="dark"] .report-panel .track-matrix .m-delta { color: #999; }
 :root[data-theme="dark"] .report-panel .track-matrix .m-val { color: #ddd; }
-:root[data-theme="dark"] .report-panel .sparkline-delta { color: #ccc; }
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) .report-panel .track-matrix .m-label,
   :root:not([data-theme="light"]) .report-panel .track-matrix .m-delta { color: #999; }
   :root:not([data-theme="light"]) .report-panel .track-matrix .m-val { color: #ddd; }
-  :root:not([data-theme="light"]) .report-panel .sparkline-delta { color: #ccc; }
 }
