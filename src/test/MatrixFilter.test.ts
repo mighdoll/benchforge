@@ -1,6 +1,10 @@
 import { expect, test } from "vitest";
 import type { BenchMatrix } from "../matrix/BenchMatrix.ts";
-import { filterMatrix, parseMatrixFilter } from "../matrix/MatrixFilter.ts";
+import {
+  filterMatrix,
+  parseMatrixFilter,
+  resolveCaseIds,
+} from "../matrix/MatrixFilter.ts";
 
 const inlineMatrix: BenchMatrix<string> = {
   name: "Test",
@@ -15,6 +19,12 @@ const inlineMatrix: BenchMatrix<string> = {
 const noExplicitCases: BenchMatrix = {
   name: "NoCase",
   variants: { fast: () => {} },
+};
+
+const caseDataMatrix: BenchMatrix<number> = {
+  name: "CaseData",
+  variants: { fast: (n: number) => n * 2 },
+  caseData: { small: 1, large: () => 1000 },
 };
 
 test("parseMatrixFilter: case/variant", () => {
@@ -114,4 +124,19 @@ test("filterMatrix: multiple matching variants", async () => {
 test("filterMatrix: implicit default case returns default", async () => {
   const result = await filterMatrix(noExplicitCases, { case: "default" });
   expect(result.filteredCases).toEqual(["default"]);
+});
+
+test("resolveCaseIds: inline caseData keys", async () => {
+  expect(await resolveCaseIds(caseDataMatrix)).toEqual(["small", "large"]);
+});
+
+test("filterMatrix: case filter selects an inline caseData case", async () => {
+  const result = await filterMatrix(caseDataMatrix, { case: "large" });
+  expect(result.filteredCases).toEqual(["large"]);
+});
+
+test("filterMatrix: no matching caseData case throws", async () => {
+  await expect(
+    filterMatrix(caseDataMatrix, { case: "nonexistent" }),
+  ).rejects.toThrow('No cases match filter: "nonexistent"');
 });

@@ -42,10 +42,12 @@ export async function filterMatrix<T>(
   return { ...matrix, filteredCases, filteredVariants };
 }
 
-/** Collect all case IDs from either casesModule or inline cases */
+/** Collect all case IDs from inline caseData, a casesModule, or inline cases.
+ *  Inline caseData keys take precedence, matching resolveCases in BenchMatrix. */
 export async function resolveCaseIds<T>(
   matrix: BenchMatrix<T>,
 ): Promise<string[] | undefined> {
+  if (matrix.caseData) return Object.keys(matrix.caseData);
   if (matrix.casesModule)
     return (await loadCasesModule(matrix.casesModule)).cases;
   return matrix.cases;
