@@ -233,16 +233,17 @@ async function runBatchedTabs(
     process.stderr.write(msg);
   };
 
-  const {
-    results: [current],
-    baseline,
-  } = await runBatched(
+  const batched = await runBatched(
     [runCurrent],
     runBaseline,
     Math.max(args.batches, 2),
     args["warmup-batch"] ?? false,
     progress,
   );
+  const {
+    results: [current],
+    baseline,
+  } = batched;
   process.stderr.write("\r" + " ".repeat(50) + "\r");
 
   const baseName = baselineUrl ? nameFromUrl(baselineUrl) : undefined;

@@ -183,13 +183,11 @@ async function runMatrixCalibratePipeline(
       "--calibrate requires a directory-based matrix (variantDir)",
     );
 
+  const { filteredCases, filteredVariants } = filtered;
+  const runOpts = { ...options, filteredCases, filteredVariants };
   const result = await runMatrixCalibration(
     filtered,
-    {
-      ...options,
-      filteredCases: filtered.filteredCases,
-      filteredVariants: filtered.filteredVariants,
-    },
+    runOpts,
     reportCalibrateRun,
   );
   console.log(formatCalibration(result));
@@ -219,13 +217,8 @@ export async function runFilteredMatrices(
       continue;
     }
     const { filteredCases, filteredVariants } = filtered;
-    results.push(
-      await runMatrix(filtered, {
-        ...options,
-        filteredCases,
-        filteredVariants,
-      }),
-    );
+    const runOpts = { ...options, filteredCases, filteredVariants };
+    results.push(await runMatrix(filtered, runOpts));
   }
   if (!results.length && lastFilterError) throw lastFilterError;
   return results;

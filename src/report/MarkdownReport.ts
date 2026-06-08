@@ -67,8 +67,12 @@ function sectionMarkdown(section: ViewerSection): string[] {
     const shared = sharedTable(section.rows.filter(r => r.shared));
     return [...header, ...tables, shared].filter((s): s is string => !!s);
   }
-  const table = trackTable(section.rows.filter(r => !isRunsRow(r) && !r.shared));
-  const shared = sharedTable(section.rows.filter(r => r.shared && !isRunsRow(r)));
+  const table = trackTable(
+    section.rows.filter(r => !isRunsRow(r) && !r.shared),
+  );
+  const shared = sharedTable(
+    section.rows.filter(r => r.shared && !isRunsRow(r)),
+  );
   return [...header, table, shared].filter((s): s is string => !!s);
 }
 
@@ -85,7 +89,9 @@ function shiftTables(primary: ViewerRow): string[] {
 /** Per-variant diagnostics (warmup shape, full GC by batch), labeled with the
  *  variant name when a case has more than one. */
 function benchDiagnostics(entry: BenchmarkEntry, labeled: boolean): string[] {
-  const warmup = entry.warmupShape ? warmupShapeMarkdown(entry.warmupShape) : [];
+  const warmup = entry.warmupShape
+    ? warmupShapeMarkdown(entry.warmupShape)
+    : [];
   const gc = entry.gcByBatch ? gcByBatchMarkdown(entry.gcByBatch) : [];
   const parts = [...warmup, ...gc];
   if (!parts.length) return [];
@@ -100,7 +106,8 @@ function warmupShapeMarkdown(w: WarmupShape): string[] {
   const header = "| region | median | vs plateau |\n|---|---|---|";
   const last = w.regions.length - 1;
   const rows = w.regions.map((r, i) => {
-    const vs = i === last ? "plateau" : formatSignedPercent(r.pctVsPlateau * 100);
+    const vs =
+      i === last ? "plateau" : formatSignedPercent(r.pctVsPlateau * 100);
     return `| ${r.label} | ${timeMs(r.medianMs)} | ${vs} |`;
   });
   const note =
@@ -169,8 +176,12 @@ function trackTable(rows: ViewerRow[]): string | undefined {
   if (!usable.length) return undefined;
   const head = ["metric", ...usable[0].entries.map(e => e.runName)];
   const sep = head.map(() => "---");
-  const body = usable.map(r => `| ${[r.label, ...r.entries.map(cell)].join(" | ")} |`);
-  return [`| ${head.join(" | ")} |`, `| ${sep.join(" | ")} |`, ...body].join("\n");
+  const body = usable.map(
+    r => `| ${[r.label, ...r.entries.map(cell)].join(" | ")} |`,
+  );
+  return [`| ${head.join(" | ")} |`, `| ${sep.join(" | ")} |`, ...body].join(
+    "\n",
+  );
 }
 
 /** One track cell: its value, with the Δ% appended on comparison tracks. */
@@ -193,9 +204,8 @@ function sharedTable(rows: ViewerRow[]): string | undefined {
  *  Δ% is current relative to baseline in the metric's own units; the verdict
  *  column carries the good/bad reading (it accounts for metric direction). */
 function shiftTable(shift: ShiftFunction, label?: string): string {
-  const title = label
-    ? `${label}: ${shift.metric} (Δ% vs baseline)`
-    : `${shift.metric} (Δ% vs baseline)`;
+  const prefix = label ? `${label}: ` : "";
+  const title = `${prefix}${shift.metric} (Δ% vs baseline)`;
   const header = "| stat | current | baseline | Δ% | 95% CI | verdict |";
   const sep = "|---|---|---|---|---|---|";
   const rows = shift.points.map(pointRow);

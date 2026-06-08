@@ -47,13 +47,9 @@ export async function inlineCaseDataMap<T>(
   caseIds: string[],
 ): Promise<Map<string, unknown> | undefined> {
   if (matrix.caseData) {
-    const entries = await Promise.all(
-      caseIds.map(
-        async id =>
-          [id, await resolveInlineCase(matrix.caseData!, id)] as const,
-      ),
-    );
-    return new Map(entries);
+    const resolve = async (id: string) =>
+      [id, await resolveInlineCase(matrix.caseData!, id)] as const;
+    return new Map(await Promise.all(caseIds.map(resolve)));
   }
   if (matrix.casesModule) return undefined;
   return new Map(caseIds.map(id => [id, id]));
@@ -98,7 +94,14 @@ async function runVariantCases<T>(
       ? computeDeltaPercent(baseline, measured)
       : undefined;
     const baselineId = baselineSource?.variantId;
-    cases.push({ caseId, measured, metadata, baseline, baselineId, deltaPercent });
+    cases.push({
+      caseId,
+      measured,
+      metadata,
+      baseline,
+      baselineId,
+      deltaPercent,
+    });
   }
   return cases;
 }

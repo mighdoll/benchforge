@@ -41,9 +41,8 @@ export function warmupShape(r: MeasuredResults): WarmupShape | undefined {
   const { samples, batchOffsets } = r;
   if (!samples?.length) return undefined;
 
-  const batches = splitBatches(samples, batchOffsets).filter(
-    b => b.length >= minBatchSamples,
-  );
+  const split = splitBatches(samples, batchOffsets);
+  const batches = split.filter(b => b.length >= minBatchSamples);
   if (!batches.length) return undefined;
 
   const plateau = regionBounds.length - 1;
@@ -51,7 +50,8 @@ export function warmupShape(r: MeasuredResults): WarmupShape | undefined {
   const regions = regionBounds.map((bound, i) => ({
     label: bound.label,
     medianMs: median(perBatch.map(b => b[i])),
-    pctVsPlateau: i === plateau ? 0 : median(perBatch.map(b => b[i] / b[plateau] - 1)),
+    pctVsPlateau:
+      i === plateau ? 0 : median(perBatch.map(b => b[i] / b[plateau] - 1)),
   }));
   return { batches: batches.length, regions };
 }

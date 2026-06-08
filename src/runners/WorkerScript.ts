@@ -203,14 +203,12 @@ process.on("message", async (message: RunMessage) => {
     sendAndExit(result, 0);
   } catch (error) {
     const err = error instanceof Error ? error : undefined;
-    sendAndExit(
-      {
-        type: "error",
-        error: err?.message ?? String(error),
-        stack: err?.stack,
-      },
-      1,
-    );
+    const errorMsg: ErrorMessage = {
+      type: "error",
+      error: err?.message ?? String(error),
+      stack: err?.stack,
+    };
+    sendAndExit(errorMsg, 1);
   }
 });
 

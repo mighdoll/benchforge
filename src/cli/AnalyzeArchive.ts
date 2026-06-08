@@ -120,9 +120,8 @@ function printBatchTable(
       continue;
     }
     const baseMed = (timeMs(median(baselines[i])) ?? "").padStart(10);
-    const delta = formatDelta(medianDelta(benches[i], baselines[i])).padStart(
-      8,
-    );
+    const pct = medianDelta(benches[i], baselines[i]);
+    const delta = formatDelta(pct).padStart(8);
     const order = i % 2 === 0 ? dim(" B>C") : dim(" C>B");
     console.log(`  ${idx} ${n}  ${med}  ${baseMed}  ${delta}${order}`);
   }

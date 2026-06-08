@@ -124,7 +124,11 @@ function caseGroups(matrix: MatrixResults): ReportGroup[] {
     // No group-level baseline: each variant carries its own (a single shared
     // baseline would mislabel "vs <one variant>" for the others). The shared
     // baseline variant is named instead, so the viewer can label it.
-    return { name, reports, baselineVariantId: baselineVariantId(matrix, caseId) };
+    return {
+      name,
+      reports,
+      baselineVariantId: baselineVariantId(matrix, caseId),
+    };
   });
 }
 
@@ -163,11 +167,7 @@ function variantReport(variantId: string, c: CaseResult): BenchmarkReport {
 
 /** Assemble report sections from CLI flags (time/gc/runs). */
 export function buildReportSections(gcStats: boolean): ReportSection[] {
-  return [
-    timeSection,
-    ...(gcStats ? [gcStatsSection] : []),
-    runsSection,
-  ];
+  return [timeSection, ...(gcStats ? [gcStatsSection] : []), runsSection];
 }
 
 /** Build sections from CLI feature flags (time/gc/runs). */

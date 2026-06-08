@@ -59,14 +59,8 @@ export async function runBenchmark<T = unknown>({
 export async function runMatrixVariant(
   params: RunMatrixVariantParams,
 ): Promise<MeasuredResults[]> {
-  const {
-    source,
-    caseId,
-    caseData,
-    casesModule,
-    options,
-    useWorker = true,
-  } = params;
+  const { source, caseId, caseData, casesModule, options } = params;
+  const { useWorker = true } = params;
   const name = `${source.variantId}/${caseId}`;
 
   if (!useWorker) return runMatrixVariantDirect(params, name);

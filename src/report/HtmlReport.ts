@@ -53,13 +53,9 @@ export function prepareHtmlData(
   groups: ReportGroup[],
   options: PrepareHtmlOptions,
 ): ReportData {
-  const { cliArgs, currentVersion, baselineVersion, equivMargin, noBatchTrim } =
-    options;
-  const comparison: ComparisonOptions = {
-    equivMargin,
-    noBatchTrim,
-    resamples: options.resamples,
-  };
+  const { cliArgs, currentVersion, baselineVersion } = options;
+  const { equivMargin, noBatchTrim, resamples } = options;
+  const comparison: ComparisonOptions = { equivMargin, noBatchTrim, resamples };
   const sections = options.sections ?? defaultSections(cliArgs);
   return {
     groups: groups.map(g => prepareGroupData(g, sections, comparison)),
@@ -81,15 +77,14 @@ export function prepareHtmlData(
 }
 
 /** Build default sections when caller doesn't provide custom ones */
-function defaultSections(
-  cliArgs?: Record<string, unknown>,
-): ReportSection[] {
+function defaultSections(cliArgs?: Record<string, unknown>): ReportSection[] {
   const hasGc = cliArgs?.["gc-stats"] === true;
-  return [
+  const sections = [
     timeSection,
     hasGc ? gcStatsSection : undefined,
     runsSection,
-  ].filter((s): s is ReportSection => s !== undefined);
+  ];
+  return sections.filter((s): s is ReportSection => s !== undefined);
 }
 
 /** @return case data: raw per-series benchmarks plus the case-level,
@@ -205,7 +200,8 @@ function buildRawCaseSections(
   const untrimmed = (m?: MeasuredResults) =>
     !m || trimOutlierBatches(m.samples, m.batchOffsets).trimCount === 0;
   const anyTrimmed = ctx.tracks.some(
-    t => !untrimmed(t.measured) || (t.baseline && !untrimmed(t.baseline.measured)),
+    t =>
+      !untrimmed(t.measured) || (t.baseline && !untrimmed(t.baseline.measured)),
   );
   if (!anyTrimmed) return undefined;
 
@@ -299,14 +295,11 @@ function buildWarnings(
   lowBatches: boolean,
 ): string[] | undefined {
   const parts: string[] = [];
-  if (singleBatch)
-    parts.push(
-      "Confidence intervals may be too narrow (single batch). Use --batches for more accurate intervals.",
-    );
-  if (lowBatches)
-    parts.push(
-      `Too few batches for reliable comparison (need ${minBatches}+).`,
-    );
+  const single =
+    "Confidence intervals may be too narrow (single batch). Use --batches for more accurate intervals.";
+  const low = `Too few batches for reliable comparison (need ${minBatches}+).`;
+  if (singleBatch) parts.push(single);
+  if (lowBatches) parts.push(low);
   return parts.length ? parts : undefined;
 }
 

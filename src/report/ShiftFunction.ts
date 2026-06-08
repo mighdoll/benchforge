@@ -156,14 +156,19 @@ function shiftStats(
     stats,
     { equivMargin: comparison?.equivMargin, noBatchTrim, resamples },
   );
-  const curAbs = bootstrapCIs(current.samples, current.batchOffsets, stats, {
-    noTrim: noBatchTrim,
-    resamples,
-  });
-  const baseAbs = bootstrapCIs(baseline.samples, baseline.batchOffsets, stats, {
-    noTrim: noBatchTrim,
-    resamples,
-  });
+  const absOpts = { noTrim: noBatchTrim, resamples };
+  const curAbs = bootstrapCIs(
+    current.samples,
+    current.batchOffsets,
+    stats,
+    absOpts,
+  );
+  const baseAbs = bootstrapCIs(
+    baseline.samples,
+    baseline.batchOffsets,
+    stats,
+    absOpts,
+  );
   return { diffs, curAbs, baseAbs };
 }
 
