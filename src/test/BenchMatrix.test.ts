@@ -291,6 +291,33 @@ test("baselineVariant with inline variants", async () => {
   expect(typeof slowVariant?.cases[0].deltaPercent).toBe("number");
 });
 
+test("filtering to a non-baseline inline variant keeps the comparison", async () => {
+  const matrix: BenchMatrix = {
+    name: "FilteredBaseline",
+    variants: {
+      fast: () => {},
+      slow: () => {
+        let _x = 0;
+        for (let i = 0; i < 1000; i++) _x++;
+      },
+    },
+    baselineVariant: "fast",
+  };
+  // Filter to slow only; the baseline (fast) is excluded from the run set but
+  // must still be available to produce a delta/comparison.
+  const results = await runMatrix(matrix, {
+    iterations: 20,
+    ...fast,
+    filteredVariants: ["slow"],
+  });
+  expect(results.variants).toHaveLength(1);
+  const slow = results.variants[0];
+  expect(slow.id).toBe("slow");
+  expect(slow.cases[0].baseline).toBeDefined();
+  expect(slow.cases[0].baselineId).toBe("fast");
+  expect(typeof slow.cases[0].deltaPercent).toBe("number");
+});
+
 test("baselineVariant skips when variant not found", async () => {
   const matrix: BenchMatrix = {
     name: "BadBaselineVariant",

@@ -23,16 +23,18 @@ export async function runMatrixInline<T>(
 
   const allVariants = Object.entries(matrix.variants!);
   const { filteredVariants } = options;
-  const selected = filteredVariants
-    ? allVariants.filter(([id]) => filteredVariants.includes(id))
-    : allVariants;
-  const sources = new Map(selected.map(([id, v]) => [id, inlineSource(id, v)]));
+  // Serialize every variant so a filtered run can still resolve its baseline
+  // for comparison, but only run (plan) the filtered set.
+  const sources = new Map(
+    allVariants.map(([id, v]) => [id, inlineSource(id, v)]),
+  );
+  const runIds = filteredVariants ?? allVariants.map(([id]) => id);
   const baselineId = matrix.baselineVariant;
 
   const plan = await buildMatrixPlan(
     matrix,
     options,
-    [...sources.keys()],
+    runIds,
     variantId => ({
       source: sources.get(variantId)!,
       baselineSource:
