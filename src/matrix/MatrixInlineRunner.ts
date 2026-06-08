@@ -2,9 +2,9 @@ import type { VariantSource } from "../runners/RunnerUtils.ts";
 import {
   type BenchMatrix,
   isStatefulVariant,
+  type MatrixResults,
   type RunMatrixOptions,
   type Variant,
-  type VariantResult,
 } from "./BenchMatrix.ts";
 import { buildMatrixPlan, runMatrixPlan } from "./MatrixRun.ts";
 
@@ -15,7 +15,7 @@ import { buildMatrixPlan, runMatrixPlan } from "./MatrixRun.ts";
 export async function runMatrixInline<T>(
   matrix: BenchMatrix<T>,
   options: RunMatrixOptions,
-): Promise<{ name: string; variants: VariantResult[] }> {
+): Promise<MatrixResults> {
   if (matrix.baselineDir)
     throw new Error(
       "BenchMatrix with inline 'variants' cannot use 'baselineDir'. Use 'variantDir' instead.",
@@ -38,7 +38,7 @@ export async function runMatrixInline<T>(
         ? sources.get(baselineId)
         : undefined,
   }));
-  return runMatrixPlan(matrix.name, plan);
+  return runMatrixPlan(matrix.name, plan, baselineId);
 }
 
 /** Serialize an inline variant to a worker-reconstructable source. */

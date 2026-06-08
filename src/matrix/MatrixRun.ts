@@ -9,6 +9,7 @@ import type { VariantSource } from "../runners/RunnerUtils.ts";
 import type {
   BenchMatrix,
   CaseResult,
+  MatrixResults,
   RunMatrixOptions,
   VariantResult,
 } from "./BenchMatrix.ts";
@@ -91,11 +92,14 @@ export async function buildMatrixPlan<T>(
 }
 
 /** Run every variant over every case, batching and interleaving each variant
- *  with its paired baseline. Shared by the directory and inline matrix runners. */
+ *  with its paired baseline. Shared by the directory and inline matrix runners.
+ *  `baselineVariant` (the configured reference id) is stamped on the result so
+ *  the report keeps peer-baseline mode even when that variant is filtered out. */
 export async function runMatrixPlan<T>(
   name: string,
   plan: MatrixPlan<T>,
-): Promise<{ name: string; variants: VariantResult[] }> {
+  baselineVariant?: string,
+): Promise<MatrixResults> {
   const variants: VariantResult[] = [];
   for (const variantId of plan.variantIds) {
     variants.push({
@@ -103,7 +107,7 @@ export async function runMatrixPlan<T>(
       cases: await runVariantCases(variantId, plan),
     });
   }
-  return { name, variants };
+  return { name, variants, baselineVariant };
 }
 
 /** Run all cases for a single variant. */
