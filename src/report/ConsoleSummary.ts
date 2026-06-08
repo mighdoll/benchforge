@@ -43,9 +43,7 @@ function groupLines(group: BenchmarkGroup): string[] {
     .flatMap(e => trackLines(e, metric, group.name));
 }
 
-/** Headline + optional verdict for one track. The label is the group name when
- *  it already identifies the track (matrix "variant / case", whose track name is
- *  just the variant), else the track name prefixed by a distinct group name. */
+/** Headline line plus an optional verdict line for one track. */
 function trackLines(
   entry: ViewerEntry,
   metric: ViewerRow,

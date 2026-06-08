@@ -196,15 +196,18 @@ function cell(e: ViewerEntry): string {
   return v;
 }
 
+/** A count spread as "min..max (mean N)". */
 function spreadCounts(s: Spread): string {
   const range = s.min === s.max ? `${s.min}` : `${s.min}..${s.max}`;
   return `${range} (mean ${s.mean.toFixed(1)})`;
 }
 
+/** A time spread as "min..max (mean, CV%)". */
 function spreadTime(s: Spread): string {
   return `${timeMs(s.min)}..${timeMs(s.max)} (mean ${timeMs(s.mean)}, CV ${integer(s.cv * 100)}%)`;
 }
 
+/** A byte spread as "min..max (mean, CV%)". */
 function spreadBytes(s: Spread): string {
   return `${formatBytes(s.min)}..${formatBytes(s.max)} (mean ${formatBytes(s.mean)}, CV ${integer(s.cv * 100)}%)`;
 }

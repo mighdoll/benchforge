@@ -16,9 +16,8 @@ const { bold, dim, red, green, yellow } = colors;
 
 const blockFenceMultiplier = 3;
 
-/** Read an archive and print per-batch diagnostic analysis.
- * (for benchforge debugging/development purposes, not a general user tool)
- */
+/** Read an archive and print per-batch diagnostic analysis (a benchforge
+ *  development tool, not a general user tool). */
 export async function analyzeArchive(filePath: string): Promise<void> {
   const content = await readFile(resolve(filePath), "utf-8");
   const { report } = JSON.parse(content);

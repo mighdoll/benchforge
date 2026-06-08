@@ -192,10 +192,10 @@ export function classifyDirection(
   ci: [number, number],
   margin = 0,
 ): CIDirection {
-  if (ci[1] < -margin) return "faster"; // whole CI below -margin
-  if (ci[0] > margin) return "slower"; // whole CI above +margin
-  if (ci[0] >= -margin && ci[1] <= margin) return "equivalent"; // whole CI inside
-  return "uncertain"; // CI straddles a margin edge -> need more data
+  if (ci[1] < -margin) return "faster";
+  if (ci[0] > margin) return "slower";
+  if (ci[0] >= -margin && ci[1] <= margin) return "equivalent";
+  return "uncertain";
 }
 
 /** Build diff operations: mean/min/max first (non-destructive), then percentiles ascending.
