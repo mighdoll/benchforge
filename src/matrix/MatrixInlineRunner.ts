@@ -31,18 +31,13 @@ export async function runMatrixInline<T>(
   const runIds = filteredVariants ?? allVariants.map(([id]) => id);
   const baselineId = matrix.baselineVariant;
 
-  const plan = await buildMatrixPlan(
-    matrix,
-    options,
-    runIds,
-    variantId => ({
-      source: sources.get(variantId)!,
-      baselineSource:
-        baselineId && baselineId !== variantId
-          ? sources.get(baselineId)
-          : undefined,
-    }),
-  );
+  const plan = await buildMatrixPlan(matrix, options, runIds, variantId => ({
+    source: sources.get(variantId)!,
+    baselineSource:
+      baselineId && baselineId !== variantId
+        ? sources.get(baselineId)
+        : undefined,
+  }));
   return runMatrixPlan(matrix.name, plan);
 }
 

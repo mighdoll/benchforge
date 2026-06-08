@@ -125,7 +125,8 @@ function ScalarSection({ section }: { section: ViewerSection }) {
   const hasDelta = section.rows.some(r => r.entries.some(e => e.comparisonCI));
   const [showDelta, setShowDelta] = useState(true);
   const delta = showDelta && hasDelta;
-  const cols = `max-content ${tracks.map(() => (delta ? "max-content max-content" : "max-content")).join(" ")}`;
+  const trackCols = delta ? "max-content max-content" : "max-content";
+  const cols = `max-content ${tracks.map(() => trackCols).join(" ")}`;
   return (
     <div class="section-panel matrix-section">
       <div class="panel-header">

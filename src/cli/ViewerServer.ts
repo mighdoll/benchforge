@@ -72,8 +72,7 @@ export async function startViewerServer(
 
 /** Open a .benchforge archive in the viewer. */
 export async function viewArchive(filePath: string): Promise<void> {
-  const absPath = resolve(filePath);
-  const content = await readFile(absPath, "utf-8");
+  const content = await readFile(resolve(filePath), "utf-8");
   const raw = JSON.parse(content);
 
   const schema = raw.schema ?? 0;

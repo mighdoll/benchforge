@@ -20,8 +20,7 @@ const blockFenceMultiplier = 3;
  * (for benchforge debugging/development purposes, not a general user tool)
  */
 export async function analyzeArchive(filePath: string): Promise<void> {
-  const absPath = resolve(filePath);
-  const content = await readFile(absPath, "utf-8");
+  const content = await readFile(resolve(filePath), "utf-8");
   const { report } = JSON.parse(content);
   if (!report?.groups?.length) {
     console.error("No report data found in archive.");
