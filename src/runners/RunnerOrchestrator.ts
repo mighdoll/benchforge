@@ -250,6 +250,14 @@ function attachProfilingData(
   }
 }
 
+/** Resolve WorkerScript path for dev (.ts) or dist (.mjs) */
+function resolveWorkerPath(): string {
+  const dir = import.meta.dirname!;
+  const tsPath = path.join(dir, "WorkerScript.ts");
+  if (existsSync(tsPath)) return tsPath;
+  return path.join(dir, "runners", "WorkerScript.mjs");
+}
+
 /** Rebase GC offsets to loop-relative time and keep only in-loop events.
  *  Without a loop anchor we can't tell warmup from loop, so keep all (offsets
  *  dropped, since they can't be placed on the sample timeline). */
@@ -268,12 +276,4 @@ function loopGcEvents(
 function stripOffset(e: GcEvent): GcEvent {
   const { offset: _drop, ...rest } = e;
   return rest;
-}
-
-/** Resolve WorkerScript path for dev (.ts) or dist (.mjs) */
-function resolveWorkerPath(): string {
-  const dir = import.meta.dirname!;
-  const tsPath = path.join(dir, "WorkerScript.ts");
-  if (existsSync(tsPath)) return tsPath;
-  return path.join(dir, "runners", "WorkerScript.mjs");
 }

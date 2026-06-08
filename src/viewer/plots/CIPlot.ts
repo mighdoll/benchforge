@@ -199,39 +199,6 @@ function drawTitles(
   }
 }
 
-/** Merge two CI bound labels into a range, or one label when they're identical
- *  at display precision. */
-function rangeLabel(loLabel: string, hiLabel: string): string {
-  return loLabel === hiLabel ? loLabel : `${loLabel} - ${hiLabel}`;
-}
-
-/** Keep a text label inside [pad, width-pad] given its anchor, so labels at the
- *  data edges aren't clipped by the SVG viewport. Width is estimated from the
- *  character count (charW ~6px at the 11px label size, ~10px for the 15px point). */
-function clampLabelX(
-  x: number,
-  label: string,
-  anchor: "start" | "middle" | "end",
-  width: number,
-  charW: number,
-): number {
-  const w = label.length * charW;
-  const { left, right } = labelOverhang(anchor, w);
-  const lo = 2 + left;
-  const hi = width - 2 - right;
-  return Math.max(lo, Math.min(hi, x));
-}
-
-/** Pixels a label extends left/right of its anchor point, by anchor type. */
-function labelOverhang(
-  anchor: "start" | "middle" | "end",
-  w: number,
-): { left: number; right: number } {
-  if (anchor === "start") return { left: 0, right: w };
-  if (anchor === "end") return { left: w, right: 0 };
-  return { left: w / 2, right: w / 2 };
-}
-
 /** Draw equivalence margin zone: hatched band centered vertically */
 function drawMarginZone(
   svg: SVGSVGElement,
@@ -378,6 +345,36 @@ function drawCILabels(
   drawBoundLabel(svg, hiLabel, hiX, labelY, "start", width);
 }
 
+/** Top margin: room for the point-label, else the title, else a thin band. */
+function layoutTop(hasPointLabel?: boolean, hasTitle?: boolean): number {
+  if (hasPointLabel) return 30;
+  if (hasTitle) return defaultMargin.top;
+  return 6;
+}
+
+/** Keep a text label inside [pad, width-pad] given its anchor, so labels at the
+ *  data edges aren't clipped by the SVG viewport. Width is estimated from the
+ *  character count (charW ~6px at the 11px label size, ~10px for the 15px point). */
+function clampLabelX(
+  x: number,
+  label: string,
+  anchor: "start" | "middle" | "end",
+  width: number,
+  charW: number,
+): number {
+  const w = label.length * charW;
+  const { left, right } = labelOverhang(anchor, w);
+  const lo = 2 + left;
+  const hi = width - 2 - right;
+  return Math.max(lo, Math.min(hi, x));
+}
+
+/** Merge two CI bound labels into a range, or one label when they're identical
+ *  at display precision. */
+function rangeLabel(loLabel: string, hiLabel: string): string {
+  return loLabel === hiLabel ? loLabel : `${loLabel} - ${hiLabel}`;
+}
+
 /** Draw one clamped CI-bound label at the given anchor. */
 function drawBoundLabel(
   svg: SVGSVGElement,
@@ -391,9 +388,12 @@ function drawBoundLabel(
   svg.appendChild(text(clampedX, labelY, label, anchor, "11"));
 }
 
-/** Top margin: room for the point-label, else the title, else a thin band. */
-function layoutTop(hasPointLabel?: boolean, hasTitle?: boolean): number {
-  if (hasPointLabel) return 30;
-  if (hasTitle) return defaultMargin.top;
-  return 6;
+/** Pixels a label extends left/right of its anchor point, by anchor type. */
+function labelOverhang(
+  anchor: "start" | "middle" | "end",
+  w: number,
+): { left: number; right: number } {
+  if (anchor === "start") return { left: 0, right: w };
+  if (anchor === "end") return { left: w, right: 0 };
+  return { left: w / 2, right: w / 2 };
 }

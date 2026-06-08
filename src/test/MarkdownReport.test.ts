@@ -46,6 +46,25 @@ function point(
   };
 }
 
+/** Batched samples as a global ramp, so percentile tails are genuinely sparse.
+ *  scale > 1 makes every value larger (slower), simulating a regression. */
+function batched(
+  batches: number,
+  perBatch: number,
+  scale = 1,
+): MeasuredResults {
+  const samples: number[] = [];
+  const batchOffsets: number[] = [];
+  const n = batches * perBatch;
+  let k = 0;
+  for (let b = 0; b < batches; b++) {
+    batchOffsets.push(samples.length);
+    for (let i = 0; i < perBatch; i++)
+      samples.push((1 + (k++ / n) * 2) * scale);
+  }
+  return { name: "current", samples, batchOffsets } as MeasuredResults;
+}
+
 test("renders a shift table with mean, percentiles, and reliability", () => {
   const points = [
     {
@@ -110,7 +129,10 @@ test("scalar-only section (no baseline) renders a value table, lifts runs, skips
           {
             title: "time",
             rows: [
-              { label: "mean", entries: [{ runName: "current", value: "1.2us" }] },
+              {
+                label: "mean",
+                entries: [{ runName: "current", value: "1.2us" }],
+              },
             ],
           },
           {
@@ -176,25 +198,6 @@ test("comparable scalar section (GC) shows per-track values with inline Δ%", ()
   expect(md).toContain("| metric | current | baseline |");
   expect(md).toContain("| alloc/iter | 1.2KB (-12.5%) | 1.4KB |");
 });
-
-/** Batched samples as a global ramp, so percentile tails are genuinely sparse.
- *  scale > 1 makes every value larger (slower), simulating a regression. */
-function batched(
-  batches: number,
-  perBatch: number,
-  scale = 1,
-): MeasuredResults {
-  const samples: number[] = [];
-  const batchOffsets: number[] = [];
-  const n = batches * perBatch;
-  let k = 0;
-  for (let b = 0; b < batches; b++) {
-    batchOffsets.push(samples.length);
-    for (let i = 0; i < perBatch; i++)
-      samples.push((1 + (k++ / n) * 2) * scale);
-  }
-  return { name: "current", samples, batchOffsets } as MeasuredResults;
-}
 
 test("integration: baseline run flows through prepareHtmlData into a shift table", () => {
   const current = batched(24, 50);

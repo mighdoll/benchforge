@@ -12,6 +12,13 @@ export interface BatchProgress {
 
 type SamplesFn = (r: MeasuredResults) => number[] | undefined;
 
+/** Per-batch timeline data shifted onto the merged sample timeline. */
+interface MergedTimelines {
+  batchOffsets: number[];
+  offsetPauses: NonNullable<MeasuredResults["pausePoints"]>;
+  mergedGcEvents: GcEvent[];
+}
+
 /**
  * V8's `Array.prototype.flatMap` caps at 2^26 = ~67M elements for fast arrays,
  * and sort/percentile passes on large merged arrays push Node past its 4GB
@@ -130,11 +137,26 @@ export async function runBatched(
   return { results, baseline: mergedBaseline };
 }
 
-/** Per-batch timeline data shifted onto the merged sample timeline. */
-interface MergedTimelines {
-  batchOffsets: number[];
-  offsetPauses: NonNullable<MeasuredResults["pausePoints"]>;
-  mergedGcEvents: GcEvent[];
+/** Systematically subsample parallel sample arrays in a batch by `factor`.
+ *  Stride sampling preserves time-order for time-series plots; the bootstrap
+ *  doesn't care about ordering, so this is unbiased for stats too. */
+function subsampleBatch(r: MeasuredResults, factor: number): MeasuredResults {
+  const stride = (arr: number[]): number[] => {
+    const targetLen = Math.max(1, Math.floor(arr.length * factor));
+    const step = arr.length / targetLen;
+    const out = new Array<number>(targetLen);
+    for (let i = 0; i < targetLen; i++) out[i] = arr[Math.floor(i * step)];
+    return out;
+  };
+  const opt = (arr: number[] | undefined) => (arr ? stride(arr) : undefined);
+  return {
+    ...r,
+    samples: stride(r.samples),
+    heapSamples: opt(r.heapSamples),
+    allocationSamples: opt(r.allocationSamples),
+    pausePoints: undefined, // sample indices no longer match after stride
+    gcEvents: undefined, // time offsets no longer map to strided samples
+  };
 }
 
 /** Walk the batches, shifting pause points (by sample index) and GC events (by
@@ -162,28 +184,6 @@ function mergeTimelines(batches: MeasuredResults[]): MergedTimelines {
     prefixTime += r.samples.reduce((sum, s) => sum + s, 0);
   }
   return { batchOffsets, offsetPauses, mergedGcEvents };
-}
-
-/** Systematically subsample parallel sample arrays in a batch by `factor`.
- *  Stride sampling preserves time-order for time-series plots; the bootstrap
- *  doesn't care about ordering, so this is unbiased for stats too. */
-function subsampleBatch(r: MeasuredResults, factor: number): MeasuredResults {
-  const stride = (arr: number[]): number[] => {
-    const targetLen = Math.max(1, Math.floor(arr.length * factor));
-    const step = arr.length / targetLen;
-    const out = new Array<number>(targetLen);
-    for (let i = 0; i < targetLen; i++) out[i] = arr[Math.floor(i * step)];
-    return out;
-  };
-  const opt = (arr: number[] | undefined) => (arr ? stride(arr) : undefined);
-  return {
-    ...r,
-    samples: stride(r.samples),
-    heapSamples: opt(r.heapSamples),
-    allocationSamples: opt(r.allocationSamples),
-    pausePoints: undefined, // sample indices no longer match after stride
-    gcEvents: undefined, // time offsets no longer map to strided samples
-  };
 }
 
 /** Concat optional number arrays across batches. */

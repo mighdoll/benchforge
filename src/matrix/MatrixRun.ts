@@ -160,13 +160,6 @@ function caseArgs<T>(
   };
 }
 
-/** Run one variant/case, returning its single MeasuredResults. */
-async function runVariantOnce(
-  args: RunMatrixVariantParams,
-): Promise<MeasuredResults> {
-  return (await runMatrixVariant(args))[0];
-}
-
 /** Run a batched measurement for a case, alternating current/baseline order. */
 async function runCaseBatched<T>(
   variantArgs: RunMatrixVariantParams,
@@ -194,4 +187,11 @@ async function runCaseSingle(
     ? await runVariantOnce(baselineArgs)
     : undefined;
   return { measured, baseline };
+}
+
+/** Run one variant/case, returning its single MeasuredResults. */
+async function runVariantOnce(
+  args: RunMatrixVariantParams,
+): Promise<MeasuredResults> {
+  return (await runMatrixVariant(args))[0];
 }

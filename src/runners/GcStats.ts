@@ -90,13 +90,6 @@ export function aggregateGcStats(events: GcEvent[]): GcStats {
   };
 }
 
-/** Extract the wall-clock offset (ms since process start) from the nvp line
- *  prefix, e.g. `[71753:0x...:0] 9 ms: ...` ==> 9. Undefined if absent. */
-function parseOffset(line: string): number | undefined {
-  const match = line.match(/^\[[^\]]*\]\s+(\d+)\s+ms:/);
-  return match ? Number.parseInt(match[1], 10) : undefined;
-}
-
 /** Parse name=value pairs from a trace-gc-nvp line. */
 function parseNvpFields(line: string): Record<string, string> {
   const pairs = [...line.matchAll(/(\w+)=([^\s,]+)/g)];
@@ -112,4 +105,11 @@ function parseGcType(gcField: string): GcEvent["type"] {
   if (gcField === "mmc" || gcField === "minor-mc" || gcField === "minor-ms")
     return "minor-ms";
   return "unknown";
+}
+
+/** Extract the wall-clock offset (ms since process start) from the nvp line
+ *  prefix, e.g. `[71753:0x...:0] 9 ms: ...` ==> 9. Undefined if absent. */
+function parseOffset(line: string): number | undefined {
+  const match = line.match(/^\[[^\]]*\]\s+(\d+)\s+ms:/);
+  return match ? Number.parseInt(match[1], 10) : undefined;
 }

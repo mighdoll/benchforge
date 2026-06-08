@@ -18,6 +18,13 @@ export type ThemePreference = "system" | "light" | "dark";
  *  "raw" uses every sample. Default is "trim". */
 export type TrimMode = "trim" | "raw";
 
+/** Payload for the shift-detail popup: one point plus its display context. */
+export interface ShiftDetail {
+  point: ShiftPercentile;
+  metric: string;
+  equivMargin?: number;
+}
+
 /** Active data source (server or archive). */
 export const provider = signal<DataProvider | null>(null);
 
@@ -36,13 +43,6 @@ export const urlError = signal<{ url: string; detail: string } | null>(null);
 /** Open source-code tabs. */
 export const sourceTabs = signal<SourceTabState[]>([]);
 export const trimMode = signal<TrimMode>("trim");
-
-/** Payload for the shift-detail popup: one point plus its display context. */
-export interface ShiftDetail {
-  point: ShiftPercentile;
-  metric: string;
-  equivMargin?: number;
-}
 
 /** Open detail popup for a shift-function point (verdict or percentile). Null = closed. */
 export const shiftDetail = signal<ShiftDetail | null>(null);

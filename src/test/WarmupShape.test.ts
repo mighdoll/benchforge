@@ -1,6 +1,6 @@
 import { expect, test } from "vitest";
-import type { MeasuredResults } from "../runners/MeasuredResults.ts";
 import { warmupShape } from "../report/WarmupShape.ts";
+import type { MeasuredResults } from "../runners/MeasuredResults.ts";
 
 /** MeasuredResults carrying just the fields warmupShape reads. */
 function results(samples: number[], batchOffsets?: number[]): MeasuredResults {

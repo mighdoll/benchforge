@@ -104,6 +104,22 @@ function prepareGroupData(
   };
 }
 
+/** Build the case-level trimmed sections plus the raw (untrimmed) view when
+ *  trimming changed something. */
+function buildCaseSections(
+  sections: ReportSection[],
+  tracks: CaseTrack[],
+  comparison?: ComparisonOptions,
+): { sections: ViewerSection[]; rawSections?: ViewerSection[] } | undefined {
+  if (!tracks.length) return undefined;
+  const ctx: CaseContext = { tracks, comparison };
+  const trimmed = buildViewerSections(sections, ctx);
+  return {
+    sections: trimmed.sections,
+    rawSections: buildRawCaseSections(sections, ctx, trimmed.caches),
+  };
+}
+
 /** Resolve a case into ordered display tracks. The only mode-aware code: in
  *  baselineVariant mode the named sibling is a peer baseline track (kept in
  *  report order); in version mode each variant gets a shadow baseline track. */
@@ -111,6 +127,89 @@ function resolveTracks(group: ReportGroup): CaseTrack[] {
   return group.baselineVariantId
     ? baselineVariantTracks(group, group.baselineVariantId)
     : versionTracks(group);
+}
+
+/** @return raw per-series benchmark data (samples, stats, profiling summaries) */
+function prepareBenchmarkData(report: BenchmarkReport): BenchmarkEntry {
+  const { measuredResults: m, name, metadata } = report;
+  return {
+    name,
+    metadata,
+    samples: m.samples,
+    warmupSamples: m.warmupSamples,
+    allocationSamples: m.allocationSamples,
+    heapSamples: m.heapSamples,
+    gcEvents: viewerGcEvents(m.gcEvents),
+    pausePoints: m.pausePoints,
+    batchOffsets: m.batchOffsets,
+    gcByBatch: gcByBatch(m),
+    warmupShape: warmupShape(m),
+    stats: m.time,
+    heapSize: m.heapSize,
+    totalTime: m.totalTime,
+    heapSummary: m.heapProfile ? summarizeHeap(m.heapProfile) : undefined,
+    coverageSummary: m.coverage ? summarizeCoverage(m.coverage) : undefined,
+  };
+}
+
+/** A benchmark entry: raw per-series data plus its own paired baseline (for the
+ *  analyze command's per-batch diagnostics). */
+function benchmarkEntry(report: BenchmarkReport): BenchmarkEntry {
+  const baseline = report.baseline
+    ? prepareBenchmarkData(report.baseline)
+    : undefined;
+  return { ...prepareBenchmarkData(report), baseline };
+}
+
+/** Worst-case batch-reliability warnings across the group, using each report's
+ *  effective baseline (its own paired baseline, else the group baseline). */
+function groupWarnings(
+  group: ReportGroup,
+  comparison?: ComparisonOptions,
+): string[] | undefined {
+  const noTrim = comparison?.noBatchTrim;
+  const pairs = group.reports.map(report => ({
+    base: (report.baseline ?? group.baseline)?.measuredResults,
+    cur: report.measuredResults,
+  }));
+  const singleBatch = pairs.some(p => isSingleBatch(p.base, p.cur));
+  const lowBatches = pairs.some(p => hasLowBatchCount(p.base, p.cur, noTrim));
+  return buildWarnings(singleBatch, lowBatches);
+}
+
+/** @return the untrimmed section view, or undefined when trimming changed
+ *  nothing. Reuses the trimmed view's per-track bootstrap for tracks (and diffs)
+ *  trimming left untouched. */
+function buildRawCaseSections(
+  sections: ReportSection[],
+  ctx: CaseContext,
+  trimmedCaches: SectionCICache[],
+): ViewerSection[] | undefined {
+  if (ctx.comparison?.noBatchTrim) return undefined;
+  const untrimmed = (m?: MeasuredResults) =>
+    !m || trimOutlierBatches(m.samples, m.batchOffsets).trimCount === 0;
+  const anyTrimmed = ctx.tracks.some(
+    t =>
+      !untrimmed(t.measured) || (t.baseline && !untrimmed(t.baseline.measured)),
+  );
+  if (!anyTrimmed) return undefined;
+
+  const reuse: SectionCICache[] = trimmedCaches.map(c => ({
+    track: c.track?.map((r, i) =>
+      untrimmed(ctx.tracks[i]?.measured) ? r : undefined,
+    ),
+    // diff depends on both sides; reuse only when neither was trimmed
+    diff: c.diff?.map((d, i) => {
+      const t = ctx.tracks[i];
+      const ok = untrimmed(t?.measured) && untrimmed(t?.baseline?.measured);
+      return ok ? d : undefined;
+    }),
+  }));
+  const rawCtx: CaseContext = {
+    tracks: ctx.tracks,
+    comparison: { ...ctx.comparison, noBatchTrim: true },
+  };
+  return buildViewerSections(sections, rawCtx, reuse).sections;
 }
 
 /** Tracks for baselineVariant mode: report order preserved, the named sibling
@@ -151,123 +250,6 @@ function versionTracks(group: ReportGroup): CaseTrack[] {
   });
 }
 
-/** A comparison track: a variant's measurement paired with its baseline (its own
- *  interleaved baseline, else the group baseline) for the Δ% and shift. */
-function comparisonTrack(
-  report: BenchmarkReport,
-  groupBaseline?: BenchmarkReport,
-): CaseTrack {
-  const base = report.baseline ?? groupBaseline;
-  return {
-    name: report.name,
-    measured: report.measuredResults,
-    meta: report.metadata,
-    isBaseline: false,
-    baseline: base
-      ? { measured: base.measuredResults, meta: base.metadata, name: base.name }
-      : undefined,
-  };
-}
-
-/** Build the case-level trimmed sections plus the raw (untrimmed) view when
- *  trimming changed something. */
-function buildCaseSections(
-  sections: ReportSection[],
-  tracks: CaseTrack[],
-  comparison?: ComparisonOptions,
-): { sections: ViewerSection[]; rawSections?: ViewerSection[] } | undefined {
-  if (!tracks.length) return undefined;
-  const ctx: CaseContext = { tracks, comparison };
-  const trimmed = buildViewerSections(sections, ctx);
-  return {
-    sections: trimmed.sections,
-    rawSections: buildRawCaseSections(sections, ctx, trimmed.caches),
-  };
-}
-
-/** @return the untrimmed section view, or undefined when trimming changed
- *  nothing. Reuses the trimmed view's per-track bootstrap for tracks (and diffs)
- *  trimming left untouched. */
-function buildRawCaseSections(
-  sections: ReportSection[],
-  ctx: CaseContext,
-  trimmedCaches: SectionCICache[],
-): ViewerSection[] | undefined {
-  if (ctx.comparison?.noBatchTrim) return undefined;
-  const untrimmed = (m?: MeasuredResults) =>
-    !m || trimOutlierBatches(m.samples, m.batchOffsets).trimCount === 0;
-  const anyTrimmed = ctx.tracks.some(
-    t =>
-      !untrimmed(t.measured) || (t.baseline && !untrimmed(t.baseline.measured)),
-  );
-  if (!anyTrimmed) return undefined;
-
-  const reuse: SectionCICache[] = trimmedCaches.map(c => ({
-    track: c.track?.map((r, i) =>
-      untrimmed(ctx.tracks[i]?.measured) ? r : undefined,
-    ),
-    // diff depends on both sides; reuse only when neither was trimmed
-    diff: c.diff?.map((d, i) => {
-      const t = ctx.tracks[i];
-      const ok = untrimmed(t?.measured) && untrimmed(t?.baseline?.measured);
-      return ok ? d : undefined;
-    }),
-  }));
-  const rawCtx: CaseContext = {
-    tracks: ctx.tracks,
-    comparison: { ...ctx.comparison, noBatchTrim: true },
-  };
-  return buildViewerSections(sections, rawCtx, reuse).sections;
-}
-
-/** Worst-case batch-reliability warnings across the group, using each report's
- *  effective baseline (its own paired baseline, else the group baseline). */
-function groupWarnings(
-  group: ReportGroup,
-  comparison?: ComparisonOptions,
-): string[] | undefined {
-  const noTrim = comparison?.noBatchTrim;
-  const pairs = group.reports.map(report => ({
-    base: (report.baseline ?? group.baseline)?.measuredResults,
-    cur: report.measuredResults,
-  }));
-  const singleBatch = pairs.some(p => isSingleBatch(p.base, p.cur));
-  const lowBatches = pairs.some(p => hasLowBatchCount(p.base, p.cur, noTrim));
-  return buildWarnings(singleBatch, lowBatches);
-}
-
-/** A benchmark entry: raw per-series data plus its own paired baseline (for the
- *  analyze command's per-batch diagnostics). */
-function benchmarkEntry(report: BenchmarkReport): BenchmarkEntry {
-  const baseline = report.baseline
-    ? prepareBenchmarkData(report.baseline)
-    : undefined;
-  return { ...prepareBenchmarkData(report), baseline };
-}
-
-/** @return raw per-series benchmark data (samples, stats, profiling summaries) */
-function prepareBenchmarkData(report: BenchmarkReport): BenchmarkEntry {
-  const { measuredResults: m, name, metadata } = report;
-  return {
-    name,
-    metadata,
-    samples: m.samples,
-    warmupSamples: m.warmupSamples,
-    allocationSamples: m.allocationSamples,
-    heapSamples: m.heapSamples,
-    gcEvents: viewerGcEvents(m.gcEvents),
-    pausePoints: m.pausePoints,
-    batchOffsets: m.batchOffsets,
-    gcByBatch: gcByBatch(m),
-    warmupShape: warmupShape(m),
-    stats: m.time,
-    heapSize: m.heapSize,
-    totalTime: m.totalTime,
-    heapSummary: m.heapProfile ? summarizeHeap(m.heapProfile) : undefined,
-    coverageSummary: m.coverage ? summarizeCoverage(m.coverage) : undefined,
-  };
-}
-
 /** Map engine GC events to the viewer's {offset, duration} shape, keeping only
  *  events whose offset was rebased to loop-relative time (others can't be placed
  *  on the time-series axis). */
@@ -282,20 +264,6 @@ function viewerGcEvents(
     type: e.type,
     collected: e.collected,
   }));
-}
-
-/** @return user-facing warning strings about CI reliability, or undefined if none apply */
-function buildWarnings(
-  singleBatch: boolean,
-  lowBatches: boolean,
-): string[] | undefined {
-  const parts: string[] = [];
-  const single =
-    "Confidence intervals may be too narrow (single batch). Use --batches for more accurate intervals.";
-  const low = `Too few batches for reliable comparison (need ${minBatches}+).`;
-  if (singleBatch) parts.push(single);
-  if (lowBatches) parts.push(low);
-  return parts.length ? parts : undefined;
 }
 
 /** Compute heap allocation summary from profile */
@@ -313,4 +281,36 @@ function summarizeCoverage(coverage: CoverageData): CoverageSummary {
   );
   const totalCalls = called.reduce((sum, fn) => sum + fn.ranges[0].count, 0);
   return { functionCount: called.length, totalCalls };
+}
+
+/** @return user-facing warning strings about CI reliability, or undefined if none apply */
+function buildWarnings(
+  singleBatch: boolean,
+  lowBatches: boolean,
+): string[] | undefined {
+  const parts: string[] = [];
+  const single =
+    "Confidence intervals may be too narrow (single batch). Use --batches for more accurate intervals.";
+  const low = `Too few batches for reliable comparison (need ${minBatches}+).`;
+  if (singleBatch) parts.push(single);
+  if (lowBatches) parts.push(low);
+  return parts.length ? parts : undefined;
+}
+
+/** A comparison track: a variant's measurement paired with its baseline (its own
+ *  interleaved baseline, else the group baseline) for the Δ% and shift. */
+function comparisonTrack(
+  report: BenchmarkReport,
+  groupBaseline?: BenchmarkReport,
+): CaseTrack {
+  const base = report.baseline ?? groupBaseline;
+  return {
+    name: report.name,
+    measured: report.measuredResults,
+    meta: report.metadata,
+    isBaseline: false,
+    baseline: base
+      ? { measured: base.measuredResults, meta: base.metadata, name: base.name }
+      : undefined,
+  };
 }
