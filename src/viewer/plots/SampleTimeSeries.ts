@@ -268,18 +268,18 @@ function lttb<T>(
   for (let i = 0; i < n - 2; i++) {
     const bStart = Math.floor(i * bucketSize) + 1;
     const bEnd = Math.floor((i + 1) * bucketSize) + 1;
-    const nStart = bEnd;
-    const nEnd = Math.min(
+    // average the next bucket [bEnd, nextEnd) for the triangle's far vertex
+    const nextEnd = Math.min(
       Math.floor((i + 2) * bucketSize) + 1,
       data.length - 1,
     );
     let avgX = 0;
     let avgY = 0;
-    for (let j = nStart; j < nEnd; j++) {
+    for (let j = bEnd; j < nextEnd; j++) {
       avgX += getX(data[j]);
       avgY += getY(data[j]);
     }
-    const cnt = nEnd - nStart || 1;
+    const cnt = nextEnd - bEnd || 1;
     avgX /= cnt;
     avgY /= cnt;
     const prev = result[result.length - 1];

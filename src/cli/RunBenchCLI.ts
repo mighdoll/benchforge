@@ -18,6 +18,7 @@ import {
   resolveCaseIds,
   resolveVariantIds,
 } from "../matrix/MatrixFilter.ts";
+import { reportMatrixResults } from "../matrix/MatrixReport.ts";
 import type { ReportSection } from "../report/BenchmarkReport.ts";
 import { consoleSummary } from "../report/ConsoleSummary.ts";
 import type { GitVersion } from "../report/GitUtils.ts";
@@ -31,7 +32,6 @@ import {
 import { finishReports } from "./CliExport.ts";
 import { cliToMatrixOptions, validateArgs } from "./CliOptions.ts";
 import {
-  defaultMatrixReport,
   defaultReportData,
   matrixToReportGroups,
   withStatus,
@@ -59,7 +59,7 @@ export async function runBenchCli<Extra = Record<string, never>>(
     config.configure ?? (y => y as Argv<DefaultCliArgs & Extra>);
   const args = parseCliArgs(y => configure(defaultCliArgs(y)));
   const result = await config.build(args);
-  if (args.list) return listResult(result.suite);
+  if (args.list) return listMatrixSuite(result.suite);
   return runMatrixPipeline(result, args);
 }
 
@@ -83,11 +83,6 @@ export async function dispatchCli(): Promise<void> {
   throw new Error("Provide a benchmark file or --url for browser mode.");
 }
 
-/** Print available cases and variants for --list. */
-async function listResult(suite: MatrixSuite): Promise<void> {
-  await listMatrixSuite(suite);
-}
-
 /** Require a file argument for a subcommand, exiting with usage on missing. */
 function requireFile(filePath: string | undefined, subcommand: string): string {
   if (filePath) return filePath;
@@ -102,7 +97,7 @@ async function runFileBench(
 ): Promise<void> {
   const result = await resolveFileResult(filePath);
   if (!result) return;
-  if (args.list) return listResult(result.suite);
+  if (args.list) return listMatrixSuite(result.suite);
   await runMatrixPipeline(result, args);
 }
 
@@ -138,7 +133,7 @@ async function runMatrixPipeline(
       baselineVersion: m.baselineVersion,
     }),
   );
-  const tally = defaultMatrixReport(reportData);
+  const tally = reportMatrixResults(reportData);
   console.log([consoleSummary(reportData), tally].filter(Boolean).join("\n\n"));
   await finishReports(groups, args, {
     sections: m.sections,
@@ -183,13 +178,11 @@ async function runMatrixCalibratePipeline(
       "--calibrate requires a directory-based matrix (variantDir)",
     );
 
+  const { filteredCases, filteredVariants } = filtered;
+  const runOpts = { ...options, filteredCases, filteredVariants };
   const result = await runMatrixCalibration(
     filtered,
-    {
-      ...options,
-      filteredCases: filtered.filteredCases,
-      filteredVariants: filtered.filteredVariants,
-    },
+    runOpts,
     reportCalibrateRun,
   );
   console.log(formatCalibration(result));
@@ -219,13 +212,8 @@ export async function runFilteredMatrices(
       continue;
     }
     const { filteredCases, filteredVariants } = filtered;
-    results.push(
-      await runMatrix(filtered, {
-        ...options,
-        filteredCases,
-        filteredVariants,
-      }),
-    );
+    const runOpts = { ...options, filteredCases, filteredVariants };
+    results.push(await runMatrix(filtered, runOpts));
   }
   if (!results.length && lastFilterError) throw lastFilterError;
   return results;

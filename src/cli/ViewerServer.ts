@@ -17,6 +17,9 @@ import {
   fetchSource,
 } from "../export/ArchiveExport.ts";
 import { archiveSchemaVersion } from "../export/ArchiveFormat.ts";
+import type { LineCoverage } from "../export/CoverageExport.ts";
+import type { SpeedscopeFile } from "../export/SpeedscopeTypes.ts";
+import type { ReportData } from "../viewer/ReportData.ts";
 
 export interface ViewerServerOptions {
   /** Speedscope JSON profile data (allocation) */
@@ -83,13 +86,12 @@ export async function viewArchive(filePath: string): Promise<void> {
     process.exit(1);
   }
 
-  const archive = raw;
-  const sources = archive.sources as Record<string, string> | undefined;
+  const sources = raw.sources as Record<string, string> | undefined;
   const { close } = await startViewerServer({
-    profileData: optionalJson(archive.allocProfile),
-    timeProfileData: optionalJson(archive.timeProfile),
-    coverageData: optionalJson(archive.coverage),
-    reportData: optionalJson(archive.report),
+    profileData: optionalJson(raw.allocProfile),
+    timeProfileData: optionalJson(raw.timeProfile),
+    coverageData: optionalJson(raw.coverage),
+    reportData: optionalJson(raw.report),
     sources,
   });
 
@@ -100,6 +102,13 @@ export async function viewArchive(filePath: string): Promise<void> {
 /** Serialize a value to JSON if truthy, otherwise return undefined. */
 export function optionalJson(v: unknown): string | undefined {
   return v ? JSON.stringify(v) : undefined;
+}
+
+/** Parse a JSON string if present, otherwise return undefined. */
+export function optionalParse<T = unknown>(
+  s: string | undefined,
+): T | undefined {
+  return s ? (JSON.parse(s) as T) : undefined;
 }
 
 /** Wait for Ctrl+C (SIGINT) before resolving. */
@@ -254,11 +263,12 @@ async function handleArchiveRequest(
   sourceCache: Map<string, string>,
 ): Promise<void> {
   try {
-    const parse = (s?: string) => (s ? JSON.parse(s) : undefined);
-    const profile = parse(ctx.profileData);
-    const timeProfile = parse(ctx.timeProfileData);
-    const coverage = parse(ctx.coverageData);
-    const report = parse(ctx.reportData);
+    const profile = optionalParse<SpeedscopeFile>(ctx.profileData);
+    const timeProfile = optionalParse<SpeedscopeFile>(ctx.timeProfileData);
+    const coverage = optionalParse<Record<string, LineCoverage[]>>(
+      ctx.coverageData,
+    );
+    const report = optionalParse<ReportData>(ctx.reportData);
     const allFrames = collectProfileFrames(profile, timeProfile);
     const sources = allFrames.length
       ? await collectSources(allFrames, sourceCache)

@@ -48,16 +48,16 @@ function analyzeBenchmark(
   baseline: BenchmarkEntry | undefined,
   batchCount?: number,
 ): void {
-  const bOffsets =
+  const benchOffsets =
     bench.batchOffsets ?? inferOffsets(bench.samples, batchCount);
   const baseOffsets =
     baseline?.batchOffsets ?? inferOffsets(baseline?.samples, batchCount);
-  if (!bOffsets?.length) {
+  if (!benchOffsets?.length) {
     console.log(dim("  No batch data (single batch run)"));
     return;
   }
 
-  const batches = splitByOffsets(bench.samples, bOffsets);
+  const batches = splitByOffsets(bench.samples, benchOffsets);
   const baseBatches =
     baseOffsets && baseline
       ? splitByOffsets(baseline.samples, baseOffsets)
@@ -120,9 +120,8 @@ function printBatchTable(
       continue;
     }
     const baseMed = (timeMs(median(baselines[i])) ?? "").padStart(10);
-    const delta = formatDelta(medianDelta(benches[i], baselines[i])).padStart(
-      8,
-    );
+    const pct = medianDelta(benches[i], baselines[i]);
+    const delta = formatDelta(pct).padStart(8);
     const order = i % 2 === 0 ? dim(" B>C") : dim(" C>B");
     console.log(`  ${idx} ${n}  ${med}  ${baseMed}  ${delta}${order}`);
   }

@@ -4,6 +4,7 @@ import type {
   ShiftFunction,
   ShiftPercentile,
 } from "../ReportData.ts";
+import type { DistributionPlotOptions } from "../plots/CIPlot.ts";
 import { formatPct } from "../plots/PlotTypes.ts";
 import { reportData, shiftDetail } from "../State.ts";
 import { useLazyPlot } from "./LazyPlot.ts";
@@ -106,6 +107,21 @@ function CIPlotMount(
   );
 }
 
+/** DistributionPlotOptions for an absolute (non-zero-anchored) bootstrap plot,
+ *  pulling CI labels/level/reliability off the data. Used by inline sparklines
+ *  and the shift-detail popup, which differ only in size and point label. */
+export function distributionOpts(
+  ci: BootstrapCIData,
+  size: { width: number; height: number; pointLabel?: string; domain?: [number, number] },
+): DistributionPlotOptions {
+  return {
+    width: size.width, height: size.height, title: "", direction: "uncertain",
+    ciLabels: ci.ciLabels, includeZero: false, smooth: true,
+    pointLabel: size.pointLabel, ciLevel: ci.ciLevel, ciReliable: ci.ciReliable,
+    domain: size.domain,
+  };
+}
+
 /** Lazy-imports CIPlot and renders a bootstrap distribution sparkline inline.
  *  `shift` nudges it horizontally to position the estimate within a section's
  *  range; `domain` pins a shared x-scale so sibling sparklines are comparable. */
@@ -117,11 +133,7 @@ export function BootstrapCIMount({ ci, label, shift, domain }: {
 }) {
   const ref = useLazyPlot(async () => {
     const { createDistributionPlot } = await import("../plots/CIPlot.ts");
-    const opts = {
-      width: 240, height: 80, title: "", direction: "uncertain" as const,
-      ciLabels: ci.ciLabels, includeZero: false, smooth: true, pointLabel: label,
-      ciLevel: ci.ciLevel, ciReliable: ci.ciReliable, domain,
-    };
+    const opts = distributionOpts(ci, { width: 240, height: 80, pointLabel: label, domain });
     return createDistributionPlot(ci.histogram, ci.ci, ci.estimate, opts);
   }, [ci, label, domain], "Bootstrap CI plot");
   const style = shift != null ? { marginLeft: `${Math.round(shift)}px` } : undefined;

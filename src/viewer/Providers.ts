@@ -114,9 +114,8 @@ export class ServerProvider implements DataProvider {
     const resp = await fetch("/api/archive", { method: "POST" });
     if (!resp.ok) throw new Error("Archive failed");
     const header = resp.headers.get("Content-Disposition") || "";
-    const filename =
-      header.match(/filename="?(.+?)"?$/)?.[1] ||
-      "benchforge-archive.benchforge";
+    const fallback = "benchforge-archive.benchforge";
+    const filename = header.match(/filename="?(.+?)"?$/)?.[1] || fallback;
     return { blob: await resp.blob(), filename };
   }
 }

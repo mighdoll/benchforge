@@ -77,8 +77,9 @@ async function resolveVariant(source: VariantSource): Promise<Variant> {
   return { setup: evalFn(source.setupCode), run } as Variant;
 }
 
-/** Eval serialized function source back into a callable. */
-function evalFn(code: string): (...args: unknown[]) => unknown {
+/** Eval serialized function source back into a callable. Used for both inline
+ *  matrix variants and serialized bench functions reconstructed in the worker. */
+export function evalFn(code: string): (...args: unknown[]) => unknown {
   // biome-ignore lint/security/noGlobalEval: worker isolation; code is trusted (self-authored variant)
   const fn = eval(`(${code})`); // eslint-disable-line no-eval
   if (typeof fn !== "function")

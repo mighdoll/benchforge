@@ -7,6 +7,7 @@ import type { BenchmarkFunction, BenchmarkSpec } from "./BenchmarkSpec.ts";
 import type { BenchRunner, RunnerOptions } from "./BenchRunner.ts";
 import type { MeasuredResults } from "./MeasuredResults.ts";
 import {
+  evalFn,
   importBenchFn,
   resolveVariantFn,
   type VariantSource,
@@ -99,7 +100,10 @@ async function resolveBenchmarkFn(
     const { modulePath, exportName, setupExportName, params } = message;
     return importBenchFn(modulePath, exportName, setupExportName, params);
   }
-  return { fn: reconstructFunction(message.fnCode!), params: message.params };
+  return {
+    fn: evalFn(message.fnCode!) as BenchmarkFunction,
+    params: message.params,
+  };
 }
 
 /** The matrix variant source carried by a run message, if any (dir or inline). */
@@ -113,16 +117,6 @@ function variantSource(message: RunMessage): VariantSource | undefined {
       variantId: variantId ?? "",
     };
   return undefined;
-}
-
-/** Eval serialized function body back into a callable */
-function reconstructFunction(fnCode: string): BenchmarkFunction {
-  // biome-ignore lint/security/noGlobalEval: Necessary for worker process isolation, code is from trusted source
-  const fn = eval(`(${fnCode})`); // eslint-disable-line no-eval
-  if (typeof fn !== "function") {
-    throw new Error("Reconstructed code is not a function");
-  }
-  return fn;
 }
 
 /** Run benchmark with optional heap, time, and coverage profiling */
@@ -155,43 +149,55 @@ function buildProfilingChain(
   runner: BenchRunner,
   state: ProfilingState,
 ): () => Promise<MeasuredResults[]> {
-  const { alloc, profile, profileInterval, allocInterval, allocDepth } =
-    message.options;
+  const { alloc, profile } = message.options;
 
   const run = async () => {
     const { fn, params } = await resolveBenchmarkFn(message);
     return runner.runBench({ ...message.spec, fn }, message.options, params);
   };
 
-  const runMaybeWithTime = profile
-    ? async () => {
-        const { withTimeProfiling } = await import(
-          "../profiling/node/TimeSampler.ts"
-        );
-        const opts = {
-          interval: profileInterval,
-          session: state.profilerSession,
-        };
-        const r = await withTimeProfiling(opts, run);
-        state.timeProfile = r.profile;
-        return r.result;
-      }
-    : run;
+  const runMaybeWithTime = profile ? wrapWithTime(run, message, state) : run;
+  if (!alloc) return runMaybeWithTime;
+  return wrapWithHeap(runMaybeWithTime, message, state);
+}
 
-  return alloc
-    ? async () => {
-        const { withHeapSampling } = await import(
-          "../profiling/node/HeapSampler.ts"
-        );
-        const heapOpts = {
-          samplingInterval: allocInterval,
-          stackDepth: allocDepth,
-        };
-        const r = await withHeapSampling(heapOpts, runMaybeWithTime);
-        state.heapProfile = r.profile;
-        return r.result;
-      }
-    : runMaybeWithTime;
+/** Wrap a run with CPU time profiling, recording the profile into state. */
+function wrapWithTime(
+  run: () => Promise<MeasuredResults[]>,
+  message: RunMessage,
+  state: ProfilingState,
+): () => Promise<MeasuredResults[]> {
+  return async () => {
+    const { withTimeProfiling } = await import(
+      "../profiling/node/TimeSampler.ts"
+    );
+    const interval = message.options.profileInterval;
+    const opts = { interval, session: state.profilerSession };
+    const r = await withTimeProfiling(opts, run);
+    state.timeProfile = r.profile;
+    return r.result;
+  };
+}
+
+/** Wrap a run with heap allocation sampling, recording the profile into state. */
+function wrapWithHeap(
+  run: () => Promise<MeasuredResults[]>,
+  message: RunMessage,
+  state: ProfilingState,
+): () => Promise<MeasuredResults[]> {
+  return async () => {
+    const { withHeapSampling } = await import(
+      "../profiling/node/HeapSampler.ts"
+    );
+    const { allocInterval, allocDepth } = message.options;
+    const heapOpts = {
+      samplingInterval: allocInterval,
+      stackDepth: allocDepth,
+    };
+    const r = await withHeapSampling(heapOpts, run);
+    state.heapProfile = r.profile;
+    return r.result;
+  };
 }
 
 process.on("message", async (message: RunMessage) => {
@@ -203,14 +209,12 @@ process.on("message", async (message: RunMessage) => {
     sendAndExit(result, 0);
   } catch (error) {
     const err = error instanceof Error ? error : undefined;
-    sendAndExit(
-      {
-        type: "error",
-        error: err?.message ?? String(error),
-        stack: err?.stack,
-      },
-      1,
-    );
+    const errorMsg: ErrorMessage = {
+      type: "error",
+      error: err?.message ?? String(error),
+      stack: err?.stack,
+    };
+    sendAndExit(errorMsg, 1);
   }
 });
 

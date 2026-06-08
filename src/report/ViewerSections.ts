@@ -11,10 +11,9 @@ import {
   type DifferenceCI,
   flipCI,
   isBootstrappable,
+  prepareBlocks,
   type StatKind,
-  splitByOffsets,
   trimOutlierBatches,
-  tukeyKeep,
 } from "../stats/StatisticalUtils.ts";
 import type {
   BootstrapCIData,
@@ -185,9 +184,17 @@ function effectiveBatchCount(
 ): number {
   const offsets = m?.batchOffsets;
   if (!m || !offsets || offsets.length < 2) return offsets?.length ?? 0;
-  if (noTrim) return offsets.length;
-  const means = splitByOffsets(m.samples, offsets).map(average);
-  return tukeyKeep(means).length;
+  return keptBatchCount(m, noTrim);
+}
+
+/** @return distinct batches the bootstrap keeps after Tukey trimming (all when
+ *  noTrim). Assumes batch structure exists (2+ offsets). */
+export function keptBatchCount(
+  m: MeasuredResults,
+  noTrim: boolean | undefined,
+): number {
+  return prepareBlocks(m.samples, m.batchOffsets!, average, noTrim).keptSplits
+    .length;
 }
 
 function batchCount(m?: MeasuredResults): number {
@@ -234,37 +241,18 @@ function metricRow(
   const trackDiff: (DifferenceCI | undefined)[] = [];
 
   const entries = ctx.tracks.map((track, i) => {
-    const { measured, meta } = track;
-    const offsets = measured.batchOffsets;
-    const trimmed = trimOutlierBatches(measured.samples, offsets, noTrim).samples;
     const boot = canBoot
-      ? (reuse?.track?.[i] ?? bootstrapTrack(measured, stat, noTrim))
+      ? (reuse?.track?.[i] ?? bootstrapTrack(track.measured, stat, noTrim))
       : undefined;
     trackBoot[i] = boot;
 
-    const entry: ViewerEntry = {
-      runName: track.name,
-      value: section.formatter(metricValue(section, measured, meta, trimmed)) ?? "",
-    };
-    if (track.isBaseline) entry.isBaseline = true;
-    if (boot) entry.bootstrapCI = formatBootstrapCI(section, boot, offsets, meta);
-
+    const entry = baseEntry(section, track, boot, noTrim);
     if (!track.isBaseline && track.baseline) {
       const diff = canBoot
         ? (reuse?.diff?.[i] ?? trackDiffCI(section, stat, track, ctx))
         : undefined;
       trackDiff[i] = diff;
-      if (diff) entry.comparisonCI = diff;
-      const shift = buildShiftFunction(
-        section,
-        measured,
-        track.baseline.measured,
-        meta,
-        track.baseline.meta,
-        ctx.comparison,
-        track.baseline.name,
-      );
-      if (shift) entry.shiftFunction = shift;
+      addComparison(entry, diff, section, track, ctx);
     }
     return entry;
   });
@@ -279,6 +267,48 @@ function metricRow(
   };
 }
 
+/** The value cell for one track: formatted metric plus its own bootstrap CI. */
+function baseEntry(
+  section: MetricSection,
+  track: CaseContext["tracks"][number],
+  boot: BootstrapResult | undefined,
+  noTrim: boolean | undefined,
+): ViewerEntry {
+  const { measured, meta } = track;
+  const offsets = measured.batchOffsets;
+  const trimmed = trimOutlierBatches(measured.samples, offsets, noTrim).samples;
+  const value = metricValue(section, measured, meta, trimmed);
+  const entry: ViewerEntry = {
+    runName: track.name,
+    value: section.formatter(value) ?? "",
+  };
+  if (track.isBaseline) entry.isBaseline = true;
+  if (boot) entry.bootstrapCI = formatBootstrapCI(section, boot, offsets, meta);
+  return entry;
+}
+
+/** Attach the diff CI and shift function comparing a track to its baseline. */
+function addComparison(
+  entry: ViewerEntry,
+  diff: DifferenceCI | undefined,
+  section: MetricSection,
+  track: CaseContext["tracks"][number],
+  ctx: CaseContext,
+): void {
+  const base = track.baseline!;
+  if (diff) entry.comparisonCI = diff;
+  const shift = buildShiftFunction(
+    section,
+    track.measured,
+    base.measured,
+    track.meta,
+    base.meta,
+    ctx.comparison,
+    base.name,
+  );
+  if (shift) entry.shiftFunction = shift;
+}
+
 /** A viewer row for one scalar row: a shared single value (non-comparable), or
  *  one cell per track with a point-ratio delta on comparison tracks. A missing
  *  comparable cell reads "n/a" so the matrix stays aligned. */
@@ -289,31 +319,32 @@ function scalarRow(scalar: ScalarRow, ctx: CaseContext): ViewerRow | undefined {
   if (!scalar.comparable) {
     // one cell per track, but flagged shared: case-constant rows (line counts)
     // display once; rows that differ per variant (runs) fan out in the footer.
-    let anyValue = false;
-    const entries = ctx.tracks.map(track => {
-      const value = format(scalar.value(track.measured, track.meta));
-      if (value && value !== "—") anyValue = true;
-      return { runName: track.name, value };
-    });
-    if (!anyValue) return undefined;
+    const entries = ctx.tracks.map(track => ({
+      runName: track.name,
+      value: format(scalar.value(track.measured, track.meta)),
+    }));
+    if (!entries.some(e => e.value && e.value !== "—")) return undefined;
     return { label: scalar.title, entries, shared: true };
   }
 
   const na = (v: unknown) => (v === undefined ? "n/a" : format(v));
-  let anyValue = false;
-  const entries: ViewerEntry[] = ctx.tracks.map(track => {
-    const raw = scalar.value(track.measured, track.meta);
-    if (raw !== undefined) anyValue = true;
-    const entry: ViewerEntry = { runName: track.name, value: na(raw) };
+  const raws = ctx.tracks.map(track =>
+    scalar.value(track.measured, track.meta),
+  );
+  if (raws.every(raw => raw === undefined)) return undefined;
+  const entries: ViewerEntry[] = ctx.tracks.map((track, i) => {
+    const entry: ViewerEntry = { runName: track.name, value: na(raws[i]) };
     if (track.isBaseline) entry.isBaseline = true;
     if (!track.isBaseline && track.baseline) {
-      const baseRaw = scalar.value(track.baseline.measured, track.baseline.meta);
-      const delta = simpleDeltaCI(raw, baseRaw);
+      const baseRaw = scalar.value(
+        track.baseline.measured,
+        track.baseline.meta,
+      );
+      const delta = simpleDeltaCI(raws[i], baseRaw);
       if (delta) entry.comparisonCI = delta;
     }
     return entry;
   });
-  if (!anyValue) return undefined;
   return { label: scalar.title, entries };
 }
 
@@ -338,10 +369,8 @@ function trackDiffCI(
   const base = track.baseline!;
   if (!base.measured.samples?.length || !track.measured.samples?.length)
     return undefined;
-  const opts: BlockDiffOptions = {
-    equivMargin: ctx.comparison?.equivMargin,
-    noBatchTrim: ctx.comparison?.noBatchTrim,
-  };
+  const { equivMargin, noBatchTrim } = ctx.comparison ?? {};
+  const opts: BlockDiffOptions = { equivMargin, noBatchTrim };
   const ci = diffCIs(
     base.measured.samples,
     base.measured.batchOffsets,
@@ -355,7 +384,7 @@ function trackDiffCI(
   const lowBatches = hasLowBatchCount(
     base.measured,
     track.measured,
-    ctx.comparison?.noBatchTrim,
+    noBatchTrim,
   );
   return annotateCI(adjusted, section.title, lowBatches);
 }

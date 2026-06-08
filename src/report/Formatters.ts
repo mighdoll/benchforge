@@ -6,7 +6,8 @@ export function timeMs(ms: unknown): string | null {
   if (ms < 0.001) return `${(ms * 1000000).toFixed(0)}ns`;
   if (ms < 1) {
     const us = ms * 1000;
-    return `${us.toFixed(us < 10 ? 1 : 0)}μs`;
+    const precision = us < 10 ? 1 : 0;
+    return `${us.toFixed(precision)}μs`;
   }
   if (ms >= 1000) return `${(ms / 1000).toFixed(2)}s`;
   if (ms >= 10) return `${ms.toFixed(0)}ms`;

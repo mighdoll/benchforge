@@ -24,9 +24,7 @@ const maxMergedSamples = 5_000_000;
 
 /** Merge multiple batch results, concatenating samples and tracking batch boundaries. */
 export function mergeBatchResults(results: MeasuredResults[]): MeasuredResults {
-  if (results.length === 0) {
-    throw new Error("Cannot merge empty results array");
-  }
+  if (results.length === 0) throw new Error("Cannot merge empty results array");
   if (results.length === 1) return { ...results[0], batchOffsets: [0] };
 
   const totalLen = results.reduce((sum, r) => sum + r.samples.length, 0);

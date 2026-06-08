@@ -27,7 +27,9 @@ function labeledDiffs(group: BenchmarkGroup): LabeledDiff[] {
   return metric.entries.flatMap(e => {
     const ci = e.comparisonCI;
     if (!ci || e.isBaseline) return [];
-    return [{ label: benchLabel(e.runName, group.name), direction: ci.direction }];
+    return [
+      { label: benchLabel(e.runName, group.name), direction: ci.direction },
+    ];
   });
 }
 

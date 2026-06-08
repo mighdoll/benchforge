@@ -64,8 +64,8 @@ export const plotLayout = {
 
 /** Fill/stroke palette keyed by comparison direction, shared across plots.
  *  green=better, red=worse, blue=confirmed equivalent (CI inside the margin),
- *  grey=uncertain (CI straddles zero, no signal). Equivalent is a real verdict
- *  ("confirmed no meaningful change"), so it reads distinct from "can't tell". */
+ *  grey=uncertain (CI straddles zero, no signal). Equivalent is a real verdict,
+ *  so it reads distinct from "can't tell". */
 export const directionColors: Record<
   CIDirection,
   { fill: string; stroke: string }

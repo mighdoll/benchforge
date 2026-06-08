@@ -1,5 +1,5 @@
 import type { MeasuredResults } from "../runners/MeasuredResults.ts";
-import { median } from "../stats/StatisticalUtils.ts";
+import { median, splitByOffsets } from "../stats/StatisticalUtils.ts";
 
 /** Per-batch time-by-position summary: how much the early iterations of each
  *  batch run above the plateau (last 50%). Agent-facing diagnostic for the JIT/
@@ -41,9 +41,8 @@ export function warmupShape(r: MeasuredResults): WarmupShape | undefined {
   const { samples, batchOffsets } = r;
   if (!samples?.length) return undefined;
 
-  const batches = splitBatches(samples, batchOffsets).filter(
-    b => b.length >= minBatchSamples,
-  );
+  const split = splitBatches(samples, batchOffsets);
+  const batches = split.filter(b => b.length >= minBatchSamples);
   if (!batches.length) return undefined;
 
   const plateau = regionBounds.length - 1;
@@ -51,7 +50,8 @@ export function warmupShape(r: MeasuredResults): WarmupShape | undefined {
   const regions = regionBounds.map((bound, i) => ({
     label: bound.label,
     medianMs: median(perBatch.map(b => b[i])),
-    pctVsPlateau: i === plateau ? 0 : median(perBatch.map(b => b[i] / b[plateau] - 1)),
+    pctVsPlateau:
+      i === plateau ? 0 : median(perBatch.map(b => b[i] / b[plateau] - 1)),
   }));
   return { batches: batches.length, regions };
 }
@@ -59,8 +59,7 @@ export function warmupShape(r: MeasuredResults): WarmupShape | undefined {
 /** Split samples into per-batch slices (the whole array when unbatched). */
 function splitBatches(samples: number[], offsets?: number[]): number[][] {
   if (!offsets?.length) return [samples];
-  const bounds = [...offsets, samples.length];
-  return offsets.map((_, b) => samples.slice(bounds[b], bounds[b + 1]));
+  return splitByOffsets(samples, offsets);
 }
 
 /** Median sample time within each position region of one batch. */

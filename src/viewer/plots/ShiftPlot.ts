@@ -206,22 +206,9 @@ function drawViolin(
   yScale: Scale,
   onSelect?: (point: ShiftPercentile) => void,
 ): void {
-  const histogram = point.diff.histogram;
-  if (!histogram?.length) return;
+  if (!point.diff.histogram?.length) return;
   const stroke = strokeFor(point);
-  const sorted = [...histogram].sort((a, b) => a.x - b.x);
-  // light smoothing (small sigma) rounds jagged bins without merging modes,
-  // since violin width here encodes uncertainty
-  const smoothed = gaussianSmooth(sorted, 0.8);
-  const widthOf = (count: number) => (count / maxCount) * halfMax;
-  const rightEdge = smoothed.map(
-    b => `${cx + widthOf(b.count)},${yScale(b.x)}`,
-  );
-  const leftEdge = smoothed
-    .slice()
-    .reverse()
-    .map(b => `${cx - widthOf(b.count)},${yScale(b.x)}`);
-  const outlinePath = `M${rightEdge.join("L")}L${leftEdge.join("L")}Z`;
+  const outlinePath = violinPath(point, cx, halfMax, maxCount, yScale);
 
   const group = document.createElementNS(svgNS, "g");
   group.classList.add("shift-violin");
@@ -241,6 +228,29 @@ function drawViolin(
   });
   group.appendChild(outline);
   svg.appendChild(group);
+}
+
+/** SVG path for a smoothed violin mirrored around cx (width encodes density). */
+function violinPath(
+  point: ShiftPercentile,
+  cx: number,
+  halfMax: number,
+  maxCount: number,
+  yScale: Scale,
+): string {
+  const sorted = [...point.diff.histogram!].sort((a, b) => a.x - b.x);
+  // light smoothing (small sigma) rounds jagged bins without merging modes,
+  // since violin width here encodes uncertainty
+  const smoothed = gaussianSmooth(sorted, 0.8);
+  const widthOf = (count: number) => (count / maxCount) * halfMax;
+  const rightEdge = smoothed.map(
+    b => `${cx + widthOf(b.count)},${yScale(b.x)}`,
+  );
+  const leftEdge = smoothed
+    .slice()
+    .reverse()
+    .map(b => `${cx - widthOf(b.count)},${yScale(b.x)}`);
+  return `M${rightEdge.join("L")}L${leftEdge.join("L")}Z`;
 }
 
 /** Native hover tooltip: verdict word + diff for a reliable percentile, or the
@@ -273,7 +283,7 @@ function drawMarker(
 }
 
 /** Percentile label, with the verdict point enlarged and its Δ% value captioned
- *  below (this is the same number shown elsewhere as the headline delta), and a
+ *  below (the same number shown elsewhere as the headline delta), and a
  *  tail-count caption for unreliable percentiles. */
 function drawPercentileLabel(
   svg: SVGSVGElement,

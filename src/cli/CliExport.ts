@@ -79,7 +79,7 @@ export async function exportReports(options: ExportOptions): Promise<void> {
   const profileFile = buildSpeedscopeFile(results);
   const timeFile = buildAllTimeProfiles(results);
   const coverageData = await annotateCoverage(results, profileFile, timeFile);
-  const timeData = timeFile ? JSON.stringify(timeFile) : undefined;
+  const timeData = optionalJson(timeFile);
 
   if (args.archive != null) {
     const outputPath = args.archive || undefined;

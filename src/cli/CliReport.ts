@@ -1,5 +1,4 @@
 import type { CaseResult, MatrixResults } from "../matrix/BenchMatrix.ts";
-import { reportMatrixResults } from "../matrix/MatrixReport.ts";
 import {
   aggregateSites,
   filterSites,
@@ -91,15 +90,8 @@ export function printHeapReports(
   }
 }
 
-/** Roll up the matrix verdicts from the prepared report data into a tally line. */
-export function defaultMatrixReport(data: ReportData): string {
-  return reportMatrixResults(data);
-}
-
-/** Convert MatrixResults to ReportGroup[]: one group per case, with each
- *  variant a report in it. Variants compared against a baseline carry their own
- *  paired (interleaved) baseline, so each variant is measured against its own
- *  reference rather than a single shared one. */
+/** Convert MatrixResults to ReportGroup[]: one group per case, each variant a
+ *  report in it carrying its own paired baseline (see caseGroups). */
 export function matrixToReportGroups(results: MatrixResults[]): ReportGroup[] {
   return results.flatMap(caseGroups);
 }
@@ -124,7 +116,11 @@ function caseGroups(matrix: MatrixResults): ReportGroup[] {
     // No group-level baseline: each variant carries its own (a single shared
     // baseline would mislabel "vs <one variant>" for the others). The shared
     // baseline variant is named instead, so the viewer can label it.
-    return { name, reports, baselineVariantId: baselineVariantId(matrix, caseId) };
+    return {
+      name,
+      reports,
+      baselineVariantId: baselineVariantId(matrix, caseId),
+    };
   });
 }
 
@@ -163,11 +159,7 @@ function variantReport(variantId: string, c: CaseResult): BenchmarkReport {
 
 /** Assemble report sections from CLI flags (time/gc/runs). */
 export function buildReportSections(gcStats: boolean): ReportSection[] {
-  return [
-    timeSection,
-    ...(gcStats ? [gcStatsSection] : []),
-    runsSection,
-  ];
+  return [timeSection, ...(gcStats ? [gcStatsSection] : []), runsSection];
 }
 
 /** Build sections from CLI feature flags (time/gc/runs). */

@@ -172,12 +172,7 @@ function ScalarSection({ section }: { section: ViewerSection }) {
 
 /** A shared (case-constant) row, e.g. the line count: label and a single value. */
 function SharedRow({ row }: { row: ViewerRow }) {
-  return (
-    <div class="stat-row shared-row">
-      <span class="row-label">{row.label}</span>
-      <span class="row-value">{row.entries[0]?.value}</span>
-    </div>
-  );
+  return <SharedStat label={row.label} value={row.entries[0]?.value ?? ""} />;
 }
 
 /** Always-visible per-percentile shift function below the sparkline table.

@@ -48,11 +48,10 @@ export interface ShiftDetail {
 export const shiftDetail = signal<ShiftDetail | null>(null);
 
 const cookieTheme = document.cookie.match(/(?:^|; )theme=(light|dark)/);
+const initialTheme = (cookieTheme?.[1] as ThemePreference) ?? "system";
 
 /** User's light/dark theme preference, initialized from cookie. */
-export const themePreference = signal<ThemePreference>(
-  (cookieTheme?.[1] as ThemePreference) ?? "system",
-);
+export const themePreference = signal<ThemePreference>(initialTheme);
 
 /** Pick the best default tab based on available data. */
 export function defaultTabId(): string {

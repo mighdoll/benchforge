@@ -8,12 +8,16 @@ import type {
   BootstrapCIData,
   ReportData,
   ShiftPercentile,
-  ShiftRun,
 } from "../ReportData.ts";
 import { formatPct } from "../plots/PlotTypes.ts";
 import { provider, reportData, shiftDetail, trimMode } from "../State.ts";
 import { activeGroupView, CaseCard, caseHeaderCI } from "./CaseCard.tsx";
-import { ciDomain, ComparisonBadge, shiftDetailOpener } from "./CIWidgets.tsx";
+import {
+  ciDomain,
+  ComparisonBadge,
+  distributionOpts,
+  shiftDetailOpener,
+} from "./CIWidgets.tsx";
 import { useLazyPlot } from "./LazyPlot.ts";
 
 const skipArgs = new Set(["_", "$0", "view", "file"]);
@@ -275,11 +279,9 @@ function ShiftPopupAbsolute(
 ) {
   const ref = useLazyPlot(async () => {
     const { createDistributionPlot } = await import("../plots/CIPlot.ts");
-    const opts = {
-      width: 320, height: 90, title: "", direction: "uncertain" as const,
-      ciLabels: ci.ciLabels, includeZero: false, smooth: true, pointLabel: ci.estimateLabel,
-      ciLevel: ci.ciLevel, ciReliable: ci.ciReliable, domain,
-    };
+    const opts = distributionOpts(ci, {
+      width: 320, height: 90, pointLabel: ci.estimateLabel, domain,
+    });
     return createDistributionPlot(ci.histogram, ci.ci, ci.estimate, opts);
   }, [ci, domain], "Shift absolute plot");
   return (

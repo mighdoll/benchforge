@@ -196,9 +196,8 @@ export async function resolveInlineCase<T>(
   caseId: string,
 ): Promise<T> {
   const value = caseData[caseId];
-  return typeof value === "function"
-    ? (value as () => T | Promise<T>)()
-    : value;
+  if (typeof value === "function") return (value as () => T | Promise<T>)();
+  return value;
 }
 
 /** Map matrix options to runner options, applying defaults for maxTime and warmup */

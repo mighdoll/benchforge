@@ -6,13 +6,22 @@ import {
   runMatrixVariant,
 } from "../runners/RunnerOrchestrator.ts";
 import type { VariantSource } from "../runners/RunnerUtils.ts";
-import type { BenchMatrix, CaseResult, VariantResult } from "./BenchMatrix.ts";
-import { computeDeltaPercent, resolveInlineCase } from "./BenchMatrix.ts";
+import type {
+  BenchMatrix,
+  CaseResult,
+  RunMatrixOptions,
+  VariantResult,
+} from "./BenchMatrix.ts";
+import {
+  buildRunnerOptions,
+  computeDeltaPercent,
+  resolveCases,
+  resolveInlineCase,
+} from "./BenchMatrix.ts";
 import type { CasesModule } from "./CaseLoader.ts";
 import { loadCaseData } from "./CaseLoader.ts";
 
-/** A variant's code source for a case, plus its optional paired baseline source.
- *  Returning undefined for a (variantId, caseId) skips that case. */
+/** A variant's code source for a case, plus its optional paired baseline source. */
 export interface VariantPlan {
   source: VariantSource;
   baselineSource?: VariantSource;
@@ -47,16 +56,38 @@ export async function inlineCaseDataMap<T>(
   caseIds: string[],
 ): Promise<Map<string, unknown> | undefined> {
   if (matrix.caseData) {
-    const entries = await Promise.all(
-      caseIds.map(
-        async id =>
-          [id, await resolveInlineCase(matrix.caseData!, id)] as const,
-      ),
-    );
-    return new Map(entries);
+    const resolve = async (id: string) =>
+      [id, await resolveInlineCase(matrix.caseData!, id)] as const;
+    return new Map(await Promise.all(caseIds.map(resolve)));
   }
   if (matrix.casesModule) return undefined;
   return new Map(caseIds.map(id => [id, id]));
+}
+
+/** Assemble a {@link MatrixPlan} from the matrix and options, given the already
+ *  filtered `variantIds` and a per-variant source resolver. Fills the batching,
+ *  runner-option, and case-data scaffold shared by both matrix executors; they
+ *  differ only in how they enumerate variants and resolve sources. */
+export async function buildMatrixPlan<T>(
+  matrix: BenchMatrix<T>,
+  options: RunMatrixOptions,
+  variantIds: string[],
+  plan: MatrixPlan<T>["plan"],
+): Promise<MatrixPlan<T>> {
+  const { casesModule, caseIds } = await resolveCases(matrix, options);
+  const { batches = 1, warmupBatch = false, useWorker = true } = options;
+  return {
+    variantIds,
+    caseIds,
+    casesModule,
+    casesModuleUrl: matrix.casesModule,
+    caseData: await inlineCaseDataMap(matrix, caseIds),
+    plan,
+    runnerOpts: buildRunnerOptions(options),
+    batches,
+    warmupBatch,
+    useWorker,
+  };
 }
 
 /** Run every variant over every case, batching and interleaving each variant
@@ -98,7 +129,14 @@ async function runVariantCases<T>(
       ? computeDeltaPercent(baseline, measured)
       : undefined;
     const baselineId = baselineSource?.variantId;
-    cases.push({ caseId, measured, metadata, baseline, baselineId, deltaPercent });
+    cases.push({
+      caseId,
+      measured,
+      metadata,
+      baseline,
+      baselineId,
+      deltaPercent,
+    });
   }
   return cases;
 }

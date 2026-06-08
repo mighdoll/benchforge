@@ -16,18 +16,9 @@ export function useLazyPlot(
     render()
       .then(el => {
         if (!ref.current || !el) return;
-        ref.current.innerHTML = "";
-        ref.current.appendChild(el);
+        ref.current.replaceChildren(el);
       })
-      .catch(err => {
-        console.error(`${errorLabel ?? "Plot"} failed:`, err);
-        if (ref.current) {
-          const div = document.createElement("div");
-          div.className = "loading";
-          div.textContent = String(err.message ?? err);
-          ref.current.replaceChildren(div);
-        }
-      });
+      .catch(err => showPlotError(ref.current, err, errorLabel));
   }, deps);
   return ref;
 }
@@ -56,13 +47,8 @@ export function useResponsivePlot(
           ref.current.replaceChildren(el);
         })
         .catch(err => {
-          console.error(`${errorLabel ?? "Plot"} failed:`, err);
-          if (!cancelled && ref.current) {
-            const div = document.createElement("div");
-            div.className = "loading";
-            div.textContent = String(err.message ?? err);
-            ref.current.replaceChildren(div);
-          }
+          // always log; skip the DOM write once the effect is cancelled
+          showPlotError(cancelled ? null : ref.current, err, errorLabel);
         });
     }
     const observer = new ResizeObserver(entries => {
@@ -72,7 +58,24 @@ export function useResponsivePlot(
       draw(width);
     });
     observer.observe(host);
-    return () => { cancelled = true; observer.disconnect(); };
+    return () => {
+      cancelled = true;
+      observer.disconnect();
+    };
   }, deps);
   return ref;
+}
+
+/** Log a plot-render failure and replace the host's contents with the message. */
+function showPlotError(
+  host: HTMLDivElement | null,
+  err: unknown,
+  label?: string,
+) {
+  console.error(`${label ?? "Plot"} failed:`, err);
+  if (!host) return;
+  const div = document.createElement("div");
+  div.className = "loading";
+  div.textContent = String((err as Error)?.message ?? err);
+  host.replaceChildren(div);
 }
