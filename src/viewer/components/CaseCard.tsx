@@ -93,9 +93,9 @@ function MetricSection({ section }: { section: ViewerSection }) {
   );
 }
 
-/** One track's sparkline row: name, the absolute distribution (its point label is
- *  the value), and the Δ% as plain text. Clicking the distribution opens the
- *  modal, where the diff CI and per-percentile detail live. */
+/** One track's sparkline row: name and the absolute distribution (its point
+ *  label is the value). The Δ% lives on the violin's verdict point (and, for a
+ *  single comparison, the header); clicking the distribution opens the modal. */
 function SparklineRow(
   { entry, domain }:
   { entry: ViewerRow["entries"][number]; domain?: [number, number] },
@@ -114,11 +114,6 @@ function SparklineRow(
             <BootstrapCIMount ci={entry.bootstrapCI} label={entry.value} domain={domain} />
           </div>
         : <span class="run-value">{entry.value}</span>}
-      <span class="sparkline-delta">
-        {entry.comparisonCI && (
-          <span class="comparison-plain">{formatPct(entry.comparisonCI.percent)}</span>
-        )}
-      </span>
     </div>
   );
 }

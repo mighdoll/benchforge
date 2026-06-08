@@ -272,8 +272,9 @@ function drawMarker(
   svg.appendChild(dot);
 }
 
-/** Percentile label (and tail-count caption for unreliable percentiles). The
- *  verdict's label is enlarged and bolded so it reads as the selected stat. */
+/** Percentile label, with the verdict point enlarged and its Δ% value captioned
+ *  below (this is the same number shown elsewhere as the headline delta), and a
+ *  tail-count caption for unreliable percentiles. */
 function drawPercentileLabel(
   svg: SVGSVGElement,
   point: ShiftPercentile,
@@ -292,6 +293,18 @@ function drawPercentileLabel(
       point.isPrimary ? "700" : "600",
     ),
   );
+  if (point.isPrimary && point.reliable)
+    svg.appendChild(
+      text(
+        cx,
+        height - margin.bottom + 29,
+        formatPct(point.diff.percent),
+        "middle",
+        "11",
+        directionColors[point.diff.direction].stroke,
+        "700",
+      ),
+    );
   if (!point.reliable)
     svg.appendChild(
       text(
