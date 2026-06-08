@@ -75,8 +75,8 @@ test("static viewer: archive upload shows summary with stats", {
     const summaryPanel = page.locator("#summary-panel");
     const stats = summaryPanel.locator(".section-panel").first();
     await stats.waitFor({ state: "visible", timeout: 15_000 });
-    const statRows = await summaryPanel.locator(".stat-row").count();
-    expect(statRows).toBeGreaterThan(0);
+    const metricRows = await summaryPanel.locator(".sparkline-row").count();
+    expect(metricRows).toBeGreaterThan(0);
   } finally {
     await page.close();
   }

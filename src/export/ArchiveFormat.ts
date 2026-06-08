@@ -35,16 +35,4 @@ export interface ArchiveMetadata {
   benchforgeVersion: string;
 }
 
-export const archiveSchemaVersion = 2;
-
-/** Migrate a parsed archive from older schema versions to current. */
-export function migrateArchive(
-  raw: Record<string, unknown>,
-): Partial<BenchforgeArchive> {
-  const schema = (raw.schema as number) ?? 0;
-  if (schema <= 1 && "profile" in raw && !("allocProfile" in raw)) {
-    raw.allocProfile = raw.profile;
-    delete raw.profile;
-  }
-  return raw as Partial<BenchforgeArchive>;
-}
+export const archiveSchemaVersion = 3;

@@ -81,8 +81,8 @@ test("live viewer: summary tab shows stats", {
     const summaryPanel = page.locator("#summary-panel");
     const panel = summaryPanel.locator(".section-panel").first();
     await panel.waitFor({ state: "visible", timeout: 15_000 });
-    const statRows = await summaryPanel.locator(".stat-row").count();
-    expect(statRows).toBeGreaterThan(0);
+    const metricRows = await summaryPanel.locator(".sparkline-row").count();
+    expect(metricRows).toBeGreaterThan(0);
   } finally {
     await page.close();
   }

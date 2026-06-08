@@ -9,10 +9,7 @@ import type { HeapProfile } from "../profiling/node/HeapSampler.ts";
 import { resolveProfile } from "../profiling/node/ResolvedProfile.ts";
 import type { GcEvent } from "../runners/GcStats.ts";
 import type { MeasuredResults } from "../runners/MeasuredResults.ts";
-import {
-  type DifferenceCI,
-  trimOutlierBatches,
-} from "../stats/StatisticalUtils.ts";
+import { trimOutlierBatches } from "../stats/StatisticalUtils.ts";
 import type {
   BenchmarkEntry,
   BenchmarkGroup,
@@ -27,7 +24,6 @@ import type {
   ComparisonOptions,
   ReportGroup,
   ReportSection,
-  UnknownRecord,
 } from "./BenchmarkReport.ts";
 import { gcByBatch } from "./GcByBatch.ts";
 import { gcStatsSection } from "./GcSections.ts";
@@ -35,6 +31,8 @@ import type { GitVersion } from "./GitUtils.ts";
 import { runsSection, timeSection } from "./StandardSections.ts";
 import {
   buildViewerSections,
+  type CaseContext,
+  type CaseTrack,
   hasLowBatchCount,
   isSingleBatch,
   minBatches,
@@ -48,31 +46,6 @@ export interface PrepareHtmlOptions extends ComparisonOptions {
   sections?: ReportSection[];
   currentVersion?: GitVersion;
   baselineVersion?: GitVersion;
-}
-
-/** Context shared across reports in a group. The group baseline is the fallback
- *  for reports without their own paired baseline. */
-interface GroupContext {
-  baseM?: MeasuredResults;
-  baseMeta?: UnknownRecord;
-  baseName?: string;
-  sections?: ReportSection[];
-  comparison?: ComparisonOptions;
-  /** Sibling variant serving as the shared baseline, so its entry is marked
-   *  and the others name it (matrix baselineVariant mode). */
-  baselineVariantId?: string;
-}
-
-/** Viewer sections plus the per-section bootstrap caches that produced them. */
-type ViewerView = { sections: ViewerSection[]; caches: SectionCICache[] };
-
-/** Current + baseline results and metadata, before the trim/no-trim choice. */
-interface BaseContext {
-  current: MeasuredResults;
-  baseline?: MeasuredResults;
-  currentMeta?: UnknownRecord;
-  baselineMeta?: UnknownRecord;
-  baselineName?: string;
 }
 
 /** Convert benchmark results into a ReportData payload for the HTML viewer */
@@ -119,41 +92,148 @@ function defaultSections(
   ].filter((s): s is ReportSection => s !== undefined);
 }
 
-/** @return group data with structured ViewerSections and bootstrap CIs */
+/** @return case data: raw per-series benchmarks plus the case-level,
+ *  track-columned sections (trimmed + raw views). */
 function prepareGroupData(
   group: ReportGroup,
   sections?: ReportSection[],
   comparison?: ComparisonOptions,
 ): BenchmarkGroup {
-  const base = group.baseline;
-  const baseline = base
-    ? { ...prepareBenchmarkData(base), comparisonCI: undefined }
+  const built = sections
+    ? buildCaseSections(sections, resolveTracks(group), comparison)
     : undefined;
-  const ctx: GroupContext = {
-    baseM: base?.measuredResults,
-    baseMeta: base?.metadata,
-    baseName: base?.name,
-    sections,
-    comparison,
-    baselineVariantId: group.baselineVariantId,
-  };
-
-  const benchmarks = group.reports.map(r => prepareReportEntry(r, ctx));
   return {
     name: group.name,
-    baseline,
-    warnings: groupWarnings(group, ctx),
-    benchmarks,
+    baseline: group.baseline ? prepareBenchmarkData(group.baseline) : undefined,
+    benchmarks: group.reports.map(benchmarkEntry),
+    warnings: groupWarnings(group, comparison),
+    sections: built?.sections,
+    rawSections: built?.rawSections,
   };
+}
+
+/** Resolve a case into ordered display tracks. The only mode-aware code: in
+ *  baselineVariant mode the named sibling is a peer baseline track (kept in
+ *  report order); in version mode each variant gets a shadow baseline track. */
+function resolveTracks(group: ReportGroup): CaseTrack[] {
+  return group.baselineVariantId
+    ? baselineVariantTracks(group, group.baselineVariantId)
+    : versionTracks(group);
+}
+
+/** Tracks for baselineVariant mode: report order preserved, the named sibling
+ *  flagged as the (no-Δ%) baseline; the others diff against their paired run. */
+function baselineVariantTracks(
+  group: ReportGroup,
+  baselineId: string,
+): CaseTrack[] {
+  return group.reports.map(report =>
+    report.name === baselineId
+      ? {
+          name: report.name,
+          measured: report.measuredResults,
+          meta: report.metadata,
+          isBaseline: true,
+        }
+      : comparisonTrack(report, group.baseline),
+  );
+}
+
+/** Tracks for version mode: each report emits a comparison track followed by its
+ *  own shadow baseline track (named "baseline", or "<variant> (baseline)" when
+ *  several variants share the case). */
+function versionTracks(group: ReportGroup): CaseTrack[] {
+  const multi = group.reports.length > 1;
+  return group.reports.flatMap(report => {
+    const comp = comparisonTrack(report, group.baseline);
+    const base = report.baseline ?? group.baseline;
+    if (!base) return [comp];
+    const name = multi ? `${report.name} (baseline)` : "baseline";
+    const baseTrack: CaseTrack = {
+      name,
+      measured: base.measuredResults,
+      meta: base.metadata,
+      isBaseline: true,
+    };
+    return [comp, baseTrack];
+  });
+}
+
+/** A comparison track: a variant's measurement paired with its baseline (its own
+ *  interleaved baseline, else the group baseline) for the Δ% and shift. */
+function comparisonTrack(
+  report: BenchmarkReport,
+  groupBaseline?: BenchmarkReport,
+): CaseTrack {
+  const base = report.baseline ?? groupBaseline;
+  return {
+    name: report.name,
+    measured: report.measuredResults,
+    meta: report.metadata,
+    isBaseline: false,
+    baseline: base
+      ? { measured: base.measuredResults, meta: base.metadata, name: base.name }
+      : undefined,
+  };
+}
+
+/** Build the case-level trimmed sections plus the raw (untrimmed) view when
+ *  trimming changed something. */
+function buildCaseSections(
+  sections: ReportSection[],
+  tracks: CaseTrack[],
+  comparison?: ComparisonOptions,
+): { sections: ViewerSection[]; rawSections?: ViewerSection[] } | undefined {
+  if (!tracks.length) return undefined;
+  const ctx: CaseContext = { tracks, comparison };
+  const trimmed = buildViewerSections(sections, ctx);
+  return {
+    sections: trimmed.sections,
+    rawSections: buildRawCaseSections(sections, ctx, trimmed.caches),
+  };
+}
+
+/** @return the untrimmed section view, or undefined when trimming changed
+ *  nothing. Reuses the trimmed view's per-track bootstrap for tracks (and diffs)
+ *  trimming left untouched. */
+function buildRawCaseSections(
+  sections: ReportSection[],
+  ctx: CaseContext,
+  trimmedCaches: SectionCICache[],
+): ViewerSection[] | undefined {
+  if (ctx.comparison?.noBatchTrim) return undefined;
+  const untrimmed = (m?: MeasuredResults) =>
+    !m || trimOutlierBatches(m.samples, m.batchOffsets).trimCount === 0;
+  const anyTrimmed = ctx.tracks.some(
+    t => !untrimmed(t.measured) || (t.baseline && !untrimmed(t.baseline.measured)),
+  );
+  if (!anyTrimmed) return undefined;
+
+  const reuse: SectionCICache[] = trimmedCaches.map(c => ({
+    track: c.track?.map((r, i) =>
+      untrimmed(ctx.tracks[i]?.measured) ? r : undefined,
+    ),
+    // diff depends on both sides; reuse only when neither was trimmed
+    diff: c.diff?.map((d, i) => {
+      const t = ctx.tracks[i];
+      const ok = untrimmed(t?.measured) && untrimmed(t?.baseline?.measured);
+      return ok ? d : undefined;
+    }),
+  }));
+  const rawCtx: CaseContext = {
+    tracks: ctx.tracks,
+    comparison: { ...ctx.comparison, noBatchTrim: true },
+  };
+  return buildViewerSections(sections, rawCtx, reuse).sections;
 }
 
 /** Worst-case batch-reliability warnings across the group, using each report's
  *  effective baseline (its own paired baseline, else the group baseline). */
 function groupWarnings(
   group: ReportGroup,
-  ctx: GroupContext,
+  comparison?: ComparisonOptions,
 ): string[] | undefined {
-  const noTrim = ctx.comparison?.noBatchTrim;
+  const noTrim = comparison?.noBatchTrim;
   let singleBatch = false;
   let lowBatches = false;
   for (const report of group.reports) {
@@ -165,10 +245,17 @@ function groupWarnings(
   return buildWarnings(singleBatch, lowBatches);
 }
 
-/** @return benchmark data with samples, stats, and profiling summaries */
-function prepareBenchmarkData(
-  report: BenchmarkReport,
-): Omit<BenchmarkEntry, "comparisonCI" | "sections"> {
+/** A benchmark entry: raw per-series data plus its own paired baseline (for the
+ *  analyze command's per-batch diagnostics). */
+function benchmarkEntry(report: BenchmarkReport): BenchmarkEntry {
+  const baseline = report.baseline
+    ? prepareBenchmarkData(report.baseline)
+    : undefined;
+  return { ...prepareBenchmarkData(report), baseline };
+}
+
+/** @return raw per-series benchmark data (samples, stats, profiling summaries) */
+function prepareBenchmarkData(report: BenchmarkReport): BenchmarkEntry {
   const { measuredResults: m, name, metadata } = report;
   return {
     name,
@@ -223,48 +310,6 @@ function buildWarnings(
   return parts.length ? parts : undefined;
 }
 
-/** @return a single benchmark entry with its trimmed sections and, when trimming
- *  changed something, the raw (untrimmed) sections for the UI toggle. */
-function prepareReportEntry(
-  report: BenchmarkReport,
-  ctx: GroupContext,
-): BenchmarkEntry {
-  const base = report.baseline;
-  const baseCtx = {
-    current: report.measuredResults,
-    baseline: base?.measuredResults ?? ctx.baseM,
-    currentMeta: report.metadata,
-    baselineMeta: base?.metadata ?? ctx.baseMeta,
-    baselineName: base?.name ?? ctx.baseName,
-  };
-  const trimmedView = ctx.sections
-    ? buildViewerSections(ctx.sections, {
-        ...baseCtx,
-        comparison: ctx.comparison,
-      })
-    : undefined;
-  const rawView = buildRawView(ctx, baseCtx, trimmedView);
-
-  const baseline = base
-    ? { ...prepareBenchmarkData(base), comparisonCI: undefined }
-    : undefined;
-  const isBaselineVariant = report.name === ctx.baselineVariantId;
-  const baselineLabel =
-    ctx.baselineVariantId && !isBaselineVariant && base
-      ? ctx.baselineVariantId
-      : undefined;
-  return {
-    ...prepareBenchmarkData(report),
-    baselineLabel,
-    isBaselineVariant,
-    sections: trimmedView?.sections,
-    rawSections: rawView?.sections,
-    comparisonCI: findPrimarySectionCI(trimmedView?.sections),
-    rawComparisonCI: findPrimarySectionCI(rawView?.sections),
-    baseline,
-  };
-}
-
 /** Compute heap allocation summary from profile */
 function summarizeHeap(profile: HeapProfile): HeapSummary {
   const resolved = resolveProfile(profile);
@@ -280,48 +325,4 @@ function summarizeCoverage(coverage: CoverageData): CoverageSummary {
   );
   const totalCalls = called.reduce((sum, fn) => sum + fn.ranges[0].count, 0);
   return { functionCount: called.length, totalCalls };
-}
-
-/** @return the untrimmed section view, or undefined when trimming changed
- *  nothing (the raw view would equal the trimmed one). Reuses the trimmed
- *  view's bootstrap result for any side trimming left untouched. */
-function buildRawView(
-  ctx: GroupContext,
-  baseCtx: BaseContext,
-  trimmedView: ViewerView | undefined,
-): ViewerView | undefined {
-  if (!ctx.sections) return undefined;
-  const noTrim = ctx.comparison?.noBatchTrim === true;
-  const trimCount = (mr?: MeasuredResults) =>
-    !mr || noTrim
-      ? 0
-      : trimOutlierBatches(mr.samples, mr.batchOffsets).trimCount;
-  const curTrimCount = trimCount(baseCtx.current);
-  const baseTrimCount = trimCount(baseCtx.baseline);
-  if (curTrimCount === 0 && baseTrimCount === 0) return undefined;
-
-  const reuse = trimmedView?.caches.map(c => ({
-    cur: curTrimCount === 0 ? c.cur : undefined,
-    base: baseTrimCount === 0 ? c.base : undefined,
-    // diff depends on both sides; only safe to reuse when neither was trimmed
-    diff: undefined,
-  }));
-  const rawCtx = {
-    ...baseCtx,
-    comparison: { ...ctx.comparison, noBatchTrim: true },
-  };
-  return buildViewerSections(ctx.sections, rawCtx, reuse);
-}
-
-/** Extract the comparison CI from the first primary row across all sections */
-function findPrimarySectionCI(
-  sections: ViewerSection[] | undefined,
-): DifferenceCI | undefined {
-  if (!sections) return undefined;
-  for (const section of sections) {
-    for (const row of section.rows) {
-      if (row.primary && row.comparisonCI) return row.comparisonCI;
-    }
-  }
-  return undefined;
 }

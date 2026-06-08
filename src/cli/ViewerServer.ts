@@ -16,10 +16,7 @@ import {
   defaultArchiveName,
   fetchSource,
 } from "../export/ArchiveExport.ts";
-import {
-  archiveSchemaVersion,
-  migrateArchive,
-} from "../export/ArchiveFormat.ts";
+import { archiveSchemaVersion } from "../export/ArchiveFormat.ts";
 
 export interface ViewerServerOptions {
   /** Speedscope JSON profile data (allocation) */
@@ -77,13 +74,16 @@ export async function viewArchive(filePath: string): Promise<void> {
   const raw = JSON.parse(content);
 
   const schema = raw.schema ?? 0;
-  if (schema > archiveSchemaVersion) {
-    const msg = `Archive schema version ${schema} is newer than supported (${archiveSchemaVersion}).`;
-    console.error(`${msg} Please update benchforge to view this archive.`);
+  if (schema !== archiveSchemaVersion) {
+    const rel = schema > archiveSchemaVersion ? "newer than" : "older than";
+    console.error(
+      `Archive schema version ${schema} is ${rel} supported (${archiveSchemaVersion}). ` +
+        "Regenerate the .benchforge archive with this version of benchforge.",
+    );
     process.exit(1);
   }
 
-  const archive = migrateArchive(raw);
+  const archive = raw;
   const sources = archive.sources as Record<string, string> | undefined;
   const { close } = await startViewerServer({
     profileData: optionalJson(archive.allocProfile),
