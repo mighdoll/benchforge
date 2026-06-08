@@ -283,13 +283,9 @@ function tailCoverage(
   const threshold = percentile(blocks.flat(), p);
   const inTail =
     p > 0.5 ? (v: number) => v >= threshold : (v: number) => v <= threshold;
-  let count = 0;
-  let batches = 0;
-  for (const block of blocks) {
-    const n = block.filter(inTail).length;
-    if (n > 0) batches++;
-    count += n;
-  }
+  const perBlock = blocks.map(block => block.filter(inTail).length);
+  const count = perBlock.reduce((sum, n) => sum + n, 0);
+  const batches = perBlock.filter(n => n > 0).length;
   return { count, batches };
 }
 

@@ -48,16 +48,16 @@ function analyzeBenchmark(
   baseline: BenchmarkEntry | undefined,
   batchCount?: number,
 ): void {
-  const bOffsets =
+  const benchOffsets =
     bench.batchOffsets ?? inferOffsets(bench.samples, batchCount);
   const baseOffsets =
     baseline?.batchOffsets ?? inferOffsets(baseline?.samples, batchCount);
-  if (!bOffsets?.length) {
+  if (!benchOffsets?.length) {
     console.log(dim("  No batch data (single batch run)"));
     return;
   }
 
-  const batches = splitByOffsets(bench.samples, bOffsets);
+  const batches = splitByOffsets(bench.samples, benchOffsets);
   const baseBatches =
     baseOffsets && baseline
       ? splitByOffsets(baseline.samples, baseOffsets)

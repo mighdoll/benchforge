@@ -155,43 +155,55 @@ function buildProfilingChain(
   runner: BenchRunner,
   state: ProfilingState,
 ): () => Promise<MeasuredResults[]> {
-  const { alloc, profile, profileInterval, allocInterval, allocDepth } =
-    message.options;
+  const { alloc, profile } = message.options;
 
   const run = async () => {
     const { fn, params } = await resolveBenchmarkFn(message);
     return runner.runBench({ ...message.spec, fn }, message.options, params);
   };
 
-  const runMaybeWithTime = profile
-    ? async () => {
-        const { withTimeProfiling } = await import(
-          "../profiling/node/TimeSampler.ts"
-        );
-        const opts = {
-          interval: profileInterval,
-          session: state.profilerSession,
-        };
-        const r = await withTimeProfiling(opts, run);
-        state.timeProfile = r.profile;
-        return r.result;
-      }
-    : run;
+  const runMaybeWithTime = profile ? wrapWithTime(run, message, state) : run;
+  if (!alloc) return runMaybeWithTime;
+  return wrapWithHeap(runMaybeWithTime, message, state);
+}
 
-  return alloc
-    ? async () => {
-        const { withHeapSampling } = await import(
-          "../profiling/node/HeapSampler.ts"
-        );
-        const heapOpts = {
-          samplingInterval: allocInterval,
-          stackDepth: allocDepth,
-        };
-        const r = await withHeapSampling(heapOpts, runMaybeWithTime);
-        state.heapProfile = r.profile;
-        return r.result;
-      }
-    : runMaybeWithTime;
+/** Wrap a run with CPU time profiling, recording the profile into state. */
+function wrapWithTime(
+  run: () => Promise<MeasuredResults[]>,
+  message: RunMessage,
+  state: ProfilingState,
+): () => Promise<MeasuredResults[]> {
+  return async () => {
+    const { withTimeProfiling } = await import(
+      "../profiling/node/TimeSampler.ts"
+    );
+    const interval = message.options.profileInterval;
+    const opts = { interval, session: state.profilerSession };
+    const r = await withTimeProfiling(opts, run);
+    state.timeProfile = r.profile;
+    return r.result;
+  };
+}
+
+/** Wrap a run with heap allocation sampling, recording the profile into state. */
+function wrapWithHeap(
+  run: () => Promise<MeasuredResults[]>,
+  message: RunMessage,
+  state: ProfilingState,
+): () => Promise<MeasuredResults[]> {
+  return async () => {
+    const { withHeapSampling } = await import(
+      "../profiling/node/HeapSampler.ts"
+    );
+    const { allocInterval, allocDepth } = message.options;
+    const heapOpts = {
+      samplingInterval: allocInterval,
+      stackDepth: allocDepth,
+    };
+    const r = await withHeapSampling(heapOpts, run);
+    state.heapProfile = r.profile;
+    return r.result;
+  };
 }
 
 process.on("message", async (message: RunMessage) => {

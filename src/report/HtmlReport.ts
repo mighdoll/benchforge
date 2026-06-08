@@ -227,14 +227,12 @@ function groupWarnings(
   comparison?: ComparisonOptions,
 ): string[] | undefined {
   const noTrim = comparison?.noBatchTrim;
-  let singleBatch = false;
-  let lowBatches = false;
-  for (const report of group.reports) {
-    const baseM = (report.baseline ?? group.baseline)?.measuredResults;
-    const curM = report.measuredResults;
-    singleBatch ||= isSingleBatch(baseM, curM);
-    lowBatches ||= hasLowBatchCount(baseM, curM, noTrim);
-  }
+  const pairs = group.reports.map(report => ({
+    base: (report.baseline ?? group.baseline)?.measuredResults,
+    cur: report.measuredResults,
+  }));
+  const singleBatch = pairs.some(p => isSingleBatch(p.base, p.cur));
+  const lowBatches = pairs.some(p => hasLowBatchCount(p.base, p.cur, noTrim));
   return buildWarnings(singleBatch, lowBatches);
 }
 

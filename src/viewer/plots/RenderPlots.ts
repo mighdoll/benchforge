@@ -213,11 +213,10 @@ function rejectedIndices(b: PreparedBenchmark): Set<number> | undefined {
 
   const rejected = new Set<number>();
   for (let bi = 0; bi < means.length; bi++) {
-    if (!kept.has(bi)) {
-      const start = offsets[bi];
-      const end = bi + 1 < offsets.length ? offsets[bi + 1] : b.samples.length;
-      for (let j = start; j < end; j++) rejected.add(j);
-    }
+    if (kept.has(bi)) continue;
+    const start = offsets[bi];
+    const end = bi + 1 < offsets.length ? offsets[bi + 1] : b.samples.length;
+    for (let j = start; j < end; j++) rejected.add(j);
   }
   return rejected.size > 0 ? rejected : undefined;
 }

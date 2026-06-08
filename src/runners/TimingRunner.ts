@@ -66,24 +66,14 @@ async function collectSamples<T>(
   const warmupSamples = config.skipWarmup ? [] : await runWarmup(config);
   const heapBefore = process.memoryUsage().heapUsed;
   const loop = await runSampleLoop(config);
-  const { samples, heapSamples, pausePoints } = loop;
-  const { startTime, loopStartTime } = loop;
-  if (samples.length === 0)
+  if (loop.samples.length === 0)
     throw new Error(
       `No samples collected for benchmark: ${config.benchmark.name}`,
     );
   const heapAfter = process.memoryUsage().heapUsed;
   const heapGrowth =
-    Math.max(0, heapAfter - heapBefore) / 1024 / samples.length;
-  return {
-    samples,
-    warmupSamples,
-    heapGrowth,
-    heapSamples,
-    startTime,
-    loopStartTime,
-    pausePoints,
-  };
+    Math.max(0, heapAfter - heapBefore) / 1024 / loop.samples.length;
+  return { ...loop, warmupSamples, heapGrowth };
 }
 
 /** Assemble CollectResult into a MeasuredResults record. */

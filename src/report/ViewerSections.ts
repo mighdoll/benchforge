@@ -312,34 +312,32 @@ function scalarRow(scalar: ScalarRow, ctx: CaseContext): ViewerRow | undefined {
   if (!scalar.comparable) {
     // one cell per track, but flagged shared: case-constant rows (line counts)
     // display once; rows that differ per variant (runs) fan out in the footer.
-    let anyValue = false;
-    const entries = ctx.tracks.map(track => {
-      const value = format(scalar.value(track.measured, track.meta));
-      if (value && value !== "—") anyValue = true;
-      return { runName: track.name, value };
-    });
-    if (!anyValue) return undefined;
+    const entries = ctx.tracks.map(track => ({
+      runName: track.name,
+      value: format(scalar.value(track.measured, track.meta)),
+    }));
+    if (!entries.some(e => e.value && e.value !== "—")) return undefined;
     return { label: scalar.title, entries, shared: true };
   }
 
   const na = (v: unknown) => (v === undefined ? "n/a" : format(v));
-  let anyValue = false;
-  const entries: ViewerEntry[] = ctx.tracks.map(track => {
-    const raw = scalar.value(track.measured, track.meta);
-    if (raw !== undefined) anyValue = true;
-    const entry: ViewerEntry = { runName: track.name, value: na(raw) };
+  const raws = ctx.tracks.map(track =>
+    scalar.value(track.measured, track.meta),
+  );
+  if (raws.every(raw => raw === undefined)) return undefined;
+  const entries: ViewerEntry[] = ctx.tracks.map((track, i) => {
+    const entry: ViewerEntry = { runName: track.name, value: na(raws[i]) };
     if (track.isBaseline) entry.isBaseline = true;
     if (!track.isBaseline && track.baseline) {
       const baseRaw = scalar.value(
         track.baseline.measured,
         track.baseline.meta,
       );
-      const delta = simpleDeltaCI(raw, baseRaw);
+      const delta = simpleDeltaCI(raws[i], baseRaw);
       if (delta) entry.comparisonCI = delta;
     }
     return entry;
   });
-  if (!anyValue) return undefined;
   return { label: scalar.title, entries };
 }
 

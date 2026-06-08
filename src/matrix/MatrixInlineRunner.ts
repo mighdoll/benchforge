@@ -31,12 +31,12 @@ export async function runMatrixInline<T>(
   const runnerOpts = buildRunnerOptions(options);
   const { batches = 1, warmupBatch = false, useWorker = true } = options;
 
-  const all = Object.entries(matrix.variants!);
+  const allVariants = Object.entries(matrix.variants!);
   const { filteredVariants } = options;
-  const entries = filteredVariants
-    ? all.filter(([id]) => filteredVariants.includes(id))
-    : all;
-  const sources = new Map(entries.map(([id, v]) => [id, inlineSource(id, v)]));
+  const selected = filteredVariants
+    ? allVariants.filter(([id]) => filteredVariants.includes(id))
+    : allVariants;
+  const sources = new Map(selected.map(([id, v]) => [id, inlineSource(id, v)]));
   const baselineId = matrix.baselineVariant;
 
   const plan: MatrixPlan<T> = {

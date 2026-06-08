@@ -150,11 +150,8 @@ function spreadBytes(s: Spread): string {
 
 /** @return the runs count from the runs row (first track), if any. */
 function findRunsValue(sections: ViewerSection[]): string | undefined {
-  for (const section of sections) {
-    const row = section.rows.find(isRunsRow);
-    if (row) return entryValue(row.entries[0]);
-  }
-  return undefined;
+  const runsRow = sections.flatMap(s => s.rows).find(isRunsRow);
+  return runsRow ? entryValue(runsRow.entries[0]) : undefined;
 }
 
 /** The runs row is the shared "runs" count, lifted to case metadata. */

@@ -48,7 +48,7 @@ export function gcByBatch(r: MeasuredResults): GcByBatchSummary | undefined {
   const full = placed.filter(p => p.event.type === "mark-compact");
   const scavenges = placed.filter(p => p.event.type === "scavenge").length;
 
-  const perBatchCounts = countFullPerBatch(full, batchOffsets, samples.length);
+  const perBatchCounts = countFullPerBatch(full, batchOffsets);
   return {
     batches: batchOffsets.length,
     fullPerBatch: spread(perBatchCounts),
@@ -79,27 +79,18 @@ function mapToSample(offset: number, endTimes: number[]): number {
 type PlacedEvent = { event: GcEvent; sampleIndex: number };
 
 /** Count full GCs falling in each batch's sample range. */
-function countFullPerBatch(
-  full: PlacedEvent[],
-  offsets: number[],
-  total: number,
-): number[] {
+function countFullPerBatch(full: PlacedEvent[], offsets: number[]): number[] {
   const counts = new Array<number>(offsets.length).fill(0);
-  for (const p of full) counts[batchOf(p.sampleIndex, offsets, total)]++;
+  for (const p of full) counts[batchOf(p.sampleIndex, offsets)]++;
   return counts;
 }
 
-/** @return the batch index whose sample range contains sampleIndex. */
-function batchOf(
-  sampleIndex: number,
-  offsets: number[],
-  total: number,
-): number {
-  for (let b = offsets.length - 1; b >= 0; b--) {
-    const end = b + 1 < offsets.length ? offsets[b + 1] : total;
-    if (sampleIndex >= offsets[b] && sampleIndex < end) return b;
-  }
-  return 0;
+/** @return the batch index whose sample range contains sampleIndex. Batches are
+ *  contiguous ([offsets[b], offsets[b+1])), so the containing batch is the last
+ *  one whose start is at or before sampleIndex. */
+function batchOf(sampleIndex: number, offsets: number[]): number {
+  const b = offsets.findLastIndex(start => sampleIndex >= start);
+  return b >= 0 ? b : 0;
 }
 
 /** min/max/mean/cv over values; zero-filled when empty. */

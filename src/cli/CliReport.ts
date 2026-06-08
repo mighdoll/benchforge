@@ -1,5 +1,4 @@
 import type { CaseResult, MatrixResults } from "../matrix/BenchMatrix.ts";
-import { reportMatrixResults } from "../matrix/MatrixReport.ts";
 import {
   aggregateSites,
   filterSites,
@@ -89,11 +88,6 @@ export function printHeapReports(
       console.log(formatRawSamples(resolved));
     }
   }
-}
-
-/** Roll up the matrix verdicts from the prepared report data into a tally line. */
-export function defaultMatrixReport(data: ReportData): string {
-  return reportMatrixResults(data);
 }
 
 /** Convert MatrixResults to ReportGroup[]: one group per case, with each

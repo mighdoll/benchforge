@@ -8,7 +8,6 @@ import type {
   BootstrapCIData,
   ReportData,
   ShiftPercentile,
-  ShiftRun,
 } from "../ReportData.ts";
 import { formatPct } from "../plots/PlotTypes.ts";
 import { provider, reportData, shiftDetail, trimMode } from "../State.ts";

@@ -126,19 +126,29 @@ export function diffCIs(
   const hasBlocks =
     (aOffsets?.length ?? 0) >= 2 && (bOffsets?.length ?? 0) >= 2;
   const results = hasBlocks
-    ? supportedStats.map(s => {
-        const fn = statKindToFn(s);
-        const diffOpts = { ...options, blocksB: bOffsets! };
-        return s === "mean"
-          ? blockDifferenceCI(a, aOffsets!, b, fn, diffOpts)
-          : blockPoolDifferenceCI(a, aOffsets!, b, fn, diffOpts);
-      })
+    ? supportedStats.map(s => blockDiff(a, aOffsets!, b, bOffsets!, s, options))
     : multiSampleDifferenceCI(a, b, supportedStats, options);
 
   let resultIdx = 0;
   return stats.map(s =>
     isBootstrappable(s) ? results[resultIdx++] : undefined,
   );
+}
+
+/** Block-bootstrap difference CI for one stat: mean uses per-batch means,
+ *  percentiles pool the resampled batches. */
+function blockDiff(
+  a: number[],
+  aOffsets: number[],
+  b: number[],
+  bOffsets: number[],
+  stat: StatKind,
+  options: BlockDiffOptions,
+): DifferenceCI {
+  const fn = statKindToFn(stat);
+  const diffOpts = { ...options, blocksB: bOffsets };
+  if (stat === "mean") return blockDifferenceCI(a, aOffsets, b, fn, diffOpts);
+  return blockPoolDifferenceCI(a, aOffsets, b, fn, diffOpts);
 }
 
 /** @return block bootstrap CI for percentage difference between baseline (a) and current (b).

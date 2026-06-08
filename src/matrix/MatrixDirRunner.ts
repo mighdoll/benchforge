@@ -25,7 +25,6 @@ import { discoverVariants } from "./VariantLoader.ts";
 
 /** Shared state for directory-based matrix execution */
 interface DirMatrixContext<T> {
-  matrix: BenchMatrix<T>;
   casesModule?: CasesModule<T>;
   baselineIds: string[];
   caseIds: string[];
@@ -132,7 +131,6 @@ async function createDirContext<T>(
   const runnerOpts = buildRunnerOptions(options);
   const { batches = 1, warmupBatch = false, useWorker = true } = options;
   return {
-    matrix,
     casesModule,
     baselineIds,
     caseIds,

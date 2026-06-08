@@ -77,10 +77,12 @@ function SamplesGroup({ group, index }: { group: BenchmarkGroup; index: number }
     </div>
   );
 
-  const hasHeap = flat.heapSeries.length > 0, hasBaselineHeap = flat.baselineHeapSeries.length > 0;
+  const hasHeap = flat.heapSeries.length > 0;
+  const hasBaselineHeap = flat.baselineHeapSeries.length > 0;
   const hasRejected = flat.timeSeries.some(d => d.isRejected);
   const hasFullGc = flat.allGcEvents.length > 0;
-  const totalPoints = viewFlat.timeSeries.length, sampled = totalPoints > 1000;
+  const totalPoints = viewFlat.timeSeries.length;
+  const sampled = totalPoints > 1000;
 
   const toggle = (key: keyof SeriesVisibility) =>
     setVisibility(v => ({ ...v, [key]: !v[key] }));
