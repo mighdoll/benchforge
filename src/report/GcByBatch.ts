@@ -13,13 +13,16 @@ export interface GcByBatchSummary {
 
   /** Full GCs per batch across all batches. */
   fullPerBatch: Spread;
+
   /** Full-GC pause (ms) per event, pooled across batches. */
   fullPause: Spread;
+
   /** Bytes collected per full-GC event, pooled across batches. */
   fullCollected: Spread;
 
   /** Total scavenges and full GCs (context for "is GC even happening"). */
   scavenges: number;
+
   fullGCs: number;
 }
 
@@ -37,8 +40,10 @@ type PlacedEvent = { event: GcEvent; sampleIndex: number };
 
 /** Build a per-batch full-GC summary, or undefined when there is no per-event
  *  GC data with offsets and batch structure to analyze. */
-export function gcByBatch(r: MeasuredResults): GcByBatchSummary | undefined {
-  const { gcEvents, samples, batchOffsets } = r;
+export function gcByBatch(
+  measuredResuls: MeasuredResults,
+): GcByBatchSummary | undefined {
+  const { gcEvents, samples, batchOffsets } = measuredResuls;
   if (!gcEvents?.length || !batchOffsets?.length) return undefined;
 
   const endTimes = cumulativeEndTimes(samples);

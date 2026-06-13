@@ -5,14 +5,19 @@
 export interface GcStats {
   scavenges: number;
   markCompacts: number;
+
   /** Bytes freed by GC. */
   totalCollected: number;
+
   /** Total GC pause time in milliseconds. */
   gcPauseTime: number;
+
   /** Bytes allocated (Node only). */
   totalAllocated?: number;
+
   /** Bytes promoted to old generation (Node only). */
   totalPromoted?: number;
+
   /** Bytes survived in young generation (Node only). */
   totalSurvived?: number;
 }
@@ -22,13 +27,17 @@ export interface GcEvent {
   type: "scavenge" | "mark-compact" | "minor-ms" | "unknown";
   pauseMs: number;
   collected: number;
+
   /** Wall-clock ms since process start, from the nvp line prefix (Node only).
    *  Rebased to benchmark-loop time downstream for sample-index mapping. */
   offset?: number;
+
   /** Node only. */
   allocated?: number;
+
   /** Node only. */
   promoted?: number;
+
   /** Node only. */
   survived?: number;
 }
