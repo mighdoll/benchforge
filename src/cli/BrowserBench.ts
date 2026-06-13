@@ -250,12 +250,13 @@ function toBrowserMeasured(
   name: string,
   result: BrowserProfileResult,
 ): MeasuredResults {
-  const { gcStats, heapProfile, timeProfile, coverage, navTiming, samples } =
-    result;
+  const { gcStats, gcEvents, heapProfile, timeProfile, coverage } = result;
+  const { navTiming, samples } = result;
   const navTimings = navTiming ? [navTiming] : undefined;
   const base = {
     name,
     gcStats,
+    gcEvents,
     heapProfile,
     timeProfile,
     coverage,

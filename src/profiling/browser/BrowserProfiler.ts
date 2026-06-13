@@ -1,4 +1,4 @@
-import type { GcStats } from "../../runners/GcStats.ts";
+import type { GcEvent, GcStats } from "../../runners/GcStats.ts";
 import type { CoverageData } from "../node/CoverageTypes.ts";
 import type { HeapProfile, HeapSampleOptions } from "../node/HeapSampler.ts";
 import type { TimeProfile } from "../node/TimeSampler.ts";
@@ -72,6 +72,8 @@ export interface BrowserProfileResult {
   coverage?: CoverageData;
   /** Garbage collection statistics */
   gcStats?: GcStats;
+  /** Per-GC records with loop-relative offsets (bench mode only) */
+  gcEvents?: GcEvent[];
   /** Wall-clock ms for the entire bench loop or page load */
   wallTimeMs?: number;
   /** Per-iteration timing samples (ms) from bench function mode */
@@ -154,7 +156,9 @@ async function runProfile(
     }
   }
 
-  if (params.gcStats)
-    return { ...result, gcStats: await collectTracing(cdp, traceEvents) };
+  if (params.gcStats) {
+    const { stats, events } = await collectTracing(cdp, traceEvents);
+    return { ...result, gcStats: stats, gcEvents: events.length ? events : undefined };
+  }
   return result;
 }

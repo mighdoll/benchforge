@@ -80,8 +80,10 @@ export interface MeasuredResults {
   gcStats?: GcStats;
 
   /** Per-event GC records with loop-relative offsets, for placing GC markers on
-   *  the time-series plot. Node worker only (needs --gc-stats); dropped on
-   *  subsample since strided samples break the offset mapping. */
+   *  the time-series plot. From the Node worker (--trace-gc-nvp) or, in browser
+   *  bench mode, CDP trace events rebased via a loop-start mark; needs
+   *  --gc-stats. Dropped on subsample since strided samples break the offset
+   *  mapping. */
   gcEvents?: GcEvent[];
 
   /** Heap sampling allocation profile (requires --heap-sample and worker mode) */

@@ -1,8 +1,8 @@
-import type { GcStats } from "../../runners/GcStats.ts";
+import type { GcEvent, GcStats } from "../../runners/GcStats.ts";
 import type { CoverageData, ScriptCoverage } from "../node/CoverageTypes.ts";
 import type { HeapProfile } from "../node/HeapSampler.ts";
 import type { TimeProfile } from "../node/TimeSampler.ts";
-import { browserGcStats } from "./BrowserGcStats.ts";
+import { browserGcEvents, browserGcStats } from "./BrowserGcStats.ts";
 import type { CdpClient } from "./CdpClient.ts";
 import type { TraceEvent } from "./ChromeTraceEvent.ts";
 
@@ -41,22 +41,24 @@ export async function startGcTracing(cdp: CdpClient): Promise<TraceEvent[]> {
     events.push(...(value as unknown as TraceEvent[]));
   });
   await cdp.send("Tracing.start", {
-    traceConfig: { includedCategories: ["v8", "v8.gc"] },
+    // blink.user_timing captures the loop-start mark used to rebase GC offsets
+    traceConfig: { includedCategories: ["v8", "v8.gc", "blink.user_timing"] },
   });
   return events;
 }
 
-/** End CDP tracing and aggregate collected events into GcStats. */
+/** End CDP tracing and parse collected events into aggregate GC stats plus
+ *  per-event records (with loop-relative offsets) for the time-series plot. */
 export async function collectTracing(
   cdp: CdpClient,
   traceEvents: TraceEvent[],
-): Promise<GcStats> {
+): Promise<{ stats: GcStats; events: GcEvent[] }> {
   const done = new Promise<void>(r =>
     cdp.once("Tracing.tracingComplete", () => r()),
   );
   await cdp.send("Tracing.end");
   await done;
-  return browserGcStats(traceEvents);
+  return { stats: browserGcStats(traceEvents), events: browserGcEvents(traceEvents) };
 }
 
 /** Stop active instruments and return collected profiles/coverage. */

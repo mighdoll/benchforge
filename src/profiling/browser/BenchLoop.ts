@@ -3,6 +3,7 @@ import {
   startInstruments,
   stopInstruments,
 } from "./BrowserCDP.ts";
+import { loopStartMark } from "./BrowserGcStats.ts";
 import type { BrowserProfileResult, ProfileCtx } from "./BrowserProfiler.ts";
 
 /**
@@ -27,12 +28,14 @@ export async function runBenchLoop(
   await startInstruments(cdp, opts);
 
   const { samples, totalMs } = await page.evaluate(
-    async ({ maxTime, maxIter }) => {
+    async ({ maxTime, maxIter, loopMark }) => {
       const bench = (globalThis as any).__bench;
       const estimated = Math.min(maxIter, Math.ceil(maxTime / 0.1));
       const samples = new Array<number>(estimated);
       let count = 0;
       const startAll = performance.now();
+      // anchor loop start on the trace clock so GC offsets are loop-relative
+      performance.mark(loopMark);
       const deadline = startAll + maxTime;
       for (let i = 0; i < maxIter && performance.now() < deadline; i++) {
         const t0 = performance.now();
@@ -42,7 +45,7 @@ export async function runBenchLoop(
       samples.length = count;
       return { samples, totalMs: performance.now() - startAll };
     },
-    { maxTime, maxIter },
+    { maxTime, maxIter, loopMark: loopStartMark },
   );
 
   const collected = await stopInstruments(cdp, opts);

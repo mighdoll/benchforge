@@ -37,6 +37,16 @@ test("bench function mode (window.__bench)", { timeout: 30000 }, async () => {
     expect(s).toBeGreaterThan(0);
     expect(s).toBeLessThan(1000);
   }
+
+  // GC events carry loop-relative offsets, rebased from the trace clock via the
+  // loop-start mark. The allocation-heavy example reliably triggers scavenges.
+  expect(result.gcEvents?.length).toBeGreaterThan(0);
+  const { scavenges, markCompacts } = result.gcStats!;
+  expect(scavenges + markCompacts).toBe(result.gcEvents!.length);
+  for (const e of result.gcEvents!) {
+    expect(e.offset).toBeGreaterThanOrEqual(0);
+    expect(e.offset).toBeLessThanOrEqual(result.wallTimeMs!);
+  }
 });
 
 test("bench function with heap profiling", { timeout: 30000 }, async () => {
