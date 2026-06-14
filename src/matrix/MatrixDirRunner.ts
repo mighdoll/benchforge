@@ -4,10 +4,7 @@ import {
   type RunProgress,
   runCalibration,
 } from "../runners/Calibration.ts";
-import {
-  type RunMatrixVariantParams,
-  runMatrixVariant,
-} from "../runners/RunnerOrchestrator.ts";
+import type { RunMatrixVariantParams } from "../runners/RunnerOrchestrator.ts";
 import type { VariantSource } from "../runners/RunnerUtils.ts";
 import type {
   BenchMatrix,
@@ -19,6 +16,7 @@ import {
   buildMatrixPlan,
   inlineCaseDataMap,
   runMatrixPlan,
+  runVariantOnce,
 } from "./MatrixRun.ts";
 import { discoverVariants } from "./VariantLoader.ts";
 
@@ -78,7 +76,7 @@ export async function runMatrixCalibration<T>(
     options: ctx.runnerOpts,
     useWorker: ctx.useWorker,
   };
-  const current = async () => (await runMatrixVariant(variantArgs))[0];
+  const current = () => runVariantOnce(variantArgs);
 
   return runCalibration({
     current,

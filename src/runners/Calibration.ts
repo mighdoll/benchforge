@@ -5,6 +5,7 @@ import {
 } from "../stats/CalibrationSummary.ts";
 import {
   average,
+  type IntegerCount,
   integerCounts,
   type StatKind,
 } from "../stats/StatisticalUtils.ts";
@@ -37,11 +38,14 @@ export interface RunProgress {
 export interface CalibrationResult {
   runs: number;
   batches: number;
+
   /** Per-run percentage point estimates (current vs identical current). */
   pointEstimates: number[];
+
   /** Per-run CI half-widths in percent. */
   ciHalfWidths: number[];
   summary: CalibrationSummary;
+
   /** Mean full (major) GCs per batch, or undefined when GC stats are absent
    *  (no --gc-stats). Below ~2, single-run CIs understate between-run GC
    *  timing variance: the batch mean is dominated by where the lone collection
@@ -51,7 +55,7 @@ export interface CalibrationResult {
    *  count. A single bucket means every batch is on the same GC plateau; spread
    *  across buckets means batches straddle a collection-count step, where the
    *  per-batch mean jumps by a whole major GC. Undefined without --gc-stats. */
-  gcHistogram?: { value: number; count: number }[];
+  gcHistogram?: IntegerCount[];
 }
 
 /** Measure the harness noise floor by comparing the current build against an

@@ -1,6 +1,11 @@
 import type { GcEvent } from "../runners/GcStats.ts";
 import type { MeasuredResults } from "../runners/MeasuredResults.ts";
-import { average, coefficientOfVariation } from "../stats/StatisticalUtils.ts";
+import {
+  average,
+  coefficientOfVariation,
+  cumulativeSum,
+  sampleIndexAtOffset,
+} from "../stats/StatisticalUtils.ts";
 
 /** Per-batch full-collection (mark-compact) GC summary, computed from raw
  *  per-event GC data + samples + batch boundaries. Agent-facing diagnostic:
@@ -41,15 +46,18 @@ type PlacedEvent = { event: GcEvent; sampleIndex: number };
 /** Build a per-batch full-GC summary, or undefined when there is no per-event
  *  GC data with offsets and batch structure to analyze. */
 export function gcByBatch(
-  measuredResuls: MeasuredResults,
+  results: MeasuredResults,
 ): GcByBatchSummary | undefined {
-  const { gcEvents, samples, batchOffsets } = measuredResuls;
+  const { gcEvents, samples, batchOffsets } = results;
   if (!gcEvents?.length || !batchOffsets?.length) return undefined;
 
-  const endTimes = cumulativeEndTimes(samples);
+  const endTimes = cumulativeSum(samples);
   const placed = gcEvents
     .filter(e => e.offset !== undefined && e.offset >= 0)
-    .map(e => ({ event: e, sampleIndex: mapToSample(e.offset!, endTimes) }));
+    .map(e => ({
+      event: e,
+      sampleIndex: sampleIndexAtOffset(e.offset!, endTimes),
+    }));
   if (!placed.length) return undefined;
 
   const full = placed.filter(p => p.event.type === "mark-compact");
@@ -64,23 +72,6 @@ export function gcByBatch(
     scavenges,
     fullGCs: full.length,
   };
-}
-
-/** Running total of sample durations (loop-relative end time of each sample). */
-function cumulativeEndTimes(samples: number[]): number[] {
-  const ends = new Array<number>(samples.length);
-  let sum = 0;
-  for (let i = 0; i < samples.length; i++) {
-    sum += samples[i];
-    ends[i] = sum;
-  }
-  return ends;
-}
-
-/** Map a loop-relative offset (ms) to the sample whose window contains it. */
-function mapToSample(offset: number, endTimes: number[]): number {
-  const idx = endTimes.findIndex(t => t >= offset);
-  return idx >= 0 ? idx : endTimes.length - 1;
 }
 
 /** Count full GCs falling in each batch's sample range. */

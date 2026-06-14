@@ -194,7 +194,7 @@ async function runCaseSingle(
 }
 
 /** Run one variant/case, returning its single MeasuredResults. */
-async function runVariantOnce(
+export async function runVariantOnce(
   args: RunMatrixVariantParams,
 ): Promise<MeasuredResults> {
   return (await runMatrixVariant(args))[0];

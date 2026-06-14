@@ -7,6 +7,7 @@ import { cleanCliArgs, type DefaultCliArgs } from "../cli/CliArgs.ts";
 import type { TraceEvent } from "../profiling/browser/ChromeTraceEvent.ts";
 import type { ReportGroup } from "../report/BenchmarkReport.ts";
 import type { MeasuredResults } from "../runners/MeasuredResults.ts";
+import { cumulativeSum } from "../stats/StatisticalUtils.ts";
 
 interface TraceFile {
   traceEvents: TraceEvent[];
@@ -148,13 +149,8 @@ function normalizeTimestamps(events: TraceEvent[]): void {
 
 /** Derive μs timestamps from cumulative sample durations (ms), offset by startTime. */
 function cumulativeTimestamps(samples: number[], offset = 0): number[] {
-  const timestamps = new Array<number>(samples.length);
-  let cumulative = 0;
-  for (let i = 0; i < samples.length; i++) {
-    cumulative += samples[i];
-    timestamps[i] = offset + Math.round(cumulative * 1000); // ms ==> μs
-  }
-  return timestamps;
+  // ms ==> μs
+  return cumulativeSum(samples).map(ms => offset + Math.round(ms * 1000));
 }
 
 /** Create a thread-scoped instant event */

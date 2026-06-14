@@ -1,6 +1,7 @@
 import colors from "../report/Colors.ts";
 import { formatSignedPercent } from "../report/Formatters.ts";
 import type { CalibrationResult, RunProgress } from "../runners/Calibration.ts";
+import type { IntegerCount } from "../stats/StatisticalUtils.ts";
 
 /** Below this many full GCs per batch, the batch mean is dominated by where the
  *  lone collection lands and single-run CIs understate between-run GC variance. */
@@ -32,12 +33,6 @@ export function formatCalibration(result: CalibrationResult): string {
 function pct(n: number): string {
   return `${n.toFixed(2)}%`;
 }
-
-/** A run straddles a GC-count step when its modal batch count holds less than
- *  this share of batches: most batches do N full GCs, the rest do N+/-1, and
- *  the per-batch mean jumps by a whole major GC between them. Allows a few stray
- *  batches without warning, but flags a genuine split. */
-const minModalShare = 0.9;
 
 /** Conclusion block: noise floor estimates and the suggested margin. */
 function conclusion(result: CalibrationResult): string {
@@ -97,14 +92,19 @@ function conclusion(result: CalibrationResult): string {
 }
 
 /** Render a GC-per-batch histogram as a one-line tally, e.g. "2x97  3x3". */
-function formatGcHistogram(hist: { value: number; count: number }[]): string {
+function formatGcHistogram(hist: IntegerCount[]): string {
   return hist.map(b => `${b.value}x${b.count}`).join("  ");
 }
 
-/** True when batches don't share one GC plateau: the modal bucket holds less
- *  than minModalShare of all batches, so a meaningful fraction do a different
- *  number of full GCs. A single plateau (one bucket) never straddles. */
-function straddlesStep(hist: { value: number; count: number }[]): boolean {
+/** A run straddles a GC-count step when its modal batch count holds less than
+ *  this share of batches: most batches do N full GCs, the rest do N+/-1, and
+ *  the per-batch mean jumps by a whole major GC between them. Allows a few stray
+ *  batches without warning, but flags a genuine split. */
+const minModalShare = 0.9;
+
+/** True when the modal GC-count bucket holds less than minModalShare of all
+ *  batches. A single bucket (one plateau) never straddles. */
+function straddlesStep(hist: IntegerCount[]): boolean {
   if (hist.length < 2) return false;
   const total = hist.reduce((sum, b) => sum + b.count, 0);
   const modal = Math.max(...hist.map(b => b.count));

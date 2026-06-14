@@ -58,7 +58,10 @@ export async function collectTracing(
   );
   await cdp.send("Tracing.end");
   await done;
-  return { stats: browserGcStats(traceEvents), events: browserGcEvents(traceEvents) };
+  return {
+    stats: browserGcStats(traceEvents),
+    events: browserGcEvents(traceEvents),
+  };
 }
 
 /** Stop active instruments and return collected profiles/coverage. */

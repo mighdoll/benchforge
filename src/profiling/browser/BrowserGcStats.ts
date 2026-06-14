@@ -13,7 +13,9 @@ export const loopStartMark = "benchforge:loop-start";
  *  present (bench mode) only in-loop GCs are counted, matching the Node worker;
  *  without it (page-load mode) every captured GC is aggregated. */
 export function browserGcStats(traceEvents: TraceEvent[]): GcStats {
-  return aggregateGcStats(loopGcEvents(traceEvents) ?? parseGcTraceEvents(traceEvents));
+  return aggregateGcStats(
+    loopGcEvents(traceEvents) ?? parseGcTraceEvents(traceEvents),
+  );
 }
 
 /** In-loop GC events with loop-relative offsets for the time-series plot, or []

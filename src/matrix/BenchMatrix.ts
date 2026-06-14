@@ -83,6 +83,7 @@ export interface CaseResult {
 export interface MatrixResults {
   name: string;
   variants: VariantResult[];
+
   /** Configured baselineVariant id, if any. Carried through filtering so the
    *  report still renders peer-baseline mode when the reference is filtered out. */
   baselineVariant?: string;

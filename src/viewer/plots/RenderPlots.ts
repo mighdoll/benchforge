@@ -1,5 +1,7 @@
 import {
   average,
+  cumulativeSum,
+  sampleIndexAtOffset,
   splitByOffsets,
   tukeyKeep,
 } from "../../stats/StatisticalUtils.ts";
@@ -177,8 +179,7 @@ function flattenGcEvents(
   const endTimes = cumulativeSum(b.samples);
   for (const gc of b.gcEvents) {
     if (gc.type !== "mark-compact") continue;
-    const idx = endTimes.findIndex(t => t >= gc.offset);
-    const sampleIndex = idx >= 0 ? idx : b.samples.length - 1;
+    const sampleIndex = sampleIndexAtOffset(gc.offset, endTimes);
     out.allGcEvents.push({
       benchmark: name,
       sampleIndex,
@@ -219,15 +220,4 @@ function rejectedIndices(b: PreparedBenchmark): Set<number> | undefined {
     for (let j = start; j < end; j++) rejected.add(j);
   }
   return rejected.size > 0 ? rejected : undefined;
-}
-
-/** Running total of sample durations, used to map GC offsets to sample indices */
-function cumulativeSum(arr: number[]): number[] {
-  const result: number[] = [];
-  let sum = 0;
-  for (const v of arr) {
-    sum += v;
-    result.push(sum);
-  }
-  return result;
 }

@@ -164,8 +164,8 @@ function baselineVariantId(
   matrix: MatrixResults,
   caseId: string,
 ): string | undefined {
-  const caseUsesBaseline = matrix.variants.some(
-    v => v.cases.find(c => c.caseId === caseId)?.baselineId,
+  const caseUsesBaseline = matrix.variants.some(v =>
+    Boolean(v.cases.find(c => c.caseId === caseId)?.baselineId),
   );
   if (matrix.baselineVariant)
     return caseUsesBaseline ? matrix.baselineVariant : undefined;

@@ -63,20 +63,7 @@ export function createShiftPlot(
   drawYAxis(svg, yScale, points, shift.equivMargin);
   if (centers.dividerX != null) drawDivider(svg, centers.dividerX, plotHeight);
 
-  // Clip violins/markers to the plot rect: the y-scale is set by reliable
-  // points only (buildYScale), so an unreliable tail percentile's huge spread
-  // is cut at the axis bounds instead of overflowing into the axis and labels.
-  const clip = ensureClipRect(
-    svg,
-    "plot-clip",
-    margin.left,
-    margin.top,
-    plotWidth,
-    plotHeight,
-  );
-  const layer = document.createElementNS(svgNS, "g");
-  layer.setAttribute("clip-path", `url(#${clip})`);
-  svg.appendChild(layer);
+  const layer = clipLayer(svg, plotWidth, plotHeight);
 
   points.forEach((point, i) => {
     const cx = centers.cx[i];
@@ -117,6 +104,29 @@ function buildYScale(
   max += pad;
   const range = max - min || 1;
   return (v: number) => margin.top + plotH - ((v - min) / range) * plotH;
+}
+
+/** A clipped <g> covering the plot rect: violins/markers drawn into it are cut
+ *  at the axis bounds. The y-scale is set by reliable points only (buildYScale),
+ *  so an unreliable tail percentile's huge spread can't overflow into the axis
+ *  and labels. */
+function clipLayer(
+  svg: SVGSVGElement,
+  plotWidth: number,
+  plotHeight: number,
+): SVGGElement {
+  const clip = ensureClipRect(
+    svg,
+    "plot-clip",
+    margin.left,
+    margin.top,
+    plotWidth,
+    plotHeight,
+  );
+  const layer = document.createElementNS(svgNS, "g");
+  layer.setAttribute("clip-path", `url(#${clip})`);
+  svg.appendChild(layer);
+  return layer;
 }
 
 /** Points that set the vertical scale: reliable ones only, so a sparse,

@@ -158,7 +158,11 @@ async function runProfile(
 
   if (params.gcStats) {
     const { stats, events } = await collectTracing(cdp, traceEvents);
-    return { ...result, gcStats: stats, gcEvents: events.length ? events : undefined };
+    return {
+      ...result,
+      gcStats: stats,
+      gcEvents: events.length ? events : undefined,
+    };
   }
   return result;
 }

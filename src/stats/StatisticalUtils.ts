@@ -316,10 +316,38 @@ export function average(values: number[]): number {
   return sum / values.length;
 }
 
+/** Running totals of an array: result[i] = sum of values[0..i]. Used to turn
+ *  per-sample durations into loop-relative end times for placing GC events. */
+export function cumulativeSum(values: number[]): number[] {
+  const out = new Array<number>(values.length);
+  let sum = 0;
+  for (let i = 0; i < values.length; i++) {
+    sum += values[i];
+    out[i] = sum;
+  }
+  return out;
+}
+
+/** Index of the first cumulative end time at or past `offset`, i.e. the sample
+ *  whose window contains a loop-relative offset; the last sample when `offset`
+ *  is past the end. `endTimes` is a {@link cumulativeSum} of sample durations. */
+export function sampleIndexAtOffset(
+  offset: number,
+  endTimes: number[],
+): number {
+  const idx = endTimes.findIndex(t => t >= offset);
+  return idx >= 0 ? idx : endTimes.length - 1;
+}
+
+/** One bucket of an {@link integerCounts} tally: a distinct value and how often
+ *  it occurred. */
+export interface IntegerCount {
+  value: number;
+  count: number;
+}
+
 /** Tally how often each distinct integer appears, sorted by value ascending. */
-export function integerCounts(
-  values: number[],
-): { value: number; count: number }[] {
+export function integerCounts(values: number[]): IntegerCount[] {
   const counts = new Map<number, number>();
   for (const v of values) counts.set(v, (counts.get(v) ?? 0) + 1);
   return [...counts]
