@@ -7,6 +7,12 @@ import type { IntegerCount } from "../stats/StatisticalUtils.ts";
  *  lone collection lands and single-run CIs understate between-run GC variance. */
 const minFullGcsPerBatch = 2;
 
+/** A run straddles a GC-count step when its modal batch count holds less than
+ *  this share of batches: most batches do N full GCs, the rest do N+/-1, and
+ *  the per-batch mean jumps by a whole major GC between them. Allows a few stray
+ *  batches without warning, but flags a genuine split. */
+const minModalShare = 0.9;
+
 /** Print one progress line per completed self-comparison run (to stderr). */
 export function reportCalibrateRun(p: RunProgress, label?: string): void {
   const where = label ? ` ${label}` : "";
@@ -95,12 +101,6 @@ function conclusion(result: CalibrationResult): string {
 function formatGcHistogram(hist: IntegerCount[]): string {
   return hist.map(b => `${b.value}x${b.count}`).join("  ");
 }
-
-/** A run straddles a GC-count step when its modal batch count holds less than
- *  this share of batches: most batches do N full GCs, the rest do N+/-1, and
- *  the per-batch mean jumps by a whole major GC between them. Allows a few stray
- *  batches without warning, but flags a genuine split. */
-const minModalShare = 0.9;
 
 /** True when the modal GC-count bucket holds less than minModalShare of all
  *  batches. A single bucket (one plateau) never straddles. */

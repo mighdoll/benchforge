@@ -43,6 +43,13 @@ function loopGcEvents(traceEvents: TraceEvent[]): GcEvent[] | undefined {
   return parseGcTraceEvents(traceEvents, originUs).filter(e => e.offset! >= 0);
 }
 
+/** Map CDP event names (MinorGC/MajorGC) to GcEvent type. */
+function gcType(name: string): GcEvent["type"] | undefined {
+  if (name === "MinorGC") return "scavenge";
+  if (name === "MajorGC") return "mark-compact";
+  return undefined;
+}
+
 /** Build a GcEvent from a trace event, adding a loop-relative offset when an
  *  origin timestamp is supplied. */
 function toGcEvent(e: TraceEvent, originUs?: number): GcEvent {
@@ -55,11 +62,4 @@ function toGcEvent(e: TraceEvent, originUs?: number): GcEvent {
   };
   if (originUs === undefined) return event;
   return { ...event, offset: (e.ts - originUs) / 1000 };
-}
-
-/** Map CDP event names (MinorGC/MajorGC) to GcEvent type. */
-function gcType(name: string): GcEvent["type"] | undefined {
-  if (name === "MinorGC") return "scavenge";
-  if (name === "MajorGC") return "mark-compact";
-  return undefined;
 }

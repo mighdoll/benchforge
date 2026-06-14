@@ -106,38 +106,6 @@ function buildYScale(
   return (v: number) => margin.top + plotH - ((v - min) / range) * plotH;
 }
 
-/** A clipped <g> covering the plot rect: violins/markers drawn into it are cut
- *  at the axis bounds. The y-scale is set by reliable points only (buildYScale),
- *  so an unreliable tail percentile's huge spread can't overflow into the axis
- *  and labels. */
-function clipLayer(
-  svg: SVGSVGElement,
-  plotWidth: number,
-  plotHeight: number,
-): SVGGElement {
-  const clip = ensureClipRect(
-    svg,
-    "plot-clip",
-    margin.left,
-    margin.top,
-    plotWidth,
-    plotHeight,
-  );
-  const layer = document.createElementNS(svgNS, "g");
-  layer.setAttribute("clip-path", `url(#${clip})`);
-  svg.appendChild(layer);
-  return layer;
-}
-
-/** Points that set the vertical scale: reliable ones only, so a sparse,
- *  unreliable tail percentile (huge noisy CI) can't dominate the axis and crush
- *  the informative percentiles. Falls back to all points when none are reliable,
- *  so the scale never collapses. */
-function scalePoints(points: ShiftPercentile[]): ShiftPercentile[] {
-  const reliable = points.filter(p => p.reliable);
-  return reliable.length ? reliable : points;
-}
-
 /** Slot centers across the plot. A leading mean point gets its own slot, set off
  *  from the percentiles by an extra half-slot gap with a divider line between. */
 function slotCenters(
@@ -245,6 +213,29 @@ function drawDivider(svg: SVGSVGElement, x: number, plotHeight: number): void {
   );
 }
 
+/** A clipped <g> covering the plot rect: violins/markers drawn into it are cut
+ *  at the axis bounds. The y-scale is set by reliable points only (buildYScale),
+ *  so an unreliable tail percentile's huge spread can't overflow into the axis
+ *  and labels. */
+function clipLayer(
+  svg: SVGSVGElement,
+  plotWidth: number,
+  plotHeight: number,
+): SVGGElement {
+  const clip = ensureClipRect(
+    svg,
+    "plot-clip",
+    margin.left,
+    margin.top,
+    plotWidth,
+    plotHeight,
+  );
+  const layer = document.createElementNS(svgNS, "g");
+  layer.setAttribute("clip-path", `url(#${clip})`);
+  svg.appendChild(layer);
+  return layer;
+}
+
 /** A vertical violin: the smoothed diff distribution mirrored around cx. */
 function drawViolin(
   parent: SVGElement,
@@ -343,6 +334,15 @@ function drawPercentileLabel(
         weakColor,
       ),
     );
+}
+
+/** Points that set the vertical scale: reliable ones only, so a sparse,
+ *  unreliable tail percentile (huge noisy CI) can't dominate the axis and crush
+ *  the informative percentiles. Falls back to all points when none are reliable,
+ *  so the scale never collapses. */
+function scalePoints(points: ShiftPercentile[]): ShiftPercentile[] {
+  const reliable = points.filter(p => p.reliable);
+  return reliable.length ? reliable : points;
 }
 
 /** @return [min, max] of the diff-percent axis. */

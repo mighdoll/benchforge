@@ -67,6 +67,13 @@ export type PreparedBlocks = {
   keptSplits: number[][];
 };
 
+/** One bucket of an {@link integerCounts} tally: a distinct value and how often
+ *  it occurred. */
+export interface IntegerCount {
+  value: number;
+  count: number;
+}
+
 /** Options for bootstrap resampling */
 type BootstrapOptions = {
   /** Number of bootstrap resamples (default: 10000) */
@@ -337,13 +344,6 @@ export function sampleIndexAtOffset(
 ): number {
   const idx = endTimes.findIndex(t => t >= offset);
   return idx >= 0 ? idx : endTimes.length - 1;
-}
-
-/** One bucket of an {@link integerCounts} tally: a distinct value and how often
- *  it occurred. */
-export interface IntegerCount {
-  value: number;
-  count: number;
 }
 
 /** Tally how often each distinct integer appears, sorted by value ascending. */

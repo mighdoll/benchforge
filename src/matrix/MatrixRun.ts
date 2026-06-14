@@ -110,6 +110,13 @@ export async function runMatrixPlan<T>(
   return { name, variants, baselineVariant };
 }
 
+/** Run one variant/case, returning its single MeasuredResults. */
+export async function runVariantOnce(
+  args: RunMatrixVariantParams,
+): Promise<MeasuredResults> {
+  return (await runMatrixVariant(args))[0];
+}
+
 /** Run all cases for a single variant. */
 async function runVariantCases<T>(
   variantId: string,
@@ -191,11 +198,4 @@ async function runCaseSingle(
     ? await runVariantOnce(baselineArgs)
     : undefined;
   return { measured, baseline };
-}
-
-/** Run one variant/case, returning its single MeasuredResults. */
-export async function runVariantOnce(
-  args: RunMatrixVariantParams,
-): Promise<MeasuredResults> {
-  return (await runMatrixVariant(args))[0];
 }
