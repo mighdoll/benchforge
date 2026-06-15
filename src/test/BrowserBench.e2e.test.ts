@@ -43,9 +43,13 @@ test("bench function mode (window.__bench)", { timeout: 30000 }, async () => {
   expect(result.gcEvents?.length).toBeGreaterThan(0);
   const { scavenges, markCompacts } = result.gcStats!;
   expect(scavenges + markCompacts).toBe(result.gcEvents!.length);
+  // Offsets ride the trace clock while wallTimeMs rides performance.now(); a
+  // boundary GC plus sub-ms skew between the two clocks can push an in-loop
+  // event a hair past wallTimeMs. The slack still catches an un-rebased offset
+  // (which would overshoot by the absolute trace time, ~1e6 ms).
   for (const e of result.gcEvents!) {
     expect(e.offset).toBeGreaterThanOrEqual(0);
-    expect(e.offset).toBeLessThanOrEqual(result.wallTimeMs!);
+    expect(e.offset).toBeLessThanOrEqual(result.wallTimeMs! + 10);
   }
 });
 
