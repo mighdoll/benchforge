@@ -1,7 +1,6 @@
 import type { RunMatrixOptions } from "../matrix/BenchMatrix.ts";
 import type { HeapReportOptions } from "../profiling/node/HeapSampleReport.ts";
 import type { ComparisonOptions } from "../report/BenchmarkReport.ts";
-import type { RunnerOptions } from "../runners/BenchRunner.ts";
 import { type DefaultCliArgs, defaultDuration } from "./CliArgs.ts";
 
 /** Runner limits resolved from the duration/iterations flags. */
@@ -13,16 +12,27 @@ type Limits = {
 /** Convert CLI args to matrix runner options. */
 export function cliToMatrixOptions(args: DefaultCliArgs): RunMatrixOptions {
   const { iterations, worker, batches } = args;
-  const { maxTime } = resolveLimits(args);
+  const common = cliCommonOptions(args);
+  // --inspect: one iteration, no warmup, single batch (no time budget), run
+  // in-process so an attached profiler sees the benchmark itself rather than the
+  // orchestrator that would otherwise fork it into an un-inspected worker.
+  if (args.inspect)
+    return {
+      ...common,
+      iterations: iterations ?? 1,
+      useWorker: false,
+      batches: 1,
+      warmup: 0,
+    };
   return {
     iterations,
-    maxTime,
+    maxTime: resolveLimits(args).maxTime,
     useWorker: worker,
     batches,
     warmupBatch: args["warmup-batch"],
     calibrate: args.calibrate,
     calibrateRuns: args["calibrate-runs"],
-    ...cliCommonOptions(args),
+    ...common,
   };
 }
 
@@ -33,14 +43,6 @@ export function validateArgs(args: DefaultCliArgs): void {
       "--gc-stats requires worker mode (the default). Remove --no-worker flag.",
     );
   }
-}
-
-/** Convert CLI args to benchmark runner options. */
-export function cliToRunnerOptions(args: DefaultCliArgs): RunnerOptions {
-  const { inspect, iterations } = args;
-  const gcForce = args["gc-force"];
-  if (inspect) return { maxIterations: iterations ?? 1, gcForce };
-  return { ...resolveLimits(args), ...cliCommonOptions(args) };
 }
 
 /** Convert CLI args to heap report display options. */

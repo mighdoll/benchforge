@@ -147,14 +147,17 @@ Use `--inspect` to run benchmarks once for attaching external profilers:
 
 ```bash
 # Use with Chrome DevTools profiler
-node --inspect-brk $(which benchforge) my-bench.ts --inspect
+node --inspect-brk --expose-gc $(which benchforge) my-bench.ts --inspect
 
 # Use with other profiling tools
-node --prof $(which benchforge) my-bench.ts --inspect
+node --prof --expose-gc $(which benchforge) my-bench.ts --inspect
 ```
 
-The `--inspect` flag executes exactly one iteration with no warmup, making it
-ideal for debugging and performance profiling.
+The `--inspect` flag executes exactly one iteration with no warmup and runs the
+benchmark **in-process** (not in a worker), so the profiler attached to the node
+command sees the benchmark code itself. Because there is no worker to auto-add
+the V8 flags, pass `--expose-gc` yourself if the benchmark forces GC
+(`--gc-force`), and `--allow-natives-syntax` if it uses V8 intrinsics.
 
 
 ## Worker Mode
@@ -193,5 +196,3 @@ const matrix: BenchMatrix = {
 ## Requirements
 
 - Node.js 22.6+ (for native TypeScript support)
-- Use `--expose-gc --allow-natives-syntax` flags for garbage collection
-  monitoring and V8 native functions
