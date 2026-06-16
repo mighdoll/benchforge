@@ -75,19 +75,6 @@
   text-align: center;
 }
 
-.report-panel .group-baseline { font-size: 12px; color: #999; }
-
-/* One benchmark within a multi-benchmark group */
-.report-panel .benchmark-block { margin-top: 18px; }
-.report-panel .benchmark-block-head {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 4px 0;
-}
-.report-panel .benchmark-block-head h3 { margin: 0; font-size: 15px; color: #555; }
-.report-panel .benchmark-vs { font-size: 12px; color: #999; }
-
 /* Footer-placed sections (e.g. runs), once per group below the variant cards */
 .report-panel .group-footer {
   display: flex;
@@ -217,10 +204,7 @@
 
 /* --- Stat rows --- */
 
-/* Grid so run names/values line up within a stat row. Each .run-entry is a
- * subgrid row, so the name column sizes to the widest name *in this card's
- * stat row* with no cross-card coupling and no JS measure pass. Name capped
- * (minmax) so a long name can't starve the value/chart column. */
+/* Grid used by shared stat rows so labels and values stay aligned. */
 .report-panel .stat-row {
   display: grid;
   grid-template-columns: minmax(0, max-content) max-content 1fr;
@@ -229,24 +213,10 @@
 
 .report-panel .stat-row:last-child { margin-bottom: 0; }
 
-.report-panel .row-header {
-  grid-column: 1 / -1;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  margin-bottom: 2px;
-}
-
 .report-panel .row-label {
   font-size: 12px;
   font-weight: 600;
   color: #666;
-}
-
-.report-panel .primary-row .row-label {
-  font-size: 14px;
-  font-weight: 700;
-  color: #444;
 }
 
 .report-panel .shared-row {
@@ -260,17 +230,6 @@
   font-weight: 600;
   color: #333;
   font-variant-numeric: tabular-nums;
-}
-
-/* --- Run entries --- */
-
-.report-panel .run-entry {
-  display: grid;
-  grid-column: 1 / -1;
-  grid-template-columns: subgrid;
-  align-items: center;
-  column-gap: 14px;
-  padding: 1px 0;
 }
 
 .report-panel .run-name {
@@ -440,13 +399,9 @@
   :root:not([data-theme="light"]) .report-panel .group-header { border-color: #444; }
   :root:not([data-theme="light"]) .report-panel .group-header h2 { color: #ccc; }
   :root:not([data-theme="light"]) .report-panel .group-toggle { color: #666; }
-  :root:not([data-theme="light"]) .report-panel .benchmark-block-head h3 { color: #ccc; }
-  :root:not([data-theme="light"]) .report-panel .group-baseline { color: #888; }
-  :root:not([data-theme="light"]) .report-panel .benchmark-vs { color: #888; }
   :root:not([data-theme="light"]) .report-panel .section-panel { background: #252525; box-shadow: 0 1px 3px rgba(0,0,0,0.3); }
   :root:not([data-theme="light"]) .report-panel .panel-header { color: #777; border-color: #333; }
   :root:not([data-theme="light"]) .report-panel .row-label { color: #999; }
-  :root:not([data-theme="light"]) .report-panel .primary-row .row-label { color: #ccc; }
   :root:not([data-theme="light"]) .report-panel .row-value,
   :root:not([data-theme="light"]) .report-panel .run-value { color: #ddd; }
   :root:not([data-theme="light"]) .report-panel .run-name { color: #777; }
@@ -490,13 +445,9 @@
 :root[data-theme="dark"] .report-panel .group-header { border-color: #444; }
 :root[data-theme="dark"] .report-panel .group-header h2 { color: #ccc; }
 :root[data-theme="dark"] .report-panel .group-toggle { color: #666; }
-:root[data-theme="dark"] .report-panel .benchmark-block-head h3 { color: #ccc; }
-:root[data-theme="dark"] .report-panel .group-baseline { color: #888; }
-:root[data-theme="dark"] .report-panel .benchmark-vs { color: #888; }
 :root[data-theme="dark"] .report-panel .section-panel { background: #252525; box-shadow: 0 1px 3px rgba(0,0,0,0.3); }
 :root[data-theme="dark"] .report-panel .panel-header { color: #777; border-color: #333; }
 :root[data-theme="dark"] .report-panel .row-label { color: #999; }
-:root[data-theme="dark"] .report-panel .primary-row .row-label { color: #ccc; }
 :root[data-theme="dark"] .report-panel .row-value,
 :root[data-theme="dark"] .report-panel .run-value { color: #ddd; }
 :root[data-theme="dark"] .report-panel .run-name { color: #777; }
