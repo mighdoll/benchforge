@@ -1,10 +1,12 @@
 import type { CaseResult, MatrixResults } from "../matrix/BenchMatrix.ts";
 import {
+  formatHeapReport,
+  formatRawSamples,
+} from "../profiling/node/HeapReportFormatter.ts";
+import {
   aggregateSites,
   filterSites,
   flattenProfile,
-  formatHeapReport,
-  formatRawSamples,
   type HeapReportOptions,
 } from "../profiling/node/HeapSampleReport.ts";
 import { resolveProfile } from "../profiling/node/ResolvedProfile.ts";
