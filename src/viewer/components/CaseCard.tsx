@@ -1,7 +1,7 @@
 import { Fragment } from "preact";
 import { useState } from "preact/hooks";
 import { formatSignedPercent } from "../../report/Formatters.ts";
-import type { DifferenceCI } from "../../stats/StatisticalUtils.ts";
+import type { DifferenceCI } from "../../stats/Bootstrap.ts";
 import { formatCount, formatDecimalBytes } from "../LineData.ts";
 import type {
   BenchmarkEntry,

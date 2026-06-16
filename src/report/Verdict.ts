@@ -1,4 +1,4 @@
-import type { CIDirection } from "../stats/StatisticalUtils.ts";
+import type { CIDirection } from "../stats/Bootstrap.ts";
 
 /** @return the verdict word for a comparison direction. The direction already
  *  accounts for metric orientation (higherIsBetter flips it), so "better" reads

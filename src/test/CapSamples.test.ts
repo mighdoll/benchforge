@@ -1,11 +1,7 @@
 import { expect, test } from "vitest";
-import { multiSampleDifferenceCI } from "../stats/BootstrapDifference.ts";
-import {
-  maxBootstrapInput,
-  mean,
-  multiSampleBootstrap,
-  percentile,
-} from "../stats/StatisticalUtils.ts";
+import { maxBootstrapInput, multiSampleBootstrap } from "../stats/Bootstrap.ts";
+import { mean, percentile } from "../stats/CoreStats.ts";
+import { multiSampleDifferenceCI } from "../stats/SingleSampleDifference.ts";
 
 test("multiSampleBootstrap uses full samples for point estimate", () => {
   const samples = Array.from({ length: 5000 }, (_, i) => i);

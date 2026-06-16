@@ -1,7 +1,7 @@
 import colors from "../report/Colors.ts";
 import { formatSignedPercent } from "../report/Formatters.ts";
 import type { CalibrationResult, RunProgress } from "../runners/Calibration.ts";
-import type { IntegerCount } from "../stats/StatisticalUtils.ts";
+import type { IntegerCount } from "../stats/CoreStats.ts";
 
 /** Below this many full GCs per batch, the batch mean is dominated by where the
  *  lone collection lands and single-run CIs understate between-run GC variance. */

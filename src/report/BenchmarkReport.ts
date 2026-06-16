@@ -1,5 +1,5 @@
 import type { MeasuredResults } from "../runners/MeasuredResults.ts";
-import { computeStat, type StatKind } from "../stats/StatisticalUtils.ts";
+import { computeStat, type StatKind } from "../stats/CoreStats.ts";
 
 /** Options that affect baseline comparison statistics */
 export interface ComparisonOptions {

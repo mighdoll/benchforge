@@ -2,7 +2,7 @@ import { useEffect, useState } from "preact/hooks";
 import { formatSignedPercent } from "../../report/Formatters.ts";
 import type { GitVersion } from "../../report/GitUtils.ts";
 import { verdictWord } from "../../report/Verdict.ts";
-import type { DifferenceCI } from "../../stats/StatisticalUtils.ts";
+import type { DifferenceCI } from "../../stats/Bootstrap.ts";
 import { formatRelativeTime } from "../DateFormat.ts";
 import type {
   BenchmarkGroup,

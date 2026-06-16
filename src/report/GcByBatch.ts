@@ -5,7 +5,7 @@ import {
   cumulativeSum,
   mean,
   sampleIndexAtOffset,
-} from "../stats/StatisticalUtils.ts";
+} from "../stats/CoreStats.ts";
 
 /** Per-batch full-collection (mark-compact) GC summary, computed from raw
  *  per-event GC data + samples + batch boundaries. Agent-facing diagnostic:

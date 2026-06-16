@@ -1,15 +1,12 @@
 import type { MeasuredResults } from "../runners/MeasuredResults.ts";
-import { diffCIs } from "../stats/BootstrapDifference.ts";
+import { bootstrapCIs, prepareBlocks } from "../stats/BlockBootstrap.ts";
+import { diffCIs } from "../stats/BlockDifference.ts";
 import {
   type BootstrapResult,
-  bootstrapCIs,
   type DifferenceCI,
   flipCI,
-  mean,
-  percentile,
-  prepareBlocks,
-  type StatKind,
-} from "../stats/StatisticalUtils.ts";
+} from "../stats/Bootstrap.ts";
+import { mean, percentile, type StatKind } from "../stats/CoreStats.ts";
 import type {
   ShiftFunction,
   ShiftPercentile,

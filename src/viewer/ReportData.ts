@@ -6,7 +6,7 @@ import type {
   CILevel,
   DifferenceCI,
   HistogramBin,
-} from "../stats/StatisticalUtils.ts";
+} from "../stats/Bootstrap.ts";
 
 /** Top-level data structure for the HTML benchmark report. */
 export interface ReportData {

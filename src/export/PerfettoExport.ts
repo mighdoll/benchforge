@@ -7,7 +7,7 @@ import { cleanCliArgs, type DefaultCliArgs } from "../cli/CliArgs.ts";
 import type { TraceEvent } from "../profiling/browser/ChromeTraceEvent.ts";
 import type { ReportGroup } from "../report/BenchmarkReport.ts";
 import type { MeasuredResults } from "../runners/MeasuredResults.ts";
-import { cumulativeSum } from "../stats/StatisticalUtils.ts";
+import { cumulativeSum } from "../stats/CoreStats.ts";
 
 interface TraceFile {
   traceEvents: TraceEvent[];

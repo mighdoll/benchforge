@@ -1,7 +1,4 @@
-import type {
-  CIDirection,
-  HistogramBin,
-} from "../../stats/StatisticalUtils.ts";
+import type { CIDirection, HistogramBin } from "../../stats/Bootstrap.ts";
 
 /** A single timing sample from a benchmark run */
 export interface Sample {

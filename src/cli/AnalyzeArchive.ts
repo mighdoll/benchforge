@@ -3,13 +3,8 @@ import { readFile } from "node:fs/promises";
 import { resolve } from "node:path";
 import colors from "../report/Colors.ts";
 import { formatSignedPercent, timeMs } from "../report/Formatters.ts";
-import {
-  mean,
-  median,
-  percentile,
-  splitByOffsets,
-  tukeyFences,
-} from "../stats/StatisticalUtils.ts";
+import { splitByOffsets, tukeyFences } from "../stats/BlockBootstrap.ts";
+import { mean, median, percentile } from "../stats/CoreStats.ts";
 import type { BenchmarkEntry, BenchmarkGroup } from "../viewer/ReportData.ts";
 
 const { bold, dim, red, green, yellow } = colors;

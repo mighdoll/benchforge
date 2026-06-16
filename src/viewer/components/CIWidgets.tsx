@@ -1,5 +1,5 @@
 import { formatSignedPercent } from "../../report/Formatters.ts";
-import type { CIDirection, DifferenceCI } from "../../stats/StatisticalUtils.ts";
+import type { CIDirection, DifferenceCI } from "../../stats/Bootstrap.ts";
 import type {
   BootstrapCIData,
   ShiftFunction,

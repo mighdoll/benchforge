@@ -6,7 +6,7 @@ import type { MatrixSuite } from "../matrix/BenchMatrix.ts";
 import type { BenchmarkReport } from "../report/BenchmarkReport.ts";
 import { consoleSummary } from "../report/ConsoleSummary.ts";
 import type { MeasuredResults } from "../runners/MeasuredResults.ts";
-import { mean, percentile } from "../stats/StatisticalUtils.ts";
+import { mean, percentile } from "../stats/CoreStats.ts";
 import { bevy30SamplesMs } from "./fixtures/bevy30-samples.ts";
 
 /** Validation helpers for statistical tests */

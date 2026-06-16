@@ -4,7 +4,7 @@ import type {
   CILevel,
   DifferenceCI,
   HistogramBin,
-} from "../../stats/StatisticalUtils.ts";
+} from "../../stats/Bootstrap.ts";
 import { directionColors, gaussianSmooth } from "./PlotTypes.ts";
 import {
   createSvg,

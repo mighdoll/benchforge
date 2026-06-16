@@ -1,10 +1,9 @@
+import { splitByOffsets, tukeyKeep } from "../../stats/BlockBootstrap.ts";
 import {
   cumulativeSum,
   mean,
   sampleIndexAtOffset,
-  splitByOffsets,
-  tukeyKeep,
-} from "../../stats/StatisticalUtils.ts";
+} from "../../stats/CoreStats.ts";
 import type { BenchmarkEntry, ReportData } from "../ReportData.ts";
 import type {
   FlatGcEvent,

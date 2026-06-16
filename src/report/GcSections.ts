@@ -1,6 +1,6 @@
 import type { NavTiming } from "../profiling/browser/BrowserProfiler.ts";
 import type { MeasuredResults } from "../runners/MeasuredResults.ts";
-import { mean, median, percentile } from "../stats/StatisticalUtils.ts";
+import { mean, median, percentile } from "../stats/CoreStats.ts";
 import {
   type ReportSection,
   type ScalarRow,

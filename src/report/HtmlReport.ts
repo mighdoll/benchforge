@@ -9,7 +9,7 @@ import type { HeapProfile } from "../profiling/node/HeapSampler.ts";
 import { resolveProfile } from "../profiling/node/ResolvedProfile.ts";
 import type { GcEvent } from "../runners/GcStats.ts";
 import type { MeasuredResults } from "../runners/MeasuredResults.ts";
-import { trimOutlierBatches } from "../stats/StatisticalUtils.ts";
+import { trimOutlierBatches } from "../stats/BlockBootstrap.ts";
 import type {
   BenchmarkEntry,
   BenchmarkGroup,

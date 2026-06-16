@@ -1,4 +1,4 @@
-import { mean, percentile, standardDeviation } from "./StatisticalUtils.ts";
+import { mean, percentile, standardDeviation } from "./CoreStats.ts";
 
 /** Noise-floor summary from repeated current-vs-current comparisons. */
 export interface CalibrationSummary {

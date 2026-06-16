@@ -39,5 +39,5 @@ export type { GitVersion } from "./report/GitUtils.ts";
 export { getBaselineVersion, getCurrentGitVersion } from "./report/GitUtils.ts";
 export { runsSection, timeSection } from "./report/StandardSections.ts";
 export type { MeasuredResults } from "./runners/MeasuredResults.ts";
-export type { StatKind } from "./stats/StatisticalUtils.ts";
-export { mean } from "./stats/StatisticalUtils.ts";
+export type { StatKind } from "./stats/CoreStats.ts";
+export { mean } from "./stats/CoreStats.ts";

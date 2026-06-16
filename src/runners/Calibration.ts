@@ -1,4 +1,4 @@
-import { diffCIs } from "../stats/BootstrapDifference.ts";
+import { diffCIs } from "../stats/BlockDifference.ts";
 import {
   type CalibrationSummary,
   summarizeCalibration,
@@ -8,7 +8,7 @@ import {
   integerCounts,
   mean,
   type StatKind,
-} from "../stats/StatisticalUtils.ts";
+} from "../stats/CoreStats.ts";
 import type { MeasuredResults } from "./MeasuredResults.ts";
 import { runBatched } from "./MergeBatches.ts";
 

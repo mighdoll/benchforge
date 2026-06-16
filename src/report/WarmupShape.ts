@@ -1,5 +1,6 @@
 import type { MeasuredResults } from "../runners/MeasuredResults.ts";
-import { median, splitByOffsets } from "../stats/StatisticalUtils.ts";
+import { splitByOffsets } from "../stats/BlockBootstrap.ts";
+import { median } from "../stats/CoreStats.ts";
 
 /** Per-batch time-by-position summary: how much the early iterations of each
  *  batch run above the plateau (last 50%). Agent-facing diagnostic for the JIT/

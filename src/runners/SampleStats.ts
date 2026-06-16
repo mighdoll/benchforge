@@ -4,7 +4,7 @@ import {
   medianAbsoluteDeviation,
   percentile,
   percentileIndex,
-} from "../stats/StatisticalUtils.ts";
+} from "../stats/CoreStats.ts";
 import type { MeasuredResults } from "./MeasuredResults.ts";
 
 /** Compute percentiles, CV, MAD, and outlier rate from timing samples. */

@@ -1,6 +1,6 @@
 import colors from "../report/Colors.ts";
 import { benchLabel, primaryMetricRow } from "../report/ConsoleSummary.ts";
-import type { CIDirection } from "../stats/StatisticalUtils.ts";
+import type { CIDirection } from "../stats/Bootstrap.ts";
 import type { BenchmarkGroup, ReportData } from "../viewer/ReportData.ts";
 
 interface LabeledDiff {

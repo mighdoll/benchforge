@@ -1,22 +1,24 @@
 import { expect, test } from "vitest";
 import {
-  blockDifferenceCI,
-  blockPoolDifferenceCI,
-  classifyDirection,
-  diffCIs,
-} from "../stats/BootstrapDifference.ts";
-import {
   blockBootstrap,
   blockPoolBootstrap,
-  coefficientOfVariation,
   findOutliers,
+} from "../stats/BlockBootstrap.ts";
+import {
+  blockDifferenceCI,
+  blockPoolDifferenceCI,
+  diffCIs,
+} from "../stats/BlockDifference.ts";
+import {
+  coefficientOfVariation,
   integerCounts,
   mean,
   median,
   medianAbsoluteDeviation,
   percentile,
   standardDeviation,
-} from "../stats/StatisticalUtils.ts";
+} from "../stats/CoreStats.ts";
+import { classifyDirection } from "../stats/SingleSampleDifference.ts";
 import { assertValid, getSampleData } from "./TestUtils.ts";
 
 /** Build samples where per-batch p50s skew low but the pooled p50 sits high:

@@ -1,6 +1,6 @@
 import type { RunnerOptions } from "../runners/BenchRunner.ts";
 import type { MeasuredResults } from "../runners/MeasuredResults.ts";
-import { mean } from "../stats/StatisticalUtils.ts";
+import { mean } from "../stats/CoreStats.ts";
 import type { CasesModule } from "./CaseLoader.ts";
 import { loadCasesModule } from "./CaseLoader.ts";
 import { runMatrixWithDir } from "./MatrixDirRunner.ts";

@@ -1,20 +1,20 @@
 import type { MeasuredResults } from "../runners/MeasuredResults.ts";
 import {
+  bootstrapCIs,
+  prepareBlocks,
+  trimOutlierBatches,
+} from "../stats/BlockBootstrap.ts";
+import {
   type BlockDiffOptions,
   binBootstrapResult,
   diffCIs,
-} from "../stats/BootstrapDifference.ts";
+} from "../stats/BlockDifference.ts";
 import {
   type BootstrapResult,
-  bootstrapCIs,
   type DifferenceCI,
   flipCI,
-  isBootstrappable,
-  mean,
-  prepareBlocks,
-  type StatKind,
-  trimOutlierBatches,
-} from "../stats/StatisticalUtils.ts";
+} from "../stats/Bootstrap.ts";
+import { isBootstrappable, mean, type StatKind } from "../stats/CoreStats.ts";
 import type {
   BootstrapCIData,
   ViewerEntry,
