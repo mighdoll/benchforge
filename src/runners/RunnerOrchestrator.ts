@@ -5,7 +5,7 @@ import type { CoverageData } from "../profiling/node/CoverageTypes.ts";
 import type { HeapProfile } from "../profiling/node/HeapSampler.ts";
 import type { TimeProfile } from "../profiling/node/TimeSampler.ts";
 import type { BenchmarkFunction, BenchmarkSpec } from "./BenchmarkSpec.ts";
-import type { RunnerOptions } from "./BenchRunner.ts";
+import { BenchRunner, type RunnerOptions } from "./BenchRunner.ts";
 import {
   aggregateGcStats,
   type GcEvent,
@@ -18,7 +18,6 @@ import {
   resolveVariantFn,
   type VariantSource,
 } from "./RunnerUtils.ts";
-import { TimingRunner } from "./TimingRunner.ts";
 import type {
   ErrorMessage,
   ResultMessage,
@@ -53,7 +52,7 @@ export async function runBenchmark<T = unknown>({
     const resolved = spec.modulePath
       ? await resolveModuleSpec(spec, params)
       : { spec, params };
-    return new TimingRunner().runBench(resolved.spec, options, resolved.params);
+    return new BenchRunner().runBench(resolved.spec, options, resolved.params);
   }
 
   const msg = createRunMessage(spec, options, params);
@@ -191,7 +190,7 @@ async function runMatrixVariantDirect(
     caseData,
     casesModule,
   });
-  return new TimingRunner().runBench({ name, fn }, options);
+  return new BenchRunner().runBench({ name, fn }, options);
 }
 
 /** Spawn worker process with V8 flags */

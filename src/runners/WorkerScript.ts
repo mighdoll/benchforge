@@ -4,7 +4,7 @@ import type { CoverageData } from "../profiling/node/CoverageTypes.ts";
 import type { HeapProfile } from "../profiling/node/HeapSampler.ts";
 import type { TimeProfile } from "../profiling/node/TimeSampler.ts";
 import type { BenchmarkFunction, BenchmarkSpec } from "./BenchmarkSpec.ts";
-import type { BenchRunner, RunnerOptions } from "./BenchRunner.ts";
+import { BenchRunner, type RunnerOptions } from "./BenchRunner.ts";
 import type { MeasuredResults } from "./MeasuredResults.ts";
 import {
   evalFn,
@@ -12,7 +12,6 @@ import {
   resolveVariantFn,
   type VariantSource,
 } from "./RunnerUtils.ts";
-import { TimingRunner } from "./TimingRunner.ts";
 
 /** Message sent to worker process to start a benchmark run. */
 export interface RunMessage {
@@ -204,7 +203,7 @@ process.on("message", async (message: RunMessage) => {
   if (message.type !== "run") return;
 
   try {
-    const runner = new TimingRunner();
+    const runner = new BenchRunner();
     const result = await runWithProfiling(message, runner);
     sendAndExit(result, 0);
   } catch (error) {

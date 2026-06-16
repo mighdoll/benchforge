@@ -9,7 +9,7 @@ import type { BrowserProfileResult, ProfileCtx } from "./BrowserProfiler.ts";
 /**
  * Bench function mode: run window.__bench in a timed iteration loop.
  *
- * Simplified vs TimingRunner because it runs inside page.evaluate()
+ * Simplified vs BenchRunner because it runs inside page.evaluate()
  * where shared code, Node APIs, and V8 intrinsics are unavailable.
  *
  * Not feasible in browser page context:

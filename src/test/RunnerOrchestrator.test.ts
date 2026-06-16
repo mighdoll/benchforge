@@ -9,7 +9,7 @@ function simpleTestFunction(): number {
   return sum;
 }
 
-test("TimingRunner runs benchmark in worker mode", async () => {
+test("BenchRunner runs benchmark in worker mode", async () => {
   const spec: BenchmarkSpec = {
     name: "timing-worker-test",
     fn: simpleTestFunction,
@@ -37,7 +37,7 @@ test("TimingRunner runs benchmark in worker mode", async () => {
   expect(result.time.p99).toBeGreaterThan(0);
 });
 
-test("TimingRunner runs benchmark in non-worker mode", async () => {
+test("BenchRunner runs benchmark in non-worker mode", async () => {
   const spec: BenchmarkSpec = {
     name: "timing-test",
     fn: simpleTestFunction,
@@ -60,7 +60,7 @@ test("TimingRunner runs benchmark in non-worker mode", async () => {
   expect(result.time.p50).toBeGreaterThan(0);
 });
 
-test("TimingRunner with parameterized benchmark", async () => {
+test("BenchRunner with parameterized benchmark", async () => {
   const spec: BenchmarkSpec<number> = {
     name: "parameterized-test",
     fn: (n: number) => {
