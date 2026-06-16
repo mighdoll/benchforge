@@ -4,7 +4,7 @@ import { resolve } from "node:path";
 import colors from "../report/Colors.ts";
 import { formatSignedPercent, timeMs } from "../report/Formatters.ts";
 import {
-  average,
+  mean,
   median,
   percentile,
   splitByOffsets,
@@ -131,8 +131,8 @@ function printOrderEffect(benches: number[][], baselines: number[][]): void {
   const deltas = benches.map((b, i) => medianDelta(b, baselines[i]));
   const baseFirstDeltas = deltas.filter((_, i) => i % 2 === 0);
   const currFirstDeltas = deltas.filter((_, i) => i % 2 === 1);
-  const baseFirstAvg = baseFirstDeltas.length ? average(baseFirstDeltas) : 0;
-  const currFirstAvg = currFirstDeltas.length ? average(currFirstDeltas) : 0;
+  const baseFirstAvg = baseFirstDeltas.length ? mean(baseFirstDeltas) : 0;
+  const currFirstAvg = currFirstDeltas.length ? mean(currFirstDeltas) : 0;
 
   console.log();
   console.log(bold("  Order effect:"));
@@ -159,7 +159,7 @@ function printPairedDeltas(benches: number[][], baselines: number[][]): void {
 
   const positive = deltas.filter(d => d > 0).length;
   const negative = deltas.filter(d => d < 0).length;
-  const avgDelta = average(deltas);
+  const avgDelta = mean(deltas);
   const med = median(deltas);
   const spread = percentile(deltas, 0.75) - percentile(deltas, 0.25);
 
@@ -190,8 +190,8 @@ function printTrimmedBlocks(
 ): void {
   console.log();
   console.log(bold("  Trimmed blocks:"));
-  const baseMeans = baselines.map(b => average(b));
-  const benchMeans = benches.map(b => average(b));
+  const baseMeans = baselines.map(b => mean(b));
+  const benchMeans = benches.map(b => mean(b));
   printSideTrim("baseline", baseMeans);
   printSideTrim(name, benchMeans);
 }

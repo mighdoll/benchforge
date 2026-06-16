@@ -116,7 +116,7 @@ export function flipCI(ci: DifferenceCI): DifferenceCI {
 
 /** Compute a statistic from samples by kind */
 export function computeStat(samples: number[], kind: StatKind): number {
-  if (kind === "mean") return average(samples);
+  if (kind === "mean") return mean(samples);
   if (kind === "min") return minOf(samples);
   if (kind === "max") return maxOf(samples);
   return percentile(samples, kind.percentile);
@@ -147,10 +147,10 @@ export function maxOf(samples: number[]): number {
 
 /** @return relative standard deviation (coefficient of variation) */
 export function coefficientOfVariation(samples: number[]): number {
-  const mean = average(samples);
-  if (mean === 0) return 0;
+  const avg = mean(samples);
+  if (avg === 0) return 0;
   const stdDev = standardDeviation(samples);
-  return stdDev / mean;
+  return stdDev / avg;
 }
 
 /** @return median absolute deviation for robust variability measure */
@@ -235,7 +235,7 @@ export function bootstrapCIs(
 
 /** Convert StatKind to a stat function */
 export function statKindToFn(kind: StatKind): (s: number[]) => number {
-  if (kind === "mean") return average;
+  if (kind === "mean") return mean;
   if (kind === "min") return minOf;
   if (kind === "max") return maxOf;
   const p = kind.percentile;
@@ -258,7 +258,7 @@ export function blockBootstrap(
     options;
   const side = prepareBlocks(samples, blocks, statFn, options.noTrim);
   const stats = Array.from({ length: resamples }, () =>
-    average(createResample(side.blockVals)),
+    mean(createResample(side.blockVals)),
   );
   return {
     estimate: statFn(side.filtered),
@@ -318,7 +318,7 @@ export function poolResampleStat(
 }
 
 /** @return mean of values */
-export function average(values: number[]): number {
+export function mean(values: number[]): number {
   const sum = values.reduce((a, b) => a + b, 0);
   return sum / values.length;
 }
@@ -363,9 +363,9 @@ export function median(values: number[]): number {
 /** @return standard deviation with Bessel's correction */
 export function standardDeviation(samples: number[]): number {
   if (samples.length <= 1) return 0;
-  const mean = average(samples);
+  const avg = mean(samples);
   const variance =
-    samples.reduce((sum, x) => sum + (x - mean) ** 2, 0) / (samples.length - 1);
+    samples.reduce((sum, x) => sum + (x - avg) ** 2, 0) / (samples.length - 1);
   return Math.sqrt(variance);
 }
 
@@ -380,7 +380,7 @@ export function percentile(values: number[], p: number): number {
   return quickSelect(copy, percentileIndex(copy.length, p));
 }
 
-/** Hoare's selection: O(N) average k-th smallest element. Mutates arr. */
+/** Hoare's selection: O(N) mean k-th smallest element. Mutates arr. */
 export function quickSelect(arr: number[], k: number): number {
   let lo = 0;
   let hi = arr.length - 1;
@@ -464,7 +464,7 @@ export function trimOutlierBatches(
     return { samples, trimCount: 0 };
   }
   const splits = splitByOffsets(samples, offsets);
-  const means = splits.map(average);
+  const means = splits.map(mean);
   const keep = tukeyKeep(means);
   if (keep.length === splits.length) return { samples, trimCount: 0 };
   return {
@@ -483,7 +483,7 @@ export function prepareBlocks(
   noTrim?: boolean,
 ): PreparedBlocks {
   const splits = splitByOffsets(samples, offsets);
-  const means = splits.map(average);
+  const means = splits.map(mean);
   const keep = noTrim ? means.map((_, i) => i) : tukeyKeep(means);
   const keptSplits = keep.map(i => splits[i]);
   return {
@@ -528,7 +528,7 @@ function buildStatOps(stats: StatKind[], n: number): StatOp[] {
     origIndex: i,
   });
   const ops = stats.map((s, i): StatOp & { order: number } => {
-    if (s === "mean") return nonDestructive(-3, i, average);
+    if (s === "mean") return nonDestructive(-3, i, mean);
     if (s === "min") return nonDestructive(-2, i, minOf);
     if (s === "max") return nonDestructive(-1, i, maxOf);
     const p = s.percentile;

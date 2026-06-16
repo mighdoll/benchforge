@@ -4,9 +4,9 @@ import {
   summarizeCalibration,
 } from "../stats/CalibrationSummary.ts";
 import {
-  average,
   type IntegerCount,
   integerCounts,
+  mean,
   type StatKind,
 } from "../stats/StatisticalUtils.ts";
 import type { MeasuredResults } from "./MeasuredResults.ts";
@@ -93,7 +93,7 @@ export async function runCalibration(
 
   const summary = summarizeCalibration(pointEstimates, ciHalfWidths);
   const haveGc = runsWithGc === runs && perBatchGcs.length > 0;
-  const fullGcsPerBatch = haveGc ? average(perBatchGcs) : undefined;
+  const fullGcsPerBatch = haveGc ? mean(perBatchGcs) : undefined;
   const gcHistogram = haveGc ? integerCounts(perBatchGcs) : undefined;
   return {
     runs,

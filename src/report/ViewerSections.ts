@@ -5,12 +5,12 @@ import {
   diffCIs,
 } from "../stats/BootstrapDifference.ts";
 import {
-  average,
   type BootstrapResult,
   bootstrapCIs,
   type DifferenceCI,
   flipCI,
   isBootstrappable,
+  mean,
   prepareBlocks,
   type StatKind,
   trimOutlierBatches,
@@ -182,7 +182,7 @@ export function keptBatchCount(
   m: MeasuredResults,
   noTrim: boolean | undefined,
 ): number {
-  return prepareBlocks(m.samples, m.batchOffsets!, average, noTrim).keptSplits
+  return prepareBlocks(m.samples, m.batchOffsets!, mean, noTrim).keptSplits
     .length;
 }
 

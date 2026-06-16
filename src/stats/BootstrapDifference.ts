@@ -8,7 +8,6 @@ import type {
 } from "./StatisticalUtils.ts";
 import {
   allocPoolBuf,
-  average,
   bootstrapSamples,
   computeInterval,
   createResample,
@@ -16,6 +15,7 @@ import {
   isBootstrappable,
   maxBootstrapInput,
   maxOf,
+  mean,
   minOf,
   percentile,
   percentileIndex,
@@ -154,7 +154,7 @@ export function blockDifferenceCI(
     b,
     statFn,
     options,
-    side => () => average(createResample(side.blockVals)),
+    side => () => mean(createResample(side.blockVals)),
   );
 }
 
@@ -215,7 +215,7 @@ function buildDiffOps(stats: StatKind[], nA: number, nB: number): DiffOp[] {
     pointEstimate: fn,
   });
   const entries = stats.map((s, i) => {
-    if (s === "mean") return sameBothSides(-3, i, average);
+    if (s === "mean") return sameBothSides(-3, i, mean);
     if (s === "min") return sameBothSides(-2, i, minOf);
     if (s === "max") return sameBothSides(-1, i, maxOf);
     const p = s.percentile;

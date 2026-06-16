@@ -1,6 +1,6 @@
 import {
-  average,
   cumulativeSum,
+  mean,
   sampleIndexAtOffset,
   splitByOffsets,
   tukeyKeep,
@@ -209,7 +209,7 @@ function rejectedIndices(b: PreparedBenchmark): Set<number> | undefined {
   const offsets = b.batchOffsets;
   if (!offsets || offsets.length < 4) return undefined;
 
-  const means = splitByOffsets(b.samples, offsets).map(s => average(s));
+  const means = splitByOffsets(b.samples, offsets).map(s => mean(s));
   const kept = new Set(tukeyKeep(means));
 
   const rejected = new Set<number>();

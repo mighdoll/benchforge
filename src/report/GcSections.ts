@@ -1,6 +1,6 @@
 import type { NavTiming } from "../profiling/browser/BrowserProfiler.ts";
 import type { MeasuredResults } from "../runners/MeasuredResults.ts";
-import { average, median, percentile } from "../stats/StatisticalUtils.ts";
+import { mean, median, percentile } from "../stats/StatisticalUtils.ts";
 import {
   type ReportSection,
   type ScalarRow,
@@ -139,7 +139,7 @@ function pageLoadSection(
   return scalarSection({
     title,
     rows: [
-      row("Mean", average),
+      row("Mean", mean),
       row("P50", median),
       row("P99", v => percentile(v, 0.99)),
     ],

@@ -1,11 +1,11 @@
 import type { MeasuredResults } from "../runners/MeasuredResults.ts";
 import { diffCIs } from "../stats/BootstrapDifference.ts";
 import {
-  average,
   type BootstrapResult,
   bootstrapCIs,
   type DifferenceCI,
   flipCI,
+  mean,
   percentile,
   prepareBlocks,
   type StatKind,
@@ -272,7 +272,7 @@ function tailCoverage(
   const { samples, batchOffsets } = m;
   const blocks =
     batchOffsets && batchOffsets.length >= 2
-      ? prepareBlocks(samples, batchOffsets, average, noBatchTrim).keptSplits
+      ? prepareBlocks(samples, batchOffsets, mean, noBatchTrim).keptSplits
       : [samples];
   const threshold = percentile(blocks.flat(), p);
   const inTail =

@@ -1,9 +1,9 @@
 import type { GcEvent } from "../runners/GcStats.ts";
 import type { MeasuredResults } from "../runners/MeasuredResults.ts";
 import {
-  average,
   coefficientOfVariation,
   cumulativeSum,
+  mean,
   sampleIndexAtOffset,
 } from "../stats/StatisticalUtils.ts";
 
@@ -88,7 +88,7 @@ function spread(values: number[]): Spread {
     count: values.length,
     min: Math.min(...values),
     max: Math.max(...values),
-    mean: average(values),
+    mean: mean(values),
     cv: values.length > 1 ? coefficientOfVariation(values) : 0,
   };
 }

@@ -6,12 +6,12 @@ import {
   diffCIs,
 } from "../stats/BootstrapDifference.ts";
 import {
-  average,
   blockBootstrap,
   blockPoolBootstrap,
   coefficientOfVariation,
   findOutliers,
   integerCounts,
+  mean,
   median,
   medianAbsoluteDeviation,
   percentile,
@@ -35,9 +35,9 @@ function skewedBatchData(): { samples: number[]; blocks: number[] } {
 test("calculates mean correctly", () => {
   const subset = getSampleData(0, 10);
   const expected = subset.reduce((a, b) => a + b, 0) / subset.length;
-  expect(average(subset)).toBeCloseTo(expected, 5);
-  expect(average([10])).toBe(10);
-  expect(average([-5, 5])).toBe(0);
+  expect(mean(subset)).toBeCloseTo(expected, 5);
+  expect(mean([10])).toBe(10);
+  expect(mean([-5, 5])).toBe(0);
 });
 
 test("calculates standard deviation", () => {

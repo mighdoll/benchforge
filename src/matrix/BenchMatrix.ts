@@ -1,6 +1,6 @@
 import type { RunnerOptions } from "../runners/BenchRunner.ts";
 import type { MeasuredResults } from "../runners/MeasuredResults.ts";
-import { average } from "../stats/StatisticalUtils.ts";
+import { mean } from "../stats/StatisticalUtils.ts";
 import type { CasesModule } from "./CaseLoader.ts";
 import { loadCasesModule } from "./CaseLoader.ts";
 import { runMatrixWithDir } from "./MatrixDirRunner.ts";
@@ -230,7 +230,7 @@ export function computeDeltaPercent(
   base: MeasuredResults,
   cur: MeasuredResults,
 ): number {
-  const avg = average(base.samples);
+  const avg = mean(base.samples);
   if (avg === 0) return 0;
-  return ((average(cur.samples) - avg) / avg) * 100;
+  return ((mean(cur.samples) - avg) / avg) * 100;
 }

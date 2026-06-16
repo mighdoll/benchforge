@@ -6,7 +6,7 @@ import type { MatrixSuite } from "../matrix/BenchMatrix.ts";
 import type { BenchmarkReport } from "../report/BenchmarkReport.ts";
 import { consoleSummary } from "../report/ConsoleSummary.ts";
 import type { MeasuredResults } from "../runners/MeasuredResults.ts";
-import { average, percentile } from "../stats/StatisticalUtils.ts";
+import { mean, percentile } from "../stats/StatisticalUtils.ts";
 import { bevy30SamplesMs } from "./fixtures/bevy30-samples.ts";
 
 /** Validation helpers for statistical tests */
@@ -69,7 +69,7 @@ export function createMeasuredResults(
     time: {
       min: sorted[0],
       max: sorted[sorted.length - 1],
-      avg: average(samples),
+      avg: mean(samples),
       p50: percentile(samples, 0.5),
       p75: percentile(samples, 0.75),
       p99: percentile(samples, 0.99),

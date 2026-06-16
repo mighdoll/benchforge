@@ -1,4 +1,4 @@
-import { average, percentile, standardDeviation } from "./StatisticalUtils.ts";
+import { mean, percentile, standardDeviation } from "./StatisticalUtils.ts";
 
 /** Noise-floor summary from repeated current-vs-current comparisons. */
 export interface CalibrationSummary {
@@ -27,10 +27,10 @@ export function summarizeCalibration(
   pointEstimates: number[],
   ciHalfWidths: number[],
 ): CalibrationSummary {
-  const meanPoint = average(pointEstimates);
+  const meanPoint = mean(pointEstimates);
   const scatterStd = standardDeviation(pointEstimates);
   const scatterP95 = percentile(pointEstimates.map(Math.abs), 0.95);
-  const meanCiHalfWidth = average(ciHalfWidths);
+  const meanCiHalfWidth = mean(ciHalfWidths);
   const overconfident = scatterP95 > meanCiHalfWidth;
   const suggestedMargin = roundUpMargin(Math.max(scatterP95, meanCiHalfWidth));
   return {
