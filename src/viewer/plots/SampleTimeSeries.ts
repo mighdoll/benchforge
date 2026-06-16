@@ -1,5 +1,6 @@
 import * as Plot from "@observablehq/plot";
 import * as d3 from "d3";
+import { lttb } from "./Downsampling.ts";
 import { buildLegend, type LegendItem } from "./LegendUtils.ts";
 import {
   type FlatGcEvent,
@@ -10,7 +11,6 @@ import {
   type TimeSeriesPoint,
 } from "./PlotTypes.ts";
 import {
-  buildLegendItems,
   gcMark,
   type HeapScale,
   heapAxisMarks,
@@ -18,8 +18,16 @@ import {
   type PlotContext,
   pauseMarks,
   type SampleData,
-  sampleDotMarks,
 } from "./TimeSeriesMarks.ts";
+import { sampleDotMarks } from "./TimeSeriesSamples.ts";
+import {
+  buildSampleData,
+  computeHeapScale,
+  computeYRange,
+  type HeapPlotPoint,
+  prepareHeapData,
+} from "./TimeSeriesScaling.ts";
+import { buildLegendItems } from "./TimeSeriesSeries.ts";
 
 /** Controls which data series are visible in the time series plot.
  *  `hidden` holds benchmark names toggled off (the baseline is just one of
@@ -31,8 +39,6 @@ export interface SeriesVisibility {
   rejected: boolean;
   fullGc: boolean;
 }
-
-type HeapPlotPoint = { benchmark: string; sample: number; y: number };
 
 interface MarkParams {
   ctx: PlotContext;
@@ -187,117 +193,4 @@ function buildMarks(p: MarkParams): Plot.Markish[] {
     Plot.ruleY([yMin], { stroke: "black", strokeWidth: 1 }),
     ...buildLegend({ xMin, xMax, yMin, yMax }, legendItems),
   ];
-}
-
-/** Convert TimeSeriesPoint data to SampleData */
-function buildSampleData(
-  timeSeries: TimeSeriesPoint[],
-): Omit<SampleData, "displayValue">[] {
-  return timeSeries.map(d => ({
-    benchmark: d.benchmark,
-    sample: d.iteration,
-    value: d.value,
-    isBaseline: d.isBaseline || false,
-    isWarmup: d.isWarmup || false,
-    isRejected: d.isRejected || false,
-  }));
-}
-
-/** Pad Y range and snap yMin to a round number for clean axis ticks */
-function computeYRange(values: number[]) {
-  const dataMin = d3.min(values)!;
-  const dataMax = d3.max(values)!;
-  const range = dataMax - dataMin;
-  let yMin = dataMin - range * 0.15;
-  const mag = 10 ** Math.floor(Math.log10(Math.abs(yMin)));
-  yMin = Math.floor(yMin / mag) * mag;
-  if (dataMin > 0 && yMin < 0) yMin = 0;
-  return { yMin, yMax: dataMax + range * 0.05 };
-}
-
-/** Compute scale to map heap byte values into the bottom 25% of the Y axis */
-function computeHeapScale(
-  allHeap: HeapPoint[],
-  yMin: number,
-  yMax: number,
-): HeapScale | undefined {
-  if (allHeap.length === 0) return undefined;
-  const heapMinBytes = d3.min(allHeap, d => d.value)!;
-  const heapRangeBytes = d3.max(allHeap, d => d.value)! - heapMinBytes || 1;
-  return {
-    heapMinBytes,
-    heapRangeBytes,
-    scale: ((yMax - yMin) * 0.25) / heapRangeBytes,
-    yMin,
-  };
-}
-
-/** Map heap byte values to the time-series Y scale and downsample via LTTB,
- *  per benchmark so the area mark never connects across series boundaries. */
-function prepareHeapData(
-  heapSeries: HeapPoint[],
-  hs: HeapScale,
-): HeapPlotPoint[] {
-  if (heapSeries.length === 0) return [];
-  const byBench = d3.group(heapSeries, d => d.benchmark);
-  return [...byBench.values()].flatMap(points => {
-    const mapped = points.map(d => ({
-      benchmark: d.benchmark,
-      sample: d.iteration,
-      y: hs.yMin + (d.value - hs.heapMinBytes) * hs.scale,
-    }));
-    return lttb(
-      mapped,
-      500,
-      d => d.sample,
-      d => d.y,
-    );
-  });
-}
-
-/** LTTB downsampling: select n points that best preserve visual shape */
-function lttb<T>(
-  data: T[],
-  n: number,
-  getX: (d: T) => number,
-  getY: (d: T) => number,
-): T[] {
-  if (data.length <= n) return data;
-  const bucketSize = (data.length - 2) / (n - 2);
-  const result: T[] = [data[0]];
-  for (let i = 0; i < n - 2; i++) {
-    const bStart = Math.floor(i * bucketSize) + 1;
-    const bEnd = Math.floor((i + 1) * bucketSize) + 1;
-    // average the next bucket [bEnd, nextEnd) for the triangle's far vertex
-    const nextEnd = Math.min(
-      Math.floor((i + 2) * bucketSize) + 1,
-      data.length - 1,
-    );
-    let avgX = 0;
-    let avgY = 0;
-    for (let j = bEnd; j < nextEnd; j++) {
-      avgX += getX(data[j]);
-      avgY += getY(data[j]);
-    }
-    const cnt = nextEnd - bEnd || 1;
-    avgX /= cnt;
-    avgY /= cnt;
-    const prev = result[result.length - 1];
-    const px = getX(prev);
-    const py = getY(prev);
-    let maxArea = -1;
-    let maxIdx = bStart;
-    for (let j = bStart; j < bEnd; j++) {
-      const area = Math.abs(
-        (px - avgX) * (getY(data[j]) - py) - (px - getX(data[j])) * (avgY - py),
-      );
-      if (area > maxArea) {
-        maxArea = area;
-        maxIdx = j;
-      }
-    }
-    result.push(data[maxIdx]);
-  }
-  result.push(data[data.length - 1]);
-  return result;
 }

@@ -1,20 +1,19 @@
-import { formatSignedPercent } from "../../report/Formatters.ts";
 import type {
   CIDirection,
   CILevel,
   DifferenceCI,
   HistogramBin,
 } from "../../stats/Bootstrap.ts";
-import { directionColors, gaussianSmooth } from "./PlotTypes.ts";
+import { drawCILabels, drawTitles } from "./CILabels.ts";
 import {
-  createSvg,
-  ensureHatchPattern,
-  ensureSketchFilter,
-  line,
-  path,
-  rect,
-  text,
-} from "./SvgHelpers.ts";
+  drawCIRegion,
+  drawHistogramBars,
+  drawMarginZone,
+  drawReferenceLine,
+  drawSmoothedDist,
+} from "./CIRegions.ts";
+import { directionColors } from "./PlotTypes.ts";
+import { createSvg, line } from "./SvgHelpers.ts";
 
 export interface DistributionPlotOptions {
   width?: number;
@@ -39,8 +38,8 @@ export interface DistributionPlotOptions {
   domain?: [number, number];
 }
 
-type Scales = { x: (v: number) => number; y: (v: number) => number };
-type Layout = {
+export type Scales = { x: (v: number) => number; y: (v: number) => number };
+export type Layout = {
   width: number;
   height: number;
   margin: { top: number; right: number; bottom: number; left: number };
@@ -173,228 +172,9 @@ function buildScales(
   };
 }
 
-function drawTitles(
-  svg: SVGSVGElement,
-  opts: DistributionPlotOptions,
-  layout: Layout,
-  pointX: number,
-): void {
-  const { margin, width } = layout;
-  if (opts.title)
-    svg.appendChild(
-      text(margin.left, 14, opts.title, "start", "13", "currentColor", "600"),
-    );
-  if (opts.pointLabel) {
-    const x = clampLabelX(pointX, opts.pointLabel, "middle", width, 10);
-    svg.appendChild(
-      text(
-        x,
-        margin.top - 6,
-        opts.pointLabel,
-        "middle",
-        "15",
-        "currentColor",
-        "700",
-      ),
-    );
-  }
-}
-
-/** Draw equivalence margin zone: hatched band centered vertically */
-function drawMarginZone(
-  svg: SVGSVGElement,
-  equivMargin: number,
-  scales: Scales,
-  layout: Layout,
-): void {
-  const { margin, plot } = layout;
-  const x1 = scales.x(-equivMargin);
-  const x2 = scales.x(equivMargin);
-  const fill = `url(#${ensureHatchPattern(svg)})`;
-  const bandH = plot.h / 3;
-  const bandY = margin.top + (plot.h - bandH) / 2;
-  const zone = rect(x1, bandY, x2 - x1, bandH, { fill, strokeWidth: "1.5" });
-  zone.classList.add("margin-zone");
-  svg.appendChild(zone);
-}
-
-/** Draw the shaded CI band; an unreliable CI gets a sketchy (dashed) filter. */
-function drawCIRegion(
-  svg: SVGSVGElement,
-  ci: [number, number],
-  scales: Scales,
-  layout: Layout,
-  opts: DistributionPlotOptions & {
-    direction: CIDirection;
-    includeZero: boolean;
-  },
-  fill: string,
-): void {
-  const { margin, plot } = layout;
-  const ciX = scales.x(ci[0]);
-  const ciRect = rect(ciX, margin.top, scales.x(ci[1]) - ciX, plot.h, { fill });
-  const strength = opts.includeZero ? "ci-region-strong" : "ci-region";
-  ciRect.classList.add(strength, `ci-${opts.direction}`);
-  if (opts.ciReliable === false) {
-    ciRect.classList.add("ci-unreliable");
-    ciRect.setAttribute("filter", `url(#${ensureSketchFilter(svg)})`);
-  }
-  svg.appendChild(ciRect);
-}
-
-/** Draw a filled area + stroke path using gaussian-smoothed histogram data */
-function drawSmoothedDist(
-  svg: SVGSVGElement,
-  histogram: HistogramBin[],
-  scales: Scales,
-  stroke: string,
-): void {
-  const sorted = [...histogram].sort((a, b) => a.x - b.x);
-  const smoothed = gaussianSmooth(sorted, 2);
-  const pts = smoothed.map(b => `${scales.x(b.x)},${scales.y(b.count)}`);
-  const base = scales.y(0);
-  const startX = scales.x(smoothed[0].x);
-  const endX = scales.x(smoothed.at(-1)!.x);
-  const fillD = `M${startX},${base}L${pts.join("L")}L${endX},${base}Z`;
-  const fillPath = path(fillD, { fill: stroke });
-  fillPath.classList.add("dist-fill");
-  svg.appendChild(fillPath);
-  const strokePath = path(`M${pts.join("L")}`, {
-    stroke,
-    fill: "none",
-    strokeWidth: "1.5",
-  });
-  strokePath.classList.add("dist-stroke");
-  svg.appendChild(strokePath);
-}
-
-function drawHistogramBars(
-  svg: SVGSVGElement,
-  histogram: HistogramBin[],
-  scales: Scales,
-  layout: Layout,
-  stroke: string,
-): void {
-  const sorted = [...histogram].sort((a, b) => a.x - b.x);
-  const binW = sorted.length > 1 ? sorted[1].x - sorted[0].x : 1;
-  const xRange = scales.x(sorted.at(-1)!.x) - scales.x(sorted[0].x) + binW;
-  const barW = (binW / xRange) * layout.plot.w * 0.9;
-  const base = scales.y(0);
-  const attrs = { fill: stroke, opacity: "0.6" };
-  for (const bin of sorted) {
-    const top = scales.y(bin.count);
-    svg.appendChild(
-      rect(scales.x(bin.x) - barW / 2, top, barW, base - top, attrs),
-    );
-  }
-}
-
-/** Draw zero reference line extending past plot area (comparison CIs only) */
-function drawReferenceLine(
-  svg: SVGSVGElement,
-  scales: Scales,
-  layout: Layout,
-  includeZero: boolean,
-): void {
-  const { margin, plot } = layout;
-  const zeroX = scales.x(0);
-  const inBounds = zeroX >= margin.left && zeroX <= layout.width - margin.right;
-  if (!includeZero || !inBounds) return;
-
-  svg.appendChild(
-    line(zeroX, margin.top - 4, zeroX, margin.top + plot.h + 4, {
-      stroke: "#000",
-      strokeWidth: "1",
-    }),
-  );
-}
-
-function drawCILabels(
-  svg: SVGSVGElement,
-  ci: [number, number],
-  scales: Scales,
-  layout: Layout,
-  opts: DistributionPlotOptions & { includeZero: boolean },
-): void {
-  if (layout.margin.bottom < 15) return;
-  const labelY = layout.height - 4;
-  const loLabel = opts.ciLabels?.[0] ?? formatSignedPercent(ci[0]);
-  const hiLabel = opts.ciLabels?.[1] ?? formatSignedPercent(ci[1]);
-  const loX = scales.x(ci[0]);
-  const hiX = scales.x(ci[1]);
-  const minGap = Math.max(loLabel.length, hiLabel.length) * 6;
-  const { width } = layout;
-
-  // Too tight to fit both bounds: merge into one clamped range label at the CI
-  // midpoint so the bounds stay readable (same for diff and absolute plots).
-  if (hiX - loX < minGap) {
-    const merged = rangeLabel(loLabel, hiLabel);
-    const x = clampLabelX((loX + hiX) / 2, merged, "middle", width, 6);
-    svg.appendChild(text(x, labelY, merged, "middle", "11"));
-    return;
-  }
-
-  // Diff plots (includeZero) center each bound label; absolute plots anchor each
-  // label outward so the two never encroach on each other. Clamp either way so
-  // edge labels aren't clipped.
-  if (opts.includeZero) {
-    drawBoundLabel(svg, loLabel, loX, labelY, "middle", width);
-    drawBoundLabel(svg, hiLabel, hiX, labelY, "middle", width);
-    return;
-  }
-  drawBoundLabel(svg, loLabel, loX, labelY, "end", width);
-  drawBoundLabel(svg, hiLabel, hiX, labelY, "start", width);
-}
-
 /** Top margin: room for the point-label, else the title, else a thin band. */
 function layoutTop(hasPointLabel?: boolean, hasTitle?: boolean): number {
   if (hasPointLabel) return 30;
   if (hasTitle) return defaultMargin.top;
   return 6;
-}
-
-/** Keep a text label inside [pad, width-pad] given its anchor, so labels at the
- *  data edges aren't clipped by the SVG viewport. Width is estimated from the
- *  character count (charW ~6px at the 11px label size, ~10px for the 15px point). */
-function clampLabelX(
-  x: number,
-  label: string,
-  anchor: "start" | "middle" | "end",
-  width: number,
-  charW: number,
-): number {
-  const w = label.length * charW;
-  const { left, right } = labelOverhang(anchor, w);
-  const lo = 2 + left;
-  const hi = width - 2 - right;
-  return Math.max(lo, Math.min(hi, x));
-}
-
-/** Merge two CI bound labels into a range, or one label when they're identical
- *  at display precision. */
-function rangeLabel(loLabel: string, hiLabel: string): string {
-  return loLabel === hiLabel ? loLabel : `${loLabel} - ${hiLabel}`;
-}
-
-/** Draw one clamped CI-bound label at the given anchor. */
-function drawBoundLabel(
-  svg: SVGSVGElement,
-  label: string,
-  x: number,
-  labelY: number,
-  anchor: "start" | "middle" | "end",
-  width: number,
-): void {
-  const clampedX = clampLabelX(x, label, anchor, width, 6);
-  svg.appendChild(text(clampedX, labelY, label, anchor, "11"));
-}
-
-/** Pixels a label extends left/right of its anchor point, by anchor type. */
-function labelOverhang(
-  anchor: "start" | "middle" | "end",
-  w: number,
-): { left: number; right: number } {
-  if (anchor === "start") return { left: 0, right: w };
-  if (anchor === "end") return { left: w, right: 0 };
-  return { left: w / 2, right: w / 2 };
 }

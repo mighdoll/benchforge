@@ -1,17 +1,13 @@
-import { formatSignedPercent } from "../../report/Formatters.ts";
-import { verdictWord } from "../../report/Verdict.ts";
 import type { ShiftFunction, ShiftPercentile } from "../ReportData.ts";
-import { directionColors, gaussianSmooth } from "./PlotTypes.ts";
 import {
-  createSvg,
-  ensureClipRect,
-  ensureHatchPattern,
-  line,
-  path,
-  rect,
-  svgNS,
-  text,
-} from "./SvgHelpers.ts";
+  drawDivider,
+  drawMarginBand,
+  drawYAxis,
+  drawZeroLine,
+} from "./ShiftAxis.ts";
+import { margin, type Scale, scalePoints } from "./ShiftLayout.ts";
+import { drawMarker, drawPercentileLabel, drawViolin } from "./ShiftViolins.ts";
+import { createSvg, ensureClipRect, svgNS } from "./SvgHelpers.ts";
 
 export interface ShiftPlotOptions {
   width?: number;
@@ -20,21 +16,7 @@ export interface ShiftPlotOptions {
   onSelect?: (point: ShiftPercentile) => void;
 }
 
-type Scale = (v: number) => number;
-
-const weakColor = "#9ca3af";
-// Unreliable (too few tail samples) reads as a lighter grey, paired with a
-// dashed outline, so it stays distinct from the medium grey of a reliable-but-
-// uncertain percentile (directionColors.uncertain shares weakColor).
-const unreliableColor = "#cbd5e1";
-
 const defaults = { width: 760, height: 300 };
-const margin = { top: 14, right: 16, bottom: 34, left: 44 };
-
-/** Per-percentile stroke: direction color when reliable, light grey when there
- *  are too few tail samples to trust it (paired with a dashed outline). */
-const strokeFor = (p: ShiftPercentile) =>
-  p.reliable ? directionColors[p.diff.direction].stroke : unreliableColor;
 
 /** Create a shift-function plot: one violin per percentile showing the diff
  *  distribution across the whole sample distribution. Violins are colored by
@@ -134,85 +116,6 @@ function maxHistogramCount(points: ShiftPercentile[]): number {
   return max;
 }
 
-/** Horizontal +/- equivalence band: diffs landing inside it are treated as
- *  practically equivalent, so it spans the full plot width as a reference zone. */
-function drawMarginBand(
-  svg: SVGSVGElement,
-  equivMargin: number,
-  yScale: Scale,
-  width: number,
-): void {
-  const yTop = yScale(equivMargin);
-  const yBottom = yScale(-equivMargin);
-  const bandWidth = width - margin.left - margin.right;
-  const fill = `url(#${ensureHatchPattern(svg)})`;
-  const band = rect(margin.left, yTop, bandWidth, yBottom - yTop, { fill });
-  band.classList.add("margin-zone");
-  svg.appendChild(band);
-  for (const y of [yTop, yBottom])
-    svg.appendChild(
-      line(margin.left, y, margin.left + bandWidth, y, {
-        stroke: "#d1d5db",
-        strokeWidth: "1",
-      }),
-    );
-}
-
-/** Zero reference line spanning the plot width. */
-function drawZeroLine(svg: SVGSVGElement, yScale: Scale, width: number): void {
-  const y = yScale(0);
-  svg.appendChild(
-    line(margin.left, y, width - margin.right, y, {
-      stroke: "#000",
-      strokeWidth: "1",
-    }),
-  );
-}
-
-/** y-axis ticks at a nice step across the diff-percent range. */
-function drawYAxis(
-  svg: SVGSVGElement,
-  yScale: Scale,
-  points: ShiftPercentile[],
-  equivMargin: number | undefined,
-): void {
-  const [spanMin, spanMax] = axisSpan(points, equivMargin);
-  const step = niceStep((spanMax - spanMin) / 5);
-  for (
-    let tick = Math.ceil(spanMin / step) * step;
-    tick <= spanMax;
-    tick += step
-  ) {
-    const y = yScale(tick);
-    svg.appendChild(
-      line(margin.left - 4, y, margin.left, y, {
-        stroke: "#9ca3af",
-        strokeWidth: "1",
-      }),
-    );
-    const decimals = tick % 1 ? 1 : 0;
-    svg.appendChild(
-      text(
-        margin.left - 7,
-        y + 3.5,
-        formatSignedPercent(tick, decimals),
-        "end",
-        "10",
-      ),
-    );
-  }
-}
-
-/** Faint vertical divider separating the mean slot from the percentile slots. */
-function drawDivider(svg: SVGSVGElement, x: number, plotHeight: number): void {
-  svg.appendChild(
-    line(x, margin.top, x, margin.top + plotHeight, {
-      stroke: "#e0e0e0",
-      strokeWidth: "1",
-    }),
-  );
-}
-
 /** A clipped <g> covering the plot rect: violins/markers drawn into it are cut
  *  at the axis bounds. The y-scale is set by reliable points only (buildYScale),
  *  so an unreliable tail percentile's huge spread can't overflow into the axis
@@ -234,180 +137,4 @@ function clipLayer(
   layer.setAttribute("clip-path", `url(#${clip})`);
   svg.appendChild(layer);
   return layer;
-}
-
-/** A vertical violin: the smoothed diff distribution mirrored around cx. */
-function drawViolin(
-  parent: SVGElement,
-  point: ShiftPercentile,
-  cx: number,
-  halfMax: number,
-  maxCount: number,
-  yScale: Scale,
-  onSelect?: (point: ShiftPercentile) => void,
-): void {
-  if (!point.diff.histogram?.length) return;
-  const stroke = strokeFor(point);
-  const outlinePath = violinPath(point, cx, halfMax, maxCount, yScale);
-
-  const group = document.createElementNS(svgNS, "g");
-  group.classList.add("shift-violin");
-  if (!point.reliable) group.classList.add("shift-weak");
-  group.appendChild(violinTitle(point));
-  if (onSelect) {
-    group.style.cursor = "pointer";
-    group.addEventListener("click", () => onSelect(point));
-  }
-  const body = path(outlinePath, { fill: stroke });
-  body.classList.add("shift-violin-fill");
-  group.appendChild(body);
-  const outlineAttrs: Record<string, string> = {
-    stroke,
-    fill: "none",
-    strokeWidth: "1.5",
-  };
-  if (!point.reliable) outlineAttrs.strokeDasharray = "3 2";
-  group.appendChild(path(outlinePath, outlineAttrs));
-  parent.appendChild(group);
-}
-
-/** Point-estimate marker: hollow circle, grey when unreliable. */
-function drawMarker(
-  parent: SVGElement,
-  point: ShiftPercentile,
-  cx: number,
-  yScale: Scale,
-): void {
-  const stroke = strokeFor(point);
-  const dot = document.createElementNS(svgNS, "circle");
-  dot.setAttribute("cx", String(cx));
-  dot.setAttribute("cy", String(yScale(point.diff.percent)));
-  dot.setAttribute("r", "3");
-  dot.setAttribute("fill", "#fff");
-  dot.setAttribute("stroke", stroke);
-  dot.setAttribute("stroke-width", "1.5");
-  dot.style.pointerEvents = "none";
-  parent.appendChild(dot);
-}
-
-/** Percentile label, with the verdict point enlarged and its Δ% value captioned
- *  below (the same number shown elsewhere as the headline delta), and a
- *  tail-count caption for unreliable percentiles. */
-function drawPercentileLabel(
-  svg: SVGSVGElement,
-  point: ShiftPercentile,
-  cx: number,
-  height: number,
-): void {
-  const color = labelColor(point);
-  svg.appendChild(
-    text(
-      cx,
-      height - margin.bottom + 16,
-      point.label,
-      "middle",
-      point.isPrimary ? "13" : "11",
-      color,
-      point.isPrimary ? "700" : "600",
-    ),
-  );
-  if (point.isPrimary && point.reliable)
-    svg.appendChild(
-      text(
-        cx,
-        height - margin.bottom + 29,
-        formatSignedPercent(point.diff.percent),
-        "middle",
-        "11",
-        directionColors[point.diff.direction].stroke,
-        "700",
-      ),
-    );
-  if (!point.reliable)
-    svg.appendChild(
-      text(
-        cx,
-        height - margin.bottom + 28,
-        `n=${point.tailCount}`,
-        "middle",
-        "9",
-        weakColor,
-      ),
-    );
-}
-
-/** Points that set the vertical scale: reliable ones only, so a sparse,
- *  unreliable tail percentile (huge noisy CI) can't dominate the axis and crush
- *  the informative percentiles. Falls back to all points when none are reliable,
- *  so the scale never collapses. */
-function scalePoints(points: ShiftPercentile[]): ShiftPercentile[] {
-  const reliable = points.filter(p => p.reliable);
-  return reliable.length ? reliable : points;
-}
-
-/** @return [min, max] of the diff-percent axis. */
-function axisSpan(
-  points: ShiftPercentile[],
-  equivMargin: number | undefined,
-): [number, number] {
-  let min = 0;
-  let max = 0;
-  if (equivMargin) {
-    min = -equivMargin;
-    max = equivMargin;
-  }
-  for (const p of scalePoints(points)) {
-    if (p.diff.ci[0] < min) min = p.diff.ci[0];
-    if (p.diff.ci[1] > max) max = p.diff.ci[1];
-  }
-  return [min, max];
-}
-
-/** @return a "nice" axis step (1, 2, or 5 times a power of ten) near raw. */
-function niceStep(raw: number): number {
-  const mag = 10 ** Math.floor(Math.log10(raw || 1));
-  const mantissa = raw / mag;
-  if (mantissa < 1.5) return mag;
-  if (mantissa < 3) return 2 * mag;
-  if (mantissa < 7) return 5 * mag;
-  return 10 * mag;
-}
-
-/** SVG path for a smoothed violin mirrored around cx (width encodes density). */
-function violinPath(
-  point: ShiftPercentile,
-  cx: number,
-  halfMax: number,
-  maxCount: number,
-  yScale: Scale,
-): string {
-  const sorted = [...point.diff.histogram!].sort((a, b) => a.x - b.x);
-  // light smoothing (small sigma) rounds jagged bins without merging modes,
-  // since violin width here encodes uncertainty
-  const smoothed = gaussianSmooth(sorted, 0.8);
-  const widthOf = (count: number) => (count / maxCount) * halfMax;
-  const rightEdge = smoothed.map(
-    b => `${cx + widthOf(b.count)},${yScale(b.x)}`,
-  );
-  const leftEdge = smoothed
-    .slice()
-    .reverse()
-    .map(b => `${cx - widthOf(b.count)},${yScale(b.x)}`);
-  return `M${rightEdge.join("L")}L${leftEdge.join("L")}Z`;
-}
-
-/** Native hover tooltip: verdict word + diff for a reliable percentile, or the
- *  tail-sample count when there is too little data to trust it. */
-function violinTitle(point: ShiftPercentile): SVGTitleElement {
-  const node = document.createElementNS(svgNS, "title");
-  node.textContent = point.reliable
-    ? `${point.label} - ${verdictWord(point.diff.direction)} - ${formatSignedPercent(point.diff.percent)}`
-    : `${point.label} - insufficient data (n=${point.tailCount})`;
-  return node;
-}
-
-/** Label color: dark for the primary mean, mid-grey when reliable, weak otherwise. */
-function labelColor(point: ShiftPercentile): string {
-  if (point.isMean) return "#111827";
-  return point.reliable ? "#374151" : weakColor;
 }

@@ -9,7 +9,10 @@ import {
   prepareBenchmarks,
 } from "../plots/RenderPlots.ts";
 import type { SeriesVisibility } from "../plots/SampleTimeSeries.ts";
-import { defaultSeriesColor, seriesColorMap } from "../plots/TimeSeriesMarks.ts";
+import {
+  defaultSeriesColor,
+  seriesColorMap,
+} from "../plots/TimeSeriesSeries.ts";
 import { reportData, samplesLoaded } from "../State.ts";
 import { useLazyPlot } from "./LazyPlot.ts";
 
