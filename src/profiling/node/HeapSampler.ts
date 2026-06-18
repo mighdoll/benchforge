@@ -1,4 +1,5 @@
-import { Session } from "node:inspector/promises";
+import type { Session } from "node:inspector/promises";
+import { withSession } from "./InspectorSession.ts";
 
 export interface HeapSampleOptions {
   /** Bytes between samples (default 32768) */
@@ -78,17 +79,12 @@ export async function withHeapSampling<T>(
   fn: () => Promise<T> | T,
 ): Promise<{ result: T; profile: HeapProfile }> {
   const opts = { ...defaultOptions, ...options };
-  const session = new Session();
-  session.connect();
-
-  try {
+  return withSession(undefined, async session => {
     await startSampling(session, opts);
     const result = await fn();
     const profile = await stopSampling(session);
     return { result, profile };
-  } finally {
-    session.disconnect();
-  }
+  });
 }
 
 /** Start heap sampling, falling back if include-collected params aren't supported */

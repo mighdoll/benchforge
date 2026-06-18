@@ -1,5 +1,6 @@
-import { Session } from "node:inspector/promises";
+import type { Session } from "node:inspector/promises";
 import type { CallFrame } from "./HeapSampler.ts";
+import { withSession } from "./InspectorSession.ts";
 
 /** V8 CPU profile node (flat array element, not tree) */
 export interface TimeProfileNode {
@@ -36,22 +37,18 @@ export async function withTimeProfiling<T>(
   fn: () => Promise<T> | T,
 ): Promise<{ result: T; profile: TimeProfile }> {
   const { interval } = options;
-  const ownSession = !options.session;
-  const session = options.session ?? new Session();
-  if (ownSession) session.connect();
-
-  try {
-    if (ownSession) await session.post("Profiler.enable");
-    if (interval)
-      await session.post("Profiler.setSamplingInterval", { interval });
-    await session.post("Profiler.start");
-    const result = await fn();
-    const { profile } = await session.post("Profiler.stop");
-    return { result, profile: profile as unknown as TimeProfile };
-  } finally {
-    if (ownSession) {
-      await session.post("Profiler.disable");
-      session.disconnect();
+  const owned = !options.session;
+  return withSession(options.session, async session => {
+    try {
+      if (owned) await session.post("Profiler.enable");
+      if (interval)
+        await session.post("Profiler.setSamplingInterval", { interval });
+      await session.post("Profiler.start");
+      const result = await fn();
+      const { profile } = await session.post("Profiler.stop");
+      return { result, profile: profile as unknown as TimeProfile };
+    } finally {
+      if (owned) await session.post("Profiler.disable");
     }
-  }
+  });
 }
