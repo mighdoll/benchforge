@@ -198,15 +198,6 @@ export function splitByOffsets(
   });
 }
 
-/** @return per-block statistic values from sample data split by offsets */
-export function blockValues(
-  samples: number[],
-  offsets: number[],
-  fn: (s: number[]) => number,
-): number[] {
-  return splitByOffsets(samples, offsets).map(fn);
-}
-
 /** Allocate a worst-case buffer for pool-resample draws over `splits`. */
 export function allocPoolBuf(splits: number[][]): number[] {
   let maxBlock = 0;

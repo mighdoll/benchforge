@@ -112,17 +112,6 @@ export function metricValue(
   return section.toDisplay ? section.toDisplay(raw, metadata) : raw;
 }
 
-/** @return scalar row values keyed by row key/title. */
-export function scalarValues(
-  rows: ScalarRow[],
-  results: MeasuredResults,
-  metadata?: UnknownRecord,
-): UnknownRecord {
-  return Object.fromEntries(
-    rows.map(row => [row.key ?? row.title, row.value(results, metadata)]),
-  );
-}
-
 /** All reports in a group, including each report's own baseline and the
  *  group baseline, de-duplicated (per-report baselines may repeat the group
  *  baseline, or share measured results across reports). */
