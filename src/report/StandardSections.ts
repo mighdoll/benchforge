@@ -2,10 +2,12 @@ import type { MeasuredResults } from "../runners/MeasuredResults.ts";
 import {
   type MetricSection,
   metricSection,
+  type ReportSection,
   type ScalarSection,
   scalarSection,
 } from "./BenchmarkReport.ts";
 import { timeMs } from "./Formatters.ts";
+import { gcStatsSection } from "./GcSections.ts";
 
 /** Timing section: the mean (+ a Δ% CI when a baseline exists). Per-percentile
  *  detail lives in the markdown report and HTML viewer (shift function), so the
@@ -30,3 +32,8 @@ export const runsSection: ScalarSection = scalarSection({
     },
   ],
 });
+
+/** Default report sections: time, optional GC stats, then the runs footer. */
+export function defaultReportSections(gcStats: boolean): ReportSection[] {
+  return [timeSection, ...(gcStats ? [gcStatsSection] : []), runsSection];
+}

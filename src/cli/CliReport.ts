@@ -17,10 +17,9 @@ import type {
 } from "../report/BenchmarkReport.ts";
 import { groupReports } from "../report/BenchmarkReport.ts";
 import colors from "../report/Colors.ts";
-import { gcStatsSection } from "../report/GcSections.ts";
 import type { GitVersion } from "../report/GitUtils.ts";
 import { prepareHtmlData } from "../report/HtmlReport.ts";
-import { runsSection, timeSection } from "../report/StandardSections.ts";
+import { defaultReportSections } from "../report/StandardSections.ts";
 import type { ReportData } from "../viewer/ReportData.ts";
 import type { DefaultCliArgs } from "./CliArgs.ts";
 import { cliComparisonOptions } from "./CliOptions.ts";
@@ -98,15 +97,9 @@ export function matrixToReportGroups(results: MatrixResults[]): ReportGroup[] {
   return results.flatMap(caseGroups);
 }
 
-/** Assemble report sections from CLI flags (time/gc/runs). */
-export function buildReportSections(gcStats: boolean): ReportSection[] {
-  return [timeSection, ...(gcStats ? [gcStatsSection] : []), runsSection];
-}
-
 /** Build sections from CLI feature flags (time/gc/runs). */
 function cliDefaultSections(args: DefaultCliArgs): ReportSection[] {
-  const { "gc-stats": gcStats } = args;
-  return buildReportSections(gcStats);
+  return defaultReportSections(args["gc-stats"]);
 }
 
 /** One ReportGroup per case in a matrix, preserving case order across variants. */

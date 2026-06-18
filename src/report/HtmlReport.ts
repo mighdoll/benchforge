@@ -27,9 +27,8 @@ import type {
 } from "./BenchmarkReport.ts";
 import { hasLowBatchCount, isSingleBatch, minBatches } from "./CiFormatting.ts";
 import { gcByBatch } from "./GcByBatch.ts";
-import { gcStatsSection } from "./GcSections.ts";
 import type { GitVersion } from "./GitUtils.ts";
-import { runsSection, timeSection } from "./StandardSections.ts";
+import { defaultReportSections } from "./StandardSections.ts";
 import { resolveTracks } from "./TrackResolution.ts";
 import {
   buildViewerSections,
@@ -55,7 +54,8 @@ export function prepareHtmlData(
   const { cliArgs, currentVersion, baselineVersion } = options;
   const { equivMargin, noBatchTrim, resamples } = options;
   const comparison: ComparisonOptions = { equivMargin, noBatchTrim, resamples };
-  const sections = options.sections ?? defaultSections(cliArgs);
+  const sections =
+    options.sections ?? defaultReportSections(cliArgs?.["gc-stats"] === true);
   return {
     groups: groups.map(g => prepareGroupData(g, sections, comparison)),
     metadata: {
@@ -73,14 +73,6 @@ export function prepareHtmlData(
       },
     },
   };
-}
-
-/** Build default sections when caller doesn't provide custom ones */
-function defaultSections(cliArgs?: Record<string, unknown>): ReportSection[] {
-  const hasGc = cliArgs?.["gc-stats"] === true;
-  return [timeSection, hasGc ? gcStatsSection : undefined, runsSection].filter(
-    (s): s is ReportSection => s !== undefined,
-  );
 }
 
 /** @return case data: raw per-series benchmarks plus the case-level,
