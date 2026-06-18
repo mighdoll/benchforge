@@ -45,7 +45,10 @@ export interface BuildResult {
 }
 
 export interface BenchCliConfig<Extra = Record<string, never>> {
-  /** Augment yargs with custom options. Receives yargs already configured with defaults. */
+  /**
+   * Augment yargs with custom options. Receives yargs already configured with
+   * defaults; explicit command-line args override those defaults at parse time.
+   */
   configure?: (yargs: Argv<DefaultCliArgs>) => Argv<DefaultCliArgs & Extra>;
   /** Build the suite and report metadata from parsed args. */
   build: (args: DefaultCliArgs & Extra) => Promise<BuildResult> | BuildResult;
