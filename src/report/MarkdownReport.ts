@@ -11,6 +11,7 @@ import type {
 import { entryValue } from "./ConsoleSummary.ts";
 import {
   formatBytes,
+  formatPercentCI,
   formatSignedPercent,
   integer,
   timeMs,
@@ -211,8 +212,7 @@ function pointRow(point: ShiftPercentile): string {
   const { diff, runs, label, reliable, tailCount } = point;
   const cur = runs[0]?.bootstrapCI.estimateLabel ?? "";
   const base = runs[1]?.bootstrapCI.estimateLabel ?? "";
-  const [lo, hi] = diff.ci.map(v => formatSignedPercent(v));
   const word = verdictWord(diff.direction);
   const verdict = reliable ? word : `${word} (unreliable, n=${tailCount})`;
-  return `| ${label} | ${cur} | ${base} | ${formatSignedPercent(diff.percent)} | [${lo}, ${hi}] | ${verdict} |`;
+  return `| ${label} | ${cur} | ${base} | ${formatSignedPercent(diff.percent)} | ${formatPercentCI(diff.ci)} | ${verdict} |`;
 }

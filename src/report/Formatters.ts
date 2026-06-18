@@ -45,3 +45,9 @@ export function formatSignedPercent(v: number, precision = 1): string {
   const sign = v >= 0 ? "+" : "";
   return `${sign}${v.toFixed(precision)}%`;
 }
+
+/** @return a signed-percent CI as "[+1.2%, +3.4%]". */
+export function formatPercentCI(ci: [number, number], precision = 1): string {
+  const [lo, hi] = ci.map(v => formatSignedPercent(v, precision));
+  return `[${lo}, ${hi}]`;
+}

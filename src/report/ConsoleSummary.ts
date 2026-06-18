@@ -6,7 +6,7 @@ import type {
   ViewerRow,
 } from "../viewer/ReportData.ts";
 import colors from "./Colors.ts";
-import { formatSignedPercent } from "./Formatters.ts";
+import { formatPercentCI, formatSignedPercent } from "./Formatters.ts";
 import { verdictWord } from "./Verdict.ts";
 
 const { bold, dim, green, red } = colors;
@@ -72,8 +72,7 @@ function headline(entry: ViewerEntry, metric: ViewerRow): string {
 /** The verdict line body: colored direction word, Δ%, CI, "vs baseline". */
 function verdict(ci: DifferenceCI): string {
   const word = colorVerdict(ci.direction);
-  const [lo, hi] = ci.ci.map(v => formatSignedPercent(v));
-  return `${word} ${formatSignedPercent(ci.percent)} [${lo}, ${hi}] vs baseline`;
+  return `${word} ${formatSignedPercent(ci.percent)} ${formatPercentCI(ci.ci)} vs baseline`;
 }
 
 function colorVerdict(direction: CIDirection): string {
