@@ -1,3 +1,4 @@
+import * as d3 from "d3";
 import type { CIDirection, HistogramBin } from "../../stats/Bootstrap.ts";
 
 /** A single timing sample from a benchmark run */
@@ -58,6 +59,16 @@ export const plotLayout = {
   height: 300,
   style: { fontSize: "14px" },
 } as const;
+
+/** The d3 Observable 10 categorical palette (typed past d3's loose typings). */
+const observable10 = (d3 as unknown as { schemeObservable10: string[] })
+  .schemeObservable10;
+
+/** Color for the i-th series, cycling the Observable 10 palette. Shared so the
+ *  histogram, time-series dots, legend, and toggle pills all match. */
+export function seriesColor(i: number): string {
+  return observable10[i % observable10.length];
+}
 
 /** Fill/stroke palette keyed by comparison direction, shared across plots.
  *  green=better, red=worse, blue=confirmed equivalent (CI inside the margin),

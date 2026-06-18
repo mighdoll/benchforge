@@ -1,7 +1,12 @@
 import * as Plot from "@observablehq/plot";
 import * as d3 from "d3";
 import { buildLegend, type LegendItem } from "./LegendUtils.ts";
-import { getTimeUnit, plotLayout, type Sample } from "./PlotTypes.ts";
+import {
+  getTimeUnit,
+  plotLayout,
+  type Sample,
+  seriesColor,
+} from "./PlotTypes.ts";
 
 interface Bar {
   benchmark: string;
@@ -101,11 +106,11 @@ function buildBarData(allSamples: Sample[], benchmarkNames: string[]) {
 
 /** Map benchmark names to colors and legend items using Observable 10 palette */
 function buildColorData(benchmarkNames: string[]) {
-  const scheme = (d3 as any).schemeObservable10;
-  const color = (i: number) => scheme[i % 10];
-  const colorMap = new Map(benchmarkNames.map((name, i) => [name, color(i)]));
+  const colorMap = new Map(
+    benchmarkNames.map((name, i) => [name, seriesColor(i)]),
+  );
   const legendItems: LegendItem[] = benchmarkNames.map((name, i) => ({
-    color: color(i),
+    color: seriesColor(i),
     label: name,
     style: "vertical-bar",
   }));

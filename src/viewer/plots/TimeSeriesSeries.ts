@@ -1,5 +1,5 @@
-import * as d3 from "d3";
 import type { LegendItem } from "./LegendUtils.ts";
+import { seriesColor } from "./PlotTypes.ts";
 
 interface LegendParams {
   hasWarmup: boolean;
@@ -24,10 +24,8 @@ export function seriesColorMap(
   benchmarks: string[],
   baselineNames: Set<string>,
 ): Map<string, string> {
-  const scheme = (d3 as unknown as { schemeObservable10: string[] })
-    .schemeObservable10;
   const ordered = orderSeries(benchmarks, baselineNames);
-  return new Map(ordered.map((name, i) => [name, scheme[i % scheme.length]]));
+  return new Map(ordered.map((name, i) => [name, seriesColor(i)]));
 }
 
 /** Build legend items based on which data series are present in the plot */
