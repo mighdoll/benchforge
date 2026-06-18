@@ -66,6 +66,20 @@ export function speedscopeFile(
   };
 }
 
+/** Build a SpeedscopeFile by interning each item into one shared frame context.
+ *  Returns undefined when there are no items. */
+export function multiProfileFile<T>(
+  items: T[],
+  buildProfile: (item: T, ctx: FrameContext) => SpeedscopeProfile,
+): SpeedscopeFile | undefined {
+  if (items.length === 0) return undefined;
+  const ctx = frameContext();
+  return speedscopeFile(
+    ctx,
+    items.map(item => buildProfile(item, ctx)),
+  );
+}
+
 /** Intern a call frame, returning its index in the shared frames array.
  *  All values should be 1-indexed (caller converts from V8's 0-indexed if needed). */
 export function internFrame(

@@ -9,6 +9,7 @@ import {
   type FrameContext,
   frameContext,
   internFrame,
+  multiProfileFile,
   type SpeedscopeFile,
   type SpeedscopeTimeProfile,
   speedscopeFile,
@@ -28,11 +29,9 @@ export function timeProfileToSpeedscope(
 export function buildTimeSpeedscopeFile(
   entries: { name: string; profile: TimeProfile }[],
 ): SpeedscopeFile | undefined {
-  if (entries.length === 0) return undefined;
-
-  const ctx = frameContext();
-  const profiles = entries.map(e => buildTimeProfile(e.name, e.profile, ctx));
-  return speedscopeFile(ctx, profiles);
+  return multiProfileFile(entries, (e, ctx) =>
+    buildTimeProfile(e.name, e.profile, ctx),
+  );
 }
 
 /** Build a speedscope profile from a V8 TimeProfile */

@@ -7,32 +7,23 @@ import {
 import { groupReports, type ReportGroup } from "../report/BenchmarkReport.ts";
 import {
   type FrameContext,
-  frameContext,
   internFrame,
+  multiProfileFile,
   type SpeedscopeFile,
   type SpeedscopeHeapProfile,
-  speedscopeFile,
 } from "./SpeedscopeTypes.ts";
 
 /** Build SpeedscopeFile from report groups. Returns undefined if no profiles found. */
 export function buildSpeedscopeFile(
   groups: ReportGroup[],
 ): SpeedscopeFile | undefined {
-  const ctx = frameContext();
-  const profiles: SpeedscopeHeapProfile[] = [];
-
-  for (const group of groups) {
-    for (const report of groupReports(group)) {
-      const { heapProfile } = report.measuredResults;
-      if (!heapProfile) continue;
-      const resolved = resolveProfile(heapProfile);
-      profiles.push(buildProfile(report.name, resolved, ctx));
-    }
-  }
-
-  if (profiles.length === 0) return undefined;
-
-  return speedscopeFile(ctx, profiles);
+  const entries = groups.flatMap(groupReports).flatMap(report => {
+    const { heapProfile } = report.measuredResults;
+    return heapProfile ? [{ name: report.name, heapProfile }] : [];
+  });
+  return multiProfileFile(entries, (e, ctx) =>
+    buildProfile(e.name, resolveProfile(e.heapProfile), ctx),
+  );
 }
 
 /** Build a single speedscope profile from a resolved heap profile. */
