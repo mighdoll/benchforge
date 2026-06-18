@@ -101,7 +101,7 @@ Core flags for common workflows. Run `benchforge --help` for the full list.
 | `--profile` | V8 CPU time sampling profiler |
 | `--call-counts` | Per-function execution counts |
 | `--stats <list>` | Timing columns to display (default: mean,p50,p99) |
-| `--view` | Open interactive viewer in browser |
+| `--view` | Open interactive viewer in browser (on by default in an interactive terminal; `--no-view` disables) |
 | `--archive [file]` | Archive profiles + sources to `.benchforge` file |
 | `--duration <sec>` | Duration per batch (default: 0.642s) |
 | `--iterations <n>` | Exact iterations (overrides --duration) |

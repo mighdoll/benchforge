@@ -41,7 +41,7 @@ const cliOptions = {
   profile:          { type: "boolean", default: false, alias: "time-sample", describe: "V8 CPU time sampling profiler" },
   "profile-interval":{ type: "number", default: 1000, alias: "time-interval", describe: "CPU sampling interval in microseconds" },
   "call-counts":    { type: "boolean", default: false, describe: "collect per-function execution counts via V8 precise coverage" },
-  view:             { type: "boolean", default: false, alias: "html", describe: "open viewer in browser" },
+  view:             { type: "boolean", alias: "html", describe: "open viewer in browser (default: on for interactive terminals; use --no-view to disable)" },
   "view-serve":     { type: "boolean", default: false, describe: "start viewer server without opening browser (reload an existing tab)" },
   "export-perfetto":{ type: "string",  requiresArg: true, describe: "export Perfetto trace file (view at ui.perfetto.dev)" },
   "export-profile": { type: "string",  requiresArg: true, alias: "export-time", describe: "export CPU profile as .cpuprofile (V8/Chrome DevTools format)" },

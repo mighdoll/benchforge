@@ -72,6 +72,17 @@ export function needsProfile(args: DefaultCliArgs): boolean {
   return args.profile || !!args["export-profile"];
 }
 
+/** Whether to launch the viewer: --view-serve or explicit --view wins; else default on for interactive terminals. */
+export function shouldViewReport(args: DefaultCliArgs): boolean {
+  if (args["view-serve"]) return true;
+  return args.view ?? interactiveSession();
+}
+
+/** A human is watching: stdout is a real terminal and we are not in CI. */
+function interactiveSession(): boolean {
+  return !!process.stdout.isTTY && !process.env.CI;
+}
+
 /** Extract baseline comparison options from CLI args. */
 export function cliComparisonOptions(args: DefaultCliArgs): ComparisonOptions {
   return {

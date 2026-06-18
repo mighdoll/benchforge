@@ -22,6 +22,7 @@ import {
   cliComparisonOptions,
   cliHeapReportOptions,
   needsAlloc,
+  shouldViewReport,
 } from "./CliOptions.ts";
 import { printHeapReports, withStatus } from "./CliReport.ts";
 import {
@@ -91,7 +92,7 @@ export async function exportReports(options: ExportOptions): Promise<void> {
       outputPath,
     });
   }
-  if (args.view || args["view-serve"]) {
+  if (shouldViewReport(args)) {
     await openViewer(profileFile, timeData, coverageData, reportData, args);
   }
 }
