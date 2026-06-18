@@ -10,9 +10,7 @@ import {
   subsample,
 } from "./Bootstrap.ts";
 import {
-  maxOf,
-  mean,
-  minOf,
+  nonPercentileStat,
   percentile,
   percentileIndex,
   quickSelect,
@@ -126,32 +124,28 @@ export function binValues(values: number[], binCount = 30): HistogramBin[] {
 /** Build diff operations: mean/min/max first (non-destructive), then percentiles ascending.
  *  Each side (A, B) gets its own quickSelect k since sample sizes may differ. */
 function buildDiffOps(stats: StatKind[], nA: number, nB: number): DiffOp[] {
-  const sameBothSides = (
-    order: number,
-    i: number,
-    fn: (s: number[]) => number,
-  ) => ({
-    order,
-    origIndex: i,
-    execIndex: 0,
-    computeA: fn,
-    computeB: fn,
-    pointEstimate: fn,
-  });
   const entries = stats.map((s, i) => {
-    if (s === "mean") return sameBothSides(-3, i, mean);
-    if (s === "min") return sameBothSides(-2, i, minOf);
-    if (s === "max") return sameBothSides(-1, i, maxOf);
-    const p = s.percentile;
-    const kA = percentileIndex(nA, p);
-    const kB = percentileIndex(nB, p);
+    if (typeof s === "object") {
+      const p = s.percentile;
+      const kA = percentileIndex(nA, p);
+      const kB = percentileIndex(nB, p);
+      return {
+        order: p,
+        origIndex: i,
+        execIndex: 0,
+        computeA: (buf: number[]) => quickSelect(buf, kA),
+        computeB: (buf: number[]) => quickSelect(buf, kB),
+        pointEstimate: (v: number[]) => percentile(v, p),
+      };
+    }
+    const np = nonPercentileStat(s)!;
     return {
-      order: p,
+      order: np.order,
       origIndex: i,
       execIndex: 0,
-      computeA: (buf: number[]) => quickSelect(buf, kA),
-      computeB: (buf: number[]) => quickSelect(buf, kB),
-      pointEstimate: (v: number[]) => percentile(v, p),
+      computeA: np.fn,
+      computeB: np.fn,
+      pointEstimate: np.fn,
     };
   });
   entries.sort((a, b) => a.order - b.order);

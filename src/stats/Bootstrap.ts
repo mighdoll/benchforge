@@ -1,7 +1,5 @@
 import {
-  maxOf,
-  mean,
-  minOf,
+  nonPercentileStat,
   percentile,
   percentileIndex,
   quickSelect,
@@ -174,28 +172,19 @@ export function computeInterval(
 /** Build stat operations in safe order: mean/min/max first (non-destructive),
  *  then percentiles ascending (quickSelect mutates buf). */
 function buildStatOps(stats: StatKind[], n: number): StatOp[] {
-  const nonDestructive = (
-    order: number,
-    i: number,
-    fn: (s: number[]) => number,
-  ) => ({
-    order,
-    compute: fn,
-    pointEstimate: fn,
-    origIndex: i,
-  });
   const ops = stats.map((s, i): StatOp & { order: number } => {
-    if (s === "mean") return nonDestructive(-3, i, mean);
-    if (s === "min") return nonDestructive(-2, i, minOf);
-    if (s === "max") return nonDestructive(-1, i, maxOf);
-    const p = s.percentile;
-    const k = percentileIndex(n, p);
-    return {
-      order: p,
-      origIndex: i,
-      compute: (buf: number[]) => quickSelect(buf, k),
-      pointEstimate: (v: number[]) => percentile(v, p),
-    };
+    if (typeof s === "object") {
+      const p = s.percentile;
+      const k = percentileIndex(n, p);
+      return {
+        order: p,
+        origIndex: i,
+        compute: (buf: number[]) => quickSelect(buf, k),
+        pointEstimate: (v: number[]) => percentile(v, p),
+      };
+    }
+    const np = nonPercentileStat(s)!;
+    return { order: np.order, compute: np.fn, pointEstimate: np.fn, origIndex: i };
   });
   ops.sort((a, b) => a.order - b.order);
   return ops;

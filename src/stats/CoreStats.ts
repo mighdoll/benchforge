@@ -30,6 +30,19 @@ export function statKindToFn(kind: StatKind): (s: number[]) => number {
   return (s: number[]) => percentile(s, p);
 }
 
+/** The non-percentile stat kinds (mean/min/max) compute without mutating their
+ *  input, so staged bootstrap builders run them before the destructive
+ *  percentile selects. @return the reducer plus its sort order, or undefined for
+ *  a percentile kind (the caller sequences that by its own fraction). */
+export function nonPercentileStat(
+  kind: StatKind,
+): { order: number; fn: (s: number[]) => number } | undefined {
+  if (kind === "mean") return { order: -3, fn: mean };
+  if (kind === "min") return { order: -2, fn: minOf };
+  if (kind === "max") return { order: -1, fn: maxOf };
+  return undefined;
+}
+
 /** @return smallest value in samples (loop to avoid spread-arg limits) */
 export function minOf(samples: number[]): number {
   let min = samples[0];
