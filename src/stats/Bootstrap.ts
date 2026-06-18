@@ -184,7 +184,12 @@ function buildStatOps(stats: StatKind[], n: number): StatOp[] {
       };
     }
     const np = nonPercentileStat(s)!;
-    return { order: np.order, compute: np.fn, pointEstimate: np.fn, origIndex: i };
+    return {
+      order: np.order,
+      compute: np.fn,
+      pointEstimate: np.fn,
+      origIndex: i,
+    };
   });
   ops.sort((a, b) => a.order - b.order);
   return ops;
