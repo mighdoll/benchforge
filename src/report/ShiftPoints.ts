@@ -13,6 +13,7 @@ import {
   formatBootstrapCI,
   keptBatchCount,
 } from "./CiFormatting.ts";
+import { baselineLabel } from "./Formatters.ts";
 
 interface PointArgs {
   p: number;
@@ -168,11 +169,4 @@ function effectiveBatches(
   const { batchOffsets } = m;
   if (!batchOffsets || batchOffsets.length < 2) return 1;
   return keptBatchCount(m, noTrim);
-}
-
-/** Label the baseline run with its real name, suffixed "(baseline)" unless the
- *  name already carries that suffix; falls back to "baseline" when unnamed. */
-function baselineLabel(name: string | undefined): string {
-  if (!name) return "baseline";
-  return name.endsWith("(baseline)") ? name : `${name} (baseline)`;
 }

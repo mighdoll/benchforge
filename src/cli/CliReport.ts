@@ -17,6 +17,7 @@ import type {
 } from "../report/BenchmarkReport.ts";
 import { groupReports } from "../report/BenchmarkReport.ts";
 import colors from "../report/Colors.ts";
+import { baselineLabel } from "../report/Formatters.ts";
 import type { GitVersion } from "../report/GitUtils.ts";
 import { prepareHtmlData } from "../report/HtmlReport.ts";
 import { defaultReportSections } from "../report/StandardSections.ts";
@@ -138,7 +139,7 @@ function variantReport(variantId: string, c: CaseResult): BenchmarkReport {
   const { metadata, baseline: baselineMeasured, baselineId } = c;
   const baseline = baselineMeasured
     ? {
-        name: `${baselineId ?? variantId} (baseline)`,
+        name: baselineLabel(baselineId ?? variantId),
         measuredResults: baselineMeasured,
         metadata,
       }

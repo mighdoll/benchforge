@@ -51,3 +51,12 @@ export function formatPercentCI(ci: [number, number], precision = 1): string {
   const [lo, hi] = ci.map(v => formatSignedPercent(v, precision));
   return `[${lo}, ${hi}]`;
 }
+
+/** Mark a run name as the baseline series for display. Idempotent: a name that
+ *  already reads as the baseline ("baseline" or "...(baseline)") is returned
+ *  unchanged; otherwise " (baseline)" is appended. Falls back to "baseline" when
+ *  unnamed. */
+export function baselineLabel(name?: string): string {
+  if (!name || name === "baseline") return "baseline";
+  return name.endsWith("(baseline)") ? name : `${name} (baseline)`;
+}

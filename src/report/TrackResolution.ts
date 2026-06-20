@@ -1,4 +1,5 @@
 import type { BenchmarkReport, ReportGroup } from "./BenchmarkReport.ts";
+import { baselineLabel } from "./Formatters.ts";
 import type { CaseTrack } from "./ViewerSections.ts";
 
 /** Resolve a case into ordered display tracks. The only mode-aware code: in
@@ -37,7 +38,7 @@ function versionTracks(group: ReportGroup): CaseTrack[] {
     const comp = comparisonTrack(report, group.baseline);
     const base = report.baseline ?? group.baseline;
     if (!base) return [comp];
-    const name = multi ? `${report.name} (baseline)` : "baseline";
+    const name = multi ? baselineLabel(report.name) : "baseline";
     const baseTrack: CaseTrack = {
       name,
       measured: base.measuredResults,

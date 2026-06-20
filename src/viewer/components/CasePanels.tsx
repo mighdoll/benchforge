@@ -1,6 +1,6 @@
 import { Fragment } from "preact";
 import { useState } from "preact/hooks";
-import { formatSignedPercent } from "../../report/Formatters.ts";
+import { baselineLabel, formatSignedPercent } from "../../report/Formatters.ts";
 import { formatCount, formatDecimalBytes } from "../LineData.ts";
 import type {
   BenchmarkEntry,
@@ -37,7 +37,7 @@ export function ScalarSection({ section }: { section: ViewerSection }) {
           <span class="m-label" />
           {tracks.map((t, i) => (
             <Fragment key={i}>
-              <span class="m-head">{t.isBaseline ? `${t.runName} (base)` : t.runName}</span>
+              <span class="m-head">{t.isBaseline ? baselineLabel(t.runName) : t.runName}</span>
               {delta && <span class="m-head m-delta">{t.isBaseline ? "" : "Δ%"}</span>}
             </Fragment>
           ))}

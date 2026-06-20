@@ -1,3 +1,4 @@
+import { baselineLabel } from "../../report/Formatters.ts";
 import type { DifferenceCI } from "../../stats/Bootstrap.ts";
 import type {
   BenchmarkGroup,
@@ -103,7 +104,7 @@ function SparklineRow(
   { entry: ViewerRow["entries"][number]; domain?: [number, number] },
 ) {
   const onOpen = shiftDetailOpener(entry.shiftFunction);
-  const name = entry.isBaseline ? `${entry.runName} (baseline)` : entry.runName;
+  const name = entry.isBaseline ? baselineLabel(entry.runName) : entry.runName;
   return (
     <div class="sparkline-row">
       <span class="run-name">{name}</span>
