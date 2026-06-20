@@ -1,3 +1,4 @@
+import { baselineLabel } from "../../report/Formatters.ts";
 import { splitByOffsets, tukeyKeep } from "../../stats/BlockBootstrap.ts";
 import {
   cumulativeSum,
@@ -32,14 +33,29 @@ export interface FlattenedData {
 export function prepareBenchmarks(
   group: ReportData["groups"][0],
 ): PreparedBenchmark[] {
-  const base = group.baseline;
   const current = group.benchmarks.map(b => ({ ...b, isBaseline: false }));
-  if (!base) return current;
+  const baseline = baselineEntries(group).map(b => ({
+    ...b,
+    name: baselineLabel(b.name),
+    isBaseline: true,
+  }));
+  return [...baseline, ...current];
+}
 
-  const baseName = base.name.endsWith("(baseline)")
-    ? base.name
-    : base.name + " (baseline)";
-  return [{ ...base, name: baseName, isBaseline: true }, ...current];
+/** Baseline series for the plots: the shared group baseline if present, else each
+ *  benchmark's own interleaved baseline (matrix variants each carry their own),
+ *  de-duplicated by name. */
+function baselineEntries(group: ReportData["groups"][0]): BenchmarkEntry[] {
+  if (group.baseline) return [group.baseline];
+  const seen = new Set<string>();
+  const out: BenchmarkEntry[] = [];
+  for (const { baseline } of group.benchmarks) {
+    if (baseline && !seen.has(baseline.name)) {
+      seen.add(baseline.name);
+      out.push(baseline);
+    }
+  }
+  return out;
 }
 
 /** Collect all sample data across benchmarks into flat arrays for plotting */
