@@ -1,7 +1,7 @@
 import { expect, test } from "vitest";
 import { baselineLabel } from "../report/Formatters.ts";
-import type { BenchmarkEntry, BenchmarkGroup } from "../viewer/ReportData.ts";
 import { prepareBenchmarks } from "../viewer/plots/RenderPlots.ts";
+import type { BenchmarkEntry, BenchmarkGroup } from "../viewer/ReportData.ts";
 
 const zeroStats = { min: 0, max: 0, avg: 0, p50: 0, p75: 0, p99: 0, p999: 0 };
 
@@ -32,7 +32,10 @@ test("prepareBenchmarks prefers a shared group baseline when present", () => {
     baseline: entry("baseline"),
     benchmarks: [entry("link", entry("ignored (baseline)"))],
   };
-  expect(prepareBenchmarks(group).map(b => b.name)).toEqual(["baseline", "link"]);
+  expect(prepareBenchmarks(group).map(b => b.name)).toEqual([
+    "baseline",
+    "link",
+  ]);
 });
 
 test("prepareBenchmarks de-duplicates a baseline shared across variants", () => {
