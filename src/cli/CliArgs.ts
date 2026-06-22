@@ -40,6 +40,8 @@ const cliOptions = {
   "alloc-user-only":{ type: "boolean", default: false, describe: "filter to user code only (hide node internals)" },
   profile:          { type: "boolean", default: false, alias: "time-sample", describe: "V8 CPU time sampling profiler" },
   "profile-interval":{ type: "number", default: 1000, alias: "time-interval", describe: "CPU sampling interval in microseconds" },
+  "profile-rows":   { type: "number",  default: 20, describe: "top CPU self-time functions to show" },
+  "profile-user-only":{ type: "boolean", default: false, describe: "filter to user code only (hide node internals)" },
   "call-counts":    { type: "boolean", default: false, describe: "collect per-function execution counts via V8 precise coverage" },
   view:             { type: "boolean", alias: "html", describe: "open viewer in browser (default: on for interactive terminals; use --no-view to disable)" },
   "view-serve":     { type: "boolean", default: false, describe: "start viewer server without opening browser (reload an existing tab)" },
@@ -102,7 +104,13 @@ const optionGroups = {
     "alloc-raw",
     "alloc-user-only",
   ],
-  "CPU Profiling:": ["profile", "profile-interval", "call-counts"],
+  "CPU Profiling:": [
+    "profile",
+    "profile-interval",
+    "profile-rows",
+    "profile-user-only",
+    "call-counts",
+  ],
   "Output:": [
     "view",
     "view-serve",

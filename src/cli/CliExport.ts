@@ -21,10 +21,12 @@ import type { DefaultCliArgs } from "./CliArgs.ts";
 import {
   cliComparisonOptions,
   cliHeapReportOptions,
+  cliTimeReportOptions,
   needsAlloc,
+  needsProfile,
   shouldViewReport,
 } from "./CliOptions.ts";
-import { printHeapReports, withStatus } from "./CliReport.ts";
+import { printHeapReports, printTimeReports, withStatus } from "./CliReport.ts";
 import {
   optionalJson,
   startViewerServer,
@@ -105,6 +107,9 @@ export async function finishReports(
 ): Promise<void> {
   if (needsAlloc(args)) {
     printHeapReports(results, cliHeapReportOptions(args));
+  }
+  if (needsProfile(args)) {
+    printTimeReports(results, cliTimeReportOptions(args));
   }
   await exportReports({ results, args, ...exportOptions });
 }

@@ -32,7 +32,11 @@ const maxMergedSamples = 5_000_000;
 /** Merge multiple batch results, concatenating samples and tracking batch boundaries. */
 export function mergeBatchResults(results: MeasuredResults[]): MeasuredResults {
   if (results.length === 0) throw new Error("Cannot merge empty results array");
-  if (results.length === 1) return { ...results[0], batchOffsets: [0] };
+  if (results.length === 1) {
+    const { timeProfile } = results[0];
+    const timeProfiles = timeProfile ? [timeProfile] : undefined;
+    return { ...results[0], batchOffsets: [0], timeProfiles };
+  }
 
   const totalLen = results.reduce((sum, r) => sum + r.samples.length, 0);
   const trimmed =
@@ -51,6 +55,11 @@ export function mergeBatchResults(results: MeasuredResults[]): MeasuredResults {
   );
   const batchGcStats = results.flatMap(r =>
     r.gcStats ? [r.gcStats] : (r.batchGcStats ?? []),
+  );
+  // Every batch's CPU profile, pooled by the self-time summary so its deltas use
+  // all sampled ticks rather than the lone last-batch profile carried below.
+  const timeProfiles = results.flatMap(r =>
+    r.timeProfile ? [r.timeProfile] : [],
   );
 
   // last batch as base ==> new MeasuredResults fields get "take last"
@@ -71,6 +80,7 @@ export function mergeBatchResults(results: MeasuredResults[]): MeasuredResults {
     gcStats: mergeGcStats(results),
     batchGcStats: batchGcStats.length ? batchGcStats : undefined,
     gcEvents: mergedGcEvents.length ? mergedGcEvents : undefined,
+    timeProfiles: timeProfiles.length ? timeProfiles : undefined,
   };
 }
 

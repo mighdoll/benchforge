@@ -1,6 +1,8 @@
 import type {
   BenchmarkEntry,
   BenchmarkGroup,
+  HotFunction,
+  ProfileSummary,
   ReportData,
   ShiftFunction,
   ShiftPercentile,
@@ -13,6 +15,7 @@ import {
   formatBytes,
   formatPercentCI,
   formatSignedPercent,
+  frameLocation,
   integer,
   timeMs,
 } from "./Formatters.ts";
@@ -91,7 +94,10 @@ function benchDiagnostics(entry: BenchmarkEntry, labeled: boolean): string[] {
     ? warmupShapeMarkdown(entry.warmupShape)
     : [];
   const gc = entry.gcByBatch ? gcByBatchMarkdown(entry.gcByBatch) : [];
-  const parts = [...warmup, ...gc];
+  const hot = entry.profileSummary
+    ? hotFunctionsMarkdown(entry.profileSummary)
+    : [];
+  const parts = [...warmup, ...gc, ...hot];
   if (!parts.length) return [];
   return labeled ? [`### ${entry.name}`, ...parts] : parts;
 }
@@ -169,6 +175,64 @@ function gcByBatchMarkdown(gc: GcByBatchSummary): string[] {
     `| totals | ${gc.fullGCs} full, ${gc.scavenges} scavenge, ${gc.batches} batches |`,
   ];
   return ["#### full GC by batch", [header, ...rows].join("\n")];
+}
+
+/** Top CPU self-time functions from a `--profile` pass. When the run had a
+ *  baseline, each row also carries `Δ vs base` (matched by name+file), so a
+ *  regressed function reads as both hot and a large positive delta. The numbers
+ *  come from a sampled pass, so the note frames the delta as the trustworthy
+ *  figure (both sides are sampled symmetrically). */
+function hotFunctionsMarkdown(s: ProfileSummary): string[] {
+  if (!s.rows.length) return [];
+  const withBase = s.rows.some(r => r.baseUs != null);
+  const title = withBase
+    ? "#### hot functions (self time, current vs baseline)"
+    : "#### hot functions (self time, profiled pass)";
+  const cols = withBase
+    ? ["self/iter", "self%", "Δ% share (95% CI)", "function", "location"]
+    : ["self/iter", "self%", "function", "location"];
+  const sep = cols.map(() => "---");
+  const rows = s.rows.map(
+    r => `| ${hotCells(r, withBase, s.iterations).join(" | ")} |`,
+  );
+  const note = withBase
+    ? "Self time per benchmark iteration, pooled across all batches of a sampled pass (`--profile`). Δ is each function's change in self-time *share* vs baseline with a 95% bootstrap CI over batches (`new` = absent in baseline, `~` = too few batches; a CI spanning 0 = no clear change). Resolution is sampling-limited -- a hot function's CI bottoms out near +/-1/sqrt(ticks), so tighten it by spending more samples (a longer run or a finer `--profile-interval`), and use enough batches (>= ~10) for a stable interval; batch size barely matters at a fixed budget. Self-time also shifts with JIT/inlining and module-load paths between builds, so read Δ as a hint."
+    : "Self time per benchmark iteration, pooled across all batches of a sampled pass (`--profile`); the absolute times are lightly perturbed by sampling.";
+  return [
+    title,
+    [`| ${cols.join(" | ")} |`, `| ${sep.join(" | ")} |`, ...rows].join("\n"),
+    note,
+  ];
+}
+
+/** One hot-function row's cells: self time per iteration, self %, optional Δ,
+ *  name, location. */
+function hotCells(
+  r: HotFunction,
+  withBase: boolean,
+  iterations?: number,
+): string[] {
+  const self = timeMs(selfPerIterUs(r, iterations) / 1000) ?? "";
+  const pct = `${r.selfPct.toFixed(1)}%`;
+  const head = [self, pct];
+  const tail = [r.name || "(anonymous)", frameLocation(r.url, r.line)];
+  if (!withBase) return [...head, ...tail];
+  return [...head, hotDelta(r), ...tail];
+}
+
+/** A row's self-time per benchmark iteration (us), or the run total when the
+ *  iteration count is unknown. */
+export function selfPerIterUs(r: HotFunction, iterations?: number): number {
+  return iterations && iterations > 0 ? r.selfUs / iterations : r.selfUs;
+}
+
+/** The Δ cell: the share change with its 95% CI when there were enough batches to
+ *  form one, `~` when the function matched the baseline but had too few batches,
+ *  `new` when it had no baseline match at all. */
+function hotDelta(r: HotFunction): string {
+  if (r.deltaPct != null && r.deltaCI)
+    return `${formatSignedPercent(r.deltaPct)} ${formatPercentCI(r.deltaCI)}`;
+  return r.baseUs != null ? "~" : "new";
 }
 
 /** Per-percentile diff table: mean first, then percentiles in displayed order.

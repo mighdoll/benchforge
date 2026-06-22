@@ -89,8 +89,16 @@ export interface MeasuredResults {
   /** Heap sampling allocation profile (requires --heap-sample and worker mode) */
   heapProfile?: HeapProfile;
 
-  /** V8 CPU time sampling profile (requires --profile and worker mode) */
+  /** V8 CPU time sampling profile (requires --profile and worker mode). On a
+   *  merged batched result this is the last batch's profile (the single profile
+   *  the speedscope/flamegraph export expects); {@link timeProfiles} holds them
+   *  all for the pooled self-time summary. */
   timeProfile?: TimeProfile;
+
+  /** Every batch's CPU profile, kept in memory so the self-time summary can pool
+   *  all the sampled ticks (the per-function baseline delta is noise-limited by
+   *  total ticks). Set only on a merged batched result; not serialized. */
+  timeProfiles?: TimeProfile[];
 
   /** Per-function execution counts (requires --call-counts) */
   coverage?: CoverageData;

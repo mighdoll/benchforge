@@ -4,9 +4,33 @@ import { prepareHtmlData } from "../report/HtmlReport.ts";
 import { markdownReport } from "../report/MarkdownReport.ts";
 import { timeSection } from "../report/StandardSections.ts";
 import type { MeasuredResults } from "../runners/MeasuredResults.ts";
-import type { ReportData, ShiftPercentile } from "../viewer/ReportData.ts";
+import type {
+  ProfileSummary,
+  ReportData,
+  ShiftPercentile,
+} from "../viewer/ReportData.ts";
 
 const zeroStats = { min: 0, max: 0, avg: 0, p50: 0, p75: 0, p99: 0, p999: 0 };
+
+/** A one-group ReportData carrying a single benchmark with a profile summary. */
+function profileData(summary: ProfileSummary): ReportData {
+  return {
+    groups: [
+      {
+        name: "parse",
+        benchmarks: [
+          {
+            name: "current",
+            samples: [],
+            stats: zeroStats,
+            profileSummary: summary,
+          },
+        ],
+      },
+    ],
+    metadata: { timestamp: "", bencherVersion: "0" },
+  };
+}
 
 function point(
   label: string,
@@ -221,4 +245,73 @@ test("integration: baseline run flows through prepareHtmlData into a shift table
   expect(md).toMatch(/^\| p50 \|/m);
   // current is faster than the 1.3x-slower baseline
   expect(md).toContain("better");
+});
+
+test("renders a hot-functions table without a baseline (4 columns)", () => {
+  const summary: ProfileSummary = {
+    totalUs: 32500,
+    iterations: 100,
+    rows: [
+      {
+        name: "countLineBreaks",
+        url: "/Lines.ts",
+        line: 42,
+        selfUs: 12400,
+        selfPct: 38.2,
+      },
+      {
+        name: "tokenize",
+        url: "/Token.ts",
+        line: 88,
+        selfUs: 8100,
+        selfPct: 24.9,
+      },
+    ],
+  };
+  const md = markdownReport(profileData(summary));
+
+  expect(md).toContain("#### hot functions (self time, profiled pass)");
+  expect(md).toContain("| self/iter | self% | function | location |");
+  // self time is shown per iteration: 12400us / 100 = 124us
+  expect(md).toContain("| 124μs | 38.2% | countLineBreaks | /Lines.ts:42 |");
+  expect(md).not.toContain("95% CI");
+});
+
+test("renders a hot-functions delta table with a baseline (5 columns)", () => {
+  const summary: ProfileSummary = {
+    totalUs: 32500,
+    baseTotalUs: 24000,
+    iterations: 100,
+    rows: [
+      {
+        name: "countLineBreaks",
+        url: "/Lines.ts",
+        line: 42,
+        selfUs: 12400,
+        selfPct: 38.2,
+        baseUs: 8800,
+        deltaPct: 40.9,
+        deltaCI: [20, 62],
+      },
+      // a function with no baseline match renders as "new"
+      {
+        name: "normalizeEol",
+        url: "/Eol.ts",
+        line: 5,
+        selfUs: 3000,
+        selfPct: 9.2,
+      },
+    ],
+  };
+  const md = markdownReport(profileData(summary));
+
+  expect(md).toContain("#### hot functions (self time, current vs baseline)");
+  expect(md).toContain(
+    "| self/iter | self% | Δ% share (95% CI) | function | location |",
+  );
+  expect(md).toContain(
+    "| 124μs | 38.2% | +40.9% [+20.0%, +62.0%] | countLineBreaks | /Lines.ts:42 |",
+  );
+  // a function absent from the baseline renders "new" in the delta column
+  expect(md).toMatch(/\| new \| normalizeEol \| \/Eol\.ts:5 \|/);
 });

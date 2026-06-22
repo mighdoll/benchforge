@@ -17,11 +17,23 @@ import type {
 } from "../report/BenchmarkReport.ts";
 import { groupReports } from "../report/BenchmarkReport.ts";
 import colors from "../report/Colors.ts";
-import { baselineLabel } from "../report/Formatters.ts";
+import {
+  baselineLabel,
+  formatPercentCI,
+  formatSignedPercent,
+  frameLocation,
+  timeMs,
+} from "../report/Formatters.ts";
 import type { GitVersion } from "../report/GitUtils.ts";
-import { prepareHtmlData } from "../report/HtmlReport.ts";
+import {
+  type ProfileReportOptions,
+  prepareHtmlData,
+  profilesOf,
+  summarizeTime,
+} from "../report/HtmlReport.ts";
+import { selfPerIterUs } from "../report/MarkdownReport.ts";
 import { defaultReportSections } from "../report/StandardSections.ts";
-import type { ReportData } from "../viewer/ReportData.ts";
+import type { HotFunction, ReportData } from "../viewer/ReportData.ts";
 import type { DefaultCliArgs } from "./CliArgs.ts";
 import { cliComparisonOptions } from "./CliOptions.ts";
 
@@ -90,6 +102,54 @@ export function printHeapReports(
       console.log(formatRawSamples(resolved));
     }
   }
+}
+
+/** Print the top CPU self-time functions for each profiled benchmark, with the
+ *  per-function baseline delta when a baseline was also profiled. */
+export function printTimeReports(
+  groups: ReportGroup[],
+  options: ProfileReportOptions,
+): void {
+  for (const report of groups.flatMap(g => groupReports(g))) {
+    const cur = profilesOf(report.measuredResults);
+    if (!cur.length) continue;
+    const base = report.baseline && profilesOf(report.baseline.measuredResults);
+    const summary = summarizeTime(
+      cur,
+      base || undefined,
+      options,
+      report.measuredResults.iterations,
+    );
+    if (!summary.rows.length) continue;
+    const withBase = summary.rows.some(r => r.baseUs != null);
+    console.log(dim(`\n─── CPU self-time per iteration: ${report.name} ───`));
+    for (const row of summary.rows)
+      console.log(formatHotRow(row, withBase, summary.iterations));
+  }
+}
+
+/** One console hot-function row: right-aligned self time per iteration / percent
+ *  / delta, then the function name and its dimmed source location. */
+function formatHotRow(
+  r: HotFunction,
+  withBase: boolean,
+  iterations?: number,
+): string {
+  const cols = [
+    (timeMs(selfPerIterUs(r, iterations) / 1000) ?? "").padStart(9),
+  ];
+  cols.push(`${r.selfPct.toFixed(1)}%`.padStart(7));
+  if (withBase) cols.push(deltaText(r).padStart(24));
+  const loc = dim(frameLocation(r.url, r.line));
+  return `${cols.join(" ")}  ${r.name || "(anonymous)"}  ${loc}`;
+}
+
+/** Share change with its 95% CI when enough batches supported one; "~" when
+ *  matched but too few batches, "new" when the function had no baseline match. */
+function deltaText(r: HotFunction): string {
+  if (r.deltaPct != null && r.deltaCI)
+    return `${formatSignedPercent(r.deltaPct)} ${formatPercentCI(r.deltaCI)}`;
+  return r.baseUs != null ? "~" : "new";
 }
 
 /** Convert MatrixResults to ReportGroup[]: one group per case, each variant a

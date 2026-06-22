@@ -69,6 +69,9 @@ export interface BenchmarkEntry {
   totalTime?: number;
   coverageSummary?: CoverageSummary;
   heapSummary?: HeapSummary;
+  /** Top CPU self-time functions (worker-mode --profile runs). When this entry
+   *  has a paired baseline profile, rows carry the per-function delta. */
+  profileSummary?: ProfileSummary;
   /** This benchmark's own paired baseline (matrix variants each compare against
    *  their own), for the analyze command's per-batch diagnostics. */
   baseline?: BenchmarkEntry;
@@ -206,6 +209,40 @@ export interface CoverageSummary {
 export interface HeapSummary {
   totalBytes: number;
   userBytes: number;
+}
+
+/** One function in a CPU self-time summary, optionally compared against the
+ *  baseline run's profile (matched by name+file, so a line shift between builds
+ *  still matches). */
+export interface HotFunction {
+  name: string;
+  url: string;
+  line: number;
+  col?: number;
+  /** Microseconds with this function executing (top of stack). */
+  selfUs: number;
+  /** Self-time as a percent of the profile's total sampled time. */
+  selfPct: number;
+
+  /** Baseline self-time for the same function, when a baseline profile matched. */
+  baseUs?: number;
+  /** Percent change in self-time share vs baseline. Undefined when the function
+   *  is new (no match) or there were too few batches to form a CI. */
+  deltaPct?: number;
+  /** 95% bootstrap CI for {@link deltaPct} (percent), over per-batch shares.
+   *  Present iff deltaPct is. A CI spanning 0 means no clear change. */
+  deltaCI?: [number, number];
+}
+
+/** Top CPU self-time functions for one benchmark (from a `--profile` pass). */
+export interface ProfileSummary {
+  totalUs: number;
+  baseTotalUs?: number;
+  /** Benchmark iterations the pooled profile covers, so a row's total self-time
+   *  can be shown per iteration (a stable cost, unlike the run-length-dependent
+   *  total). */
+  iterations?: number;
+  rows: HotFunction[];
 }
 
 /** A garbage collection event with timing relative to the benchmark start. */
