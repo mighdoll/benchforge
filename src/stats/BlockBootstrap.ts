@@ -5,7 +5,9 @@ import {
   computeInterval,
   createResample,
   defaultConfidence,
+  maxBootstrapInput,
   multiSampleBootstrap,
+  subsample,
 } from "./Bootstrap.ts";
 import {
   isBootstrappable,
@@ -23,7 +25,10 @@ export type BlockBootstrapOptions = BootstrapOptions & {
 };
 
 /** Trimmed-and-split blocks for one side: per-block stat values, the pooled
- *  kept samples, how many batches were trimmed, and the per-batch arrays. */
+ *  kept samples, how many batches were trimmed, and the per-batch arrays.
+ *  When a `cap` is applied, `keptSplits`/`blockVals` are the capped resample
+ *  source (bounding per-draw cost) while `filtered` stays the full kept pool so
+ *  the point estimate `statFn(filtered)` remains exact. */
 export type PreparedBlocks = {
   blockVals: number[];
   filtered: number[];
@@ -46,12 +51,7 @@ export function bootstrapCIs(
 
   const hasBlocks = (batchOffsets?.length ?? 0) >= 2;
   const results = hasBlocks
-    ? supportedStats.map(s => {
-        const fn = statKindToFn(s);
-        return s === "mean"
-          ? blockBootstrap(samples, batchOffsets!, fn, options)
-          : blockPoolBootstrap(samples, batchOffsets!, fn, options);
-      })
+    ? supportedStats.map(s => blockCI(samples, batchOffsets!, s, options))
     : multiSampleBootstrap(samples, supportedStats, options);
 
   let resultIdx = 0;
@@ -74,7 +74,13 @@ export function blockBootstrap(
 ): BootstrapResult {
   const { resamples = bootstrapSamples, confidence: conf = defaultConfidence } =
     options;
-  const side = prepareBlocks(samples, blocks, statFn, options.noTrim);
+  const side = prepareBlocks(
+    samples,
+    blocks,
+    statFn,
+    options.noTrim,
+    maxBootstrapInput,
+  );
   const stats = Array.from({ length: resamples }, () =>
     mean(createResample(side.blockVals)),
   );
@@ -100,7 +106,13 @@ export function blockPoolBootstrap(
 ): BootstrapResult {
   const { resamples = bootstrapSamples, confidence: conf = defaultConfidence } =
     options;
-  const side = prepareBlocks(samples, blocks, statFn, options.noTrim);
+  const side = prepareBlocks(
+    samples,
+    blocks,
+    statFn,
+    options.noTrim,
+    maxBootstrapInput,
+  );
   const buf = allocPoolBuf(side.keptSplits);
   const stats = Array.from({ length: resamples }, () =>
     poolResampleStat(side.keptSplits, buf, statFn),
@@ -121,16 +133,18 @@ export function prepareBlocks(
   offsets: number[],
   fn: (s: number[]) => number,
   noTrim?: boolean,
+  cap?: number,
 ): PreparedBlocks {
   const splits = splitByOffsets(samples, offsets);
   const means = splits.map(mean);
   const keep = noTrim ? means.map((_, i) => i) : tukeyKeep(means);
   const keptSplits = keep.map(i => splits[i]);
+  const drawSplits = cap ? capSplits(keptSplits, cap) : keptSplits;
   return {
-    blockVals: keptSplits.map(fn),
+    blockVals: drawSplits.map(fn),
     filtered: keptSplits.flat(),
     trimCount: means.length - keep.length,
-    keptSplits,
+    keptSplits: drawSplits,
   };
 }
 
@@ -218,4 +232,28 @@ export function poolResampleStat(
     for (let k = 0; k < block.length; k++) buf[pos++] = block[k];
   }
   return statFn(pos === buf.length ? buf : buf.slice(0, pos));
+}
+
+/** Block bootstrap CI for one stat: mean uses per-batch means, percentiles pool
+ *  the resampled batches. Mirrors {@link blockDiff} on the difference side. */
+function blockCI(
+  samples: number[],
+  blocks: number[],
+  stat: StatKind,
+  options?: BlockBootstrapOptions,
+): BootstrapResult {
+  const fn = statKindToFn(stat);
+  if (stat === "mean") return blockBootstrap(samples, blocks, fn, options);
+  return blockPoolBootstrap(samples, blocks, fn, options);
+}
+
+/** Subsample each batch (without replacement) so the pooled draw size stays
+ *  within `cap`, keeping every batch represented to preserve batch-level IID.
+ *  Bounds the per-resample cost for large sample counts, mirroring the
+ *  single-sample path's `subsample` cap. */
+function capSplits(splits: number[][], cap: number): number[][] {
+  const total = splits.reduce((n, b) => n + b.length, 0);
+  if (total <= cap) return splits;
+  const perBatch = Math.max(1, Math.floor(cap / splits.length));
+  return splits.map(b => subsample(b, perBatch));
 }

@@ -12,6 +12,7 @@ import {
   type DifferenceCI,
   defaultConfidence,
   type HistogramBin,
+  maxBootstrapInput,
 } from "./Bootstrap.ts";
 import {
   isBootstrappable,
@@ -144,8 +145,8 @@ function blockDiffCI(
     options;
   const blocksB = options.blocksB ?? blocksA;
   const noTrim = options.noBatchTrim;
-  const sideA = prepareBlocks(a, blocksA, statFn, noTrim);
-  const sideB = prepareBlocks(b, blocksB, statFn, noTrim);
+  const sideA = prepareBlocks(a, blocksA, statFn, noTrim, maxBootstrapInput);
+  const sideB = prepareBlocks(b, blocksB, statFn, noTrim, maxBootstrapInput);
 
   const baseVal = statFn(sideA.filtered);
   const currVal = statFn(sideB.filtered);
