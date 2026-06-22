@@ -1,7 +1,6 @@
 import type { RunMatrixOptions } from "../matrix/BenchMatrix.ts";
 import type { HeapReportOptions } from "../profiling/node/HeapSampleReport.ts";
 import type { ComparisonOptions } from "../report/BenchmarkReport.ts";
-import type { ProfileReportOptions } from "../report/HtmlReport.ts";
 import { type DefaultCliArgs, defaultDuration } from "./CliArgs.ts";
 
 /** Runner limits resolved from the duration/iterations flags. */
@@ -55,13 +54,6 @@ export function cliHeapReportOptions(args: DefaultCliArgs): HeapReportOptions {
     raw: args["alloc-raw"],
     userOnly: args["alloc-user-only"],
   };
-}
-
-/** Convert CLI args to CPU self-time report display options. */
-export function cliTimeReportOptions(
-  args: DefaultCliArgs,
-): ProfileReportOptions {
-  return { topN: args["profile-rows"], userOnly: args["profile-user-only"] };
 }
 
 /** True if any alloc-related flag implies allocation sampling. */

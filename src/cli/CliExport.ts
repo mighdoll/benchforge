@@ -20,12 +20,10 @@ import type { DefaultCliArgs } from "./CliArgs.ts";
 import {
   cliComparisonOptions,
   cliHeapReportOptions,
-  cliTimeReportOptions,
   needsAlloc,
-  needsProfile,
   shouldViewReport,
 } from "./CliOptions.ts";
-import { printHeapReports, printTimeReports, withStatus } from "./CliReport.ts";
+import { printHeapReports, withStatus } from "./CliReport.ts";
 import {
   optionalJson,
   startViewerServer,
@@ -107,33 +105,7 @@ export async function finishReports(
   if (needsAlloc(args)) {
     printHeapReports(results, cliHeapReportOptions(args));
   }
-  if (needsProfile(args)) {
-    printTimeReports(results, cliTimeReportOptions(args));
-  }
   await exportReports({ results, args, ...exportOptions });
-}
-
-/** Write the always-on markdown report (shift tables + GC/scalar comparison) so
- *  agents and other text consumers get the full distribution the HTML viewer
- *  shows. Default: a timestamped file plus a stable `latest.md` in bench-report/
- *  (history preserved, predictable path for agents). `--report-md <path>` writes
- *  a single explicit file instead. */
-function writeMarkdownReport(data: ReportData, args: DefaultCliArgs): void {
-  const md = markdownReport(data);
-  const override = args["report-md"];
-  if (override) {
-    const path = resolve(override);
-    writeFileSync(path, md);
-    console.log(`Markdown report written to: ${path}`);
-    return;
-  }
-  mkdirSync(reportDir, { recursive: true });
-  const stamp = fileStamp(data.metadata.timestamp);
-  const timestamped = resolve(join(reportDir, `bench-${stamp}.md`));
-  const latest = resolve(join(reportDir, "latest.md"));
-  writeFileSync(timestamped, md);
-  writeFileSync(latest, md);
-  console.log(`Markdown report written to: ${latest} (and ${timestamped})`);
 }
 
 /** Write a calibration markdown report so its noise floor and suggested margin
@@ -159,6 +131,29 @@ export function writeCalibrationReport(
   writeFileSync(timestamped, md);
   writeFileSync(latest, md);
   console.log(`Calibration report written to: ${latest} (and ${timestamped})`);
+}
+
+/** Write the always-on markdown report (shift tables + GC/scalar comparison) so
+ *  agents and other text consumers get the full distribution the HTML viewer
+ *  shows. Default: a timestamped file plus a stable `latest.md` in bench-report/
+ *  (history preserved, predictable path for agents). `--report-md <path>` writes
+ *  a single explicit file instead. */
+function writeMarkdownReport(data: ReportData, args: DefaultCliArgs): void {
+  const md = markdownReport(data);
+  const override = args["report-md"];
+  if (override) {
+    const path = resolve(override);
+    writeFileSync(path, md);
+    console.log(`Markdown report written to: ${path}`);
+    return;
+  }
+  mkdirSync(reportDir, { recursive: true });
+  const stamp = fileStamp(data.metadata.timestamp);
+  const timestamped = resolve(join(reportDir, `bench-${stamp}.md`));
+  const latest = resolve(join(reportDir, "latest.md"));
+  writeFileSync(timestamped, md);
+  writeFileSync(latest, md);
+  console.log(`Markdown report written to: ${latest} (and ${timestamped})`);
 }
 
 /** Write Perfetto and time profile files if requested by CLI args. */
