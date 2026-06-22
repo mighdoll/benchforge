@@ -1,4 +1,5 @@
 import { useEffect, useState } from "preact/hooks";
+import { formatCliCommand } from "../../report/CliCommand.ts";
 import type { GitVersion } from "../../report/GitUtils.ts";
 import { formatRelativeTime } from "../DateFormat.ts";
 import type { BenchmarkGroup, ReportData } from "../ReportData.ts";
@@ -6,8 +7,6 @@ import { provider, reportData, trimMode } from "../State.ts";
 import { activeGroupView, CaseCard, caseHeaderCI } from "./CaseCard.tsx";
 import { ComparisonBadge, shiftDetailOpener } from "./CIWidgets.tsx";
 import { ShiftDetailPopup } from "./ShiftPopup.tsx";
-
-const skipArgs = new Set(["_", "$0", "view", "file"]);
 
 declare const __BENCHFORGE_GIT_HASH__: string;
 declare const __BENCHFORGE_GIT_DIRTY__: boolean;
@@ -63,7 +62,7 @@ function ReportHeader({ data }: { data: ReportData }) {
 
   return (
     <div class="report-header">
-      <div class="cli-args">{formatCliArgs(cliArgs, cliDefaults)}</div>
+      <div class="cli-args">{formatCliCommand(cliArgs, cliDefaults)}</div>
       <div class="header-right">
         <div class="metadata">{new Date().toLocaleString()}</div>
         <div class="metadata benchforge-version">{benchforgeLabel()}</div>
@@ -134,25 +133,6 @@ function formatVersion(v: GitVersion): string {
   const hash = v.dirty ? v.hash + "*" : v.hash;
   if (!v.date) return hash;
   return `${hash} (${formatRelativeTime(v.date)})`;
-}
-
-/** Format CLI args for display, filtering out defaults, internal keys, and camelCase aliases. */
-function formatCliArgs(
-  args?: Record<string, unknown>,
-  defaults?: Record<string, unknown>,
-): string {
-  if (!args) return "benchforge";
-  const isDisplayable = (key: string, value: unknown): boolean => {
-    if (skipArgs.has(key) || value === undefined || value === false) return false;
-    if (defaults?.[key] === value) return false;
-    // skip camelCase aliases (yargs generates both kebab-case and camelCase)
-    if (!key.includes("-") && key !== key.toLowerCase()) return false;
-    return true;
-  };
-  const flags = Object.entries(args)
-    .filter(([key, value]) => isDisplayable(key, value))
-    .map(([key, value]) => (value === true ? `--${key}` : `--${key} ${value}`));
-  return ["benchforge", ...flags].join(" ");
 }
 
 /** Assemble "benchforge <hash> <relative-date>" from compile-time globals. */

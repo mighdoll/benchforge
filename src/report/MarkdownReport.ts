@@ -10,6 +10,7 @@ import type {
   ViewerRow,
   ViewerSection,
 } from "../viewer/ReportData.ts";
+import { formatCliCommand } from "./CliCommand.ts";
 import { entryValue } from "./ConsoleSummary.ts";
 import {
   formatBytes,
@@ -29,9 +30,11 @@ import type { WarmupShape } from "./WarmupShape.ts";
  *  data already on each case's metric row (mean + per-percentile diff CIs with
  *  reliability flags), so it adds no statistics of its own. */
 export function markdownReport(data: ReportData): string {
-  const { currentVersion, baselineVersion } = data.metadata;
+  const { currentVersion, baselineVersion, cliArgs, cliDefaults } =
+    data.metadata;
   const head = [
     "# Benchmark report",
+    `\`${formatCliCommand(cliArgs, cliDefaults)}\``,
     versionLine(currentVersion, baselineVersion),
   ];
   const groups = data.groups.map(groupMarkdown).filter(Boolean);

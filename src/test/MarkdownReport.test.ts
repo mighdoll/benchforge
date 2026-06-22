@@ -315,3 +315,18 @@ test("renders a hot-functions delta table with a baseline (5 columns)", () => {
   // a function absent from the baseline renders "new" in the delta column
   expect(md).toMatch(/\| new \| normalizeEol \| \/Eol\.ts:5 \|/);
 });
+
+test("renders the reconstructed cli command in the header", () => {
+  const data: ReportData = {
+    groups: [],
+    metadata: {
+      timestamp: "",
+      bencherVersion: "0",
+      cliArgs: { batches: 4, profile: true, batchesAlias: 4 },
+      cliDefaults: { batches: 1 },
+    },
+  };
+  const md = markdownReport(data);
+
+  expect(md).toContain("`benchforge --batches 4 --profile`");
+});
