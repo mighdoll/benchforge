@@ -1,4 +1,5 @@
 import type { Session } from "node:inspector/promises";
+import type { ProfileBoundary } from "../../runners/BenchRunner.ts";
 import type { CallFrame } from "./HeapSampler.ts";
 import { withSession } from "./InspectorSession.ts";
 
@@ -31,22 +32,36 @@ export interface TimeProfileOptions {
   session?: Session;
 }
 
-/** Run a function while sampling CPU time, return profile */
+/** Sample CPU time across the window `fn` brackets with `boundary.start`/`stop`,
+ *  then return the profile. Letting the caller place the boundary keeps warmup
+ *  iterations out of the profile. */
 export async function withTimeProfiling<T>(
   options: TimeProfileOptions,
-  fn: () => Promise<T> | T,
+  fn: (boundary: ProfileBoundary) => Promise<T> | T,
 ): Promise<{ result: T; profile: TimeProfile }> {
   const { interval } = options;
   const owned = !options.session;
   return withSession(options.session, async session => {
+    let profile: TimeProfile | undefined;
+    let started = false;
+    const start = async () => {
+      await session.post("Profiler.start");
+      started = true;
+    };
+    const stop = async () => {
+      if (!started || profile) return;
+      const r = await session.post("Profiler.stop");
+      profile = r.profile as unknown as TimeProfile;
+    };
     try {
       if (owned) await session.post("Profiler.enable");
       if (interval)
         await session.post("Profiler.setSamplingInterval", { interval });
-      await session.post("Profiler.start");
-      const result = await fn();
-      const { profile } = await session.post("Profiler.stop");
-      return { result, profile: profile as unknown as TimeProfile };
+      const result = await fn({ start, stop });
+      await stop();
+      if (!profile)
+        throw new Error("withTimeProfiling: boundary never started");
+      return { result, profile };
     } finally {
       if (owned) await session.post("Profiler.disable");
     }

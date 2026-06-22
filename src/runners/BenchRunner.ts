@@ -37,11 +37,19 @@ export interface RunnerOptions {
   callCounts?: boolean;
 }
 
+/** Start/stop hooks for external profilers, fired around the measured loop only
+ *  (after warmup), so warmup iterations stay out of the CPU/heap profile. */
+export interface ProfileBoundary {
+  start: () => Promise<void>;
+  stop: () => Promise<void>;
+}
+
 type CollectParams<T = unknown> = RunnerOptions &
   Required<Pick<RunnerOptions, "maxTime" | "maxIterations" | "warmup">> & {
     benchmark: BenchmarkSpec<T>;
     params?: T;
     skipWarmup?: boolean;
+    boundary?: ProfileBoundary;
   };
 
 type CollectResult = {
@@ -81,9 +89,15 @@ export class BenchRunner {
     benchmark: BenchmarkSpec<T>,
     options: RunnerOptions,
     params?: T,
+    boundary?: ProfileBoundary,
   ): Promise<MeasuredResults[]> {
     const opts = { ...defaultCollectOptions, ...options };
-    const collected = await collectSamples({ ...opts, benchmark, params });
+    const collected = await collectSamples({
+      ...opts,
+      benchmark,
+      params,
+      boundary,
+    });
     return [buildMeasuredResults(benchmark.name, collected)];
   }
 }
@@ -104,13 +118,15 @@ async function collectSamples<T>(
     throw new Error(`At least one of maxIterations or maxTime must be set`);
   }
   const warmupSamples = config.skipWarmup ? [] : await runWarmup(config);
+  await config.boundary?.start();
   const heapBefore = process.memoryUsage().heapUsed;
   const loop = await runSampleLoop(config);
+  const heapAfter = process.memoryUsage().heapUsed;
+  await config.boundary?.stop();
   if (loop.samples.length === 0)
     throw new Error(
       `No samples collected for benchmark: ${config.benchmark.name}`,
     );
-  const heapAfter = process.memoryUsage().heapUsed;
   const heapGrowth =
     Math.max(0, heapAfter - heapBefore) / 1024 / loop.samples.length;
   return { ...loop, warmupSamples, heapGrowth };
@@ -121,9 +137,8 @@ function buildMeasuredResults(
   name: string,
   collected: CollectResult,
 ): MeasuredResults {
-  const { samples, warmupSamples, heapSamples } = collected;
-  const { pausePoints, heapGrowth } = collected;
-  const { startTime, loopStartTime } = collected;
+  const { samples, warmupSamples, heapSamples, pausePoints } = collected;
+  const { heapGrowth, startTime, loopStartTime } = collected;
   const time = computeStats(samples);
   const heapSize = { avg: heapGrowth, min: heapGrowth, max: heapGrowth };
   return {

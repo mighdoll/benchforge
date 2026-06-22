@@ -4,7 +4,11 @@ import type { CoverageData } from "../profiling/node/CoverageTypes.ts";
 import type { HeapProfile } from "../profiling/node/HeapSampler.ts";
 import type { TimeProfile } from "../profiling/node/TimeSampler.ts";
 import type { BenchmarkFunction, BenchmarkSpec } from "./BenchmarkSpec.ts";
-import { BenchRunner, type RunnerOptions } from "./BenchRunner.ts";
+import {
+  BenchRunner,
+  type ProfileBoundary,
+  type RunnerOptions,
+} from "./BenchRunner.ts";
 import type { MeasuredResults } from "./MeasuredResults.ts";
 import {
   evalFn,
@@ -142,60 +146,63 @@ async function runWithProfiling(
   return { type: "result", results: r.result, ...state };
 }
 
-/** Build nested profiling wrappers: outer heap, inner time */
+/** Build a runnable that profiles only the measured loop: warmup runs before the
+ *  profiler boundary, so its tier-up transient stays out of the CPU/heap profile. */
 function buildProfilingChain(
   message: RunMessage,
   runner: BenchRunner,
   state: ProfilingState,
 ): () => Promise<MeasuredResults[]> {
-  const { alloc, profile } = message.options;
-
-  const run = async () => {
+  return async () => {
     const { fn, params } = await resolveBenchmarkFn(message);
-    return runner.runBench({ ...message.spec, fn }, message.options, params);
+    const spec = { ...message.spec, fn };
+    const run = (boundary?: ProfileBoundary) =>
+      runner.runBench(spec, message.options, params, boundary);
+    return runProfilers(message, state, run);
   };
-
-  const runMaybeWithTime = profile ? wrapWithTime(run, message, state) : run;
-  if (!alloc) return runMaybeWithTime;
-  return wrapWithHeap(runMaybeWithTime, message, state);
 }
 
-/** Wrap a run with CPU time profiling, recording the profile into state. */
-function wrapWithTime(
-  run: () => Promise<MeasuredResults[]>,
+/** Run with whichever profilers are enabled (heap outer, time inner), each
+ *  bracketing the measured loop via a shared boundary passed to the runner. */
+async function runProfilers(
   message: RunMessage,
   state: ProfilingState,
-): () => Promise<MeasuredResults[]> {
-  return async () => {
+  run: (boundary?: ProfileBoundary) => Promise<MeasuredResults[]>,
+): Promise<MeasuredResults[]> {
+  const { alloc, profile } = message.options;
+
+  const withTime = async (outer: ProfileBoundary[]) => {
+    if (!profile) return run(mergeBoundaries(outer));
     const { withTimeProfiling } = await import(
       "../profiling/node/TimeSampler.ts"
     );
     const interval = message.options.profileInterval;
     const opts = { interval, session: state.profilerSession };
-    const r = await withTimeProfiling(opts, run);
+    const r = await withTimeProfiling(opts, tb =>
+      run(mergeBoundaries([...outer, tb])),
+    );
     state.timeProfile = r.profile;
     return r.result;
   };
+
+  if (!alloc) return withTime([]);
+  const { withHeapSampling } = await import("../profiling/node/HeapSampler.ts");
+  const { allocInterval, allocDepth } = message.options;
+  const heapOpts = { samplingInterval: allocInterval, stackDepth: allocDepth };
+  const r = await withHeapSampling(heapOpts, hb => withTime([hb]));
+  state.heapProfile = r.profile;
+  return r.result;
 }
 
-/** Wrap a run with heap allocation sampling, recording the profile into state. */
-function wrapWithHeap(
-  run: () => Promise<MeasuredResults[]>,
-  message: RunMessage,
-  state: ProfilingState,
-): () => Promise<MeasuredResults[]> {
-  return async () => {
-    const { withHeapSampling } = await import(
-      "../profiling/node/HeapSampler.ts"
-    );
-    const { allocInterval, allocDepth } = message.options;
-    const heapOpts = {
-      samplingInterval: allocInterval,
-      stackDepth: allocDepth,
-    };
-    const r = await withHeapSampling(heapOpts, run);
-    state.heapProfile = r.profile;
-    return r.result;
+/** Combine profiler boundaries so one start/stop drives them all. */
+function mergeBoundaries(boundaries: ProfileBoundary[]): ProfileBoundary {
+  return {
+    start: async () => {
+      for (const b of boundaries) await b.start();
+    },
+    stop: async () => {
+      for (const b of boundaries) await b.stop();
+    },
   };
 }
 

@@ -1,4 +1,5 @@
 import type { Session } from "node:inspector/promises";
+import type { ProfileBoundary } from "../../runners/BenchRunner.ts";
 import { withSession } from "./InspectorSession.ts";
 
 export interface HeapSampleOptions {
@@ -73,16 +74,28 @@ const defaultOptions: Required<HeapSampleOptions> = {
   includeMajorGC: true,
 };
 
-/** Run a function while sampling heap allocations, return profile */
+/** Sample heap allocations across the window `fn` brackets with
+ *  `boundary.start`/`stop`, then return the profile. Letting the caller place the
+ *  boundary keeps warmup allocations out of the profile. */
 export async function withHeapSampling<T>(
   options: HeapSampleOptions,
-  fn: () => Promise<T> | T,
+  fn: (boundary: ProfileBoundary) => Promise<T> | T,
 ): Promise<{ result: T; profile: HeapProfile }> {
   const opts = { ...defaultOptions, ...options };
   return withSession(undefined, async session => {
-    await startSampling(session, opts);
-    const result = await fn();
-    const profile = await stopSampling(session);
+    let profile: HeapProfile | undefined;
+    let started = false;
+    const start = async () => {
+      await startSampling(session, opts);
+      started = true;
+    };
+    const stop = async () => {
+      if (!started || profile) return;
+      profile = await stopSampling(session);
+    };
+    const result = await fn({ start, stop });
+    await stop();
+    if (!profile) throw new Error("withHeapSampling: boundary never started");
     return { result, profile };
   });
 }

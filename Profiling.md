@@ -37,14 +37,36 @@ Short batches collect samples quickly; many batches accumulate total coverage
 and (against a baseline) average out per-function noise. Total samples are
 roughly `duration x batches / interval`, so you can trade duration down and
 batches up to keep wall-clock reasonable while still gathering enough ticks.
-Don't go so short that per-batch warmup dominates the samples -- "relatively
-short", not tiny. The same applies to `--alloc` and `--call-counts`.
+Keep each batch "relatively short", not tiny -- short enough to spread coverage
+across many fresh workers, long enough that the measured window still gathers
+ticks. The same applies to `--alloc` and `--call-counts`.
+
+### Excluding Warmup
+
+Warmup iterations run *before* profiling starts, so they stay out of the CPU and
+heap profile (just as they already stay out of the timing stats). With `--warmup`
+unset (default `0`), the measured loop includes the cold tier-up transient
+(Ignition -> Sparkplug -> Maglev -> TurboFan, plus deopts and refill scavenges),
+and those ticks land in the profile. Many short batches *amplify* this: each
+batch is a fresh worker that re-tiers from cold, so a non-trivial fraction of
+pooled ticks can land in warmup code rather than steady-state hot code.
+
+Set `--warmup N` to drop that transient and profile only the optimized steady
+state. Code that takes many iterations to reach its optimized plateau (sometimes
+dozens) benefits most:
+
+```bash
+benchforge my-bench.ts --profile --batches 50 --duration 0.1 --warmup 50
+```
+
+### Sampling Resolution
 
 You can also sample more finely for better resolution: `--profile-interval` is
 the CPU sampling period in microseconds (default `1000`). Lowering it, e.g.
 `--profile-interval 200`, takes ~5x more samples per second at the cost of more
-overhead -- worth it for sharpening self-time attribution. (`--alloc` has the
-analogous `--alloc-interval`, in bytes.)
+overhead. Pair it with `--warmup`: a finer interval sharpens *where* the ticks
+land, while `--warmup` keeps them in steady-state code rather than tier-up
+transient. (`--alloc` has the analogous `--alloc-interval`, in bytes.)
 
 ## GC Statistics
 
