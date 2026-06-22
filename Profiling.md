@@ -101,11 +101,11 @@ benchforge my-bench.ts --alloc --iterations 100
 
 **Output (default compact):**
 ```
-─── Heap profile: bevy_env_map ───
+─── Heap profile: parse-document ───
 Heap allocation sites (top 20, garbage included):
-  13.62 MB  recursiveResolve <- flattenTreeImport <- bindAndTransform
-  12.36 MB  nextToken <- parseBlockStatements <- parseCompoundStatement
-   5.15 MB  coverWithText <- finishElem <- parseVarOrLet
+  13.62 MB  allocNode <- parseExpr <- parseProgram
+  12.36 MB  nextToken <- scanTokens <- tokenize
+   5.15 MB  pushScope <- enterBlock <- evalProgram
 
 Total (all):       56.98 MB
 Total (user-code): 28.45 MB
