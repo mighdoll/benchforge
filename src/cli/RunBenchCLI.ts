@@ -20,16 +20,18 @@ import {
 } from "../matrix/MatrixFilter.ts";
 import { reportMatrixResults } from "../matrix/MatrixReport.ts";
 import type { ReportSection } from "../report/BenchmarkReport.ts";
+import { calibrationMarkdown } from "../report/CalibrationReport.ts";
 import { consoleSummary } from "../report/ConsoleSummary.ts";
 import type { GitVersion } from "../report/GitUtils.ts";
 import { browserBenchExports } from "./BrowserBench.ts";
 import { formatCalibration, reportCalibrateRun } from "./CalibrateRunner.ts";
 import {
+  cliDefaults,
   type DefaultCliArgs,
   defaultCliArgs,
   parseCliArgs,
 } from "./CliArgs.ts";
-import { finishReports } from "./CliExport.ts";
+import { finishReports, writeCalibrationReport } from "./CliExport.ts";
 import { cliToMatrixOptions, validateArgs } from "./CliOptions.ts";
 import {
   defaultReportData,
@@ -139,7 +141,7 @@ async function runMatrixPipeline(
   m: BuildResult,
   args: DefaultCliArgs,
 ): Promise<void> {
-  if (args.calibrate) return runMatrixCalibratePipeline(m.suite, args);
+  if (args.calibrate) return runMatrixCalibratePipeline(m, args);
   const results = await runFilteredMatrices(m.suite, args);
   const groups = matrixToReportGroups(results);
   const { sections, currentVersion, baselineVersion } = m;
@@ -188,15 +190,17 @@ async function applyMatrixFilters(
   return filter ? filterMatrix(withDefaults, filter) : withDefaults;
 }
 
-/** Calibrate: measure the noise floor on one matrix/variant/case, print summary. */
+/** Calibrate: measure the noise floor on one matrix/variant/case, print the
+ *  summary, and save a dated markdown report so the suggested margin and the
+ *  settings used are recallable. */
 async function runMatrixCalibratePipeline(
-  suite: MatrixSuite,
+  m: BuildResult,
   args: DefaultCliArgs,
 ): Promise<void> {
   validateArgs(args);
   const filter = args.filter ? parseMatrixFilter(args.filter) : undefined;
   const options = cliToMatrixOptions(args);
-  const matrix = suite.matrices[0];
+  const matrix = m.suite.matrices[0];
   const filtered = await applyMatrixFilters(matrix, args.all, filter);
   if (!filtered.variantDir)
     throw new Error(
@@ -211,6 +215,18 @@ async function runMatrixCalibratePipeline(
     reportCalibrateRun,
   );
   console.log(formatCalibration(result));
+  const meta = {
+    timestamp: new Date().toISOString(),
+    cliArgs: args,
+    cliDefaults,
+    currentVersion: m.currentVersion,
+    environment: {
+      node: process.version,
+      platform: process.platform,
+      arch: process.arch,
+    },
+  };
+  writeCalibrationReport(calibrationMarkdown(result, meta), meta.timestamp, args);
 }
 
 /** Load a benchmark file and shape its default export into a BuildResult. A

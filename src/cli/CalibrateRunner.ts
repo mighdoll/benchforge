@@ -1,17 +1,10 @@
+import {
+  calibrationWarnings,
+  formatGcHistogram,
+} from "../report/CalibrationReport.ts";
 import colors from "../report/Colors.ts";
 import { formatSignedPercent } from "../report/Formatters.ts";
 import type { CalibrationResult, RunProgress } from "../runners/Calibration.ts";
-import type { IntegerCount } from "../stats/CoreStats.ts";
-
-/** Below this many full GCs per batch, the batch mean is dominated by where the
- *  lone collection lands and single-run CIs understate between-run GC variance. */
-const minFullGcsPerBatch = 2;
-
-/** A run straddles a GC-count step when its modal batch count holds less than
- *  this share of batches: most batches do N full GCs, the rest do N+/-1, and
- *  the per-batch mean jumps by a whole major GC between them. Allows a few stray
- *  batches without warning, but flags a genuine split. */
-const minModalShare = 0.9;
 
 /** Print one progress line per completed self-comparison run (to stderr). */
 export function reportCalibrateRun(p: RunProgress, label?: string): void {
@@ -58,55 +51,9 @@ function conclusion(result: CalibrationResult): string {
       `  full GCs/batch           ${formatGcHistogram(gcHistogram)}   (mean ${fullGcsPerBatch.toFixed(1)})`,
     );
   }
-  if (s.overconfident) {
-    lines.push(
-      "",
-      yellow(
-        `  warning: scatter (${pct(s.scatterP95)}) exceeds within-run CI (${pct(s.meanCiHalfWidth)}) --`,
-      ),
-      yellow(
-        "    per-run CIs are overconfident; displayed CIs understate run-to-run",
-      ),
-      yellow("    noise. Margin taken from the scatter, not the CI."),
-    );
-  }
-  if (fullGcsPerBatch !== undefined && fullGcsPerBatch < minFullGcsPerBatch) {
-    lines.push(
-      "",
-      yellow(
-        `  warning: only ${fullGcsPerBatch.toFixed(1)} full GCs per batch (want >= ${minFullGcsPerBatch}) --`,
-      ),
-      yellow(
-        "    the batch mean depends on where the lone collection lands, so GC",
-      ),
-      yellow("    timing varies between runs. Increase --duration."),
-    );
-  } else if (gcHistogram && straddlesStep(gcHistogram)) {
-    lines.push(
-      "",
-      yellow(
-        `  warning: full GCs/batch varies across batches (${formatGcHistogram(gcHistogram)}) --`,
-      ),
-      yellow(
-        "    some batches do a major collection the others don't; the per-batch",
-      ),
-      yellow("    mean jumps by a whole GC. Adjust --duration so every batch"),
-      yellow("    lands on the same plateau."),
-    );
+  for (const w of calibrationWarnings(result)) {
+    lines.push("", yellow(`  warning: ${w.summary} --`));
+    for (const line of w.detail.split("\n")) lines.push(yellow(`    ${line}`));
   }
   return lines.join("\n");
-}
-
-/** Render a GC-per-batch histogram as a one-line tally, e.g. "2x97  3x3". */
-function formatGcHistogram(hist: IntegerCount[]): string {
-  return hist.map(b => `${b.value}x${b.count}`).join("  ");
-}
-
-/** True when the modal GC-count bucket holds less than minModalShare of all
- *  batches. A single bucket (one plateau) never straddles. */
-function straddlesStep(hist: IntegerCount[]): boolean {
-  if (hist.length < 2) return false;
-  const total = hist.reduce((sum, b) => sum + b.count, 0);
-  const modal = Math.max(...hist.map(b => b.count));
-  return modal / total < minModalShare;
 }

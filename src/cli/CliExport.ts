@@ -137,6 +137,31 @@ function writeMarkdownReport(data: ReportData, args: DefaultCliArgs): void {
   console.log(`Markdown report written to: ${latest} (and ${timestamped})`);
 }
 
+/** Write a calibration markdown report so its noise floor and suggested margin
+ *  are recallable. Mirrors writeMarkdownReport: `--report-md <path>` writes a
+ *  single explicit file, else a timestamped file plus a stable
+ *  `calibrate-latest.md` in bench-report/. */
+export function writeCalibrationReport(
+  md: string,
+  timestamp: string,
+  args: DefaultCliArgs,
+): void {
+  const override = args["report-md"];
+  if (override) {
+    const path = resolve(override);
+    writeFileSync(path, md);
+    console.log(`Calibration report written to: ${path}`);
+    return;
+  }
+  mkdirSync(reportDir, { recursive: true });
+  const stamp = fileStamp(timestamp);
+  const timestamped = resolve(join(reportDir, `calibrate-${stamp}.md`));
+  const latest = resolve(join(reportDir, "calibrate-latest.md"));
+  writeFileSync(timestamped, md);
+  writeFileSync(latest, md);
+  console.log(`Calibration report written to: ${latest} (and ${timestamped})`);
+}
+
 /** Write Perfetto and time profile files if requested by CLI args. */
 function exportFileFormats(results: ReportGroup[], args: DefaultCliArgs): void {
   if (args["export-perfetto"])
