@@ -16,6 +16,36 @@ Combine flags freely: `benchforge my-bench.ts --gc-stats --alloc --view`
 In browser mode, the same flags work via CDP:
 `benchforge --url http://localhost:5173 --alloc --gc-stats --view`
 
+## Run Settings for Profiling
+
+Profiling wants different run settings than a timing comparison. For a timing
+verdict you want longer batches so each batch's mean is stable across GC timing
+(see [Statistics.md](Statistics.md#batch-duration)). A profile doesn't depend on
+per-batch means at all -- each batch runs in its own worker and collects its own
+CPU/heap profile, and benchforge pools the sampled ticks (and allocation
+samples) across every batch. Resolution, and per-function baseline-delta noise
+when comparing, are limited by the *total* number of samples, not by how any
+single batch behaves.
+
+So prefer **many short batches** over a few long ones:
+
+```bash
+benchforge my-bench.ts --profile --batches 50 --duration 0.1
+```
+
+Short batches collect samples quickly; many batches accumulate total coverage
+and (against a baseline) average out per-function noise. Total samples are
+roughly `duration x batches / interval`, so you can trade duration down and
+batches up to keep wall-clock reasonable while still gathering enough ticks.
+Don't go so short that per-batch warmup dominates the samples -- "relatively
+short", not tiny. The same applies to `--alloc` and `--call-counts`.
+
+You can also sample more finely for better resolution: `--profile-interval` is
+the CPU sampling period in microseconds (default `1000`). Lowering it, e.g.
+`--profile-interval 200`, takes ~5x more samples per second at the cost of more
+overhead -- worth it for sharpening self-time attribution. (`--alloc` has the
+analogous `--alloc-interval`, in bytes.)
+
 ## GC Statistics
 
 Collect garbage collection statistics per iteration:

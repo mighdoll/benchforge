@@ -180,6 +180,10 @@ roughly `duration x batches`, and you can trade between them. Longer batches
 give more stable per-batch means, while more batches give tighter CIs. Start
 with `--duration 2` or higher for benchmarks with significant allocation.
 
+Profiling is the opposite case: it pools samples across batches, so prefer many
+short batches -- see
+[Profiling.md](Profiling.md#run-settings-for-profiling).
+
 ## Comparison Statistics
 
 When comparing against a baseline, the question changes from "how fast is this?"
