@@ -10,11 +10,10 @@ import { resolveEditorUri } from "../export/EditorUri.ts";
 import { exportPerfettoTrace } from "../export/PerfettoExport.ts";
 import { buildTimeSpeedscopeFile } from "../export/TimeExport.ts";
 import type { CoverageData } from "../profiling/node/CoverageTypes.ts";
-import type { TimeProfile } from "../profiling/node/TimeSampler.ts";
 import type { ReportGroup, ReportSection } from "../report/BenchmarkReport.ts";
 import { groupReports } from "../report/BenchmarkReport.ts";
 import type { GitVersion } from "../report/GitUtils.ts";
-import { prepareHtmlData } from "../report/HtmlReport.ts";
+import { keptProfilesOf, prepareHtmlData } from "../report/HtmlReport.ts";
 import { markdownReport } from "../report/MarkdownReport.ts";
 import type { ReportData } from "../viewer/ReportData.ts";
 import type { DefaultCliArgs } from "./CliArgs.ts";
@@ -80,7 +79,7 @@ export async function exportReports(options: ExportOptions): Promise<void> {
   exportFileFormats(results, args);
 
   const profileFile = buildSpeedscopeFile(results);
-  const timeFile = buildAllTimeProfiles(results);
+  const timeFile = buildAllTimeProfiles(results, comparison.noBatchTrim);
   const coverageData = await annotateCoverage(results, profileFile, timeFile);
   const timeData = optionalJson(timeFile);
 
@@ -170,15 +169,18 @@ function exportFileFormats(results: ReportGroup[], args: DefaultCliArgs): void {
     exportTimeProfile(results, args["export-profile"]);
 }
 
-/** Build combined Speedscope file from all time profiles in results. */
-function buildAllTimeProfiles(results: ReportGroup[]) {
+/** Build combined Speedscope file from all time profiles in results, pooling
+ *  each benchmark's kept batch profiles (same source and Tukey trim the markdown
+ *  hot-functions summary uses) so the flamegraph reflects every sampled tick from
+ *  the batches the verdict keeps, not one batch and not the noisy outliers. */
+function buildAllTimeProfiles(results: ReportGroup[], noTrim?: boolean) {
   const entries = results.flatMap(group =>
     groupReports(group)
-      .filter(r => r.measuredResults.timeProfile)
       .map(r => ({
         name: r.name,
-        profile: r.measuredResults.timeProfile as TimeProfile,
-      })),
+        profiles: keptProfilesOf(r.measuredResults, noTrim).profiles,
+      }))
+      .filter(e => e.profiles.length > 0),
   );
   return buildTimeSpeedscopeFile(entries);
 }
@@ -225,7 +227,10 @@ function fileStamp(iso: string): string {
   return iso.replace(/\.\d+Z$/, "").replace(/[:]/g, "-");
 }
 
-/** Export the first raw V8 TimeProfile to a JSON file. */
+/** Export the first raw V8 TimeProfile to a JSON file. Stays a single
+ *  (last-kept-batch) profile by design: this is the raw V8 node-tree shape for
+ *  external tools, which can't pool across batches the way the sampled
+ *  speedscope flamegraph does. */
 function exportTimeProfile(results: ReportGroup[], path: string): void {
   const profile = results
     .flatMap(g => groupReports(g))

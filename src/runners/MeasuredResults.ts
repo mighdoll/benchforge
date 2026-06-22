@@ -97,8 +97,15 @@ export interface MeasuredResults {
 
   /** Every batch's CPU profile, kept in memory so the self-time summary can pool
    *  all the sampled ticks (the per-function baseline delta is noise-limited by
-   *  total ticks). Set only on a merged batched result; not serialized. */
+   *  total ticks). Set only on a merged batched result; not serialized. Order
+   *  matches batchOffsets / batchIterations. */
   timeProfiles?: TimeProfile[];
+
+  /** Per-batch iteration counts, order matching batchOffsets / timeProfiles.
+   *  Lets the profile summary recompute self-time-per-iteration over the kept
+   *  batches when slow-outlier batches are Tukey-trimmed from the pooled profile.
+   *  Set only on a merged batched result. */
+  batchIterations?: number[];
 
   /** Per-function execution counts (requires --call-counts) */
   coverage?: CoverageData;

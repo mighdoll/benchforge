@@ -1,5 +1,8 @@
 import { expect, test } from "vitest";
-import { timeProfileToSpeedscope } from "../export/TimeExport.ts";
+import {
+  buildTimeSpeedscopeFile,
+  timeProfileToSpeedscope,
+} from "../export/TimeExport.ts";
 import type { TimeProfile } from "../profiling/node/TimeSampler.ts";
 
 /** Build a minimal TimeProfile for testing */
@@ -136,4 +139,73 @@ test("anonymous functions get location hint in name", () => {
   const file = timeProfileToSpeedscope("test", profile);
 
   expect(file.shared.frames[0].name).toBe("(anonymous utils.ts:42)");
+});
+
+/** A one-frame profile: `main` (node 2) sampled `ticks` times at `delta` us each. */
+function singleFrameProfile(
+  name: string,
+  ticks: number,
+  delta: number,
+): TimeProfile {
+  return {
+    nodes: [
+      {
+        id: 1,
+        callFrame: { functionName: "", url: "", lineNumber: -1 },
+        children: [2],
+      },
+      {
+        id: 2,
+        callFrame: { functionName: name, url: "file:///app.ts", lineNumber: 0 },
+      },
+    ],
+    startTime: 0,
+    endTime: ticks * delta,
+    samples: Array<number>(ticks).fill(2),
+    timeDeltas: Array<number>(ticks).fill(delta),
+  };
+}
+
+test("pools batch profiles: samples/weights concatenate and endValue sums", () => {
+  const profiles = [
+    singleFrameProfile("main", 3, 1000),
+    singleFrameProfile("main", 2, 1000),
+  ];
+  const file = buildTimeSpeedscopeFile([{ name: "bench", profiles }])!;
+
+  expect(file.profiles).toHaveLength(1);
+  const p = file.profiles[0];
+  expect(p.samples).toHaveLength(5); // 3 + 2 ticks
+  expect(p.weights).toHaveLength(5);
+  expect(p.endValue).toBe(5000); // summed timeDeltas across both batches
+});
+
+test("pools batch profiles: a frame shared across batches interns once", () => {
+  const profiles = [
+    singleFrameProfile("main", 1, 1000),
+    singleFrameProfile("main", 1, 1000),
+  ];
+  const file = buildTimeSpeedscopeFile([{ name: "bench", profiles }])!;
+
+  // Same function in both batch profiles ==> single shared frame.
+  expect(file.shared.frames).toHaveLength(1);
+  expect(file.shared.frames[0].name).toBe("main");
+  expect(file.profiles[0].samples).toEqual([[0], [0]]);
+});
+
+test("pooling skips sample-less batch profiles", () => {
+  const empty: TimeProfile = {
+    nodes: [
+      { id: 1, callFrame: { functionName: "", url: "", lineNumber: -1 } },
+    ],
+    startTime: 0,
+    endTime: 0,
+    samples: [],
+    timeDeltas: [],
+  };
+  const profiles = [empty, singleFrameProfile("main", 2, 1000)];
+  const file = buildTimeSpeedscopeFile([{ name: "bench", profiles }])!;
+
+  expect(file.profiles[0].samples).toHaveLength(2);
+  expect(file.profiles[0].endValue).toBe(2000);
 });

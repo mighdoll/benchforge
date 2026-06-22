@@ -49,10 +49,8 @@ export function mergeBatchResults(results: MeasuredResults[]): MeasuredResults {
 
   const { batchOffsets, offsetPauses, mergedGcEvents } =
     mergeTimelines(trimmed);
-  const iterations = results.reduce(
-    (sum, r) => sum + (r.iterations ?? r.samples.length),
-    0,
-  );
+  const batchIterations = results.map(r => r.iterations ?? r.samples.length);
+  const iterations = batchIterations.reduce((sum, n) => sum + n, 0);
   const batchGcStats = results.flatMap(r =>
     r.gcStats ? [r.gcStats] : (r.batchGcStats ?? []),
   );
@@ -81,6 +79,7 @@ export function mergeBatchResults(results: MeasuredResults[]): MeasuredResults {
     batchGcStats: batchGcStats.length ? batchGcStats : undefined,
     gcEvents: mergedGcEvents.length ? mergedGcEvents : undefined,
     timeProfiles: timeProfiles.length ? timeProfiles : undefined,
+    batchIterations,
   };
 }
 

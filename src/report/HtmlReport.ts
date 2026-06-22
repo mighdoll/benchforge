@@ -18,7 +18,11 @@ import {
 import type { TimeProfile } from "../profiling/node/TimeSampler.ts";
 import type { GcEvent } from "../runners/GcStats.ts";
 import type { MeasuredResults } from "../runners/MeasuredResults.ts";
-import { trimOutlierBatches } from "../stats/BlockBootstrap.ts";
+import {
+  splitByOffsets,
+  trimOutlierBatches,
+  tukeyKeep,
+} from "../stats/BlockBootstrap.ts";
 import {
   computeInterval,
   defaultConfidence,
@@ -62,6 +66,25 @@ export interface PrepareHtmlOptions extends ComparisonOptions {
   baselineVersion?: GitVersion;
 }
 
+/** How many CPU self-time rows to show and whether to hide runtime internals. */
+export interface ProfileReportOptions {
+  topN: number;
+  userOnly: boolean;
+}
+
+const defaultProfileOptions: ProfileReportOptions = {
+  topN: 20,
+  userOnly: false,
+};
+
+/** Minimum batches for a per-function delta CI, and the bootstrap resample count.
+ *  A function's self-time share is one number per batch, so the CI is a block
+ *  bootstrap over batches (its width is set by batch count, not batch length --
+ *  prefer many short batches). Below the floor the share spread can't be
+ *  estimated and the delta is withheld. */
+const minDeltaBatches = 4;
+const deltaResamples = 2000;
+
 /** Convert benchmark results into a ReportData payload for the HTML viewer */
 export function prepareHtmlData(
   groups: ReportGroup[],
@@ -92,6 +115,103 @@ export function prepareHtmlData(
   };
 }
 
+/** The CPU profiles to pool for a result: every batch's profile when present,
+ *  else the single last-batch profile (unbatched / single-batch runs). */
+export function profilesOf(m: MeasuredResults): TimeProfile[] {
+  if (m.timeProfiles?.length) return m.timeProfiles;
+  return m.timeProfile ? [m.timeProfile] : [];
+}
+
+/** Profiles plus the iteration count they cover, restricted to the batches the
+ *  timing verdict keeps: drops slow-outlier batches with the same Tukey mask the
+ *  headline stat uses, so the flamegraph and hot-functions summary describe the
+ *  same population (a noisy batch's wall-clock ticks land on arbitrary frames,
+ *  skewing self-time shares, not just adding ticks). Falls back to every profile
+ *  when unbatched, trimming is off, or per-batch profiles aren't aligned with the
+ *  batch boundaries. */
+export function keptProfilesOf(
+  m: MeasuredResults,
+  noTrim?: boolean,
+): { profiles: TimeProfile[]; iterations?: number } {
+  const profiles = profilesOf(m);
+  const offsets = m.batchOffsets;
+  const aligned =
+    !!offsets && offsets.length >= 2 && profiles.length === offsets.length;
+  if (noTrim || !aligned) return { profiles, iterations: m.iterations };
+
+  const means = splitByOffsets(m.samples, offsets).map(mean);
+  const keep = tukeyKeep(means);
+  if (keep.length === profiles.length)
+    return { profiles, iterations: m.iterations };
+
+  const iterations = m.batchIterations
+    ? keep.reduce((sum, i) => sum + (m.batchIterations![i] ?? 0), 0)
+    : undefined;
+  return { profiles: keep.map(i => profiles[i]), iterations };
+}
+
+/** Top CPU self-time functions for the markdown report and console, optionally
+ *  diffed against a baseline. Pools each side's per-batch profiles, joins by
+ *  name+file (so a function matches across builds despite line drift), filters to
+ *  user code when asked, then ranks by current self-time. A matched function
+ *  carries a baseline delta and its 95% CI whenever both sides have enough batches
+ *  to bootstrap the per-batch share spread; the CI (which may span 0, i.e. no
+ *  clear change) is what shows whether the shift stands out from between-batch
+ *  noise (profiler ticks are autocorrelated, so the run-to-run spread, not the
+ *  tick count, is the honest error bar). */
+export function summarizeTime(
+  cur: TimeProfile[],
+  base: TimeProfile[] | undefined,
+  options: ProfileReportOptions = defaultProfileOptions,
+  iterations?: number,
+): ProfileSummary {
+  const foldsCur = cur.map(summarizeTimeProfile);
+  const foldsBase = base?.length ? base.map(summarizeTimeProfile) : undefined;
+  const pooled = poolFolds(foldsCur);
+  const pooledBase = foldsBase ? poolFolds(foldsBase) : undefined;
+  const sorted = sortedTimeSites(pooled.byKey);
+  const filtered = options.userOnly ? sorted.filter(isNodeUserCode) : sorted;
+  const rows = filtered.slice(0, options.topN).map(s => {
+    const key = siteKey(s);
+    const baseUs = pooledBase?.byKey.get(key)?.selfUs;
+    const delta =
+      baseUs != null && foldsBase
+        ? batchDeltaCI(key, foldsCur, foldsBase)
+        : undefined;
+    const selfPct = pooled.totalUs > 0 ? (s.selfUs / pooled.totalUs) * 100 : 0;
+    const { name, url, line, col, selfUs } = s;
+    return {
+      name,
+      url,
+      line,
+      col,
+      selfUs,
+      selfPct,
+      baseUs,
+      deltaPct: delta?.pct,
+      deltaCI: delta?.ci,
+    };
+  });
+  return {
+    totalUs: pooled.totalUs,
+    baseTotalUs: pooledBase?.totalUs,
+    iterations,
+    rows,
+  };
+}
+
+/** Resolve the profile report options from raw (kebab-case) CLI args. */
+function profileOptions(
+  cliArgs?: Record<string, unknown>,
+): ProfileReportOptions {
+  if (!cliArgs) return defaultProfileOptions;
+  const topN = cliArgs["profile-rows"];
+  return {
+    topN: typeof topN === "number" ? topN : defaultProfileOptions.topN,
+    userOnly: cliArgs["profile-user-only"] === true,
+  };
+}
+
 /** @return case data: raw per-series benchmarks plus the case-level,
  *  track-columned sections (trimmed + raw views). */
 function prepareGroupData(
@@ -106,13 +226,45 @@ function prepareGroupData(
   return {
     name: group.name,
     baseline: group.baseline
-      ? prepareBenchmarkData(group.baseline, profile)
+      ? prepareBenchmarkData(group.baseline, profile, comparison?.noBatchTrim)
       : undefined,
-    benchmarks: group.reports.map(r => benchmarkEntry(r, profile)),
+    benchmarks: group.reports.map(r =>
+      benchmarkEntry(r, profile, comparison?.noBatchTrim),
+    ),
     warnings: groupWarnings(group, comparison),
     sections: built?.sections,
     rawSections: built?.rawSections,
   };
+}
+
+/** The function's percent change in self-time share vs baseline with a 95%
+ *  bootstrap CI over per-batch shares, or undefined when there are too few
+ *  batches to resample. Comparing shares, not absolute self-time, localizes where
+ *  time shifted rather than reflecting a uniform global change. */
+function batchDeltaCI(
+  key: string,
+  foldsCur: TimeFold[],
+  foldsBase: TimeFold[],
+): { pct: number; ci: [number, number] } | undefined {
+  if (foldsCur.length < minDeltaBatches || foldsBase.length < minDeltaBatches)
+    return undefined;
+  const cur = foldsCur.map(f => selfFraction(f, key));
+  const base = foldsBase.map(f => selfFraction(f, key));
+  const mb = mean(base);
+  if (mb <= 0) return undefined;
+  const pct = ((mean(cur) - mb) / mb) * 100;
+
+  const cBuf = new Array<number>(cur.length);
+  const bBuf = new Array<number>(base.length);
+  const deltas: number[] = [];
+  for (let i = 0; i < deltaResamples; i++) {
+    resampleInto(cur, cBuf);
+    resampleInto(base, bBuf);
+    const rb = mean(bBuf);
+    if (rb > 0) deltas.push(((mean(cBuf) - rb) / rb) * 100);
+  }
+  if (deltas.length < deltaResamples / 2) return undefined;
+  return { pct, ci: computeInterval(deltas, defaultConfidence) };
 }
 
 /** Build the case-level trimmed sections plus the raw (untrimmed) view when
@@ -137,8 +289,10 @@ function buildCaseSections(
 function prepareBenchmarkData(
   report: BenchmarkReport,
   profile?: ProfileReportOptions,
+  noTrim?: boolean,
 ): BenchmarkEntry {
   const { measuredResults: m, name, metadata } = report;
+  const kept = keptProfilesOf(m, noTrim);
   return {
     name,
     metadata,
@@ -156,8 +310,8 @@ function prepareBenchmarkData(
     totalTime: m.totalTime,
     heapSummary: m.heapProfile ? summarizeHeap(m.heapProfile) : undefined,
     coverageSummary: m.coverage ? summarizeCoverage(m.coverage) : undefined,
-    profileSummary: profilesOf(m).length
-      ? summarizeTime(profilesOf(m), undefined, profile, m.iterations)
+    profileSummary: kept.profiles.length
+      ? summarizeTime(kept.profiles, undefined, profile, kept.iterations)
       : undefined,
   };
 }
@@ -168,20 +322,18 @@ function prepareBenchmarkData(
 function benchmarkEntry(
   report: BenchmarkReport,
   profile?: ProfileReportOptions,
+  noTrim?: boolean,
 ): BenchmarkEntry {
   const baseline = report.baseline
-    ? prepareBenchmarkData(report.baseline, profile)
+    ? prepareBenchmarkData(report.baseline, profile, noTrim)
     : undefined;
-  const entry = prepareBenchmarkData(report, profile);
-  const cur = profilesOf(report.measuredResults);
-  const base = report.baseline && profilesOf(report.baseline.measuredResults);
-  const profileSummary = cur.length
-    ? summarizeTime(
-        cur,
-        base || undefined,
-        profile,
-        report.measuredResults.iterations,
-      )
+  const entry = prepareBenchmarkData(report, profile, noTrim);
+  const cur = keptProfilesOf(report.measuredResults, noTrim);
+  const base = report.baseline
+    ? keptProfilesOf(report.baseline.measuredResults, noTrim)
+    : undefined;
+  const profileSummary = cur.profiles.length
+    ? summarizeTime(cur.profiles, base?.profiles, profile, cur.iterations)
     : undefined;
   return { ...entry, profileSummary, baseline };
 }
@@ -200,6 +352,12 @@ function groupWarnings(
   const singleBatch = pairs.some(p => isSingleBatch(p.base, p.cur));
   const lowBatches = pairs.some(p => hasLowBatchCount(p.base, p.cur, noTrim));
   return buildWarnings(singleBatch, lowBatches);
+}
+
+/** A function's share of one batch's sampled time (normalizes batch duration). */
+function selfFraction(fold: TimeFold, key: string): number {
+  const self = fold.byKey.get(key)?.selfUs ?? 0;
+  return fold.totalUs > 0 ? self / fold.totalUs : 0;
 }
 
 /** @return the untrimmed section view, or undefined when trimming changed
@@ -258,128 +416,6 @@ function summarizeHeap(profile: HeapProfile): HeapSummary {
   const resolved = resolveProfile(profile);
   const userSites = filterSites(flattenProfile(resolved));
   return { totalBytes: resolved.totalBytes, userBytes: totalBytes(userSites) };
-}
-
-/** How many CPU self-time rows to show and whether to hide runtime internals. */
-export interface ProfileReportOptions {
-  topN: number;
-  userOnly: boolean;
-}
-
-const defaultProfileOptions: ProfileReportOptions = {
-  topN: 20,
-  userOnly: false,
-};
-
-/** Resolve the profile report options from raw (kebab-case) CLI args. */
-function profileOptions(
-  cliArgs?: Record<string, unknown>,
-): ProfileReportOptions {
-  if (!cliArgs) return defaultProfileOptions;
-  const topN = cliArgs["profile-rows"];
-  return {
-    topN: typeof topN === "number" ? topN : defaultProfileOptions.topN,
-    userOnly: cliArgs["profile-user-only"] === true,
-  };
-}
-
-/** The CPU profiles to pool for a result: every batch's profile when present,
- *  else the single last-batch profile (unbatched / single-batch runs). */
-export function profilesOf(m: MeasuredResults): TimeProfile[] {
-  if (m.timeProfiles?.length) return m.timeProfiles;
-  return m.timeProfile ? [m.timeProfile] : [];
-}
-
-/** Top CPU self-time functions for the markdown report and console, optionally
- *  diffed against a baseline. Pools each side's per-batch profiles, joins by
- *  name+file (so a function matches across builds despite line drift), filters to
- *  user code when asked, then ranks by current self-time. A matched function
- *  carries a baseline delta only when it stands out from the between-batch noise
- *  (profiler ticks are autocorrelated, so the run-to-run spread, not the tick
- *  count, is the honest error bar). */
-export function summarizeTime(
-  cur: TimeProfile[],
-  base: TimeProfile[] | undefined,
-  options: ProfileReportOptions = defaultProfileOptions,
-  iterations?: number,
-): ProfileSummary {
-  const foldsCur = cur.map(summarizeTimeProfile);
-  const foldsBase = base?.length ? base.map(summarizeTimeProfile) : undefined;
-  const pooled = poolFolds(foldsCur);
-  const pooledBase = foldsBase ? poolFolds(foldsBase) : undefined;
-  const sorted = sortedTimeSites(pooled.byKey);
-  const filtered = options.userOnly ? sorted.filter(isNodeUserCode) : sorted;
-  const rows = filtered.slice(0, options.topN).map(s => {
-    const key = siteKey(s);
-    const baseUs = pooledBase?.byKey.get(key)?.selfUs;
-    const delta =
-      baseUs != null && foldsBase
-        ? batchDeltaCI(key, foldsCur, foldsBase)
-        : undefined;
-    const selfPct = pooled.totalUs > 0 ? (s.selfUs / pooled.totalUs) * 100 : 0;
-    const { name, url, line, col, selfUs } = s;
-    return {
-      name,
-      url,
-      line,
-      col,
-      selfUs,
-      selfPct,
-      baseUs,
-      deltaPct: delta?.pct,
-      deltaCI: delta?.ci,
-    };
-  });
-  return {
-    totalUs: pooled.totalUs,
-    baseTotalUs: pooledBase?.totalUs,
-    iterations,
-    rows,
-  };
-}
-
-/** Minimum batches for a per-function delta CI, and the bootstrap resample count.
- *  A function's self-time share is one number per batch, so the CI is a block
- *  bootstrap over batches (its width is set by batch count, not batch length --
- *  prefer many short batches). Below the floor the share spread can't be
- *  estimated and the delta is withheld. */
-const minDeltaBatches = 4;
-const deltaResamples = 2000;
-
-/** The function's percent change in self-time share vs baseline with a 95%
- *  bootstrap CI over per-batch shares, or undefined when there are too few
- *  batches to resample. Comparing shares, not absolute self-time, localizes where
- *  time shifted rather than reflecting a uniform global change. */
-function batchDeltaCI(
-  key: string,
-  foldsCur: TimeFold[],
-  foldsBase: TimeFold[],
-): { pct: number; ci: [number, number] } | undefined {
-  if (foldsCur.length < minDeltaBatches || foldsBase.length < minDeltaBatches)
-    return undefined;
-  const cur = foldsCur.map(f => selfFraction(f, key));
-  const base = foldsBase.map(f => selfFraction(f, key));
-  const mb = mean(base);
-  if (mb <= 0) return undefined;
-  const pct = ((mean(cur) - mb) / mb) * 100;
-
-  const cBuf = new Array<number>(cur.length);
-  const bBuf = new Array<number>(base.length);
-  const deltas: number[] = [];
-  for (let i = 0; i < deltaResamples; i++) {
-    resampleInto(cur, cBuf);
-    resampleInto(base, bBuf);
-    const rb = mean(bBuf);
-    if (rb > 0) deltas.push(((mean(cBuf) - rb) / rb) * 100);
-  }
-  if (deltas.length < deltaResamples / 2) return undefined;
-  return { pct, ci: computeInterval(deltas, defaultConfidence) };
-}
-
-/** A function's share of one batch's sampled time (normalizes batch duration). */
-function selfFraction(fold: TimeFold, key: string): number {
-  const self = fold.byKey.get(key)?.selfUs ?? 0;
-  return fold.totalUs > 0 ? self / fold.totalUs : 0;
 }
 
 /** Compute coverage summary from V8 coverage data */

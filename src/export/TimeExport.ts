@@ -15,68 +15,71 @@ import {
   speedscopeFile,
 } from "./SpeedscopeTypes.ts";
 
-/** Convert a TimeProfile to speedscope format */
+/** Convert a single TimeProfile to speedscope format */
 export function timeProfileToSpeedscope(
   name: string,
   profile: TimeProfile,
 ): SpeedscopeFile {
   const ctx = frameContext();
-  const p = buildTimeProfile(name, profile, ctx);
+  const p = buildMergedTimeProfile(name, [profile], ctx);
   return speedscopeFile(ctx, [p]);
 }
 
-/** Build a SpeedscopeFile from multiple named time profiles (shared frames). */
+/** Build a SpeedscopeFile from multiple named benchmarks, each pooling its own
+ *  batch profiles into one flamegraph (frames shared across benchmarks). */
 export function buildTimeSpeedscopeFile(
-  entries: { name: string; profile: TimeProfile }[],
+  entries: { name: string; profiles: TimeProfile[] }[],
 ): SpeedscopeFile | undefined {
   return multiProfileFile(entries, (e, ctx) =>
-    buildTimeProfile(e.name, e.profile, ctx),
+    buildMergedTimeProfile(e.name, e.profiles, ctx),
   );
 }
 
-/** Build a speedscope profile from a V8 TimeProfile */
-function buildTimeProfile(
+/** Pool several V8 TimeProfiles (typically one per kept batch) into one sampled
+ *  speedscope profile: concatenate resolved stacks and weights over a shared
+ *  frame context, so the flamegraph reflects all sampled ticks rather than a
+ *  single batch. */
+function buildMergedTimeProfile(
   name: string,
-  profile: TimeProfile,
+  profiles: TimeProfile[],
   ctx: FrameContext,
 ): SpeedscopeTimeProfile {
-  const { samples: sampleIds, timeDeltas, nodes } = profile;
-
-  if (!sampleIds?.length || !timeDeltas) {
-    return {
-      type: "sampled",
-      name,
-      unit: "microseconds",
-      startValue: 0,
-      endValue: 0,
-      samples: [],
-      weights: [],
-    };
-  }
-
-  const nodeMap = new Map<number, TimeProfileNode>(nodes.map(n => [n.id, n]));
-  const parentMap = new Map<number, number>(); // childId -> parentId
-  for (const node of nodes) {
-    for (const childId of node.children ?? []) {
-      parentMap.set(childId, node.id);
-    }
-  }
-
-  const cache = new Map<number, number[]>();
-  const resolve = (id: number) =>
-    resolveStack(id, nodeMap, parentMap, cache, ctx);
-
-  const samples = sampleIds.map(resolve);
-  const total = timeDeltas.reduce((sum, w) => sum + w, 0);
+  const samples: number[][] = [];
+  const weights: number[] = [];
+  for (const profile of profiles) appendSamples(profile, ctx, samples, weights);
   return {
     type: "sampled",
     name,
     unit: "microseconds",
     startValue: 0,
-    endValue: total,
+    endValue: weights.reduce((sum, w) => sum + w, 0),
     samples,
-    weights: timeDeltas,
+    weights,
   };
+}
+
+/** Resolve one profile's sampled stacks and append them (with weights) to the
+ *  shared accumulators. Node ids are per-profile, so the maps/cache are local;
+ *  only interned frames are shared via ctx. Sample-less profiles add nothing. */
+function appendSamples(
+  profile: TimeProfile,
+  ctx: FrameContext,
+  samples: number[][],
+  weights: number[],
+): void {
+  const { samples: sampleIds, timeDeltas, nodes } = profile;
+  if (!sampleIds?.length || !timeDeltas) return;
+
+  const nodeMap = new Map<number, TimeProfileNode>(nodes.map(n => [n.id, n]));
+  const parentMap = new Map<number, number>(); // childId -> parentId
+  for (const node of nodes) {
+    for (const childId of node.children ?? []) parentMap.set(childId, node.id);
+  }
+
+  const cache = new Map<number, number[]>();
+  for (const id of sampleIds)
+    samples.push(resolveStack(id, nodeMap, parentMap, cache, ctx));
+  for (const w of timeDeltas) weights.push(w);
 }
 
 /** Walk from node to root, building a stack of frame indices (root-first) */
