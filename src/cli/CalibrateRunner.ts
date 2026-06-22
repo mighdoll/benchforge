@@ -3,7 +3,10 @@ import {
   formatGcHistogram,
 } from "../report/CalibrationReport.ts";
 import colors from "../report/Colors.ts";
-import { formatSignedPercent } from "../report/Formatters.ts";
+import {
+  formatSignedPercent,
+  percentMagnitude as pct,
+} from "../report/Formatters.ts";
 import type { CalibrationResult, RunProgress } from "../runners/Calibration.ts";
 
 /** Print one progress line per completed self-comparison run (to stderr). */
@@ -26,11 +29,6 @@ export function formatCalibration(result: CalibrationResult): string {
   });
   const table = ["   run        Δ%   CI half-width", ...rows].join("\n");
   return `${table}\n\n${conclusion(result)}`;
-}
-
-/** Format an unsigned percent magnitude, e.g. "1.85%". */
-function pct(n: number): string {
-  return `${n.toFixed(2)}%`;
 }
 
 /** Conclusion block: noise floor estimates and the suggested margin. */

@@ -46,6 +46,11 @@ export function formatSignedPercent(v: number, precision = 1): string {
   return `${sign}${v.toFixed(precision)}%`;
 }
 
+/** Format an already-scaled percent magnitude, e.g. "1.85%". */
+export function percentMagnitude(n: number, precision = 2): string {
+  return `${n.toFixed(precision)}%`;
+}
+
 /** A profile frame's source location as "url:line", or "" for a synthetic frame
  *  with no source (e.g. "(garbage collector)", an eval'd inline variant). */
 export function frameLocation(url: string, line?: number): string {

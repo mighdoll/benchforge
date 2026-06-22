@@ -22,6 +22,7 @@ import {
 } from "./Formatters.ts";
 import type { GcByBatchSummary, Spread } from "./GcByBatch.ts";
 import { formatGitVersion, type GitVersion } from "./GitUtils.ts";
+import { mdTable } from "./MarkdownTable.ts";
 import { verdictWord } from "./Verdict.ts";
 import type { WarmupShape } from "./WarmupShape.ts";
 
@@ -39,6 +40,12 @@ export function markdownReport(data: ReportData): string {
   ];
   const groups = data.groups.map(groupMarkdown).filter(Boolean);
   return [...head.filter(Boolean), ...groups].join("\n\n") + "\n";
+}
+
+/** A row's self-time per benchmark iteration (us), or the run total when the
+ *  iteration count is unknown. */
+export function selfPerIterUs(r: HotFunction, iterations?: number): number {
+  return iterations && iterations > 0 ? r.selfUs / iterations : r.selfUs;
 }
 
 function versionLine(current?: GitVersion, baseline?: GitVersion): string {
@@ -81,12 +88,10 @@ function sectionMarkdown(section: ViewerSection): string[] {
     const shared = sharedTable(section.rows.filter(r => r.shared));
     return [...header, ...tables, shared].filter((s): s is string => !!s);
   }
-  const table = trackTable(
-    section.rows.filter(r => !isRunsRow(r) && !r.shared),
-  );
-  const shared = sharedTable(
-    section.rows.filter(r => r.shared && !isRunsRow(r)),
-  );
+  const trackRows = section.rows.filter(r => !isRunsRow(r) && !r.shared);
+  const sharedRows = section.rows.filter(r => r.shared && !isRunsRow(r));
+  const table = trackTable(trackRows);
+  const shared = sharedTable(sharedRows);
   return [...header, table, shared].filter((s): s is string => !!s);
 }
 
@@ -126,21 +131,16 @@ function trackTable(rows: ViewerRow[]): string | undefined {
   const usable = rows.filter(r => r.entries.some(e => entryValue(e)));
   if (!usable.length) return undefined;
   const head = ["metric", ...usable[0].entries.map(e => e.runName)];
-  const sep = head.map(() => "---");
-  const body = usable.map(
-    r => `| ${[r.label, ...r.entries.map(cell)].join(" | ")} |`,
-  );
-  return [`| ${head.join(" | ")} |`, `| ${sep.join(" | ")} |`, ...body].join(
-    "\n",
-  );
+  const body = usable.map(r => [r.label, ...r.entries.map(cell)]);
+  return mdTable(head, body);
 }
 
 /** A two-column table for shared (case-constant) rows, e.g. the line count. */
 function sharedTable(rows: ViewerRow[]): string | undefined {
   const usable = rows.filter(r => entryValue(r.entries[0]) !== undefined);
   if (!usable.length) return undefined;
-  const body = usable.map(r => `| ${r.label} | ${entryValue(r.entries[0])} |`);
-  return ["| metric | value |", "|---|---|", ...body].join("\n");
+  const body = usable.map(r => [r.label, entryValue(r.entries[0]) ?? ""]);
+  return mdTable(["metric", "value"], body);
 }
 
 /** Time-by-position table: how much each batch's early iterations run above the
@@ -148,19 +148,18 @@ function sharedTable(rows: ViewerRow[]): string | undefined {
  *  the --warmup lever without recommending trimming, since the default includes
  *  warmup on purpose. */
 function warmupShapeMarkdown(w: WarmupShape): string[] {
-  const header = "| region | median | vs plateau |\n|---|---|---|";
   const last = w.regions.length - 1;
   const rows = w.regions.map((r, i) => {
     const vs =
       i === last ? "plateau" : formatSignedPercent(r.pctVsPlateau * 100);
-    return `| ${r.label} | ${timeMs(r.medianMs)} | ${vs} |`;
+    return [r.label, timeMs(r.medianMs) ?? "", vs];
   });
   const note =
     "Early-region cost is JIT/heap warmup. The measured window includes it by " +
     "default; `--warmup N` runs N iterations before measurement to exclude it.";
   return [
     `#### time by region (per batch, ${w.batches} batches)`,
-    [header, ...rows].join("\n"),
+    mdTable(["region", "median", "vs plateau"], rows),
     note,
   ];
 }
@@ -170,14 +169,17 @@ function warmupShapeMarkdown(w: WarmupShape): string[] {
  *  full GCs were observed (the framing is full collections). */
 function gcByBatchMarkdown(gc: GcByBatchSummary): string[] {
   if (gc.fullGCs === 0) return [];
-  const header = "| measure | per batch / event |\n|---|---|";
   const rows = [
-    `| full GCs / batch | ${spreadCounts(gc.fullPerBatch)} |`,
-    `| full-GC pause | ${spreadTime(gc.fullPause)} |`,
-    `| bytes collected / full GC | ${spreadBytes(gc.fullCollected)} |`,
-    `| totals | ${gc.fullGCs} full, ${gc.scavenges} scavenge, ${gc.batches} batches |`,
+    ["full GCs / batch", spreadCounts(gc.fullPerBatch)],
+    ["full-GC pause", spreadTime(gc.fullPause)],
+    ["bytes collected / full GC", spreadBytes(gc.fullCollected)],
+    [
+      "totals",
+      `${gc.fullGCs} full, ${gc.scavenges} scavenge, ${gc.batches} batches`,
+    ],
   ];
-  return ["#### full GC by batch", [header, ...rows].join("\n")];
+  const table = mdTable(["measure", "per batch / event"], rows);
+  return ["#### full GC by batch", table];
 }
 
 /** Top CPU self-time functions from a `--profile` pass. When the run had a
@@ -194,48 +196,12 @@ function hotFunctionsMarkdown(s: ProfileSummary): string[] {
   const cols = withBase
     ? ["self/iter", "self%", "Δ% share (95% CI)", "function", "location"]
     : ["self/iter", "self%", "function", "location"];
-  const sep = cols.map(() => "---");
-  const rows = s.rows.map(
-    r => `| ${hotCells(r, withBase, s.iterations).join(" | ")} |`,
-  );
+  const rows = s.rows.map(r => hotCells(r, withBase, s.iterations));
+  const table = mdTable(cols, rows);
   const note = withBase
     ? "Self time per benchmark iteration, pooled across all batches of a sampled pass (`--profile`). Δ is each function's change in self-time *share* vs baseline with a 95% bootstrap CI over batches (`new` = absent in baseline, `~` = too few batches; a CI spanning 0 = no clear change). Resolution is sampling-limited -- a hot function's CI bottoms out near +/-1/sqrt(ticks), so tighten it by spending more samples (a longer run or a finer `--profile-interval`), and use enough batches (>= ~10) for a stable interval; batch size barely matters at a fixed budget. Self-time also shifts with JIT/inlining and module-load paths between builds, so read Δ as a hint."
     : "Self time per benchmark iteration, pooled across all batches of a sampled pass (`--profile`); the absolute times are lightly perturbed by sampling.";
-  return [
-    title,
-    [`| ${cols.join(" | ")} |`, `| ${sep.join(" | ")} |`, ...rows].join("\n"),
-    note,
-  ];
-}
-
-/** One hot-function row's cells: self time per iteration, self %, optional Δ,
- *  name, location. */
-function hotCells(
-  r: HotFunction,
-  withBase: boolean,
-  iterations?: number,
-): string[] {
-  const self = timeMs(selfPerIterUs(r, iterations) / 1000) ?? "";
-  const pct = `${r.selfPct.toFixed(1)}%`;
-  const head = [self, pct];
-  const tail = [r.name || "(anonymous)", frameLocation(r.url, r.line)];
-  if (!withBase) return [...head, ...tail];
-  return [...head, hotDelta(r), ...tail];
-}
-
-/** A row's self-time per benchmark iteration (us), or the run total when the
- *  iteration count is unknown. */
-export function selfPerIterUs(r: HotFunction, iterations?: number): number {
-  return iterations && iterations > 0 ? r.selfUs / iterations : r.selfUs;
-}
-
-/** The Δ cell: the share change with its 95% CI when there were enough batches to
- *  form one, `~` when the function matched the baseline but had too few batches,
- *  `new` when it had no baseline match at all. */
-function hotDelta(r: HotFunction): string {
-  if (r.deltaPct != null && r.deltaCI)
-    return `${formatSignedPercent(r.deltaPct)} ${formatPercentCI(r.deltaCI)}`;
-  return r.baseUs != null ? "~" : "new";
+  return [title, table, note];
 }
 
 /** Per-percentile diff table: mean first, then percentiles in displayed order.
@@ -244,10 +210,9 @@ function hotDelta(r: HotFunction): string {
 function shiftTable(shift: ShiftFunction, label?: string): string {
   const prefix = label ? `${label}: ` : "";
   const title = `${prefix}${shift.metric} (Δ% vs baseline)`;
-  const header = "| stat | current | baseline | Δ% | 95% CI | verdict |";
-  const sep = "|---|---|---|---|---|---|";
-  const rows = shift.points.map(pointRow);
-  return [title, header, sep, ...rows].join("\n");
+  const cols = ["stat", "current", "baseline", "Δ%", "95% CI", "verdict"];
+  const table = mdTable(cols, shift.points.map(pointRow));
+  return `${title}\n${table}`;
 }
 
 /** One track cell: its value, with the Δ% appended on comparison tracks. */
@@ -274,12 +239,43 @@ function spreadBytes(s: Spread): string {
   return `${formatBytes(s.min)}..${formatBytes(s.max)} (mean ${formatBytes(s.mean)}, CV ${integer(s.cv * 100)}%)`;
 }
 
-/** One shift point as a table row. runs[0] is current, runs[1] is baseline. */
-function pointRow(point: ShiftPercentile): string {
+/** One hot-function row's cells: self time per iteration, self %, optional Δ,
+ *  name, location. */
+function hotCells(
+  r: HotFunction,
+  withBase: boolean,
+  iterations?: number,
+): string[] {
+  const self = timeMs(selfPerIterUs(r, iterations) / 1000) ?? "";
+  const pct = `${r.selfPct.toFixed(1)}%`;
+  const head = [self, pct];
+  const tail = [r.name || "(anonymous)", frameLocation(r.url, r.line)];
+  if (!withBase) return [...head, ...tail];
+  return [...head, hotDelta(r), ...tail];
+}
+
+/** One shift point as a row of cells. runs[0] is current, runs[1] is baseline. */
+function pointRow(point: ShiftPercentile): string[] {
   const { diff, runs, label, reliable, tailCount } = point;
   const cur = runs[0]?.bootstrapCI.estimateLabel ?? "";
   const base = runs[1]?.bootstrapCI.estimateLabel ?? "";
   const word = verdictWord(diff.direction);
   const verdict = reliable ? word : `${word} (unreliable, n=${tailCount})`;
-  return `| ${label} | ${cur} | ${base} | ${formatSignedPercent(diff.percent)} | ${formatPercentCI(diff.ci)} | ${verdict} |`;
+  return [
+    label,
+    cur,
+    base,
+    formatSignedPercent(diff.percent),
+    formatPercentCI(diff.ci),
+    verdict,
+  ];
+}
+
+/** The Δ cell: the share change with its 95% CI when there were enough batches to
+ *  form one, `~` when the function matched the baseline but had too few batches,
+ *  `new` when it had no baseline match at all. */
+function hotDelta(r: HotFunction): string {
+  if (r.deltaPct != null && r.deltaCI)
+    return `${formatSignedPercent(r.deltaPct)} ${formatPercentCI(r.deltaCI)}`;
+  return r.baseUs != null ? "~" : "new";
 }

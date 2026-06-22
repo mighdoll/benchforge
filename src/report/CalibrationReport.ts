@@ -1,18 +1,9 @@
 import type { CalibrationResult } from "../runners/Calibration.ts";
 import type { IntegerCount } from "../stats/CoreStats.ts";
 import { formatCliCommand } from "./CliCommand.ts";
-import { formatSignedPercent } from "./Formatters.ts";
+import { formatSignedPercent, percentMagnitude as pct } from "./Formatters.ts";
 import { formatGitVersion, type GitVersion } from "./GitUtils.ts";
-
-/** Below this many full GCs per batch, the batch mean is dominated by where the
- *  lone collection lands and single-run CIs understate between-run GC variance. */
-const minFullGcsPerBatch = 2;
-
-/** A run straddles a GC-count step when its modal batch count holds less than
- *  this share of batches: most batches do N full GCs, the rest do N+/-1, and
- *  the per-batch mean jumps by a whole major GC between them. Allows a few stray
- *  batches without warning, but flags a genuine split. */
-const minModalShare = 0.9;
+import { mdTable } from "./MarkdownTable.ts";
 
 /** Header context for a saved calibration report. */
 export interface CalibrationMeta {
@@ -29,6 +20,16 @@ export interface CalibrationWarning {
   summary: string;
   detail: string;
 }
+
+/** Below this many full GCs per batch, the batch mean is dominated by where the
+ *  lone collection lands and single-run CIs understate between-run GC variance. */
+const minFullGcsPerBatch = 2;
+
+/** A run straddles a GC-count step when its modal batch count holds less than
+ *  this share of batches: most batches do N full GCs, the rest do N+/-1, and
+ *  the per-batch mean jumps by a whole major GC between them. Allows a few stray
+ *  batches without warning, but flags a genuine split. */
+const minModalShare = 0.9;
 
 /** Render a calibration result as a self-contained markdown report: a header
  *  recalling the invocation and machine, the noise-floor summary (with the
@@ -104,31 +105,22 @@ function header(meta: CalibrationMeta): string {
 function noiseFloor(result: CalibrationResult): string {
   const { runs, batches, summary: s, fullGcsPerBatch, gcHistogram } = result;
   const rows = [
-    `| mean Δ% | ${formatSignedPercent(s.meanPoint)} (expected ~0) |`,
-    `| point-estimate scatter | ${pct(s.scatterStd)} std, ${pct(s.scatterP95)} 95th pct abs |`,
-    `| within-run CI half-width | ${pct(s.meanCiHalfWidth)} mean |`,
-    `| **suggested --equiv-margin** | **${pct(s.suggestedMargin)}** |`,
+    ["mean Δ%", `${formatSignedPercent(s.meanPoint)} (expected ~0)`],
+    [
+      "point-estimate scatter",
+      `${pct(s.scatterStd)} std, ${pct(s.scatterP95)} 95th pct abs`,
+    ],
+    ["within-run CI half-width", `${pct(s.meanCiHalfWidth)} mean`],
+    ["**suggested --equiv-margin**", `**${pct(s.suggestedMargin)}**`],
   ];
   if (gcHistogram && fullGcsPerBatch !== undefined) {
-    rows.push(
-      `| full GCs/batch | ${formatGcHistogram(gcHistogram)} (mean ${fullGcsPerBatch.toFixed(1)}) |`,
-    );
+    rows.push([
+      "full GCs/batch",
+      `${formatGcHistogram(gcHistogram)} (mean ${fullGcsPerBatch.toFixed(1)})`,
+    ]);
   }
   const title = `## Noise floor (${runs} runs x ${batches} batches, current vs current)`;
-  const table = ["| metric | value |", "|---|---|", ...rows].join("\n");
-  return `${title}\n\n${table}`;
-}
-
-/** Per-run table of point estimate and CI half-width. */
-function perRunTable(result: CalibrationResult): string {
-  const { pointEstimates, ciHalfWidths } = result;
-  const rows = pointEstimates.map(
-    (p, i) => `| ${i + 1} | ${formatSignedPercent(p)} | ${pct(ciHalfWidths[i])} |`,
-  );
-  const table = ["| run | Δ% | CI half-width |", "|---|---|---|", ...rows].join(
-    "\n",
-  );
-  return `## Per-run\n\n${table}`;
+  return `${title}\n\n${mdTable(["metric", "value"], rows)}`;
 }
 
 /** A warning as a markdown blockquote, one `>` per line. */
@@ -137,9 +129,16 @@ function warningQuote(w: CalibrationWarning): string {
   return lines.map(l => `> ${l}`).join("\n");
 }
 
-/** Format an unsigned percent magnitude, e.g. "1.85%". */
-function pct(n: number): string {
-  return `${n.toFixed(2)}%`;
+/** Per-run table of point estimate and CI half-width. */
+function perRunTable(result: CalibrationResult): string {
+  const { pointEstimates, ciHalfWidths } = result;
+  const rows = pointEstimates.map((p, i) => [
+    `${i + 1}`,
+    formatSignedPercent(p),
+    pct(ciHalfWidths[i]),
+  ]);
+  const table = mdTable(["run", "Δ%", "CI half-width"], rows);
+  return `## Per-run\n\n${table}`;
 }
 
 /** True when the modal GC-count bucket holds less than minModalShare of all

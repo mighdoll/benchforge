@@ -1,7 +1,7 @@
 import { expect, test } from "vitest";
 import {
-  calibrationMarkdown,
   type CalibrationMeta,
+  calibrationMarkdown,
 } from "../report/CalibrationReport.ts";
 import type { CalibrationResult } from "../runners/Calibration.ts";
 import { summarizeCalibration } from "../stats/CalibrationSummary.ts";
@@ -34,13 +34,19 @@ test("header carries the title, invocation, timestamp, and machine", () => {
   const md = calibrationMarkdown(calibrationResult(), meta);
   expect(md).toContain("# Calibration report");
   expect(md).toContain("`benchforge --calibrate --batches 100 --gc-stats`");
-  expect(md).toContain("2026-06-22T10:30:45.123Z -- node v22.0.0, darwin arm64");
+  expect(md).toContain(
+    "2026-06-22T10:30:45.123Z -- node v22.0.0, darwin arm64",
+  );
 });
 
 test("noise floor table bolds the suggested margin", () => {
   const md = calibrationMarkdown(calibrationResult(), meta);
-  expect(md).toContain("## Noise floor (5 runs x 100 batches, current vs current)");
-  expect(md).toMatch(/\| \*\*suggested --equiv-margin\*\* \| \*\*[\d.]+%\*\* \|/);
+  expect(md).toContain(
+    "## Noise floor (5 runs x 100 batches, current vs current)",
+  );
+  expect(md).toMatch(
+    /\| \*\*suggested --equiv-margin\*\* \| \*\*[\d.]+%\*\* \|/,
+  );
 });
 
 test("scatter cell has no literal pipe that would break the table", () => {

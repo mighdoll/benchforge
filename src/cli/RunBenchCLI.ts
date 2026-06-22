@@ -226,7 +226,8 @@ async function runMatrixCalibratePipeline(
       arch: process.arch,
     },
   };
-  writeCalibrationReport(calibrationMarkdown(result, meta), meta.timestamp, args);
+  const md = calibrationMarkdown(result, meta);
+  writeCalibrationReport(md, meta.timestamp, args);
 }
 
 /** Load a benchmark file and shape its default export into a BuildResult. A

@@ -86,7 +86,7 @@ function batched(
     for (let i = 0; i < perBatch; i++)
       samples.push((1 + (k++ / n) * 2) * scale);
   }
-  return { name: "current", samples, batchOffsets } as MeasuredResults;
+  return { name: "current", samples, batchOffsets, time: zeroStats };
 }
 
 test("renders a shift table with mean, percentiles, and reliability", () => {
@@ -312,7 +312,6 @@ test("renders a hot-functions delta table with a baseline (5 columns)", () => {
   expect(md).toContain(
     "| 124μs | 38.2% | +40.9% [+20.0%, +62.0%] | countLineBreaks | /Lines.ts:42 |",
   );
-  // a function absent from the baseline renders "new" in the delta column
   expect(md).toMatch(/\| new \| normalizeEol \| \/Eol\.ts:5 \|/);
 });
 
