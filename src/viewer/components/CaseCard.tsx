@@ -160,8 +160,8 @@ function ShiftPanel({ shift, label }: { shift: ShiftFunction; label?: string }) 
 }
 
 /** Per-percentile absolute distribution fan below the sparkline table, for a
- *  variant with no baseline. Non-interactive: there is no comparison to drill
- *  into, so the violins just show the distribution shape. */
+ *  variant with no baseline. The violins show the distribution shape; clicking
+ *  a percentile opens its distribution detail popup. */
 function AbsoluteShiftPanel({ shift, label }: { shift: AbsoluteShift; label?: string }) {
   const ref = useResponsivePlot(async width => {
     const { createAbsoluteShiftPlot } = await import("../plots/AbsoluteShiftPlot.ts");
