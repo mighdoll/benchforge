@@ -27,8 +27,8 @@ export interface DistributionPlotOptions {
   includeZero?: boolean;
   /** Centered label above chart (e.g., the formatted point estimate) */
   pointLabel?: string;
-  /** Equivalence margin in percent (draws shaded band at +/- margin) */
-  equivMargin?: number;
+  /** Equivalence margin as a display-domain [lo, hi] band (draws a shaded zone) */
+  marginBand?: [number, number];
   /** Block-level or sample-level CI */
   ciLevel?: CILevel;
   /** false ==> dashed border (insufficient batches for reliable CI) */
@@ -74,13 +74,13 @@ export function createDistributionPlot(
   if (!histogram?.length) return svg;
 
   const { fill, stroke } = directionColors[opts.direction];
-  const { includeZero, equivMargin, domain } = opts;
+  const { includeZero, marginBand, domain } = opts;
   const scales = buildScales(
     histogram,
     ci,
     layout,
     includeZero,
-    equivMargin,
+    marginBand,
     pointEstimate,
     domain,
   );
@@ -89,8 +89,8 @@ export function createDistributionPlot(
 
   drawTitles(svg, opts, layout, ptX);
 
-  if (equivMargin && includeZero)
-    drawMarginZone(svg, equivMargin, scales, layout);
+  if (marginBand && includeZero)
+    drawMarginZone(svg, marginBand, scales, layout);
 
   drawCIRegion(svg, ci, scales, layout, opts, fill);
 
@@ -151,7 +151,7 @@ function buildScales(
   ci: [number, number],
   layout: Layout,
   includeZero: boolean,
-  equivMargin?: number,
+  marginBand?: [number, number],
   pointEstimate?: number,
   domain?: [number, number],
 ): Scales {
@@ -159,7 +159,7 @@ function buildScales(
   const bounds = histogram.map(b => b.x);
   bounds.push(ci[0], ci[1]);
   if (includeZero) bounds.push(0);
-  if (equivMargin) bounds.push(-equivMargin, equivMargin);
+  if (marginBand) bounds.push(marginBand[0], marginBand[1]);
   if (pointEstimate != null) bounds.push(pointEstimate);
   if (domain) bounds.push(domain[0], domain[1]);
   const xMin = Math.min(...bounds);

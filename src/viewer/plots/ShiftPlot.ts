@@ -1,4 +1,8 @@
-import type { ShiftFunction, ShiftPercentile } from "../ReportData.ts";
+import {
+  type ShiftFunction,
+  type ShiftPercentile,
+  shiftMarginBand,
+} from "../ReportData.ts";
 import {
   drawDivider,
   drawMarginBand,
@@ -34,15 +38,15 @@ export function createShiftPlot(
 
   const plotWidth = opts.width - margin.left - margin.right;
   const plotHeight = opts.height - margin.top - margin.bottom;
-  const yScale = buildYScale(points, shift.equivMargin, plotHeight);
+  const band = shiftMarginBand(shift);
+  const yScale = buildYScale(points, band, plotHeight);
   const centers = slotCenters(points, plotWidth);
   const halfMax = centers.slotWidth * 0.42;
   const maxCount = maxHistogramCount(points);
 
-  if (shift.equivMargin)
-    drawMarginBand(svg, shift.equivMargin, yScale, opts.width);
+  if (band) drawMarginBand(svg, band, yScale, opts.width);
   drawZeroLine(svg, yScale, opts.width);
-  drawYAxis(svg, yScale, points, shift.equivMargin);
+  drawYAxis(svg, yScale, points, band);
   if (centers.dividerX != null) drawDivider(svg, centers.dividerX, plotHeight);
 
   const layer = clipLayer(svg, plotWidth, plotHeight);
@@ -64,7 +68,7 @@ export function createShiftPlot(
  *  the CI are clipped to the plot rect instead. */
 function buildYScale(
   points: ShiftPercentile[],
-  equivMargin: number | undefined,
+  band: [number, number] | undefined,
   plotH: number,
 ): Scale {
   let min = 0;
@@ -73,9 +77,9 @@ function buildYScale(
     if (v < min) min = v;
     if (v > max) max = v;
   };
-  if (equivMargin) {
-    consider(-equivMargin);
-    consider(equivMargin);
+  if (band) {
+    consider(band[0]);
+    consider(band[1]);
   }
   for (const p of scalePoints(points)) {
     consider(p.diff.ci[0]);

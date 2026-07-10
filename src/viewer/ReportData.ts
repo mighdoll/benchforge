@@ -139,6 +139,13 @@ export interface ShiftFunction {
   metric: string;
   /** Equivalence margin in percent, when set on the run (draws a +/- band). */
   equivMargin?: number;
+
+  /** The equivalence margin as a display-domain [lo, hi] band (slightly
+   *  asymmetric under a reciprocal transform). Drawn on the CI and shift plots.
+   *  Absent for archives predating this field; viewers fall back to the
+   *  symmetric +/-equivMargin band. */
+  equivMarginBand?: [number, number];
+
   points: ShiftPercentile[];
 }
 
@@ -289,4 +296,15 @@ export interface GcEvent {
   type: "scavenge" | "mark-compact" | "minor-ms" | "unknown";
   /** Bytes freed by this collection (for the tooltip). */
   collected: number;
+}
+
+/** The equivalence band to draw for a shift: the serialized display-domain
+ *  [lo, hi], or the symmetric +/-equivMargin for archives predating it. */
+export function shiftMarginBand(
+  shift?: ShiftFunction,
+): [number, number] | undefined {
+  if (!shift) return undefined;
+  if (shift.equivMarginBand) return shift.equivMarginBand;
+  if (shift.equivMargin != null) return [-shift.equivMargin, shift.equivMargin];
+  return undefined;
 }

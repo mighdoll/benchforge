@@ -1,21 +1,18 @@
 import type { MeasuredResults } from "../runners/MeasuredResults.ts";
 import { prepareBlocks } from "../stats/BlockBootstrap.ts";
-import {
-  type BootstrapResult,
-  type DifferenceCI,
-  flipCI,
-} from "../stats/Bootstrap.ts";
+import type { BootstrapResult, DifferenceCI } from "../stats/Bootstrap.ts";
 import { mean, percentile, type StatKind } from "../stats/CoreStats.ts";
 import type { ShiftPercentile, ShiftRun } from "../viewer/ReportData.ts";
 import type { MetricSection, UnknownRecord } from "./BenchmarkReport.ts";
 import {
   annotateCI,
+  displayDiffCI,
   formatBootstrapCI,
   keptBatchCount,
 } from "./CiFormatting.ts";
 import { baselineLabel } from "./Formatters.ts";
 
-interface PointArgs {
+export interface PointArgs {
   p: number;
   diff: DifferenceCI | undefined;
   curResult: BootstrapResult | undefined;
@@ -118,17 +115,23 @@ export function buildMeanPoint(args: PointArgs): ShiftPercentile | undefined {
   };
 }
 
-/** Shared point fields: flipped+annotated diff and per-run absolute distributions. */
+/** Shared point fields: display-domain diff (anchored on the baseline point
+ *  estimate) and per-run absolute distributions. */
 function buildPointBase(
   args: PointArgs,
 ): Pick<ShiftPercentile, "diff" | "runs"> | undefined {
   const { diff, curResult, baseResult, section, lowBatches } = args;
   if (!diff || !curResult || !baseResult) return undefined;
 
-  const flipped = section.higherIsBetter ? flipCI(diff) : diff;
-  const annotated = annotateCI(flipped, section.title, lowBatches);
-
   const { current, baseline, currentMeta, baselineMeta } = args;
+  const display = displayDiffCI(
+    section,
+    diff,
+    baseResult.estimate,
+    baselineMeta,
+  );
+  const annotated = annotateCI(display, section.title, lowBatches);
+
   const runCI = (
     r: BootstrapResult,
     m: MeasuredResults,

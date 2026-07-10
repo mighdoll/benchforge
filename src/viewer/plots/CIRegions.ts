@@ -9,16 +9,16 @@ import {
   rect,
 } from "./SvgHelpers.ts";
 
-/** Draw equivalence margin zone: hatched band centered vertically */
+/** Draw equivalence margin zone: hatched [lo, hi] band centered vertically */
 export function drawMarginZone(
   svg: SVGSVGElement,
-  equivMargin: number,
+  marginBand: [number, number],
   scales: Scales,
   layout: Layout,
 ): void {
   const { margin, plot } = layout;
-  const x1 = scales.x(-equivMargin);
-  const x2 = scales.x(equivMargin);
+  const x1 = scales.x(marginBand[0]);
+  const x2 = scales.x(marginBand[1]);
   const fill = `url(#${ensureHatchPattern(svg)})`;
   const bandH = plot.h / 3;
   const bandY = margin.top + (plot.h - bandH) / 2;

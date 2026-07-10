@@ -7,11 +7,7 @@ import {
   pairedBlockBootstrap,
   pairedBlockDifference,
 } from "../stats/BlockDifference.ts";
-import {
-  type BootstrapResult,
-  type DifferenceCI,
-  flipCI,
-} from "../stats/Bootstrap.ts";
+import type { BootstrapResult, DifferenceCI } from "../stats/Bootstrap.ts";
 import {
   isBootstrappable,
   type StatKind,
@@ -23,9 +19,11 @@ import {
   metricStatKind,
   metricValue,
   type ScalarRow,
+  type UnknownRecord,
 } from "./BenchmarkReport.ts";
 import {
   annotateCI,
+  displayDiffCI,
   formatBootstrapCI,
   hasBatchBlocks,
   hasLowBatchCount,
@@ -297,9 +295,18 @@ function comparisonMetric(
   const raw = pair
     ? pairedMetric(stat, pair, opts, reuse, index)
     : sampleMetric(stat, base.measured, track.measured, opts, reuse, index);
+  // a reused diff (raw view, untrimmed track) is already display-domain and
+  // annotated; adjusting again would re-apply the transform (reciprocal
+  // transforms are involutions, so it would silently revert to time-domain).
+  if (reuse?.diff?.[index]) return raw;
+  // anchor the display transform on the baseline stat from the same kept data.
+  const anchorSamples = pair ? pair.baseline.filtered : base.measured.samples;
+  const anchor = statKindToFn(stat)(anchorSamples);
   const diff = adjustDiff(section, raw.diff, base.measured, track.measured, {
     noBatchTrim,
     pairCount: pair?.pairCount,
+    anchor,
+    metadata: base.meta,
   });
   return { ...raw, diff };
 }
@@ -371,16 +378,22 @@ function sampleMetric(
   return { diff };
 }
 
-/** Apply display-direction and reliability annotations to a raw diff CI. */
+/** Transform the raw time-percent diff into the section's display domain, then
+ *  apply reliability annotations. */
 function adjustDiff(
   section: MetricSection,
   ci: DifferenceCI | undefined,
   baseline: MeasuredResults,
   current: MeasuredResults,
-  opts: { noBatchTrim?: boolean; pairCount?: number },
+  opts: {
+    noBatchTrim?: boolean;
+    pairCount?: number;
+    anchor: number;
+    metadata?: UnknownRecord;
+  },
 ): DifferenceCI | undefined {
   if (!ci) return undefined;
-  const adjusted = section.higherIsBetter ? flipCI(ci) : ci;
+  const adjusted = displayDiffCI(section, ci, opts.anchor, opts.metadata);
   const lowBatches = hasLowBatchCount(
     baseline,
     current,

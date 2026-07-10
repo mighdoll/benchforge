@@ -2,7 +2,11 @@ import { useEffect, useState } from "preact/hooks";
 import { formatCliCommand } from "../../report/CliCommand.ts";
 import type { GitVersion } from "../../report/GitUtils.ts";
 import { formatRelativeTime } from "../DateFormat.ts";
-import type { BenchmarkGroup, ReportData } from "../ReportData.ts";
+import {
+  type BenchmarkGroup,
+  type ReportData,
+  shiftMarginBand,
+} from "../ReportData.ts";
 import { provider, reportData, trimMode } from "../State.ts";
 import { activeGroupView, CaseCard, caseHeaderCI } from "./CaseCard.tsx";
 import { ComparisonBadge, shiftDetailOpener } from "./CIWidgets.tsx";
@@ -114,7 +118,11 @@ function CollapsibleGroup({ group }: { group: BenchmarkGroup }) {
         <span class="group-toggle">{open ? "▾" : "▸"}</span>
         <h2>{group.name}</h2>
         {header && (
-          <ComparisonBadge ci={header.ci} onOpen={shiftDetailOpener(header.shift)} />
+          <ComparisonBadge
+            ci={header.ci}
+            onOpen={shiftDetailOpener(header.shift)}
+            marginBand={shiftMarginBand(header.shift)}
+          />
         )}
         {group.warnings && (
           <span class="batch-warnings">

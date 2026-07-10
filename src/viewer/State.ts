@@ -22,7 +22,9 @@ export type TrimMode = "trim" | "raw";
 export interface ShiftDetail {
   point: ShiftPercentile;
   metric: string;
-  equivMargin?: number;
+  /** Resolved display-domain [lo, hi] equivalence band for the diff plot
+   *  (legacy symmetric fallback already applied by shiftMarginBand). */
+  marginBand?: [number, number];
 }
 
 /** Active data source (server or archive). */

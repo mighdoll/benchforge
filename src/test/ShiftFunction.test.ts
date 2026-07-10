@@ -6,6 +6,7 @@ import {
 import { timeMs } from "../report/Formatters.ts";
 import { buildShiftFunction } from "../report/ShiftFunction.ts";
 import type { MeasuredResults } from "../runners/MeasuredResults.ts";
+import { constBatches } from "./TestUtils.ts";
 
 // Structure tests don't need CI precision; a small bootstrap keeps them fast.
 const fast = { resamples: 200 };
@@ -170,6 +171,46 @@ test("extreme tail percentiles are unreliable with too few samples", () => {
   )!;
   expect(sf.points.find(p => p.label === "p1")!.reliable).toBe(false);
   expect(sf.points.find(p => p.label === "p50")!.reliable).toBe(true);
+});
+
+test("higherIsBetter diff is the reciprocal delta in the display domain", () => {
+  // current 1.15ms vs baseline 4ms: time -71.25%, throughput ~+247.8% loc/sec.
+  const sf = buildShiftFunction(
+    locMetric,
+    constBatches(24, 40, 1.15),
+    constBatches(24, 40, 4.0),
+    { comparison: fast },
+  )!;
+  const p50 = sf.points.find(p => p.label === "p50")!;
+  expect(p50.diff.percent).toBeCloseTo(247.8, 0);
+  expect(p50.diff.direction).toBe("faster");
+  const mean = sf.points[0];
+  expect(mean.isMean).toBe(true);
+  expect(mean.diff.percent).toBeCloseTo(247.8, 0);
+});
+
+test("equivMarginBand is the transformed, asymmetric display band", () => {
+  const sf = buildShiftFunction(
+    locMetric,
+    constBatches(24, 40, 1.15),
+    constBatches(24, 40, 4.0),
+    { comparison: { ...fast, equivMargin: 5 } },
+  )!;
+  expect(sf.equivMargin).toBe(5);
+  // +/-5% time ==> asymmetric [-4.76%, +5.26%] throughput, sorted.
+  expect(sf.equivMarginBand![0]).toBeLessThan(sf.equivMarginBand![1]);
+  expect(sf.equivMarginBand![0]).toBeCloseTo(-4.762, 1);
+  expect(sf.equivMarginBand![1]).toBeCloseTo(5.263, 1);
+});
+
+test("time metric records a symmetric equivMarginBand", () => {
+  const sf = buildShiftFunction(
+    timeMetric,
+    batched(30, 50, 0.1),
+    batched(30, 50),
+    { comparison: { ...fast, equivMargin: 2 } },
+  )!;
+  expect(sf.equivMarginBand).toEqual([-2, 2]);
 });
 
 test("equivMargin is recorded for the plot band", () => {

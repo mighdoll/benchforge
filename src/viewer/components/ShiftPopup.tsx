@@ -22,7 +22,7 @@ export function ShiftDetailPopup() {
     <ShiftPopup
       point={detail.point}
       metric={detail.metric}
-      equivMargin={detail.equivMargin}
+      marginBand={detail.marginBand}
       onClose={() => (shiftDetail.value = null)}
     />
   );
@@ -30,10 +30,10 @@ export function ShiftDetailPopup() {
 
 /** Modal detailing one percentile: the diff CI chart, then each run's absolute
  *  distribution. */
-function ShiftPopup({ point, metric, equivMargin, onClose }: {
+function ShiftPopup({ point, metric, marginBand, onClose }: {
   point: ShiftPercentile;
   metric: string;
-  equivMargin?: number;
+  marginBand?: [number, number];
   onClose: () => void;
 }) {
   const { diff } = point;
@@ -49,7 +49,7 @@ function ShiftPopup({ point, metric, equivMargin, onClose }: {
           <ShiftVerdict point={point} />
         </div>
         <div class="shift-charts">
-          <ShiftPopupDiff ci={diff} equivMargin={equivMargin} />
+          <ShiftPopupDiff ci={diff} marginBand={marginBand} />
           {point.runs.map((run, i) => (
             <ShiftPopupAbsolute key={i} runName={run.runName} ci={run.bootstrapCI} domain={domain} />
           ))}
@@ -82,12 +82,12 @@ function cap(s: string): string {
 
 /** The diff CI chart in the popup (reuses createCIPlot). The Δ% point estimate
  *  is drawn as a bold label above the median line, not in the popup title. */
-function ShiftPopupDiff({ ci, equivMargin }: { ci: DifferenceCI; equivMargin?: number }) {
+function ShiftPopupDiff({ ci, marginBand }: { ci: DifferenceCI; marginBand?: [number, number] }) {
   const ref = useLazyPlot(async () => {
     const { createCIPlot } = await import("../plots/CIPlot.ts");
-    const opts = { width: 320, height: 90, title: "", pointLabel: formatSignedPercent(ci.percent), equivMargin };
+    const opts = { width: 320, height: 90, title: "", pointLabel: formatSignedPercent(ci.percent), marginBand };
     return createCIPlot(ci, opts);
-  }, [ci], "Shift diff plot");
+  }, [ci, marginBand?.[0], marginBand?.[1]], "Shift diff plot");
   return (
     <div class="shift-chart">
       <div class="shift-chart-label">difference</div>

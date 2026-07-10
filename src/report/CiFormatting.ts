@@ -1,10 +1,18 @@
 import type { MeasuredResults } from "../runners/MeasuredResults.ts";
 import { prepareBlocks } from "../stats/BlockBootstrap.ts";
 import { binBootstrapResult } from "../stats/BlockDifference.ts";
-import type { BootstrapResult } from "../stats/Bootstrap.ts";
+import {
+  type BootstrapResult,
+  type DifferenceCI,
+  flipCI,
+} from "../stats/Bootstrap.ts";
 import { mean } from "../stats/CoreStats.ts";
 import type { BootstrapCIData } from "../viewer/ReportData.ts";
-import type { Formatter, UnknownRecord } from "./BenchmarkReport.ts";
+import type {
+  Formatter,
+  MetricSection,
+  UnknownRecord,
+} from "./BenchmarkReport.ts";
 
 /** The bits of a metric a bootstrap-CI display needs: how to transform the
  *  value and how to format it. */
@@ -87,9 +95,7 @@ export function formatBootstrapCI(
   const formatValue = (v: number) => spec.formatter(v) ?? String(v);
 
   const binned = binBootstrapResult(result);
-  const dLo = toDisplay(binned.ci[0]);
-  const dHi = toDisplay(binned.ci[1]);
-  const ci = (dLo <= dHi ? [dLo, dHi] : [dHi, dLo]) as [number, number];
+  const ci = sortPair(toDisplay(binned.ci[0]), toDisplay(binned.ci[1]));
   const histogram = binned.histogram.map(b => ({
     x: toDisplay(b.x),
     count: b.count,
@@ -107,6 +113,43 @@ export function formatBootstrapCI(
     ciLevel: result.ciLevel,
     ciReliable,
   };
+}
+
+/** Transform a time-percent DifferenceCI into the section's display domain. For
+ *  a metric with a toDisplay transform (e.g. lines/sec = 1000/ms), a time delta
+ *  maps to the true throughput delta (-71.2% time ==> ~+247% loc/sec), not the
+ *  first-order sign flip. `anchor` is the baseline point estimate in the time
+ *  domain. Falls back to flip/identity when there's no transform or the anchor
+ *  is degenerate. Leaves direction, trimmed, ciLevel untouched. */
+export function displayDiffCI(
+  section: MetricSection,
+  diff: DifferenceCI,
+  anchor: number,
+  metadata?: UnknownRecord,
+): DifferenceCI {
+  const f = displayPercentFn(section, anchor, metadata);
+  if (!f) return section.higherIsBetter ? flipCI(diff) : diff;
+  const ci = sortPair(f(diff.ci[0]), f(diff.ci[1]));
+  return {
+    ...diff,
+    percent: f(diff.percent),
+    ci,
+    histogram: diff.histogram?.map(bin => ({ x: f(bin.x), count: bin.count })),
+  };
+}
+
+/** Transform a symmetric +/- time-percent equivalence margin into the display
+ *  domain [lo, hi], sorted (a decreasing transform swaps the ends and makes the
+ *  band slightly asymmetric). Falls back to [-margin, margin] with no transform. */
+export function displayMarginBand(
+  section: MetricSection,
+  margin: number,
+  anchor: number,
+  metadata?: UnknownRecord,
+): [number, number] {
+  const f = displayPercentFn(section, anchor, metadata);
+  if (!f) return [-margin, margin];
+  return sortPair(f(-margin), f(margin));
 }
 
 /** The equiv-margin (%) in effect from raw CLI args, or undefined when
@@ -143,4 +186,27 @@ function effectiveBatchCount(
 
 function batchCount(m?: MeasuredResults): number {
   return m?.batchOffsets?.length ?? 0;
+}
+
+/** The pair sorted ascending (a decreasing display transform swaps the ends). */
+function sortPair(a: number, b: number): [number, number] {
+  return a <= b ? [a, b] : [b, a];
+}
+
+/** @return f(t) mapping a time-percent delta to the display-domain percent for
+ *  a section, or undefined when there's no toDisplay or the anchor is degenerate
+ *  (transform can't be built). Pointwise-exact for any monotonic toDisplay (it
+ *  maps the anchored time delta through the transform), including the reciprocal
+ *  (c/x) and linear (c*x) transforms that are the only real uses. */
+function displayPercentFn(
+  section: MetricSection,
+  anchor: number,
+  metadata?: UnknownRecord,
+): ((timePct: number) => number) | undefined {
+  const { toDisplay } = section;
+  if (!toDisplay) return undefined;
+  const dAnchor = toDisplay(anchor, metadata);
+  if (!Number.isFinite(dAnchor) || dAnchor === 0) return undefined;
+  return (t: number) =>
+    (toDisplay(anchor * (1 + t / 100), metadata) / dAnchor - 1) * 100;
 }

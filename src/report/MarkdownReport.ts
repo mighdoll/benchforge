@@ -17,14 +17,16 @@ import type {
   ViewerRow,
   ViewerSection,
 } from "../viewer/ReportData.ts";
+import { marginArg, minBatches } from "./CiFormatting.ts";
 import { formatCliCommand } from "./CliCommand.ts";
-import { entryValue } from "./ConsoleSummary.ts";
+import { displayMargin, entryValue } from "./ConsoleSummary.ts";
 import {
   formatBytes,
   formatPercentCI,
   formatSignedPercent,
   frameLocation,
   integer,
+  percentMagnitude,
   timeMs,
 } from "./Formatters.ts";
 import type { GcByBatchSummary, Spread } from "./GcByBatch.ts";
@@ -50,12 +52,6 @@ export function markdownReport(data: ReportData): string {
   return [...head.filter(Boolean), ...groups].join("\n\n") + "\n";
 }
 
-/** The equiv-margin (%) in effect, or undefined when unset/disabled (0). */
-function marginArg(cliArgs?: Record<string, unknown>): number | undefined {
-  const m = cliArgs?.["equiv-margin"];
-  return typeof m === "number" && m > 0 ? m : undefined;
-}
-
 /** A row's self-time per benchmark iteration (us), or the run total when the
  *  iteration count is unknown. */
 export function selfPerIterUs(r: HotFunction, iterations?: number): number {
@@ -79,55 +75,14 @@ function groupMarkdown(group: BenchmarkGroup, margin?: number): string {
   const warnings = group.warnings?.map(w => `> ${w}`).join("\n") ?? "";
   const parts = sections.flatMap(sectionMarkdown);
   const noise = group.noiseFloor
-    ? noiseFloorMarkdown(group.noiseFloor, margin)
+    ? noiseFloorMarkdown(group.noiseFloor, margin, displayMargin(group, margin))
     : [];
   const labeled = group.benchmarks.length > 1;
   const diags = group.benchmarks.flatMap(b => benchDiagnostics(b, labeled));
-  const body = [warnings, ...meta, ...parts, ...noise, ...diags].filter(
-    Boolean,
-  );
+  const bodyParts = [warnings, ...meta, ...parts, ...noise, ...diags];
+  const body = bodyParts.filter(Boolean);
   if (!body.length) return "";
   return [`## ${group.name}`, ...body].join("\n\n");
-}
-
-/** The baseline noise floor as a compact context line: the run's achieved
- *  resolution on the (same-code) baseline and the batch count it rests on. A
- *  reading sentence is added only when it is actionable -- the floor reaches the
- *  margin (near-margin verdicts are then untrustworthy) or the environment
- *  drifted mid-run. Framed as context, never as a verdict. */
-function noiseFloorMarkdown(nf: NoiseFloor, margin?: number): string[] {
-  const rough =
-    nf.batches < 20 ? " (few batches, so this floor is itself rough)" : "";
-  const marginTxt = margin ? `, equiv-margin ${margin.toFixed(2)}%` : "";
-  const lead =
-    `**baseline noise floor:** +/-${nf.halfWidthPct.toFixed(2)}% over ` +
-    `${nf.batches} baseline batches${marginTxt}${rough}.`;
-  const parts = [lead, marginReading(nf, margin), driftNote(nf)].filter(
-    Boolean,
-  );
-  return [parts.join(" ")];
-}
-
-/** Actionable reading only when the floor reaches the margin: within that band
- *  a better/worse verdict is likely environmental, not real. Silent otherwise so
- *  the clean case stays a single line. */
-function marginReading(nf: NoiseFloor, margin?: number): string {
-  if (!noiseFloorAtOrAboveMargin(nf, margin)) return "";
-  return (
-    `The noise floor is at or above the margin, so a verdict within about ` +
-    `+/-${margin!.toFixed(2)}% is likely environmental, not a real change -- ` +
-    `re-run on a quieter machine or widen the margin.`
-  );
-}
-
-/** Note a mid-run environment shift only when the half-to-half drift exceeds the
- *  run's own resolution (the environment moved by more than the run can resolve). */
-function driftNote(nf: NoiseFloor): string {
-  if (!significantDrift(nf)) return "";
-  return (
-    `Baseline timing drifted ${formatSignedPercent(nf.driftPct)} from the first ` +
-    `to the second half of the run -- the environment was not stationary.`
-  );
 }
 
 /** @return the runs count from the runs row (first track), if any. */
@@ -152,6 +107,32 @@ function sectionMarkdown(section: ViewerSection): string[] {
   const table = trackTable(trackRows);
   const shared = sharedTable(sharedRows);
   return [...header, table, shared].filter((s): s is string => !!s);
+}
+
+/** The baseline noise floor as a compact context line: the run's achieved
+ *  resolution on the (same-code) baseline and the batch count it rests on. A
+ *  reading sentence is added only when it is actionable -- the floor reaches the
+ *  margin (near-margin verdicts are then untrustworthy) or the environment
+ *  drifted mid-run. Framed as context, never as a verdict. */
+function noiseFloorMarkdown(
+  nf: NoiseFloor,
+  margin?: number,
+  quotedMargin?: number,
+): string[] {
+  const rough =
+    nf.batches < minBatches
+      ? " (few batches, so this floor is itself rough)"
+      : "";
+  const marginTxt = margin ? `, equiv-margin ${percentMagnitude(margin)}` : "";
+  const lead =
+    `**baseline noise floor:** +/-${percentMagnitude(nf.halfWidthPct)} over ` +
+    `${nf.batches} baseline batches${marginTxt}${rough}.`;
+  const parts = [
+    lead,
+    marginReading(nf, margin, quotedMargin),
+    driftNote(nf),
+  ].filter(Boolean);
+  return [parts.join(" ")];
 }
 
 /** Per-variant diagnostics (warmup shape, full GC by batch), labeled with the
@@ -203,6 +184,34 @@ function sharedTable(rows: ViewerRow[]): string | undefined {
   if (!usable.length) return undefined;
   const body = usable.map(r => [r.label, entryValue(r.entries[0]) ?? ""]);
   return mdTable(["metric", "value"], body);
+}
+
+/** Actionable reading only when the floor reaches the margin: within that band
+ *  a better/worse verdict is likely environmental, not real. Silent otherwise so
+ *  the clean case stays a single line. */
+function marginReading(
+  nf: NoiseFloor,
+  margin?: number,
+  quotedMargin?: number,
+): string {
+  // Gate in the time domain (noise floor and margin are both time-percent); the
+  // quoted magnitude is display-domain when the primary metric transforms.
+  if (!noiseFloorAtOrAboveMargin(nf, margin)) return "";
+  return (
+    `The noise floor is at or above the margin, so a verdict within about ` +
+    `+/-${percentMagnitude(quotedMargin ?? margin!)} is likely environmental, ` +
+    `not a real change -- re-run on a quieter machine or widen the margin.`
+  );
+}
+
+/** Note a mid-run environment shift only when the half-to-half drift exceeds the
+ *  run's own resolution (the environment moved by more than the run can resolve). */
+function driftNote(nf: NoiseFloor): string {
+  if (!significantDrift(nf)) return "";
+  return (
+    `Baseline timing drifted ${formatSignedPercent(nf.driftPct)} from the first ` +
+    `to the second half of the run -- the environment was not stationary.`
+  );
 }
 
 /** Time-by-position table: how much each batch's early iterations run above the
@@ -286,30 +295,6 @@ function heapSitesMarkdown(
   ];
 }
 
-/** One allocation site row: bytes, percent share, name, location, caller chain. */
-function heapSiteCells(site: HeapSiteRow): string[] {
-  const callers = site.callers?.length ? site.callers.join(" <- ") : "";
-  return [
-    formatBytes(site.bytes) ?? "",
-    `${site.pct.toFixed(1)}%`,
-    site.name || "(anonymous)",
-    site.location,
-    callers,
-  ];
-}
-
-/** Total (all) / total (user code) / sample-count footer, from the heap summary. */
-function heapFooter(summary?: HeapSummary): string[] {
-  if (!summary) return [];
-  const parts = [
-    `Total (all): ${formatBytes(summary.totalBytes)}`,
-    `user code: ${formatBytes(summary.userBytes)}`,
-  ];
-  if (summary.sampleCount != null)
-    parts.push(`samples: ${summary.sampleCount.toLocaleString()}`);
-  return [parts.join(" -- ")];
-}
-
 /** Per-percentile diff table: mean first, then percentiles in displayed order.
  *  Δ% is current relative to baseline in the metric's own units; the verdict
  *  column carries the good/bad reading (it accounts for metric direction). */
@@ -358,6 +343,30 @@ function hotCells(
   const tail = [r.name || "(anonymous)", frameLocation(r.url, r.line)];
   if (!withBase) return [...head, ...tail];
   return [...head, hotDelta(r), ...tail];
+}
+
+/** One allocation site row: bytes, percent share, name, location, caller chain. */
+function heapSiteCells(site: HeapSiteRow): string[] {
+  const callers = site.callers?.length ? site.callers.join(" <- ") : "";
+  return [
+    formatBytes(site.bytes) ?? "",
+    `${site.pct.toFixed(1)}%`,
+    site.name || "(anonymous)",
+    site.location,
+    callers,
+  ];
+}
+
+/** Total (all) / total (user code) / sample-count footer, from the heap summary. */
+function heapFooter(summary?: HeapSummary): string[] {
+  if (!summary) return [];
+  const parts = [
+    `Total (all): ${formatBytes(summary.totalBytes)}`,
+    `user code: ${formatBytes(summary.userBytes)}`,
+  ];
+  if (summary.sampleCount != null)
+    parts.push(`samples: ${summary.sampleCount.toLocaleString()}`);
+  return [parts.join(" -- ")];
 }
 
 /** One shift point as a row of cells. runs[0] is current, runs[1] is baseline. */

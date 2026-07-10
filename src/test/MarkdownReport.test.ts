@@ -1,5 +1,7 @@
 import { expect, test } from "vitest";
 import type { ReportGroup } from "../report/BenchmarkReport.ts";
+import { metricSection } from "../report/BenchmarkReport.ts";
+import { integer } from "../report/Formatters.ts";
 import { prepareHtmlData } from "../report/HtmlReport.ts";
 import { markdownReport } from "../report/MarkdownReport.ts";
 import { timeSection } from "../report/StandardSections.ts";
@@ -10,8 +12,15 @@ import type {
   ReportData,
   ShiftPercentile,
 } from "../viewer/ReportData.ts";
+import { constBatches, zeroStats } from "./TestUtils.ts";
 
-const zeroStats = { min: 0, max: 0, avg: 0, p50: 0, p75: 0, p99: 0, p999: 0 };
+const cleanFloor: NoiseFloor = {
+  halfWidthPct: 0.42,
+  dispersionPct: 0.5,
+  batches: 24,
+  driftPct: 0.05,
+  crossRoundAcf: 0,
+};
 
 /** A one-group ReportData carrying a single benchmark with a profile summary. */
 function profileData(summary: ProfileSummary): ReportData {
@@ -73,7 +82,7 @@ function point(
 
 /** Batched samples as a global ramp, so percentile tails are genuinely sparse.
  *  scale > 1 makes every value larger (slower), simulating a regression. */
-function batched(
+function rampedBatches(
   batches: number,
   perBatch: number,
   scale = 1,
@@ -88,6 +97,25 @@ function batched(
       samples.push((1 + (k++ / n) * 2) * scale);
   }
   return { name: "current", samples, batchOffsets, time: zeroStats };
+}
+
+/** A one-case ReportData whose group carries only a noise floor (no sections),
+ *  with an optional equiv-margin in the CLI args. */
+function noiseData(nf: NoiseFloor, margin?: number): ReportData {
+  return {
+    groups: [
+      {
+        name: "sort",
+        benchmarks: [{ name: "current", samples: [], stats: zeroStats }],
+        noiseFloor: nf,
+      },
+    ],
+    metadata: {
+      timestamp: "",
+      bencherVersion: "0",
+      cliArgs: margin != null ? { "equiv-margin": margin } : undefined,
+    },
+  };
 }
 
 test("renders a shift table with mean, percentiles, and reliability", () => {
@@ -225,8 +253,8 @@ test("comparable scalar section (GC) shows per-track values with inline Δ%", ()
 });
 
 test("integration: baseline run flows through prepareHtmlData into a shift table", () => {
-  const current = batched(24, 50);
-  const baseline = { ...batched(24, 50, 1.3), name: "baseline" };
+  const current = rampedBatches(24, 50);
+  const baseline = { ...rampedBatches(24, 50, 1.3), name: "baseline" };
   const groups: ReportGroup[] = [
     {
       name: "sort",
@@ -251,32 +279,39 @@ test("integration: baseline run flows through prepareHtmlData into a shift table
   expect(md).toContain("baseline batches");
 });
 
-/** A one-case ReportData whose group carries only a noise floor (no sections),
- *  with an optional equiv-margin in the CLI args. */
-function noiseData(nf: NoiseFloor, margin?: number): ReportData {
-  return {
-    groups: [
-      {
-        name: "sort",
-        benchmarks: [{ name: "current", samples: [], stats: zeroStats }],
-        noiseFloor: nf,
+test("integration: a reciprocal metric renders the display-domain percent", () => {
+  const locSection = metricSection({
+    title: "lines / sec",
+    higherIsBetter: true,
+    toDisplay: (ms: number) => 1000 / ms,
+    formatter: integer,
+  });
+  const groups: ReportGroup[] = [
+    {
+      name: "parse",
+      reports: [
+        {
+          name: "current",
+          measuredResults: constBatches(24, 40, 1.15, "current"),
+        },
+      ],
+      baseline: {
+        name: "baseline",
+        measuredResults: { ...constBatches(24, 40, 4), name: "baseline" },
       },
-    ],
-    metadata: {
-      timestamp: "",
-      bencherVersion: "0",
-      cliArgs: margin != null ? { "equiv-margin": margin } : undefined,
     },
-  };
-}
+  ];
+  const data = prepareHtmlData(groups, {
+    sections: [locSection],
+    resamples: 200,
+  });
+  const md = markdownReport(data);
 
-const cleanFloor: NoiseFloor = {
-  halfWidthPct: 0.42,
-  dispersionPct: 0.5,
-  batches: 24,
-  driftPct: 0.05,
-  crossRoundAcf: 0,
-};
+  expect(md).toContain("lines / sec (Δ% vs baseline)");
+  // 1.15ms vs 4ms baseline: not the -71% sign flip but the ~+247.8% throughput.
+  expect(md).toMatch(/\| mean \| [\d,]+ \| [\d,]+ \| \+247\.\d% \|/);
+  expect(md).toContain("better");
+});
 
 test("noise floor renders a compact context line with the batch count", () => {
   const md = markdownReport(noiseData(cleanFloor));

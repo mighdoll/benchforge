@@ -10,15 +10,32 @@ import {
 } from "../stats/BlockDifference.ts";
 import type { BootstrapResult, DifferenceCI } from "../stats/Bootstrap.ts";
 import { type StatKind, statKindToFn } from "../stats/CoreStats.ts";
-import type { ShiftFunction } from "../viewer/ReportData.ts";
+import type { ShiftFunction, ShiftPercentile } from "../viewer/ReportData.ts";
 import type {
   ComparisonOptions,
   MetricSection,
   UnknownRecord,
 } from "./BenchmarkReport.ts";
 import { metricStatKind } from "./BenchmarkReport.ts";
-import { hasBatchBlocks, hasLowBatchCount } from "./CiFormatting.ts";
-import { buildMeanPoint, buildPoint } from "./ShiftPoints.ts";
+import {
+  displayMarginBand,
+  hasBatchBlocks,
+  hasLowBatchCount,
+} from "./CiFormatting.ts";
+import { buildMeanPoint, buildPoint, type PointArgs } from "./ShiftPoints.ts";
+
+/** Options for {@link buildShiftFunction} beyond the two measured results. */
+export interface ShiftFunctionOptions {
+  currentMeta?: UnknownRecord;
+  baselineMeta?: UnknownRecord;
+  comparison?: ComparisonOptions;
+  baselineName?: string;
+  prepared?: PreparedPairedBlocks;
+}
+
+/** The shared per-comparison fields fed to every point (all but the per-point
+ *  stat and its precomputed diff/abs results). */
+type ShiftContext = Omit<PointArgs, "p" | "diff" | "curResult" | "baseResult">;
 
 type ShiftStats = {
   diffs: (DifferenceCI | undefined)[];
@@ -32,15 +49,6 @@ type ShiftStats = {
  *  in the middle). Same set regardless of metric direction; for higherIsBetter
  *  metrics the displayed percentile is the mirror (1 - p). */
 const shiftPercentiles = [0.01, 0.05, 0.1, 0.25, 0.5, 0.75, 0.9, 0.95, 0.99];
-
-/** Options for {@link buildShiftFunction} beyond the two measured results. */
-export interface ShiftFunctionOptions {
-  currentMeta?: UnknownRecord;
-  baselineMeta?: UnknownRecord;
-  comparison?: ComparisonOptions;
-  baselineName?: string;
-  prepared?: PreparedPairedBlocks;
-}
 
 /** Build the per-percentile shift function for a metric section. Computes diff
  *  CIs and per-run absolute distributions across the distribution from raw
@@ -58,11 +66,11 @@ export function buildShiftFunction(
 
   const noBatchTrim = comparison?.noBatchTrim;
   const stats = shiftStats(current, baseline, comparison, prepared);
-  const { diffs, curAbs, baseAbs, paired } = stats;
+  const { baseAbs, paired } = stats;
   const nPairs = paired?.pairCount;
   const lowBatches = hasLowBatchCount(baseline, current, noBatchTrim, nPairs);
   const verdict = metricStatKind(section);
-  const ctx = {
+  const ctx: ShiftContext = {
     section,
     current,
     baseline,
@@ -78,35 +86,16 @@ export function buildShiftFunction(
     baselineOffsets: paired?.baseline.batchOffsets,
   };
 
-  const percentiles = shiftPercentiles.flatMap((p, i) => {
-    // +1 skips the leading mean entry in the result arrays.
-    const point = buildPoint({
-      p,
-      diff: diffs[i + 1],
-      curResult: curAbs[i + 1],
-      baseResult: baseAbs[i + 1],
-      ...ctx,
-    });
-    return point ? [point] : [];
-  });
-  // higherIsBetter metrics read low==>high in displayed percentile, which is the
-  // reverse of the timing percentile order; sort by displayed percentile.
-  percentiles.sort((a, b) => a.percentile - b.percentile);
-
-  const mean = buildMeanPoint({
-    p: 0,
-    diff: diffs[0],
-    curResult: curAbs[0],
-    baseResult: baseAbs[0],
-    ...ctx,
-  });
-  const points = mean ? [mean, ...percentiles] : percentiles;
+  const points = buildPoints(ctx, stats);
   if (!points.length) return undefined;
-  return {
-    metric: section.title,
-    equivMargin: comparison?.equivMargin,
-    points,
-  };
+  const equivMargin = comparison?.equivMargin;
+  const equivMarginBand = marginBand(
+    section,
+    equivMargin,
+    baseAbs[0],
+    baselineMeta,
+  );
+  return { metric: section.title, equivMargin, equivMarginBand, points };
 }
 
 /** Prepare paired batch blocks from two results, throwing if either lacks the
@@ -148,6 +137,50 @@ function shiftStats(
   if (hasBatchBlocks(baseline, current))
     return pairedShiftStats(stats, current, baseline, comparison, paired);
   return sampleShiftStats(stats, current, baseline, comparison, noBatchTrim);
+}
+
+/** Build the mean point plus one point per sampled percentile (skipping any that
+ *  drop out), sorted by displayed percentile. The mean leads the result arrays,
+ *  so percentile i reads index i+1. higherIsBetter mirrors the displayed
+ *  percentile, so sort by it rather than the timing order. */
+function buildPoints(ctx: ShiftContext, stats: ShiftStats): ShiftPercentile[] {
+  const { diffs, curAbs, baseAbs } = stats;
+  const percentiles = shiftPercentiles.flatMap((p, i) => {
+    const point = buildPoint({
+      p,
+      diff: diffs[i + 1],
+      curResult: curAbs[i + 1],
+      baseResult: baseAbs[i + 1],
+      ...ctx,
+    });
+    return point ? [point] : [];
+  });
+  percentiles.sort((a, b) => a.percentile - b.percentile);
+  const mean = buildMeanPoint({
+    p: 0,
+    diff: diffs[0],
+    curResult: curAbs[0],
+    baseResult: baseAbs[0],
+    ...ctx,
+  });
+  return mean ? [mean, ...percentiles] : percentiles;
+}
+
+/** The equivalence margin as a display-domain band, anchored on the baseline
+ *  mean (the same anchor as the mean point's diff). Undefined when no margin. */
+function marginBand(
+  section: MetricSection,
+  equivMargin: number | undefined,
+  baseMean: BootstrapResult | undefined,
+  baselineMeta: UnknownRecord | undefined,
+): [number, number] | undefined {
+  if (equivMargin == null || !baseMean) return undefined;
+  return displayMarginBand(
+    section,
+    equivMargin,
+    baseMean.estimate,
+    baselineMeta,
+  );
 }
 
 /** Block-bootstrap path: diffs and absolute CIs from the shared batch pairing,

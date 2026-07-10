@@ -1,9 +1,11 @@
+import { marginArg } from "../../report/CiFormatting.ts";
 import { formatSignedPercent } from "../../report/Formatters.ts";
 import type { CIDirection, DifferenceCI } from "../../stats/Bootstrap.ts";
-import type {
-  BootstrapCIData,
-  ShiftFunction,
-  ShiftPercentile,
+import {
+  type BootstrapCIData,
+  type ShiftFunction,
+  type ShiftPercentile,
+  shiftMarginBand,
 } from "../ReportData.ts";
 import type { DistributionPlotOptions } from "../plots/CIPlot.ts";
 import { reportData, shiftDetail } from "../State.ts";
@@ -24,7 +26,7 @@ export function openShiftDetail(shift: ShiftFunction, point: ShiftPercentile) {
   shiftDetail.value = {
     point,
     metric: shift.metric,
-    equivMargin: shift.equivMargin,
+    marginBand: shiftMarginBand(shift),
   };
 }
 
@@ -62,8 +64,8 @@ export function ciDomain(cis: BootstrapCIData[]): [number, number] | undefined {
 /** Comparison verdict: a colored chip (group header) or plain delta text
  *  (compact). When `onOpen` is set, the CI chart becomes a click target. */
 export function ComparisonBadge(
-  { ci, compact, onOpen }:
-  { ci: DifferenceCI; compact?: boolean; onOpen?: () => void },
+  { ci, compact, onOpen, marginBand }:
+  { ci: DifferenceCI; compact?: boolean; onOpen?: () => void; marginBand?: [number, number] },
 ) {
   // Colored chip is reserved for the main verdict; per-row (compact) comparisons
   // render as plain bold text regardless of direction.
@@ -73,29 +75,29 @@ export function ComparisonBadge(
       <span class={cls}>
         {compact ? formatSignedPercent(ci.percent) : directionLabels[ci.direction]}
       </span>
-      {ci.histogram && <CIPlotMount ci={ci} compact={compact} onOpen={onOpen} />}
+      {ci.histogram && <CIPlotMount ci={ci} compact={compact} onOpen={onOpen} marginBand={marginBand} />}
       {!compact && <span class="comparison-pct">{formatSignedPercent(ci.percent)}</span>}
     </span>
   );
 }
 
 /** Lazy-imports CIPlot and renders a confidence interval chart inline. When
- *  `onOpen` is set the chart is clickable; the click is stopped from bubbling so
- *  it doesn't also toggle the enclosing group's collapse. */
+ *  `onOpen` is set the chart is clickable; the click is stopped from bubbling
+ *  so enclosing click targets don't also fire. */
 function CIPlotMount(
-  { ci, compact, onOpen }:
-  { ci: DifferenceCI; compact?: boolean; onOpen?: () => void },
+  { ci, compact, onOpen, marginBand }:
+  { ci: DifferenceCI; compact?: boolean; onOpen?: () => void; marginBand?: [number, number] },
 ) {
+  const band = marginBand ?? cliArgsMarginBand();
+  // Depend on band's scalar ends, not the tuple: the fallback builds a fresh
+  // array each render, so a reference dep would re-run the plot every time.
   const ref = useLazyPlot(async () => {
     const { createCIPlot } = await import("../plots/CIPlot.ts");
-    const equivMargin =
-      (reportData.value?.metadata.cliArgs?.["equiv-margin"] as number) ||
-      undefined;
     const opts = compact
-      ? { width: 200, height: 70, title: "", equivMargin }
-      : { equivMargin };
+      ? { width: 200, height: 70, title: "", marginBand: band }
+      : { marginBand: band };
     return createCIPlot(ci, opts);
-  }, [ci, compact], "CI plot");
+  }, [ci, compact, band?.[0], band?.[1]], "CI plot");
   const clickable = !!onOpen;
   return (
     <div
@@ -105,6 +107,13 @@ function CIPlotMount(
       onClick={onOpen ? (e => { e.stopPropagation(); onOpen(); }) : undefined}
     />
   );
+}
+
+/** Symmetric +/- band from the run's equiv-margin CLI arg, for archives that
+ *  predate the serialized display band (no shift.equivMarginBand available). */
+function cliArgsMarginBand(): [number, number] | undefined {
+  const m = marginArg(reportData.value?.metadata.cliArgs);
+  return m === undefined ? undefined : [-m, m];
 }
 
 /** DistributionPlotOptions for an absolute (non-zero-anchored) bootstrap plot,

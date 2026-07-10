@@ -7,17 +7,17 @@ import { ensureHatchPattern, line, rect, text } from "./SvgHelpers.ts";
  *  practically equivalent, so it spans the full plot width as a reference zone. */
 export function drawMarginBand(
   svg: SVGSVGElement,
-  equivMargin: number,
+  band: [number, number],
   yScale: Scale,
   width: number,
 ): void {
-  const yTop = yScale(equivMargin);
-  const yBottom = yScale(-equivMargin);
+  const yTop = yScale(band[1]);
+  const yBottom = yScale(band[0]);
   const bandWidth = width - margin.left - margin.right;
   const fill = `url(#${ensureHatchPattern(svg)})`;
-  const band = rect(margin.left, yTop, bandWidth, yBottom - yTop, { fill });
-  band.classList.add("margin-zone");
-  svg.appendChild(band);
+  const zone = rect(margin.left, yTop, bandWidth, yBottom - yTop, { fill });
+  zone.classList.add("margin-zone");
+  svg.appendChild(zone);
   for (const y of [yTop, yBottom])
     svg.appendChild(
       line(margin.left, y, margin.left + bandWidth, y, {
@@ -47,9 +47,9 @@ export function drawYAxis(
   svg: SVGSVGElement,
   yScale: Scale,
   points: ShiftPercentile[],
-  equivMargin: number | undefined,
+  band: [number, number] | undefined,
 ): void {
-  const [spanMin, spanMax] = axisSpan(points, equivMargin);
+  const [spanMin, spanMax] = axisSpan(points, band);
   const step = niceStep((spanMax - spanMin) / 5);
   for (
     let tick = Math.ceil(spanMin / step) * step;
@@ -93,13 +93,13 @@ export function drawDivider(
 /** @return [min, max] of the diff-percent axis. */
 function axisSpan(
   points: ShiftPercentile[],
-  equivMargin: number | undefined,
+  band: [number, number] | undefined,
 ): [number, number] {
   let min = 0;
   let max = 0;
-  if (equivMargin) {
-    min = -equivMargin;
-    max = equivMargin;
+  if (band) {
+    min = band[0];
+    max = band[1];
   }
   for (const p of scalePoints(points)) {
     if (p.diff.ci[0] < min) min = p.diff.ci[0];
