@@ -15,16 +15,24 @@ Batch length matters most for allocation-heavy code, because each batch starts
 with a fresh heap. If a batch is too short, the heap never fills enough to
 trigger a full (major) garbage collection, and the batch average misses that
 cost entirely. If a batch is just long enough for a single full collection, the
-average swings depending on exactly when that collection lands. Give each batch
-enough time for several full collections and its average settles.
+average swings depending on exactly when that collection lands. Give such a
+batch enough time for several full collections and its average settles.
+
+Many workloads never trigger a full collection at all -- low-allocation code, or
+code whose allocation was tuned down, collects only cheap minor GCs (scavenges),
+and every batch sees plenty of those. There is no collection-placement artifact
+to average out, so batch length only needs to be long enough for a stable sample
+count; you tighten the margin by adding batches, not by lengthening them. Run
+`--calibrate --gc-stats` to see which regime you are in: it reports full GCs per
+batch, and reads "no major GCs" when the workload is scavenge-dominated.
 
 Total time is roughly `--duration` times `--batches`, and you can trade one
-against the other: longer batches give steadier per-batch averages, more batches
-give a tighter confidence interval. When the per-batch averages vary a lot,
-lengthen `--duration` before adding batches. To see whether each batch triggers
-enough full collections, step through the batches on the time-per-iteration
-chart, where each one is marked. Lengthen `--duration` until every batch sees a
-few.
+against the other: longer batches give steadier per-batch averages when full
+collections are in play, more batches give a tighter confidence interval. When
+per-batch averages swing because of full-collection placement, lengthen
+`--duration`; otherwise prefer more batches. To see whether each batch triggers
+full collections, step through the batches on the time-per-iteration chart,
+where each one is marked.
 
 Aim for 40 batches or more for a reliable comparison.
 
@@ -89,13 +97,16 @@ flags this. The suggested margin already accounts for it, since it uses the
 larger of the two floors, but it is a sign to run more batches and to calibrate
 under realistic conditions.
 
-**Give each batch enough garbage collections.** When batches average fewer than
-about two full collections, the batch average depends on where its lone
+**Give each batch enough garbage collections, if it has any.** This applies only
+when the workload triggers full collections. When batches average fewer than
+about two (but more than none), the batch average depends on where its lone
 collection lands, and that placement varies between runs in a way a single run
 cannot see. `--calibrate` warns when full collections per batch are low, and
 shows how they are distributed; if some batches see one more collection than
 others, the per-batch average jumps by a whole collection. The fix is a longer
-`--duration`, not more batches. Run with `--gc-stats` to check.
+`--duration`, not more batches. A scavenge-dominated workload (zero full
+collections) has no such artifact and draws no warning. Run with `--gc-stats` to
+check.
 
 **Calibrate the way you will compare.** Calibration measures the background load
 present while it runs, so a quiet machine gives the tightest margin. If your

@@ -47,9 +47,11 @@ export interface CalibrationResult {
   summary: CalibrationSummary;
 
   /** Mean full (major) GCs per batch, or undefined when GC stats are absent
-   *  (no --gc-stats). Below ~2, single-run CIs understate between-run GC
-   *  timing variance: the batch mean is dominated by where the lone collection
-   *  lands. Increase --duration so each batch averages over several GCs. */
+   *  (no --gc-stats). Exactly 0 means no major collections at all (the workload
+   *  is scavenge-dominated); duration is not GC-constrained and no warning
+   *  fires. Between 0 and ~2, single-run CIs understate between-run GC timing
+   *  variance: the batch mean is dominated by where the lone collection lands,
+   *  so increase --duration to average each batch over several GCs. */
   fullGcsPerBatch?: number;
   /** Distribution of full GCs per batch, pooled across all runs and sorted by
    *  count. A single bucket means every batch is on the same GC plateau; spread

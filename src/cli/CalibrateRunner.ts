@@ -1,6 +1,6 @@
 import {
   calibrationWarnings,
-  formatGcHistogram,
+  formatFullGcs,
 } from "../report/CalibrationReport.ts";
 import colors from "../report/Colors.ts";
 import {
@@ -46,7 +46,7 @@ function conclusion(result: CalibrationResult): string {
   ];
   if (gcHistogram && fullGcsPerBatch !== undefined) {
     lines.push(
-      `  full GCs/batch           ${formatGcHistogram(gcHistogram)}   (mean ${fullGcsPerBatch.toFixed(1)})`,
+      `  full GCs/batch           ${formatFullGcs(fullGcsPerBatch, gcHistogram)}`,
     );
   }
   for (const w of calibrationWarnings(result)) {

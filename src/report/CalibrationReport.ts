@@ -62,7 +62,14 @@ export function calibrationWarnings(
         "noise. Margin taken from the scatter, not the CI.",
     });
   }
-  if (fullGcsPerBatch !== undefined && fullGcsPerBatch < minFullGcsPerBatch) {
+  if (fullGcsPerBatch !== undefined && fullGcsPerBatch === 0) {
+    // No major collections at all: the workload is scavenge-dominated, so there
+    // is no lone-collection-placement artifact and longer batches buy no GC
+    // stability. Nothing to warn about; the GC row already reads "no major GCs".
+  } else if (
+    fullGcsPerBatch !== undefined &&
+    fullGcsPerBatch < minFullGcsPerBatch
+  ) {
     warnings.push({
       summary: `only ${fullGcsPerBatch.toFixed(1)} full GCs per batch (want >= ${minFullGcsPerBatch})`,
       detail:
@@ -84,6 +91,17 @@ export function calibrationWarnings(
 /** Render a GC-per-batch histogram as a one-line tally, e.g. "2x97  3x3". */
 export function formatGcHistogram(hist: IntegerCount[]): string {
   return hist.map(b => `${b.value}x${b.count}`).join("  ");
+}
+
+/** GC-per-batch summary value. Zero major GCs is its own regime: the workload is
+ *  scavenge-dominated, so say that plainly instead of a bare "0x468 (mean 0.0)"
+ *  that reads like a warning-worthy shortfall. */
+export function formatFullGcs(
+  fullGcsPerBatch: number,
+  hist: IntegerCount[],
+): string {
+  if (fullGcsPerBatch === 0) return "0 (no major GCs, scavenge-dominated)";
+  return `${formatGcHistogram(hist)} (mean ${fullGcsPerBatch.toFixed(1)})`;
 }
 
 /** Title, invocation, git version, timestamp + machine. */
@@ -114,10 +132,7 @@ function noiseFloor(result: CalibrationResult): string {
     ["**suggested --equiv-margin**", `**${pct(s.suggestedMargin)}**`],
   ];
   if (gcHistogram && fullGcsPerBatch !== undefined) {
-    rows.push([
-      "full GCs/batch",
-      `${formatGcHistogram(gcHistogram)} (mean ${fullGcsPerBatch.toFixed(1)})`,
-    ]);
+    rows.push(["full GCs/batch", formatFullGcs(fullGcsPerBatch, gcHistogram)]);
   }
   const title = `## Noise floor (${runs} runs x ${batches} batches, current vs current)`;
   return `${title}\n\n${mdTable(["metric", "value"], rows)}`;

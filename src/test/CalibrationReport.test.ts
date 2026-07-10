@@ -114,6 +114,21 @@ test("too-few-GCs warning takes priority over the straddle warning", () => {
   expect(md).not.toContain("varies across batches");
 });
 
+test("zero full GCs reads as scavenge-dominated with no warning", () => {
+  const md = calibrationMarkdown(
+    calibrationResult({
+      fullGcsPerBatch: 0,
+      gcHistogram: [{ value: 0, count: 100 }],
+    }),
+    meta,
+  );
+  expect(md).toContain(
+    "| full GCs/batch | 0 (no major GCs, scavenge-dominated) |",
+  );
+  expect(md).not.toContain("full GCs per batch (want");
+  expect(md).not.toContain("Increase --duration");
+});
+
 test("overconfident scatter warns as a blockquote", () => {
   const points = [2, -2, 1.5, -1.5, 0];
   const halfWidths = [0.2, 0.2, 0.2, 0.2, 0.2];

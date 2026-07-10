@@ -27,7 +27,7 @@ test("renders a single-plateau GC histogram with no straddle warning", () => {
       gcHistogram: [{ value: 2, count: 100 }],
     }),
   );
-  expect(out).toContain("full GCs/batch           2x100   (mean 2.0)");
+  expect(out).toContain("full GCs/batch           2x100 (mean 2.0)");
   expect(out).not.toContain("varies across batches");
 });
 
