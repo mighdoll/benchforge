@@ -22,6 +22,7 @@ import {
 import type { DefaultCliArgs } from "./CliArgs.ts";
 import { exportReports } from "./CliExport.ts";
 import {
+  cliComparisonOptions,
   cliHeapReportOptions,
   needsAlloc,
   needsProfile,
@@ -59,6 +60,7 @@ function warnBrowserFlags(args: DefaultCliArgs): void {
   const checks: [boolean, string][] = [
     [!args.worker, "--no-worker"],
     [!!args["gc-force"], "--gc-force"],
+    [args["max-samples"] != null, "--max-samples"],
   ];
   const ignored = checks.filter(([active]) => active).map(([, flag]) => flag);
   if (ignored.length > 0)
@@ -134,7 +136,12 @@ function printBrowserReport(
   let reportData: ReportData | undefined;
   if (sections.length > 0) {
     reportData = withStatus("computing report", () =>
-      prepareHtmlData(results, { cliArgs: args, sections, heapReport }),
+      prepareHtmlData(results, {
+        cliArgs: args,
+        sections,
+        heapReport,
+        ...cliComparisonOptions(args),
+      }),
     );
     console.log(consoleSummary(reportData));
   }
