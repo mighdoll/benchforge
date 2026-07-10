@@ -9,25 +9,32 @@ type Downsample = <T>(
   getY: (d: T) => number,
 ) => T[];
 
-const maxDots = 1000;
+/** Sample cap per dot-partition (warmup/baseline/measured) before downsampling
+ *  kicks in; shared with SamplesPanel.tsx so its "(downsampled)" caption can't
+ *  drift from what this plot actually thins. */
+export const maxDots = 1000;
 
-/** Dot marks for all sample categories: warmup, baseline, measured, rejected */
+/** Dot marks for all sample categories: warmup, baseline, measured, rejected.
+ *  In batchMode (the batch-aligned "All" view) per-point tooltips are dropped:
+ *  hovering thousands of interleaved dots is more distracting than useful. */
 export function sampleDotMarks(
   ctx: PlotContext,
   showRejected: boolean,
   lttb: Downsample,
+  batchMode = false,
 ): any[] {
   const { unitSuffix, formatValue } = ctx;
   const fmtVal = (d: SampleData) =>
     `${formatValue(d.displayValue)}${unitSuffix}`;
-  const tipTitle = (d: SampleData) => `Iteration ${d.sample}: ${fmtVal(d)}`;
+  const tip = (fn: (d: SampleData) => string) => (batchMode ? undefined : fn);
+  const tipTitle = tip(d => `Iteration ${d.sample}: ${fmtVal(d)}`);
   const xy = { x: "sample" as const, y: "displayValue" as const, r: 3 };
   const { warmup, baseline, measured, rejected } = partitionSamples(
     ctx.convertedData,
     showRejected,
     lttb,
   );
-  const colors = seriesColorMap(ctx.benchmarks, ctx.baselineNames);
+  const colors = seriesColorMap(ctx.allBenchmarks, ctx.baselineNames);
   const colorOf = (d: SampleData) =>
     colors.get(d.benchmark) ?? defaultSeriesColor;
   return [
@@ -37,7 +44,7 @@ export function sampleDotMarks(
       fill: "none",
       strokeWidth: 1.5,
       opacity: 0.7,
-      title: (d: SampleData) => `Warmup ${d.sample}: ${fmtVal(d)}`,
+      title: tip(d => `Warmup ${d.sample}: ${fmtVal(d)}`),
     }),
     // baselines: series color outline (hollow) to distinguish from current dots
     Plot.dot(baseline, {
@@ -54,7 +61,11 @@ export function sampleDotMarks(
       title: tipTitle,
       fill: colorOf,
     }),
-    ...rejectedDotMark(rejected, xy, tipTitle),
+    ...rejectedDotMark(
+      rejected,
+      xy,
+      tip(d => `Rejected iteration ${d.sample}: ${fmtVal(d)}`),
+    ),
   ];
 }
 
@@ -85,7 +96,7 @@ function partitionSamples(
 function rejectedDotMark(
   rejected: SampleData[],
   xy: { x: "sample"; y: "displayValue"; r: number },
-  tipTitle: (d: SampleData) => string,
+  title: ((d: SampleData) => string) | undefined,
 ): any[] {
   if (!rejected.length) return [];
   return [
@@ -95,7 +106,7 @@ function rejectedDotMark(
       fill: "none",
       strokeWidth: 1,
       opacity: 0.3,
-      title: (d: SampleData) => `Rejected ${tipTitle(d)}`,
+      title,
     }),
   ];
 }

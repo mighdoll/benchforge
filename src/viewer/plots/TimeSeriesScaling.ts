@@ -6,6 +6,28 @@ import type { HeapScale, SampleData } from "./TimeSeriesMarks.ts";
 /** A heap value mapped onto the time-series Y scale for one benchmark. */
 export type HeapPlotPoint = { benchmark: string; sample: number; y: number };
 
+/** Finite x/y plot domains, with fallbacks for empty inputs. */
+export interface PlotDomains {
+  xMin: number;
+  xMax: number;
+  yMin: number;
+  yMax: number;
+}
+
+/** Derive finite plot domains: x from sample positions, falling back to
+ *  overlay (heap/GC) positions, then [0, 1]; y from sample values, falling
+ *  back to [0, 1]. */
+export function plotDomains(
+  sampleXs: number[],
+  sampleValues: number[],
+  overlayXs: number[],
+): PlotDomains {
+  const { xMin, xMax } = xDomain(sampleXs.length ? sampleXs : overlayXs);
+  if (sampleValues.length === 0) return { xMin, xMax, yMin: 0, yMax: 1 };
+  const { yMin, yMax } = computeYRange(sampleValues);
+  return { xMin, xMax, yMin, yMax };
+}
+
 /** Convert TimeSeriesPoint data to SampleData */
 export function buildSampleData(
   timeSeries: TimeSeriesPoint[],
@@ -21,7 +43,10 @@ export function buildSampleData(
 }
 
 /** Pad Y range and snap yMin to a round number for clean axis ticks */
-export function computeYRange(values: number[]) {
+export function computeYRange(values: number[]): {
+  yMin: number;
+  yMax: number;
+} {
   const dataMin = d3.min(values)!;
   const dataMax = d3.max(values)!;
   const range = dataMax - dataMin;
@@ -32,11 +57,14 @@ export function computeYRange(values: number[]) {
   return { yMin, yMax: dataMax + range * 0.05 };
 }
 
-/** Compute scale to map heap byte values into the bottom 25% of the Y axis */
+/** Compute scale to map heap byte values into the bottom `fillFraction` of the
+ *  Y axis (a low band under the samples by default; most of the plot in
+ *  heap-only mode). */
 export function computeHeapScale(
   allHeap: HeapPoint[],
   yMin: number,
   yMax: number,
+  fillFraction = 0.25,
 ): HeapScale | undefined {
   if (allHeap.length === 0) return undefined;
   const heapMinBytes = d3.min(allHeap, d => d.value)!;
@@ -44,7 +72,7 @@ export function computeHeapScale(
   return {
     heapMinBytes,
     heapRangeBytes,
-    scale: ((yMax - yMin) * 0.25) / heapRangeBytes,
+    scale: ((yMax - yMin) * fillFraction) / heapRangeBytes,
     yMin,
   };
 }
@@ -70,4 +98,16 @@ export function prepareHeapData(
       d => d.y,
     );
   });
+}
+
+/** X extent of the given positions, padded when degenerate; [0, 1] if empty. */
+function xDomain(xs: number[]): { xMin: number; xMax: number } {
+  if (xs.length === 0) return { xMin: 0, xMax: 1 };
+  let xMin = d3.min(xs)!;
+  let xMax = d3.max(xs)!;
+  if (xMin === xMax) {
+    xMin -= 0.5;
+    xMax += 0.5;
+  }
+  return { xMin, xMax };
 }

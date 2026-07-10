@@ -13,6 +13,7 @@ import { reportData, samplesLoaded } from "../State.ts";
 import {
   BatchStepper,
   benchmarkPills,
+  gcPills,
   SeriesToggles,
   toggledSet,
 } from "./SamplesControls.tsx";
@@ -68,7 +69,7 @@ function SamplesGroup({ group, index }: { group: BenchmarkGroup; index: number }
     heap: true,
     baselineHeap: false,
     rejected: true,
-    fullGc: false,
+    gcShown: new Set(),
   });
 
   if (!group.benchmarks?.length) return null;
@@ -86,7 +87,6 @@ function SamplesGroup({ group, index }: { group: BenchmarkGroup; index: number }
   const hasHeap = flat.heapSeries.length > 0;
   const hasBaselineHeap = flat.baselineHeapSeries.length > 0;
   const hasRejected = flat.timeSeries.some(d => d.isRejected);
-  const hasFullGc = flat.allGcEvents.length > 0;
   const totalPoints = viewFlat.timeSeries.length;
   const sampled = totalPoints > 1000;
 
@@ -94,7 +94,11 @@ function SamplesGroup({ group, index }: { group: BenchmarkGroup; index: number }
     setVisibility(v => ({ ...v, [key]: !v[key] }));
   const toggleBenchmark = (name: string) =>
     setVisibility(v => ({ ...v, hidden: toggledSet(v.hidden, name) }));
+  const toggleGc = (name: string) =>
+    setVisibility(v => ({ ...v, gcShown: toggledSet(v.gcShown, name) }));
   const seriesPills = benchmarkPills(benchmarks, visibility.hidden);
+  const gcSeriesNames = [...new Set(flat.allGcEvents.map(e => e.benchmark))];
+  const gcPillList = gcPills(benchmarks, gcSeriesNames, visibility.gcShown);
 
   return (
     <div>
@@ -114,13 +118,14 @@ function SamplesGroup({ group, index }: { group: BenchmarkGroup; index: number }
           <div class="plot-controls">
             <SeriesToggles
               seriesPills={seriesPills}
+              gcPills={gcPillList}
               hasHeap={hasHeap}
               hasBaselineHeap={hasBaselineHeap}
               hasRejected={hasRejected}
-              hasFullGc={hasFullGc}
               visibility={visibility}
               onToggle={toggle}
               onToggleBenchmark={toggleBenchmark}
+              onToggleGc={toggleGc}
             />
             {numBatches > 1 && (
               <BatchStepper batch={activeBatch} total={numBatches} onChange={setBatch} />

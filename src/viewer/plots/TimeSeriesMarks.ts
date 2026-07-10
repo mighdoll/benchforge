@@ -28,6 +28,10 @@ export interface PlotContext {
   hasRejected: boolean;
   baselineNames: Set<string>;
   benchmarks: string[];
+
+  /** Every series in the plot data, visible or not; color assignment uses this
+   *  so a series keeps its color when others are toggled off. */
+  allBenchmarks: string[];
 }
 
 /** Parameters for mapping heap byte values to the time series Y axis */
@@ -37,8 +41,6 @@ export interface HeapScale {
   scale: number;
   yMin: number;
 }
-
-const gcViolet = "#7c3aed";
 
 /** Area fill marks for heap usage overlay on the time series chart. `z` groups
  *  by benchmark so each series is its own area (no line across the gap between
@@ -104,23 +106,29 @@ export function heapAxisMarks(
   ];
 }
 
-/** Full-height violet rules marking full GCs (mark-compact) across the Y range.
- *  Scavenges are filtered upstream; these are the locatable spikes. */
+/** Full-height rules marking full GCs (mark-compact) across the Y range, each
+ *  stroked in its owning series color so GCs read as belonging to that variant.
+ *  Scavenges are filtered upstream; these are the locatable spikes. Rules stay
+ *  translucent since dense runs stack 75+ marks. */
 export function gcMark(
   gcEvents: FlatGcEvent[],
   yMin: number,
   yMax: number,
+  colorOf: (benchmark: string) => string,
+  batchMode = false,
 ): any[] {
-  return gcEvents.map(gc =>
-    Plot.ruleX([gc.sampleIndex], {
+  if (!gcEvents.length) return [];
+  return [
+    Plot.ruleX(gcEvents, {
+      x: "sampleIndex",
       y1: yMin,
       y2: yMax,
-      stroke: gcViolet,
+      stroke: (d: FlatGcEvent) => colorOf(d.benchmark),
       strokeWidth: 1,
       strokeOpacity: 0.25,
-      title: gcTooltip(gc),
+      title: batchMode ? undefined : gcTooltip,
     }),
-  );
+  ];
 }
 
 /** Dashed vertical rules marking pause points across the full Y range */
@@ -128,6 +136,7 @@ export function pauseMarks(
   pausePoints: FlatPausePoint[],
   yMin: number,
   yMax: number,
+  batchMode = false,
 ): any[] {
   return pausePoints.map(p =>
     Plot.ruleX([p.sampleIndex], {
@@ -137,13 +146,13 @@ export function pauseMarks(
       strokeWidth: 1,
       strokeDasharray: "4,4",
       strokeOpacity: 0.7,
-      title: `Pause: ${p.durationMs}ms`,
+      title: batchMode ? undefined : `Pause: ${p.durationMs}ms`,
     }),
   );
 }
 
-/** Hover text for a full-GC rule: iteration, pause duration, bytes collected. */
+/** Hover text for a full-GC rule: series, iteration, pause duration, bytes. */
 function gcTooltip(gc: FlatGcEvent): string {
   const bytes = formatBytes(gc.bytes) ?? "0B";
-  return `Full GC @ iter ${gc.sampleIndex}: ${gc.duration.toFixed(2)}ms, ${bytes} collected`;
+  return `Full GC (${gc.benchmark}) @ iter ${gc.sampleIndex}: ${gc.duration.toFixed(2)}ms, ${bytes} collected`;
 }
