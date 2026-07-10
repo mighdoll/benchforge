@@ -5,6 +5,7 @@ import {
   computeInterval,
   type DifferenceCI,
   defaultConfidence,
+  defaultRand,
   type HistogramBin,
   maxBootstrapInput,
   resampleInto,
@@ -43,7 +44,7 @@ export function multiSampleDifferenceCI(
 ): DifferenceCI[] {
   const { resamples = bootstrapSamples, confidence: conf = defaultConfidence } =
     options;
-  const rand = options.random ?? Math.random;
+  const rand = options.random ?? defaultRand();
   const subA = subsample(a, maxBootstrapInput, rand);
   const subB = subsample(b, maxBootstrapInput, rand);
   const bufA = new Array(subA.length);

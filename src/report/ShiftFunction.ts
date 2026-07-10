@@ -8,7 +8,11 @@ import {
   pairedBlockDifference,
   preparePairedBlocks,
 } from "../stats/BlockDifference.ts";
-import type { BootstrapResult, DifferenceCI } from "../stats/Bootstrap.ts";
+import {
+  type BootstrapResult,
+  type DifferenceCI,
+  defaultRand,
+} from "../stats/Bootstrap.ts";
 import { median, type StatKind, statKindToFn } from "../stats/CoreStats.ts";
 import type {
   AbsolutePercentile,
@@ -177,7 +181,7 @@ export function preparePairedResults(
     baseline.batchOffsets,
     current.samples,
     current.batchOffsets,
-    { noTrim, rand: Math.random },
+    { noTrim, rand: defaultRand() },
   );
 }
 

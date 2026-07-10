@@ -19,6 +19,7 @@ import {
   bootstrapSamples,
   computeInterval,
   defaultConfidence,
+  defaultRand,
   maxBootstrapInput,
   multiSampleBootstrap,
   type Rand,
@@ -73,7 +74,7 @@ export function pairingBenefit(
   statKind: StatKind = "mean",
   options: BlockDiffOptions = {},
 ): PairingBenefit {
-  const rand = options.random ?? Math.random;
+  const rand = options.random ?? defaultRand();
   const pair = preparePairedBlocks(
     baseline,
     baselineOffsets,

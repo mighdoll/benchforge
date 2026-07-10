@@ -8,7 +8,7 @@
  *  the CI it contextualizes. */
 
 import { blockBootstrap, prepareBlocks } from "./BlockBootstrap.ts";
-import type { Rand } from "./Bootstrap.ts";
+import { defaultRand, type Rand } from "./Bootstrap.ts";
 import { mean, standardDeviation } from "./CoreStats.ts";
 import { batchMeanAutocorrelation } from "./NoiseStructure.ts";
 
@@ -43,7 +43,7 @@ export function noiseFloor(
   samples: number[],
   offsets: number[] | undefined,
   noTrim?: boolean,
-  random: Rand = Math.random,
+  random: Rand = defaultRand(),
 ): NoiseFloor | undefined {
   if (!offsets || offsets.length < 2) return undefined;
   // no cap, so blockVals are the kept per-batch means and rand is never drawn

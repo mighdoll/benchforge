@@ -4,6 +4,7 @@ import { binBootstrapResult } from "../stats/BlockDifference.ts";
 import {
   type BootstrapResult,
   type DifferenceCI,
+  defaultRand,
   flipCI,
 } from "../stats/Bootstrap.ts";
 import { mean } from "../stats/CoreStats.ts";
@@ -169,7 +170,7 @@ export function keptBatchCount(
 ): number {
   return prepareBlocks(m.samples, m.batchOffsets!, mean, {
     noTrim,
-    rand: Math.random,
+    rand: defaultRand(),
   }).keptSplits.length;
 }
 

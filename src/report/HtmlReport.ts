@@ -30,6 +30,7 @@ import {
 import {
   computeInterval,
   defaultConfidence,
+  defaultRand,
   resampleInto,
 } from "../stats/Bootstrap.ts";
 import { mean } from "../stats/CoreStats.ts";
@@ -288,9 +289,10 @@ function batchDeltaCI(
   const cBuf = new Array<number>(cur.length);
   const bBuf = new Array<number>(base.length);
   const deltas: number[] = [];
+  const rand = defaultRand();
   for (let i = 0; i < deltaResamples; i++) {
-    resampleInto(cur, cBuf, Math.random);
-    resampleInto(base, bBuf, Math.random);
+    resampleInto(cur, cBuf, rand);
+    resampleInto(base, bBuf, rand);
     const rb = mean(bBuf);
     if (rb > 0) deltas.push(((mean(cBuf) - rb) / rb) * 100);
   }

@@ -5,6 +5,7 @@ import {
   computeInterval,
   createResample,
   defaultConfidence,
+  defaultRand,
   maxBootstrapInput,
   multiSampleBootstrap,
   type Rand,
@@ -88,7 +89,7 @@ export function blockBootstrap(
 ): BootstrapResult {
   const { resamples = bootstrapSamples, confidence: conf = defaultConfidence } =
     options;
-  const rand = options.random ?? Math.random;
+  const rand = options.random ?? defaultRand();
   const side = prepareBlocks(samples, blocks, statFn, {
     noTrim: options.noTrim,
     cap: maxBootstrapInput,
@@ -119,7 +120,7 @@ export function blockPoolBootstrap(
 ): BootstrapResult {
   const { resamples = bootstrapSamples, confidence: conf = defaultConfidence } =
     options;
-  const rand = options.random ?? Math.random;
+  const rand = options.random ?? defaultRand();
   const side = prepareBlocks(samples, blocks, statFn, {
     noTrim: options.noTrim,
     cap: maxBootstrapInput,

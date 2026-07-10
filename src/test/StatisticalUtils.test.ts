@@ -247,6 +247,13 @@ test("unbatched comparisons keep the sample-level fallback", () => {
   expect(ci?.ciLevel).toBe("sample");
 });
 
+test("CIs are deterministic without an explicit random source", () => {
+  const { baseline, current, blocks } = sharedDriftData(10, 5, 1.05);
+  const run = () =>
+    diffCIs(baseline, blocks, current, blocks, ["mean"], { resamples: 200 });
+  expect(run()).toEqual(run());
+});
+
 test("classifyDirection without a margin colors any CI excluding zero", () => {
   expect(classifyDirection([-3, -1])).toBe("faster");
   expect(classifyDirection([1, 3])).toBe("slower");

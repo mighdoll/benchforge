@@ -1,6 +1,10 @@
 import type { MeasuredResults } from "../runners/MeasuredResults.ts";
 import { prepareBlocks } from "../stats/BlockBootstrap.ts";
-import type { BootstrapResult, DifferenceCI } from "../stats/Bootstrap.ts";
+import {
+  type BootstrapResult,
+  type DifferenceCI,
+  defaultRand,
+} from "../stats/Bootstrap.ts";
 import { mean, percentile, type StatKind } from "../stats/CoreStats.ts";
 import type {
   AbsolutePercentile,
@@ -249,7 +253,7 @@ function tailCoverage(
     (batchOffsets && batchOffsets.length >= 2
       ? prepareBlocks(samples, batchOffsets, mean, {
           noTrim: noBatchTrim,
-          rand: Math.random,
+          rand: defaultRand(),
         }).keptSplits
       : [samples]);
   const threshold = percentile(blocks.flat(), p);

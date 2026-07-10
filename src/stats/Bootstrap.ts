@@ -66,8 +66,9 @@ export type BootstrapOptions = {
   resamples?: number;
   /** Confidence level 0-1 (default: 0.95) */
   confidence?: number;
-  /** Random source for resampling draws (default: Math.random). Pass
-   *  seededRng(n) for reproducible CIs. */
+  /** Random source for resampling draws (default: a fixed-seed stream, so
+   *  identical data yields identical CIs). Pass seededRng(n) for a specific
+   *  seed, or Math.random for varied draws. */
   random?: Rand;
 };
 
@@ -100,7 +101,7 @@ export function multiSampleBootstrap(
 ): BootstrapResult[] {
   const { resamples = bootstrapSamples, confidence: conf = defaultConfidence } =
     options;
-  const rand = options.random ?? Math.random;
+  const rand = options.random ?? defaultRand();
   const sub = subsample(samples, maxBootstrapInput, rand);
   const n = sub.length;
   const buf = new Array(n);
@@ -160,6 +161,16 @@ export function subsample(
   }
   return copy.slice(0, max);
 }
+
+/** Fresh default random stream for resampling. A fixed seed makes every CI a
+ *  pure function of its input data, so re-rendering a report or archive
+ *  reproduces the same numbers. Each caller gets its own stream, so results
+ *  don't depend on call order. */
+export function defaultRand(): Rand {
+  return seededRng(defaultSeed);
+}
+
+const defaultSeed = 0x5eed;
 
 /** Deterministic mulberry32 PRNG stream, for reproducible resampling. */
 export function seededRng(seed: number): Rand {

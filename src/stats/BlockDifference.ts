@@ -15,6 +15,7 @@ import {
   computeInterval,
   type DifferenceCI,
   defaultConfidence,
+  defaultRand,
   type HistogramBin,
   maxBootstrapInput,
   type Rand,
@@ -162,7 +163,7 @@ export function pairedBlockBootstrap(
 ): BootstrapResult {
   const { resamples = bootstrapSamples, confidence: conf = defaultConfidence } =
     options;
-  const rand = options.random ?? Math.random;
+  const rand = options.random ?? defaultRand();
   const buf = allocPoolBuf(side.keptSplits);
   const stats = Array.from({ length: resamples }, () =>
     poolResampleStat(side.keptSplits, buf, statFn, rand),
@@ -183,7 +184,7 @@ export function pairedBlockDifference(
 ): DifferenceCI {
   const { resamples = bootstrapSamples, confidence: conf = defaultConfidence } =
     options;
-  const rand = options.random ?? Math.random;
+  const rand = options.random ?? defaultRand();
   const baseVal = statFn(pair.baseline.filtered);
   const currVal = statFn(pair.current.filtered);
   const observedPct = percentDelta(currVal, baseVal);
@@ -217,7 +218,7 @@ export function pairedBlockDifferenceCI(
   const pair = preparePairedBlocks(a, aOffsets, b, bOffsets, {
     noTrim: options.noBatchTrim,
     cap: maxBootstrapInput,
-    rand: options.random ?? Math.random,
+    rand: options.random ?? defaultRand(),
   });
   return pairedBlockDifference(pair, statFn, options);
 }
