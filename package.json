@@ -12,7 +12,7 @@
     "v8"
   ],
   "type": "module",
-  "packageManager": "pnpm@10.28.1",
+  "packageManager": "pnpm@11.10.0",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/mighdoll/benchforge.git"
@@ -43,10 +43,10 @@
     "fix": "biome check --fix --unsafe --error-on-warnings",
     "lint": "biome check --error-on-warnings",
     "prepublishOnly": "run-s lint build",
-    "test": "pnpm --node-options=--expose-gc vitest --hideSkippedTests --exclude '**/*.e2e.test.ts'",
-    "test:e2e": "pnpm --node-options=--expose-gc vitest run '.e2e.' --exclude '**/*.static.e2e.*'",
-    "test:static:e2e": "pnpm --node-options=--expose-gc vitest run '.static.e2e.'",
-    "test:once": "pnpm --node-options=--expose-gc vitest run --exclude '**/*.e2e.test.ts'",
+    "test": "NODE_OPTIONS=--expose-gc vitest --hideSkippedTests --exclude '**/*.e2e.test.ts'",
+    "test:e2e": "NODE_OPTIONS=--expose-gc vitest run '.e2e.' --exclude '**/*.static.e2e.*'",
+    "test:static:e2e": "NODE_OPTIONS=--expose-gc vitest run '.static.e2e.'",
+    "test:once": "NODE_OPTIONS=--expose-gc vitest run --exclude '**/*.e2e.test.ts'",
     "typecheck": "tsgo && tsgo -p src/viewer",
     "prepush": "run-s fix typecheck test:once build test:e2e test:static:e2e",
     "publish:all": "pnpm publish"
