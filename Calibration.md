@@ -67,7 +67,7 @@ Copy the suggested value into your real comparisons, keeping the same
 `--batches` and `--duration`:
 
 ```bash
-benchforge my-bench.ts --baseline --batches 40 --duration 2 --equiv-margin 0.5
+benchforge my-bench.ts --batches 40 --duration 2 --equiv-margin 0.5
 ```
 
 The margin is tied to those run settings. Confidence interval width scales
