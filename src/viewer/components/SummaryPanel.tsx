@@ -10,6 +10,7 @@ import {
 import { provider, reportData, trimMode } from "../State.ts";
 import { activeGroupView, CaseCard, caseHeaderCI } from "./CaseCard.tsx";
 import { ComparisonBadge, shiftDetailOpener } from "./CIWidgets.tsx";
+import { HelpButton } from "./HelpButton.tsx";
 import { ShiftDetailPopup } from "./ShiftPopup.tsx";
 
 declare const __BENCHFORGE_GIT_HASH__: string;
@@ -44,6 +45,7 @@ export function SummaryPanel() {
         {hasRawView(data) && (
           <div class="report-toolbar">
             <TrimToggle />
+            <HelpButton topic="noiseRejection" />
           </div>
         )}
         {data.groups.map((group, i) => (
@@ -66,12 +68,21 @@ function ReportHeader({ data }: { data: ReportData }) {
 
   return (
     <div class="report-header">
-      <div class="cli-args">{formatCliCommand(cliArgs, cliDefaults)}</div>
+      <div class="cli-args" title="The exact command that produced this report">
+        {formatCliCommand(cliArgs, cliDefaults)}
+      </div>
       <div class="header-right">
-        <div class="metadata">{new Date().toLocaleString()}</div>
+        <div class="metadata" title="When the report was generated">
+          {new Date().toLocaleString()}
+        </div>
         <div class="metadata benchforge-version">{benchforgeLabel()}</div>
         {versions.length > 0 && (
-          <div class="version-info">{versions.join(" | ")}</div>
+          <div
+            class="version-info"
+            title="Git versions of the current build and the baseline it is compared against"
+          >
+            {versions.join(" | ")}
+          </div>
         )}
       </div>
     </div>
@@ -122,6 +133,7 @@ function CollapsibleGroup({ group }: { group: BenchmarkGroup }) {
             ci={header.ci}
             onOpen={shiftDetailOpener(header.shift)}
             marginBand={shiftMarginBand(header.shift)}
+            help
           />
         )}
         {group.warnings && (

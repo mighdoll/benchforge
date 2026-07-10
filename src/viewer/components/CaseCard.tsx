@@ -1,10 +1,12 @@
+import { useEffect, useRef } from "preact/hooks";
 import { baselineLabel } from "../../report/Formatters.ts";
 import type { DifferenceCI } from "../../stats/Bootstrap.ts";
-import type {
-  BenchmarkGroup,
-  ShiftFunction,
-  ViewerRow,
-  ViewerSection,
+import {
+  type BenchmarkGroup,
+  type ShiftFunction,
+  shiftMarginBand,
+  type ViewerRow,
+  type ViewerSection,
 } from "../ReportData.ts";
 import { trimMode } from "../State.ts";
 import {
@@ -20,6 +22,7 @@ import {
   openShiftDetail,
   shiftDetailOpener,
 } from "./CIWidgets.tsx";
+import { HelpButton } from "./HelpButton.tsx";
 import { useResponsivePlot } from "./LazyPlot.ts";
 
 /** The trimmed or raw case-level sections, per the current trim mode. */
@@ -74,7 +77,10 @@ function MetricSection({ section }: { section: ViewerSection }) {
   const violins = entries.filter(e => e.shiftFunction);
   return (
     <div class="section-panel primary-section">
-      <div class="panel-header"><span>{section.title}</span></div>
+      <div class="panel-header">
+        <span>{section.title}</span>
+        <HelpButton topic="metricValues" />
+      </div>
       <div class="sparkline-table">
         {entries.map((entry, i) => (
           <SparklineRow key={i} entry={entry} domain={domain} />
@@ -128,13 +134,44 @@ function ShiftPanel({ shift, label }: { shift: ShiftFunction; label?: string }) 
     const { createShiftPlot } = await import("../plots/ShiftPlot.ts");
     return createShiftPlot(shift, { width, onSelect: p => openShiftDetail(shift, p) });
   }, [shift], "Shift plot");
+  const wrapRef = useBandAlignedHelp();
   return (
     <div class="shift-panel">
       <div class="shift-caption" title="click a percentile for current vs baseline detail">
         change by percentile{label ? ` · ${label}` : ""}
+        <HelpButton topic="shiftChart" />
       </div>
-      <div class="shift-plot" ref={ref} title="click a percentile for current vs baseline detail" />
+      <div class="shift-plot-wrap" ref={wrapRef}>
+        <div class="shift-plot" ref={ref} />
+        {!!shiftMarginBand(shift) && <HelpButton topic="equivalenceMargin" />}
+      </div>
     </div>
   );
+}
+
+/** Keeps the margin-band help button vertically centered on the band. The plot
+ *  SVG appears (and is replaced on resize) asynchronously, so watch the wrapper
+ *  and re-measure the band whenever the plot changes. */
+function useBandAlignedHelp() {
+  const wrapRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const wrap = wrapRef.current;
+    if (!wrap) return;
+    // arrow (not a hoisted declaration) so wrap's non-null narrowing applies
+    const align = () => {
+      const band = wrap.querySelector(".margin-zone");
+      const btn = wrap.querySelector<HTMLElement>(":scope > .help-button");
+      if (!band || !btn) return;
+      const bandRect = band.getBoundingClientRect();
+      const wrapTop = wrap.getBoundingClientRect().top;
+      const bandMid = bandRect.top + bandRect.height / 2 - wrapTop;
+      btn.style.top = `${bandMid - btn.offsetHeight / 2}px`;
+    };
+    const observer = new MutationObserver(align);
+    observer.observe(wrap, { childList: true, subtree: true });
+    align();
+    return () => observer.disconnect();
+  }, []);
+  return wrapRef;
 }
 

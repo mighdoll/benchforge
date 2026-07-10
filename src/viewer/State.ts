@@ -1,4 +1,5 @@
 import { signal } from "@preact/signals";
+import { useEffect } from "preact/hooks";
 import type { DataProvider } from "./Providers.ts";
 import type { ReportData, ShiftPercentile } from "./ReportData.ts";
 
@@ -49,11 +50,27 @@ export const trimMode = signal<TrimMode>("trim");
 /** Open detail popup for a shift-function point (verdict or percentile). Null = closed. */
 export const shiftDetail = signal<ShiftDetail | null>(null);
 
+/** Instance id of the open help "?" button (one popover at a time; the same
+ *  topic can appear on several cards). Null = closed. */
+export const openHelp = signal<string | null>(null);
+
 const cookieTheme = document.cookie.match(/(?:^|; )theme=(light|dark)/);
 const initialTheme = (cookieTheme?.[1] as ThemePreference) ?? "system";
 
 /** User's light/dark theme preference, initialized from cookie. */
 export const themePreference = signal<ThemePreference>(initialTheme);
+
+/** Close a popup (clear its open-state signal) on Escape, for as long as the
+ *  calling component is mounted. */
+export function useEscapeClose(close: () => void): void {
+  useEffect(() => {
+    function onKey(e: KeyboardEvent) {
+      if (e.key === "Escape") close();
+    }
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, []);
+}
 
 /** Pick the best default tab based on available data. */
 export function defaultTabId(): string {

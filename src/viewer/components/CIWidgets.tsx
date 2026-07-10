@@ -9,6 +9,7 @@ import {
 } from "../ReportData.ts";
 import type { DistributionPlotOptions } from "../plots/CIPlot.ts";
 import { reportData, shiftDetail } from "../State.ts";
+import { HelpButton } from "./HelpButton.tsx";
 import { useLazyPlot } from "./LazyPlot.ts";
 
 /** Proportional horizontal offset range for aligning bootstrap CI plots. */
@@ -62,10 +63,11 @@ export function ciDomain(cis: BootstrapCIData[]): [number, number] | undefined {
 }
 
 /** Comparison verdict: a colored chip (group header) or plain delta text
- *  (compact). When `onOpen` is set, the CI chart becomes a click target. */
+ *  (compact). When `onOpen` is set, the CI chart becomes a click target.
+ *  `help` adds "?" popovers for the pill and for the chart. */
 export function ComparisonBadge(
-  { ci, compact, onOpen, marginBand }:
-  { ci: DifferenceCI; compact?: boolean; onOpen?: () => void; marginBand?: [number, number] },
+  { ci, compact, onOpen, help, marginBand }:
+  { ci: DifferenceCI; compact?: boolean; onOpen?: () => void; help?: boolean; marginBand?: [number, number] },
 ) {
   // Colored chip is reserved for the main verdict; per-row (compact) comparisons
   // render as plain bold text regardless of direction.
@@ -75,8 +77,10 @@ export function ComparisonBadge(
       <span class={cls}>
         {compact ? formatSignedPercent(ci.percent) : directionLabels[ci.direction]}
       </span>
+      {help && <HelpButton topic="verdict" />}
       {ci.histogram && <CIPlotMount ci={ci} compact={compact} onOpen={onOpen} marginBand={marginBand} />}
       {!compact && <span class="comparison-pct">{formatSignedPercent(ci.percent)}</span>}
+      {help && ci.histogram && <HelpButton topic="verdictChart" />}
     </span>
   );
 }

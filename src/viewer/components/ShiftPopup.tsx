@@ -1,22 +1,15 @@
-import { useEffect } from "preact/hooks";
 import { formatSignedPercent } from "../../report/Formatters.ts";
 import { verdictWord } from "../../report/Verdict.ts";
 import type { DifferenceCI } from "../../stats/Bootstrap.ts";
 import type { BootstrapCIData, ShiftPercentile } from "../ReportData.ts";
-import { shiftDetail } from "../State.ts";
+import { shiftDetail, useEscapeClose } from "../State.ts";
 import { ciDomain, distributionOpts } from "./CIWidgets.tsx";
 import { useLazyPlot } from "./LazyPlot.ts";
 
 /** The single shared shift-detail popup, opened from any CI chart or violin. */
 export function ShiftDetailPopup() {
   const detail = shiftDetail.value;
-  useEffect(() => {
-    function onKey(e: KeyboardEvent) {
-      if (e.key === "Escape") shiftDetail.value = null;
-    }
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, []);
+  useEscapeClose(() => (shiftDetail.value = null));
   if (!detail) return null;
   return (
     <ShiftPopup

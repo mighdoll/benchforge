@@ -16,6 +16,7 @@ import {
   SeriesToggles,
   toggledSet,
 } from "./SamplesControls.tsx";
+import { HelpButton } from "./HelpButton.tsx";
 import { useLazyPlot } from "./LazyPlot.ts";
 
 /** True when at least one benchmark group has multiple samples (enough to plot). */
@@ -102,7 +103,9 @@ function SamplesGroup({ group, index }: { group: BenchmarkGroup; index: number }
       </div>
       <div class="plot-grid">
         <div class="plot-container">
-          <div class="plot-title">Time per Iteration</div>
+          <div class="plot-title">
+            Time per Iteration <HelpButton topic="timeSeries" />
+          </div>
           <div class="plot-description">
             {sampled
               ? `Sampled from ${totalPoints.toLocaleString()} iterations (showing ~1,000)`
@@ -131,7 +134,9 @@ function SamplesGroup({ group, index }: { group: BenchmarkGroup; index: number }
           />
         </div>
         <div class="plot-container">
-          <div class="plot-title">Time Distribution</div>
+          <div class="plot-title">
+            Time Distribution <HelpButton topic="histogram" />
+          </div>
           <div class="plot-description">
             Frequency distribution of execution times
           </div>

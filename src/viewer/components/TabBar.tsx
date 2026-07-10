@@ -20,16 +20,21 @@ export function TabBar() {
 
   return (
     <div class="tab-bar">
-      <TabButton tabId="summary" disabled={!config.hasReport}>
+      <TabButton tabId="summary" disabled={!config.hasReport} title="Verdicts and metrics per case">
         Summary
       </TabButton>
-      <TabButton tabId="samples" disabled={!samplesEnabled} onActivate={() => (samplesLoaded.value = true)}>
+      <TabButton
+        tabId="samples"
+        disabled={!samplesEnabled}
+        onActivate={() => (samplesLoaded.value = true)}
+        title="Per-iteration timing charts"
+      >
         Iterations
       </TabButton>
-      <TabButton tabId="flamechart" disabled={!config.hasProfile}>
+      <TabButton tabId="flamechart" disabled={!config.hasProfile} title="Allocation profile (see Profiling.md)">
         Allocation
       </TabButton>
-      <TabButton tabId="time-flamechart" disabled={!config.hasTimeProfile}>
+      <TabButton tabId="time-flamechart" disabled={!config.hasTimeProfile} title="CPU time profile (see Profiling.md)">
         Timing
       </TabButton>
 
@@ -45,8 +50,9 @@ export function TabBar() {
 }
 
 /** Fixed tab button that sets the active tab on click. */
-function TabButton({ tabId, disabled, onActivate, children }: {
-  tabId: string; disabled: boolean; onActivate?: () => void; children: preact.ComponentChildren;
+function TabButton({ tabId, disabled, onActivate, title, children }: {
+  tabId: string; disabled: boolean; onActivate?: () => void; title?: string;
+  children: preact.ComponentChildren;
 }) {
   const active = activeTabId.value === tabId;
   return (
@@ -55,6 +61,7 @@ function TabButton({ tabId, disabled, onActivate, children }: {
       data-tab={tabId}
       id={`tab-${tabId}`}
       disabled={disabled}
+      title={title}
       onClick={() => {
         activeTabId.value = tabId;
         onActivate?.();
@@ -91,12 +98,6 @@ function SourceTabBtn({ tabId, file, line }: { tabId: string; file: string; line
   );
 }
 
-/** Remove a source tab and fall back to the best available fixed tab. */
-function closeSourceTab(tabId: string): void {
-  sourceTabs.value = sourceTabs.value.filter(t => t.id !== tabId);
-  if (activeTabId.value === tabId) activeTabId.value = defaultTabId();
-}
-
 /** Download button that bundles all report data into a `.benchforge` archive. */
 function ArchiveButton({ provider: dataProvider }: { provider: DataProvider }) {
   const [archiving, setArchiving] = useState(false);
@@ -128,4 +129,10 @@ function ArchiveButton({ provider: dataProvider }: { provider: DataProvider }) {
       {archiving ? "Archiving\u2026" : "Archive \u2193"}
     </button>
   );
+}
+
+/** Remove a source tab and fall back to the best available fixed tab. */
+function closeSourceTab(tabId: string): void {
+  sourceTabs.value = sourceTabs.value.filter(t => t.id !== tabId);
+  if (activeTabId.value === tabId) activeTabId.value = defaultTabId();
 }
