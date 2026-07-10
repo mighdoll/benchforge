@@ -1,38 +1,59 @@
 # Benchforge
 
-Benchforge helps you make faster JavaScript programs with integrated tools for
-benchmarking and performance analysis in Node.js and Chrome, including features
-designed specifically for analyzing garbage-collected programs.
+Benchforge measures JavaScript performance in Node.js and Chrome. It is built
+around the two questions every optimization loop asks: **did that change
+help?** and **where did the time and memory go?**
 
-Garbage collection is intermittent and infrequent, which makes it harder to
-identify true performance issues. Typical perf tools isolate microbenchmarks
-from GC, but that hides a key part of real-world performance. Intermittent
-events also lead to statistically skewed measurement distributions. Perf tools
-that assume normal distributions and noise-free test runs can easily create
-misleading false-positive performance reports. Benchforge captures a truer
-picture of garbage-collected programs:
+Micro-benchmark harnesses print an ops/sec figure that wobbles from run to
+run, leaving you to judge whether a change is real. Benchforge is built for
+that judgment: it measures its own noise floor, compares whole distributions,
+and reports a verdict you can act on.
 
-- **GC-aware statistics** -- bootstrap confidence intervals account for GC
-  variance instead of hiding it.
-- **Heap allocation profiling** -- see which functions allocate the most,
-  including short-lived objects already collected.
-- **GC collection reports** -- allocation rates, scavenge/full GC counts,
-  promotion %, and pause times per iteration.
-- **Visualization** -- distribution plots, icicle charts for allocators, source
-  annotations with allocation and call count metrics.
-- **Archive** -- save traces and source code together to share with your team.
+- **Equivalence testing** -- each comparison ends in a verdict: faster,
+  slower, equivalent, or inconclusive, separating "no real difference" from
+  "too noisy to tell".
+- **Measured noise floor** -- `--calibrate` runs identical code against itself
+  to find what your setup can resolve.
+- **GC-aware** -- garbage collection triggered by your code is real cost, so
+  it stays in the measurement rather than being trimmed as an outlier; the
+  report shows it directly, with GC events overlaid on the iteration timeline
+  plus allocation rates, collection counts, and pause times.
+- **Integrated investigation** -- rerun the same benchmark with `--alloc`,
+  `--profile`, or `--call-counts` to measure heap allocation per function,
+  CPU time, and call counts, annotated onto your source code.
+- **Visualized distributions** -- bootstrap confidence intervals for the mean,
+  median, and tail percentiles; a regression that hides in the average still
+  shows up at p99.
+- **Reports to keep** -- an interactive viewer, a markdown report written on
+  every run (easy for coding agents and CI to read), and a single-file
+  archive to share with your team.
 
-## Timing Distributions
-<img width="326" height="363" alt="stats with distribution curves" src="https://github.com/user-attachments/assets/532702bd-faa1-4cb3-8b33-ad5409631427" />
+## The Verdict
 
-## Heap Allocation
-Explore memory _allocation_ per function:
-<img width="4444" height="2706" alt="allocation view" src="https://github.com/user-attachments/assets/6d4e2dee-bb72-41ce-a71d-d036bebedb3d" />
+Each comparison gets a verdict, with the change shown at every percentile:
 
-## Benchmark Iteration Time Series
+<!-- TODO(image): regenerate -- summary card with the verdict badge, headline
+change, and the change by percentile chart (violins + margin band). -->
+<img width="326" height="363" alt="verdict with change by percentile" src="https://github.com/user-attachments/assets/532702bd-faa1-4cb3-8b33-ad5409631427" />
+
+## Time Per Iteration
+
+Every iteration timed in order, with heap growth and GC overlays:
+
+<!-- TODO(image): regenerate -- time series with the GC sawtooth and full-GC
+markers visible. -->
 <img width="387" height="306" alt="time series" src="https://github.com/user-attachments/assets/f5676b64-7906-422b-aef3-4eedc325c422" />
 
-## Source Code Annotated with Performance Info
+## Heap Allocation
+
+Which functions allocate the most, including objects already collected:
+
+<img width="4444" height="2706" alt="allocation view" src="https://github.com/user-attachments/assets/6d4e2dee-bb72-41ce-a71d-d036bebedb3d" />
+
+## Annotated Source
+
+Allocation and call count metrics in the margins of your own code:
+
 <img width="1946" height="460" alt="src annotations" src="https://github.com/user-attachments/assets/102cc574-ecf3-4f5f-8143-d20ee7008a72" />
 
 ## Installation
@@ -59,23 +80,49 @@ export default function (): string {
 benchforge my-bench.ts --gc-stats
 ```
 
-For multiple functions across shared inputs, with baseline comparison (a
-`MatrixSuite` of cases x variants), see [Node.md](Node.md).
+To compare variants, export a `MatrixSuite`: cases (input data) x variants
+(the functions under test), with one variant named as the baseline.
+
+```typescript
+// copy.ts
+import type { BenchMatrix, MatrixSuite } from "benchforge";
+
+const copying: BenchMatrix<number[]> = {
+  name: "Array Copy (50,000 numbers)",
+  caseData: { numbers: () => Array.from({ length: 50_000 }, () => Math.random()) },
+  variants: {
+    slice: arr => arr.slice(),
+    spread: arr => [...arr],
+  },
+  baselineVariant: "slice",
+};
+
+const suite: MatrixSuite = { name: "Performance Tests", matrices: [copying] };
+export default suite;
+```
+
+```bash
+benchforge copy.ts --batches 40
+```
+
+Each variant is interleaved against the baseline and reported with a Δ% and a
+verdict. See [Node.md](Node.md) for multiple cases, directory variants, and
+custom metrics such as throughput.
 
 ## Quick Start: Browser
 
 `benchforge --url <page>` opens Chromium and runs your program.
 
-You can time any page without modification, and compare against a baseline.
+You can time any page without modification, and compare against a baseline:
 
 ```bash
 benchforge --url http://localhost:5173 --baseline-url http://localhost:5174 \
   --gc-stats --batches 20 --iterations 10 --headless
 ```
 
-If you export your test function as `window.__bench`, benchforge can run
-multiple iterations in the same tab, which helps reveal the accumulated effect
-of heap allocation over time. Tests also run faster.
+If you export your test function as `window.__bench`, benchforge runs multiple
+iterations in the same tab, which is faster and reveals the accumulated effect
+of heap allocation over time.
 
 ```html
 <!-- bench function mode -->
@@ -87,8 +134,28 @@ window.__bench = () => {
 </script>
 ```
 
-See [Browser.md](Browser.md) for setup patterns, completion signals, and the CDP
-flow.
+See [Browser.md](Browser.md) for setup patterns, completion signals, and the
+CDP flow.
+
+## Getting an Answer You Can Trust
+
+Comparing identical code never reports exactly zero; the leftover spread is
+your setup's noise floor. Measure it once, then use it as the equivalence
+margin for real comparisons with the same run settings:
+
+```bash
+# 1. measure the noise floor of this machine + benchmark
+benchforge copy.ts --calibrate --batches 40 --duration 2
+#   ... suggested --equiv-margin 0.5%
+
+# 2. compare against the noise floor
+benchforge copy.ts --batches 40 --duration 2 --equiv-margin 0.5
+```
+
+A verdict of faster or slower now means the whole confidence interval clears
+the noise floor; equivalent means the change is bounded below it; inconclusive
+means run more batches. See [Calibration.md](Calibration.md) for sizing runs
+and [Statistics.md](Statistics.md) for the methods behind the interval.
 
 ## CLI Overview
 
@@ -96,55 +163,33 @@ Core flags for common workflows. Run `benchforge --help` for the full list.
 
 | Flag | What it does |
 |------|-------------|
-| `--gc-stats` | GC allocation/collection stats |
-| `--alloc` | Heap allocation sampling attribution |
-| `--profile` | V8 CPU time sampling profiler |
-| `--call-counts` | Per-function execution counts |
-| `--stats <list>` | Timing columns to display (default: mean,p50,p99) |
-| `--view` | Open interactive viewer in browser (on by default in an interactive terminal; `--no-view` disables) |
-| `--archive [file]` | Archive profiles + sources to `.benchforge` file |
-| `--duration <sec>` | Duration per batch (default: 0.642s) |
-| `--iterations <n>` | Exact iterations (overrides --duration) |
-| `--batches <n>` | Interleaved batches for baseline comparison |
+| `--batches <n>` | Interleaved baseline/current rounds (use 40+ to compare) |
+| `--duration <sec>` | Time budget per batch (default: 0.642s) |
+| `--iterations <n>` | Exact iterations per batch (overrides --duration) |
+| `--calibrate` | Measure the noise floor and print a recommended `--equiv-margin` |
+| `--equiv-margin <pct>` | Equivalence margin (default: 2%) |
+| `--gc-stats` | Collect GC allocation and collection stats |
+| `--alloc` | Measure heap allocation per function |
+| `--profile` | Profile CPU time (V8 sampling profiler) |
+| `--call-counts` | Count executions per function |
 | `--filter <pattern>` | Run only benchmarks matching regex/substring |
+| `--view` | Open interactive viewer (on by default in an interactive terminal; `--no-view` disables) |
+| `--archive [file]` | Archive profiles + sources to a `.benchforge` file |
 | `--url <url>` | Benchmark a browser page |
 | `--baseline-url <url>` | A/B comparison in browser |
-| `--equiv-margin <pct>` | Equivalence margin (default: 2%) |
 
-See [Profiling.md](Profiling.md) for detailed profiling options and V8 flags.
-
-## Key Concepts
-
-### Batching
-
-When comparing against a baseline, use `--batches` to interleave runs and reduce
-ordering bias. Batch 0 is dropped by default (OS cache warmup). For reliable
-comparisons, use 40+ batches.
-
-```bash
-benchforge sorting.ts --batches 40 --duration 2
-```
-
-See [Statistics.md](Statistics.md) for the full explanation of batched
-execution, block bootstrap, and Tukey trimming.
-
-### Baseline Comparison
-
-When a group has a `baseline`, all benchmarks show Δ% with a bootstrap
-confidence interval. The result is classified as faster, slower, equivalent, or
-inconclusive based on the equivalence margin.
-
-See [Statistics.md](Statistics.md#equivalence-margin) for how the four verdicts
-work and how to calibrate the margin.
+`benchforge view <file.benchforge>` reopens an archive in the viewer.
 
 ## Further Reading
 
-- [Node.md](Node.md) -- Worker mode, module imports, custom metric sections,
-  external debugger attachment
+- [Node.md](Node.md) -- MatrixSuite details, custom metric sections, worker
+  mode, external debugger attachment
 - [Browser.md](Browser.md) -- Bench function and page-load modes, completion
   signals, CDP flow
 - [Profiling.md](Profiling.md) -- Allocation sampling, GC stats, V8 flags,
   Perfetto export
-- [Statistics.md](Statistics.md) -- Column selection (`--stats`), bootstrap
-  methods, batching, equivalence testing
+- [Statistics.md](Statistics.md) -- Batches, block bootstrap, paired
+  comparison, the verdict rule
+- [Calibration.md](Calibration.md) -- Sizing runs and measuring the noise
+  floor
 - [README-tachometer.md](README-tachometer.md) -- Coming from tachometer

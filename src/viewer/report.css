@@ -111,8 +111,6 @@
   gap: 10px;
   padding: 8px 0;
   border-bottom: 2px solid var(--group-border);
-  cursor: pointer;
-  user-select: none;
 }
 
 .report-panel .group-header h2 {
@@ -129,6 +127,8 @@
   color: var(--group-toggle-color);
   width: 24px;
   text-align: center;
+  cursor: pointer;
+  user-select: none;
 }
 
 /* Footer-placed sections (e.g. runs), once per group below the variant cards */
@@ -647,3 +647,52 @@
 
 .report-panel .sparkline-cell { line-height: 0; }
 .report-panel .sparkline-cell.ci-clickable { cursor: pointer; }
+
+/* --- Help buttons and popovers --- */
+/* Set off to the right of what it labels; hidden until the surrounding
+   element is hovered (or the popover is open). */
+.report-panel .help-button {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 14px; height: 14px; margin-left: 9px; padding: 0;
+  border: 1px solid var(--muted-color); border-radius: 50%;
+  background: none; color: var(--muted-color);
+  font-size: 9px; font-weight: 700; line-height: 1;
+  cursor: pointer; vertical-align: middle; flex: none;
+  opacity: 0; transition: opacity 0.15s;
+}
+.report-panel :hover > .help-button,
+.report-panel .group-header:hover .help-button,
+.report-panel .help-button:focus-visible,
+.report-panel .help-button[aria-expanded="true"] {
+  opacity: 1;
+}
+.report-panel .help-button:hover {
+  color: var(--heading-color);
+  border-color: var(--toggle-hover-border);
+}
+
+/* Overlay the margin-band help on the plot's upper-right corner. */
+.report-panel .shift-plot-wrap { position: relative; }
+.report-panel .shift-plot-wrap > .help-button {
+  position: absolute; top: 2px; right: 2px;
+}
+
+.help-popover {
+  position: fixed; max-width: 400px; max-height: 60vh; overflow: auto;
+  background: var(--shift-popup-bg); color: var(--value-color);
+  border: 1px solid var(--shift-popup-border); border-radius: 10px;
+  padding: 12px 16px; box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2);
+  font-size: 13px; line-height: 1.5; font-weight: 400; text-align: left;
+  text-transform: none; letter-spacing: normal;
+  white-space: normal; cursor: auto;
+}
+.help-popover h3 { margin: 0 0 6px; font-size: 14px; color: var(--shift-popup-title-color); }
+.help-popover p, .help-popover ul { margin: 6px 0; }
+.help-popover ul { padding-left: 20px; }
+.help-popover a { color: var(--toggle-active-bg); }
+.help-popover .help-legend { list-style: none; padding-left: 4px; }
+.help-popover .help-legend i {
+  display: inline-block; width: 12px; height: 12px; box-sizing: border-box;
+  border-radius: 3px; margin-right: 6px; font-style: normal;
+  vertical-align: -1px;
+}
