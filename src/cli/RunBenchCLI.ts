@@ -31,7 +31,7 @@ import {
   calibrateNoiseRecord,
   machineId,
 } from "../report/NoiseLog.ts";
-import { browserBenchExports } from "./BrowserBench.ts";
+import { browserBenchExports, warnBrowserFlags } from "./BrowserBench.ts";
 import { formatCalibration, reportCalibrateRun } from "./CalibrateRunner.ts";
 import {
   cliDefaults,
@@ -81,13 +81,13 @@ export async function runBenchCli<Extra = Record<string, never>>(
     config.configure ?? (y => y as Argv<DefaultCliArgs & Extra>);
   const { presets, defaultPreset } = config;
   const argv = hideBin(process.argv);
-  const chosen = presetDefaults(presets, defaultPreset, argv);
+  const runDefaults = presetDefaults(presets, defaultPreset, argv);
   const args = parseCliArgs(y => {
     const withOpts = configure(defaultCliArgs(y));
     const withPreset = presets
       ? registerPreset(withOpts, presets, defaultPreset)
       : withOpts;
-    return applyRunDefaults(withPreset, chosen);
+    return applyRunDefaults(withPreset, runDefaults);
   }, argv);
   const result = await config.build(args);
   if (args.list) return listMatrixSuite(result.suite);
@@ -136,7 +136,10 @@ export async function dispatchCli(): Promise<void> {
   const args = parseCliArgs();
   // --url with a bench file: run that file's inline matrix in the browser against
   // the harness url. --url alone: profile the page's own window.__bench.
-  if (args.url && args.file) return runFileBench(args.file, args);
+  if (args.url && args.file) {
+    warnBrowserFlags(args);
+    return runFileBench(args.file, args);
+  }
   if (args.url) return browserBenchExports(args);
   if (args.file) return runFileBench(args.file, args);
   throw new Error("Provide a benchmark file or --url for browser mode.");

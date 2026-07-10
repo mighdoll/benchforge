@@ -13,9 +13,12 @@ import {
   type RunMatrixOptions,
   resolveCases,
 } from "./BenchMatrix.ts";
-import { inlineSource } from "./MatrixInlineRunner.ts";
 import {
-  buildMatrixPlan,
+  buildInlineVariantPlan,
+  inlineSource,
+  requireNoBaselineDir,
+} from "./MatrixInlineRunner.ts";
+import {
   calibrateSource,
   type MatrixPlan,
   runMatrixPlan,
@@ -32,26 +35,10 @@ export async function runMatrixBrowser<T>(
   const chrome = await launchBrowser(options.browser!);
   try {
     const ctx = browserCtx(options.browser!, chrome);
-    const allVariants = Object.entries(matrix.variants!);
-    const sources = new Map(
-      allVariants.map(([id, v]) => [id, inlineSource(id, v)]),
-    );
-    const runIds = options.filteredVariants ?? allVariants.map(([id]) => id);
-    const baselineId = matrix.baselineVariant;
-
-    const plan = await buildMatrixPlan(matrix, options, runIds, variantId => ({
-      source: sources.get(variantId)!,
-      baselineSource:
-        baselineId && baselineId !== variantId
-          ? sources.get(baselineId)
-          : undefined,
-    }));
+    const { plan, baselineId } = await buildInlineVariantPlan(matrix, options);
+    const browserPlan = { ...plan, browser: ctx };
     // await (not just return) so Chrome stays open until the run completes.
-    return await runMatrixPlan(
-      matrix.name,
-      { ...plan, browser: ctx },
-      baselineId,
-    );
+    return await runMatrixPlan(matrix.name, browserPlan, baselineId);
   } finally {
     await chrome.close();
   }
@@ -140,7 +127,10 @@ export async function runMatrixCalibrationBrowser<T>(
 }
 
 /** Browser matrix mode reconstructs variants in-page, so it needs inline
- *  `variants` -- directory variants would require a browser bundle step. */
+ *  `variants` -- directory variants would require a browser bundle step. Case
+ *  data must also be inline: `casesModule` is loaded per-case only by the Node
+ *  worker/direct paths (see `resolveVariantFn`), so a browser run would silently
+ *  inject `undefined` case data instead of erroring (not yet supported). */
 function requireInline<T>(matrix: BenchMatrix<T>): void {
   if (matrix.variantDir)
     throw new Error(
@@ -148,28 +138,33 @@ function requireInline<T>(matrix: BenchMatrix<T>): void {
     );
   if (!matrix.variants)
     throw new Error("BenchMatrix requires 'variants' for browser mode");
+  requireNoBaselineDir(matrix);
+  if (matrix.casesModule)
+    throw new Error(
+      "Browser matrix mode needs inline 'caseData'; 'casesModule' is not yet loaded for browser runs.",
+    );
 }
 
 /** Launch the shared Chrome instance for the whole matrix run. */
-function launchBrowser(o: BrowserRunOptions): Promise<ChromeInstance> {
+function launchBrowser(options: BrowserRunOptions): Promise<ChromeInstance> {
   return launchChrome({
-    headless: o.headless,
-    chromePath: o.chromePath,
-    chromeProfile: o.chromeProfile,
-    args: o.chromeArgs,
+    headless: options.headless,
+    chromePath: options.chromePath,
+    chromeProfile: options.chromeProfile,
+    args: options.chromeArgs,
   });
 }
 
 /** Derive the per-run browser context from launch options + the live Chrome. */
 function browserCtx(
-  o: BrowserRunOptions,
+  options: BrowserRunOptions,
   chrome: ChromeInstance,
 ): BrowserRunCtx {
   return {
     chrome,
-    url: o.url,
-    pageLoad: o.pageLoad,
-    waitFor: o.waitFor,
-    timeout: o.timeout,
+    url: options.url,
+    pageLoad: options.pageLoad,
+    waitFor: options.waitFor,
+    timeout: options.timeout,
   };
 }

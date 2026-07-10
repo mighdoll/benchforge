@@ -62,6 +62,9 @@ async function runPageVariant(
   // Iteration samples ==> bench mode; the single call covered the whole batch.
   if (raw.samples?.length) return toBrowserMeasured(name, raw);
   // No samples but a navTiming ==> auto-detected page load; the probe is load #0.
+  // Persist the mode on the shared run context so later batches skip the redundant
+  // detection navigation (and its repeated "No __bench" warning).
+  ctx.pageLoad = true;
   return multiPageLoad({ ...base, pageLoad: true }, options, name, raw);
 }
 

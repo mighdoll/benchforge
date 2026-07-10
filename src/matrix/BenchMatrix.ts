@@ -222,6 +222,7 @@ export function buildRunnerOptions(opts: RunMatrixOptions): RunnerOptions {
     warmupBatch,
     calibrate,
     calibrateRuns,
+    browser,
     ...base
   } = opts;
   const { iterations, maxTime, warmup, ...rest } = base;

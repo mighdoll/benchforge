@@ -11,6 +11,7 @@ import {
 import {
   buildMatrixPlan,
   calibrateSource,
+  type MatrixPlan,
   runMatrixPlan,
 } from "./MatrixRun.ts";
 
@@ -22,19 +23,36 @@ export async function runMatrixInline<T>(
   matrix: BenchMatrix<T>,
   options: RunMatrixOptions,
 ): Promise<MatrixResults> {
+  requireNoBaselineDir(matrix);
+  const { plan, baselineId } = await buildInlineVariantPlan(matrix, options);
+  return runMatrixPlan(matrix.name, plan, baselineId);
+}
+
+/** Inline variants can't pair with directory-loaded baselines; without this
+ *  guard a run would silently drop `baselineDir` and run current variants with
+ *  no baseline. Shared by the Node and browser inline paths. */
+export function requireNoBaselineDir<T>(matrix: BenchMatrix<T>): void {
   if (matrix.baselineDir)
     throw new Error(
       "BenchMatrix with inline 'variants' cannot use 'baselineDir'. Use 'variantDir' instead.",
     );
+}
 
+/** Serialize every inline variant and build a plan for the filtered subset,
+ *  pairing each with `baselineVariant` (the configured reference id) if set.
+ *  Shared by the Node and browser inline runners, which differ only in how
+ *  they execute the resulting plan. */
+export async function buildInlineVariantPlan<T>(
+  matrix: BenchMatrix<T>,
+  options: RunMatrixOptions,
+): Promise<{ plan: MatrixPlan<T>; baselineId?: string }> {
   const allVariants = Object.entries(matrix.variants!);
-  const { filteredVariants } = options;
   // Serialize every variant so a filtered run can still resolve its baseline
   // for comparison, but only run (plan) the filtered set.
   const sources = new Map(
     allVariants.map(([id, v]) => [id, inlineSource(id, v)]),
   );
-  const runIds = filteredVariants ?? allVariants.map(([id]) => id);
+  const runIds = options.filteredVariants ?? allVariants.map(([id]) => id);
   const baselineId = matrix.baselineVariant;
 
   const plan = await buildMatrixPlan(matrix, options, runIds, variantId => ({
@@ -44,7 +62,7 @@ export async function runMatrixInline<T>(
         ? sources.get(baselineId)
         : undefined,
   }));
-  return runMatrixPlan(matrix.name, plan, baselineId);
+  return { plan, baselineId };
 }
 
 /** Measure the harness noise floor for an inline matrix (current vs current),

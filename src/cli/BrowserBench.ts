@@ -1,10 +1,6 @@
-import type {
-  BrowserProfileParams,
-  BrowserProfileResult,
-} from "../profiling/browser/BrowserProfiler.ts";
-import { profileBrowser } from "../profiling/browser/BrowserProfiler.ts";
+import { runSingleUrlBrowser } from "../matrix/MatrixBrowserRunner.ts";
 import { isBrowserUserCode } from "../profiling/node/HeapSampleReport.ts";
-import type { ReportGroup, ReportSection } from "../report/BenchmarkReport.ts";
+import type { ReportSection } from "../report/BenchmarkReport.ts";
 import colors from "../report/Colors.ts";
 import { consoleSummary } from "../report/ConsoleSummary.ts";
 import {
@@ -13,50 +9,53 @@ import {
 } from "../report/GcSections.ts";
 import { prepareHtmlData } from "../report/HtmlReport.ts";
 import { runsSection, timeSection } from "../report/StandardSections.ts";
-import type { ReportData } from "../viewer/ReportData.ts";
-import {
-  browserResultGroups,
-  nameFromUrl,
-  runBrowserBatches,
-} from "./BrowserBatcher.ts";
+import type { MeasuredResults } from "../runners/MeasuredResults.ts";
 import type { DefaultCliArgs } from "./CliArgs.ts";
-import { exportReports } from "./CliExport.ts";
+import { finishReports } from "./CliExport.ts";
 import {
   cliComparisonOptions,
   cliHeapReportOptions,
-  needsAlloc,
-  needsProfile,
-  resolveLimits,
+  cliToMatrixOptions,
 } from "./CliOptions.ts";
-import { printRawSamples, withStatus } from "./CliReport.ts";
+import { matrixToReportGroups, withStatus } from "./CliReport.ts";
 
 const { yellow } = colors;
 
-/** Run browser profiling via CDP and report with standard pipeline. */
+/** Run a bare `--url` browser benchmark and report with the standard pipeline.
+ *  The page owns the benchmark, so this runs as a synthesized one-variant matrix
+ *  (see runSingleUrlBrowser) that shares the batching, stats, and report code
+ *  with the inline browser-matrix path. */
 export async function browserBenchExports(args: DefaultCliArgs): Promise<void> {
   warnBrowserFlags(args);
-  const params = buildBrowserParams(args);
-  const name = nameFromUrl(args.url!);
-  const baselineUrl = args["baseline-url"];
-
-  const needsBatching =
-    args.batches > 1 ||
-    !!baselineUrl ||
-    (args.iterations ?? 0) > 1 ||
-    (params.pageLoad ?? false);
-  const { raw, results } = await collectBrowserResults(
-    needsBatching,
-    params,
-    name,
-    args,
+  const options = cliToMatrixOptions(args);
+  const results = await runSingleUrlBrowser(
+    args.url!,
+    args["baseline-url"],
+    options,
   );
+  const groups = matrixToReportGroups([results]);
 
-  const reportData = printBrowserReport(raw, results, args);
-  await exportReports({ results, args, reportData });
+  const measured = groups[0]?.reports[0]?.measuredResults;
+  const sections = browserSections(measured, args["gc-stats"] ?? false);
+  const reportData = sections.length
+    ? withStatus("computing report", () =>
+        prepareHtmlData(groups, {
+          cliArgs: args,
+          sections,
+          heapReport: {
+            ...cliHeapReportOptions(args),
+            isUserCode: isBrowserUserCode,
+          },
+          ...cliComparisonOptions(args),
+        }),
+      )
+    : undefined;
+  if (reportData) console.log(consoleSummary(reportData));
+  await finishReports(groups, args, { sections, reportData });
 }
 
 /** Warn about Node-only flags ignored in browser mode. */
-function warnBrowserFlags(args: DefaultCliArgs): void {
+export function warnBrowserFlags(args: DefaultCliArgs): void {
   const checks: [boolean, string][] = [
     [!args.worker, "--no-worker"],
     [!!args["gc-force"], "--gc-force"],
@@ -67,90 +66,20 @@ function warnBrowserFlags(args: DefaultCliArgs): void {
     console.warn(yellow(`Ignored in browser mode: ${ignored.join(", ")}`));
 }
 
-/** Convert CLI args to browser profiler parameters. */
-function buildBrowserParams(args: DefaultCliArgs): BrowserProfileParams {
-  const { maxTime, maxIterations } = resolveLimits(args);
-  const chromeArgs = args["chrome-args"]
-    ?.flatMap(a => a.split(/\s+/))
-    .map(stripQuotes)
-    .filter(Boolean);
-  return {
-    url: args.url!,
-    pageLoad: args["page-load"] || !!args["wait-for"],
-    maxTime,
-    maxIterations,
-    chromeArgs,
-    allocOptions: {
-      samplingInterval: args["alloc-interval"],
-      stackDepth: args["alloc-depth"],
-    },
-    alloc: needsAlloc(args),
-    profile: needsProfile(args),
-    profileInterval: args["profile-interval"],
-    headless: args.headless,
-    chromePath: args.chrome,
-    chromeProfile: args["chrome-profile"],
-    timeout: args.timeout,
-    gcStats: args["gc-stats"],
-    callCounts: args["call-counts"],
-    waitFor: args["wait-for"],
-  };
-}
-
-/** Profile the browser once or in batches, returning the last raw result plus
- *  the report groups for the standard export pipeline. */
-async function collectBrowserResults(
-  needsBatching: boolean,
-  params: BrowserProfileParams,
-  name: string,
-  args: DefaultCliArgs,
-): Promise<{ raw: BrowserProfileResult; results: ReportGroup[] }> {
-  if (needsBatching) {
-    const { lastRaw, results } = await runBrowserBatches(params, name, args);
-    return { raw: lastRaw, results };
-  }
-  const raw = await profileBrowser(params);
-  return { raw, results: browserResultGroups(name, raw) };
-}
-
-/** Build the report data, print the console summary and optional heap profile
- *  for browser results. @return the report data for reuse by exportReports. */
-function printBrowserReport(
-  result: BrowserProfileResult,
-  results: ReportGroup[],
-  args: DefaultCliArgs,
-): ReportData | undefined {
-  const mr = results[0]?.reports[0]?.measuredResults;
-  const hasPageLoad = (mr?.navTimings?.length ?? 0) > 0 || !!result.navTiming;
-  const hasIterSamples = !!result.samples?.length;
-  const sections: ReportSection[] = [
+/** Select report sections for a browser result: a mean-time metric for bench
+ *  pages, per-metric page-load nav stats for page-load pages, optional GC, and a
+ *  runs footer. Page load has no per-iteration metric, so it shows nav stats
+ *  instead of the time section. */
+function browserSections(
+  measured: MeasuredResults | undefined,
+  gcStats: boolean,
+): ReportSection[] {
+  const hasPageLoad = (measured?.navTimings?.length ?? 0) > 0;
+  const hasIterSamples = !hasPageLoad && (measured?.samples?.length ?? 0) > 0;
+  return [
     ...(hasIterSamples ? [timeSection] : []),
     ...(hasPageLoad ? pageLoadStatsSections : []),
-    ...(result.gcStats ? [browserGcStatsSection] : []),
+    ...(gcStats ? [browserGcStatsSection] : []),
     ...(hasPageLoad || hasIterSamples ? [runsSection] : []),
   ];
-  const heapReport = {
-    ...cliHeapReportOptions(args),
-    isUserCode: isBrowserUserCode,
-  };
-  let reportData: ReportData | undefined;
-  if (sections.length > 0) {
-    reportData = withStatus("computing report", () =>
-      prepareHtmlData(results, {
-        cliArgs: args,
-        sections,
-        heapReport,
-        ...cliComparisonOptions(args),
-      }),
-    );
-    console.log(consoleSummary(reportData));
-  }
-  if (result.heapProfile && args["alloc-raw"]) printRawSamples(results);
-  return reportData;
-}
-
-/** Strip surrounding quotes from a chrome-args token. */
-function stripQuotes(s: string): string {
-  const bare = s.replace(/^(['"])(.*)\1$/s, "$2");
-  return bare.replace(/^(-[^=]+=)(['"])(.*)\2$/s, "$1$3");
 }
