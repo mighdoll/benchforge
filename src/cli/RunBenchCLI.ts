@@ -18,6 +18,7 @@ import {
   resolveCaseIds,
   resolveVariantIds,
 } from "../matrix/MatrixFilter.ts";
+import { runMatrixCalibrationInline } from "../matrix/MatrixInlineRunner.ts";
 import { reportMatrixResults } from "../matrix/MatrixReport.ts";
 import type { ReportSection } from "../report/BenchmarkReport.ts";
 import { calibrationMarkdown } from "../report/CalibrationReport.ts";
@@ -202,18 +203,11 @@ async function runMatrixCalibratePipeline(
   const options = cliToMatrixOptions(args);
   const matrix = m.suite.matrices[0];
   const filtered = await applyMatrixFilters(matrix, args.all, filter);
-  if (!filtered.variantDir)
-    throw new Error(
-      "--calibrate requires a directory-based matrix (variantDir)",
-    );
-
   const { filteredCases, filteredVariants } = filtered;
   const runOpts = { ...options, filteredCases, filteredVariants };
-  const result = await runMatrixCalibration(
-    filtered,
-    runOpts,
-    reportCalibrateRun,
-  );
+  const result = filtered.variantDir
+    ? await runMatrixCalibration(filtered, runOpts, reportCalibrateRun)
+    : await runMatrixCalibrationInline(filtered, runOpts, reportCalibrateRun);
   console.log(formatCalibration(result));
   const meta = {
     timestamp: new Date().toISOString(),

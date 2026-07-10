@@ -1,4 +1,9 @@
 import type { RunnerOptions } from "../runners/BenchRunner.ts";
+import {
+  type CalibrationResult,
+  type RunProgress,
+  runCalibration,
+} from "../runners/Calibration.ts";
 import type { MeasuredResults } from "../runners/MeasuredResults.ts";
 import { runBatched } from "../runners/MergeBatches.ts";
 import {
@@ -115,6 +120,36 @@ export async function runVariantOnce(
   args: RunMatrixVariantParams,
 ): Promise<MeasuredResults> {
   return (await runMatrixVariant(args))[0];
+}
+
+/** Measure the harness noise floor for one resolved variant source and case
+ *  (current vs current). Shared by the directory and inline calibration entry
+ *  points, which differ only in how they resolve the variant `source`. */
+export async function calibrateSource<T>(
+  matrix: BenchMatrix<T>,
+  options: RunMatrixOptions,
+  source: VariantSource,
+  caseId: string,
+  onRun?: (p: RunProgress, label: string) => void,
+): Promise<CalibrationResult> {
+  const label = `${source.variantId}/${caseId}`;
+  const caseData = await inlineCaseDataMap(matrix, [caseId]);
+  const variantArgs: RunMatrixVariantParams = {
+    source,
+    caseId,
+    caseData: matrix.casesModule ? undefined : caseData?.get(caseId),
+    casesModule: matrix.casesModule,
+    options: buildRunnerOptions(options),
+    useWorker: options.useWorker ?? true,
+  };
+  const current = () => runVariantOnce(variantArgs);
+  return runCalibration({
+    current,
+    batches: options.batches ?? 1,
+    runs: options.calibrateRuns ?? 15,
+    warmupBatch: options.warmupBatch ?? false,
+    onRun: onRun ? p => onRun(p, label) : undefined,
+  });
 }
 
 /** Run all cases for a single variant. */

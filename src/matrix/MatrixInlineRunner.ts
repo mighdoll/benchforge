@@ -1,12 +1,18 @@
+import type { CalibrationResult, RunProgress } from "../runners/Calibration.ts";
 import type { VariantSource } from "../runners/RunnerUtils.ts";
 import {
   type BenchMatrix,
   isStatefulVariant,
   type MatrixResults,
   type RunMatrixOptions,
+  resolveCases,
   type Variant,
 } from "./BenchMatrix.ts";
-import { buildMatrixPlan, runMatrixPlan } from "./MatrixRun.ts";
+import {
+  buildMatrixPlan,
+  calibrateSource,
+  runMatrixPlan,
+} from "./MatrixRun.ts";
 
 /** Run a matrix with in-memory variant functions. Variants are serialized to
  *  source and reconstructed in a worker (like directory variants), so inline
@@ -39,6 +45,24 @@ export async function runMatrixInline<T>(
         : undefined,
   }));
   return runMatrixPlan(matrix.name, plan, baselineId);
+}
+
+/** Measure the harness noise floor for an inline matrix (current vs current),
+ *  using the first filtered variant + case as a representative benchmark. */
+export async function runMatrixCalibrationInline<T>(
+  matrix: BenchMatrix<T>,
+  options: RunMatrixOptions,
+  onRun?: (p: RunProgress, label: string) => void,
+): Promise<CalibrationResult> {
+  const variants = matrix.variants ?? {};
+  const variantId = (options.filteredVariants ?? Object.keys(variants))[0];
+  const variant = variantId ? variants[variantId] : undefined;
+  if (!variantId || !variant)
+    throw new Error("No inline variants found in matrix");
+  const { caseIds } = await resolveCases(matrix, options);
+  const caseId = caseIds[0];
+  const source = inlineSource(variantId, variant);
+  return calibrateSource(matrix, options, source, caseId, onRun);
 }
 
 /** Serialize an inline variant to a worker-reconstructable source. */
