@@ -22,6 +22,7 @@ import {
 import {
   isBootstrappable,
   mean,
+  percentDelta,
   type StatKind,
   statKindToFn,
 } from "./CoreStats.ts";
@@ -174,9 +175,7 @@ export function pairedBlockBootstrap(
   };
 }
 
-/** Paired block-pool difference CI from an already prepared paired batch set.
- *  percent is non-finite when baseVal is 0 (a degenerate all-zero-sample
- *  pool); callers should treat that as unmeasurable rather than a real delta. */
+/** Paired block-pool difference CI from an already prepared paired batch set. */
 export function pairedBlockDifference(
   pair: PreparedPairedBlocks,
   statFn: (s: number[]) => number,
@@ -187,7 +186,7 @@ export function pairedBlockDifference(
   const rand = options.random ?? Math.random;
   const baseVal = statFn(pair.baseline.filtered);
   const currVal = statFn(pair.current.filtered);
-  const observedPct = ((currVal - baseVal) / baseVal) * 100;
+  const observedPct = percentDelta(currVal, baseVal);
 
   const baseBuf = allocPoolBuf(pair.baseline.keptSplits);
   const curBuf = allocPoolBuf(pair.current.keptSplits);
@@ -303,7 +302,7 @@ function pairedPoolDiff(
     curPos = appendBlock(pair.current.keptSplits[k], curBuf, curPos);
   }
   const base = statFn(filledBuf(baseBuf, basePos));
-  return ((statFn(filledBuf(curBuf, curPos)) - base) / base) * 100;
+  return percentDelta(statFn(filledBuf(curBuf, curPos)), base);
 }
 
 function validateOffsets(

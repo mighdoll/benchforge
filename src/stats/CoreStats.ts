@@ -72,6 +72,14 @@ export function median(values: number[]): number {
   return percentile(values, 0.5);
 }
 
+/** Percent change from base to curr. A zero base makes the ratio undefined
+ *  (a degenerate all-zero-sample pool), so report 0 rather than let a
+ *  non-finite value poison a CI or histogram. */
+export function percentDelta(curr: number, base: number): number {
+  if (base === 0) return 0;
+  return ((curr - base) / base) * 100;
+}
+
 /** @return value at percentile p (0-1), using O(N) quickselect */
 export function percentile(values: number[], p: number): number {
   const copy = values.slice();

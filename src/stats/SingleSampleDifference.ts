@@ -12,6 +12,7 @@ import {
 } from "./Bootstrap.ts";
 import {
   nonPercentileStat,
+  percentDelta,
   percentile,
   percentileIndex,
   quickSelect,
@@ -52,8 +53,8 @@ export function multiSampleDifferenceCI(
 
   const baseVals = ops.map(op => op.pointEstimate(a));
   const currVals = ops.map(op => op.pointEstimate(b));
-  const observedPcts = ops.map(
-    (_, j) => ((currVals[j] - baseVals[j]) / baseVals[j]) * 100,
+  const observedPcts = ops.map((_, j) =>
+    percentDelta(currVals[j], baseVals[j]),
   );
 
   for (let i = 0; i < resamples; i++) {
@@ -62,7 +63,7 @@ export function multiSampleDifferenceCI(
     for (let j = 0; j < ops.length; j++) {
       const base = ops[j].computeA(bufA);
       const curr = ops[j].computeB(bufB);
-      allDiffs[j][i] = ((curr - base) / base) * 100;
+      allDiffs[j][i] = percentDelta(curr, base);
     }
   }
 

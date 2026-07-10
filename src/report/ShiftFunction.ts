@@ -24,6 +24,7 @@ import type {
 import { metricStatKind } from "./BenchmarkReport.ts";
 import {
   displayMarginBand,
+  effectiveBatchCount,
   hasBatchBlocks,
   hasLowBatchCount,
   minBatches,
@@ -136,12 +137,11 @@ export function buildAbsoluteShift(
     resamples: comparison?.resamples,
   });
 
-  const batches = current.batchOffsets?.length ?? 0;
   const base: Omit<AbsPointArgs, "p" | "result"> = {
     section,
     current,
     currentMeta,
-    lowBatches: batches < minBatches,
+    lowBatches: effectiveBatchCount(current, noBatchTrim) < minBatches,
     noBatchTrim,
     verdict: metricStatKind(section),
   };

@@ -175,7 +175,7 @@ export function keptBatchCount(
 
 /** @return number of batches that survive Tukey trimming (or raw count if
  *  trimming is off / there are too few batches to split). */
-function effectiveBatchCount(
+export function effectiveBatchCount(
   m: MeasuredResults | undefined,
   noTrim?: boolean,
 ): number {

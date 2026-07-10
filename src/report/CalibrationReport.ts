@@ -126,7 +126,7 @@ function noiseFloor(result: CalibrationResult): string {
     ["mean Δ%", `${formatSignedPercent(s.meanPoint)} (expected ~0)`],
     [
       "point-estimate scatter",
-      `${pct(s.scatterStd)} std, ${pct(s.scatterHalfWidth)} 95% band`,
+      `${pct(s.scatterStd)} std, ${pct(s.scatterHalfWidth)} 95% band (1.96 std)`,
     ],
     ["within-run CI half-width", `${pct(s.meanCiHalfWidth)} mean`],
     ["**suggested --equiv-margin**", `**${pct(s.suggestedMargin)}**`],
