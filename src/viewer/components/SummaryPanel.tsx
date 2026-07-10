@@ -61,6 +61,7 @@ export function SummaryPanel() {
 function ReportHeader({ data }: { data: ReportData }) {
   const { metadata } = data;
   const { cliArgs, cliDefaults, currentVersion, baselineVersion } = metadata;
+  const generated = new Date(metadata.timestamp).toLocaleString();
   const versions = [
     currentVersion && `Current: ${formatVersion(currentVersion)}`,
     baselineVersion && `Baseline: ${formatVersion(baselineVersion)}`,
@@ -73,7 +74,7 @@ function ReportHeader({ data }: { data: ReportData }) {
       </div>
       <div class="header-right">
         <div class="metadata" title="When the report was generated">
-          {new Date().toLocaleString()}
+          {generated}
         </div>
         <div class="metadata benchforge-version">{benchforgeLabel()}</div>
         {versions.length > 0 && (
@@ -125,8 +126,10 @@ function CollapsibleGroup({ group }: { group: BenchmarkGroup }) {
   const header = caseHeaderCI(activeGroupView(group));
   return (
     <div class="benchmark-group">
-      <div class="group-header" onClick={() => setOpen(o => !o)}>
-        <span class="group-toggle">{open ? "▾" : "▸"}</span>
+      <div class="group-header">
+        <span class="group-toggle" onClick={() => setOpen(o => !o)}>
+          {open ? "▾" : "▸"}
+        </span>
         <h2>{group.name}</h2>
         {header && (
           <ComparisonBadge
