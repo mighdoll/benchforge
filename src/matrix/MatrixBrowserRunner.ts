@@ -1,3 +1,4 @@
+import { nameFromUrl } from "../cli/BrowserMeasured.ts";
 import type {
   BrowserRunCtx,
   BrowserRunOptions,
@@ -7,6 +8,7 @@ import { launchChrome } from "../profiling/browser/ChromeLauncher.ts";
 import type { CalibrationResult, RunProgress } from "../runners/Calibration.ts";
 import {
   type BenchMatrix,
+  buildRunnerOptions,
   type MatrixResults,
   type RunMatrixOptions,
   resolveCases,
@@ -15,6 +17,7 @@ import { inlineSource } from "./MatrixInlineRunner.ts";
 import {
   buildMatrixPlan,
   calibrateSource,
+  type MatrixPlan,
   runMatrixPlan,
 } from "./MatrixRun.ts";
 
@@ -52,6 +55,55 @@ export async function runMatrixBrowser<T>(
   } finally {
     await chrome.close();
   }
+}
+
+/** Run a bare `--url` browser benchmark as a synthesized one-variant matrix: the
+ *  page owns the benchmark (`window.__bench` or a page load), so the variant is a
+ *  page-url source rather than injected code. `--baseline-url` becomes the
+ *  variant's paired baseline (a second page). Reuses the shared batching/report
+ *  pipeline instead of a separate browser batching loop. */
+export async function runSingleUrlBrowser(
+  url: string,
+  baselineUrl: string | undefined,
+  options: RunMatrixOptions,
+): Promise<MatrixResults> {
+  const chrome = await launchBrowser(options.browser!);
+  try {
+    const ctx = browserCtx(options.browser!, chrome);
+    const currentId = nameFromUrl(url);
+    // The baseline URL is the current variant's paired baseline (carried on the
+    // report), not a sibling variant, so give it a distinct id when its basename
+    // collides with the current's (e.g. two hosts serving index.html) and leave
+    // `baselineVariant` unset -- peer-baseline mode does not apply.
+    const baselineId = baselineUrl
+      ? distinctBaselineId(nameFromUrl(baselineUrl), currentId)
+      : undefined;
+    const plan: MatrixPlan<unknown> = {
+      variantIds: [currentId],
+      caseIds: [currentId],
+      plan: () => ({
+        source: { pageUrl: url, variantId: currentId },
+        baselineSource: baselineUrl
+          ? { pageUrl: baselineUrl, variantId: baselineId! }
+          : undefined,
+      }),
+      runnerOpts: buildRunnerOptions(options),
+      batches: options.batches ?? 1,
+      warmupBatch: options.warmupBatch ?? false,
+      useWorker: false,
+      browser: ctx,
+    };
+    // await (not just return) so Chrome stays open until the run completes.
+    return await runMatrixPlan(currentId, plan);
+  } finally {
+    await chrome.close();
+  }
+}
+
+/** Keep the baseline variant id distinct from the current one so the report's
+ *  per-variant keying does not treat the current variant as its own baseline. */
+function distinctBaselineId(baselineId: string, currentId: string): string {
+  return baselineId === currentId ? `${baselineId} (baseline)` : baselineId;
 }
 
 /** Measure the browser harness noise floor (current vs current) for an inline

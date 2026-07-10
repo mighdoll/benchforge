@@ -38,24 +38,6 @@ export function cliToMatrixOptions(args: DefaultCliArgs): RunMatrixOptions {
   };
 }
 
-/** Build browser matrix launch options from CLI args (when --url is given
- *  alongside a bench file, so inline variants run against the harness page). */
-function browserRunOptions(args: DefaultCliArgs): BrowserRunOptions {
-  const chromeArgs = args["chrome-args"]
-    ?.flatMap(a => a.split(/\s+/))
-    .filter(Boolean);
-  return {
-    url: args.url!,
-    pageLoad: args["page-load"] || !!args["wait-for"],
-    waitFor: args["wait-for"],
-    timeout: args.timeout,
-    headless: args.headless,
-    chromePath: args.chrome,
-    chromeProfile: args["chrome-profile"],
-    chromeArgs,
-  };
-}
-
 /** Validate CLI argument combinations. */
 export function validateArgs(args: DefaultCliArgs): void {
   if (args["gc-stats"] && !args.worker && !args.url) {
@@ -155,7 +137,33 @@ function cliCommonOptions(args: DefaultCliArgs) {
   };
 }
 
+/** Build browser matrix launch options from CLI args (when --url is given
+ *  alongside a bench file, so inline variants run against the harness page). */
+function browserRunOptions(args: DefaultCliArgs): BrowserRunOptions {
+  const chromeArgs = args["chrome-args"]
+    ?.flatMap(a => a.split(/\s+/))
+    .map(stripQuotes)
+    .filter(Boolean);
+  return {
+    url: args.url!,
+    pageLoad: args["page-load"] || !!args["wait-for"],
+    waitFor: args["wait-for"],
+    timeout: args.timeout,
+    headless: args.headless,
+    chromePath: args.chrome,
+    chromeProfile: args["chrome-profile"],
+    chromeArgs,
+  };
+}
+
 /** A human is watching: stdout is a real terminal and we are not in CI. */
 function interactiveSession(): boolean {
   return !!process.stdout.isTTY && !process.env.CI;
+}
+
+/** Strip surrounding quotes from a chrome-args token (whole token or a
+ *  `--flag="value"` value), so shell-quoted args survive splitting. */
+function stripQuotes(s: string): string {
+  const bare = s.replace(/^(['"])(.*)\1$/s, "$2");
+  return bare.replace(/^(-[^=]+=)(['"])(.*)\2$/s, "$1$3");
 }

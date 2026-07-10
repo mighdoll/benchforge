@@ -4,13 +4,15 @@ import { loadVariant } from "../matrix/VariantLoader.ts";
 import type { BenchmarkFunction } from "./BenchmarkSpec.ts";
 
 /** Where a matrix variant's code comes from: a directory of .ts files (loaded
- *  by id, re-imported in the worker) or inline functions serialized to source
- *  (the run fn, plus a setup fn for stateful variants). Inline functions must be
- *  self-contained -- they are reconstructed by eval in the worker, so captured
- *  closure variables are not available. */
+ *  by id, re-imported in the worker), inline functions serialized to source
+ *  (the run fn, plus a setup fn for stateful variants), or a whole page URL
+ *  whose own `window.__bench` / page load is the benchmark (browser only).
+ *  Inline functions must be self-contained -- they are reconstructed by eval in
+ *  the worker, so captured closure variables are not available. */
 export type VariantSource =
   | { variantDir: string; variantId: string }
-  | { runCode: string; setupCode?: string; variantId: string };
+  | { runCode: string; setupCode?: string; variantId: string }
+  | { pageUrl: string; variantId: string };
 
 export const msToNs = 1e6;
 
@@ -82,6 +84,8 @@ async function resolveVariant(source: VariantSource): Promise<Variant> {
   if ("variantDir" in source) {
     return loadVariant(source.variantDir, source.variantId);
   }
+  if ("pageUrl" in source)
+    throw new Error("page-url variants run only in the browser");
   const run = evalFn(source.runCode);
   if (!source.setupCode) return run as Variant;
   return { setup: evalFn(source.setupCode), run } as Variant;

@@ -62,6 +62,8 @@ export async function runMatrixVariant(
     return runBrowserVariant(params, name);
   }
 
+  if ("pageUrl" in source)
+    throw new Error("page-url variants run only in the browser");
   if (!useWorker) return runMatrixVariantDirect(params, name);
 
   const message: RunMessage = {
