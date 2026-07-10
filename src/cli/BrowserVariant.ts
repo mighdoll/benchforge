@@ -8,6 +8,7 @@ import type {
 import { profileBrowser } from "../profiling/browser/BrowserProfiler.ts";
 import type { RunnerOptions } from "../runners/BenchRunner.ts";
 import type { MeasuredResults } from "../runners/MeasuredResults.ts";
+import type { BatchContext } from "../runners/MergeBatches.ts";
 import { mergeGcStats } from "../runners/MergeBatches.ts";
 import type { RunMatrixVariantParams } from "../runners/RunnerOrchestrator.ts";
 import { computeStats } from "../runners/SampleStats.ts";
@@ -23,6 +24,7 @@ import { toBrowserMeasured } from "./BrowserMeasured.ts";
 export async function runBrowserVariant(
   params: RunMatrixVariantParams,
   name: string,
+  batch?: BatchContext,
 ): Promise<MeasuredResults[]> {
   const { source, caseData, options } = params;
   const ctx = params.browser!;
@@ -32,7 +34,9 @@ export async function runBrowserVariant(
     );
 
   if ("pageUrl" in source)
-    return [await runPageVariant(source.pageUrl, ctx, options, name)];
+    return [
+      await runPageVariant(source.pageUrl, ctx, options, name, batch?.warmup),
+    ];
 
   const inject: InjectVariant = {
     runCode: source.runCode,
@@ -54,9 +58,11 @@ async function runPageVariant(
   ctx: BrowserRunCtx,
   options: RunnerOptions,
   name: string,
+  warmup = false,
 ): Promise<MeasuredResults> {
   const base = profileParams(options, ctx, url);
-  if (ctx.pageLoad) return multiPageLoad(base, options, name);
+  if (ctx.pageLoad)
+    return multiPageLoad(base, options, name, undefined, warmup);
 
   const raw = await profileBrowser(base);
   // Iteration samples ==> bench mode; the single call covered the whole batch.
@@ -65,7 +71,7 @@ async function runPageVariant(
   // Persist the mode on the shared run context so later batches skip the redundant
   // detection navigation (and its repeated "No __bench" warning).
   ctx.pageLoad = true;
-  return multiPageLoad({ ...base, pageLoad: true }, options, name, raw);
+  return multiPageLoad({ ...base, pageLoad: true }, options, name, raw, warmup);
 }
 
 /** Run page loads until the duration or iteration budget is met, collecting each
@@ -75,9 +81,16 @@ async function multiPageLoad(
   options: RunnerOptions,
   name: string,
   seed?: BrowserProfileResult,
+  warmup = false,
 ): Promise<MeasuredResults> {
-  const capIter = options.maxIterations ?? Number.POSITIVE_INFINITY;
-  const capTime = options.maxTime ?? Number.POSITIVE_INFINITY;
+  // Batch 0 is dropped from stats; one load warms OS/disk caches, so don't spend
+  // the full iteration/time budget re-loading a page whose samples are discarded.
+  const capIter = warmup
+    ? 1
+    : (options.maxIterations ?? Number.POSITIVE_INFINITY);
+  const capTime = warmup
+    ? Number.POSITIVE_INFINITY
+    : (options.maxTime ?? Number.POSITIVE_INFINITY);
   const raws = seed ? [seed] : [];
   let accumulated = seed?.wallTimeMs ?? 0;
   // Always run at least one load (a batch with no samples would break stats),

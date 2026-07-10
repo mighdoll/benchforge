@@ -6,7 +6,7 @@ import {
   runCalibration,
 } from "../runners/Calibration.ts";
 import type { MeasuredResults } from "../runners/MeasuredResults.ts";
-import { runBatched } from "../runners/MergeBatches.ts";
+import { type BatchContext, runBatched } from "../runners/MergeBatches.ts";
 import {
   type RunMatrixVariantParams,
   runMatrixVariant,
@@ -118,11 +118,13 @@ export async function runMatrixPlan<T>(
   return { name, variants, baselineVariant };
 }
 
-/** Run one variant/case, returning its single MeasuredResults. */
+/** Run one variant/case, returning its single MeasuredResults. `batch` lets the
+ *  browser page-load path shorten the throwaway warmup batch to a single load. */
 export async function runVariantOnce(
   args: RunMatrixVariantParams,
+  batch?: BatchContext,
 ): Promise<MeasuredResults> {
-  return (await runMatrixVariant(args))[0];
+  return (await runMatrixVariant(args, batch))[0];
 }
 
 /** Measure the harness noise floor for one resolved variant source and case
@@ -218,8 +220,10 @@ async function runCaseBatched<T>(
   baselineArgs: RunMatrixVariantParams | undefined,
   plan: MatrixPlan<T>,
 ): Promise<{ measured: MeasuredResults; baseline?: MeasuredResults }> {
-  const runCurrent = () => runVariantOnce(variantArgs);
-  const runBase = baselineArgs ? () => runVariantOnce(baselineArgs) : undefined;
+  const runCurrent = (ctx: BatchContext) => runVariantOnce(variantArgs, ctx);
+  const runBase = baselineArgs
+    ? (ctx: BatchContext) => runVariantOnce(baselineArgs, ctx)
+    : undefined;
   const { results, baseline } = await runBatched(
     [runCurrent],
     runBase,

@@ -102,10 +102,20 @@ export function mergeGcStats(
   };
 }
 
+/** Per-batch context passed to each runner thunk, so a runner can adapt to the
+ *  batch it is on (e.g. a page-load warmup batch runs a single load). */
+export interface BatchContext {
+  /** 0-based batch index. */
+  batchIndex: number;
+
+  /** True for the dropped warmup batch (batch 0 when it is dropped from stats). */
+  warmup: boolean;
+}
+
 /** Run N benchmarks + optional baseline in batched alternation, merge results. */
 export async function runBatched(
-  runners: (() => Promise<MeasuredResults>)[],
-  baseline: (() => Promise<MeasuredResults>) | undefined,
+  runners: ((ctx: BatchContext) => Promise<MeasuredResults>)[],
+  baseline: ((ctx: BatchContext) => Promise<MeasuredResults>) | undefined,
   batches: number,
   warmupBatch = false,
   onProgress?: (p: BatchProgress) => void,
@@ -113,28 +123,30 @@ export async function runBatched(
   const runnerBatches: MeasuredResults[][] = runners.map(() => []);
   const baselineBatches: MeasuredResults[] = [];
   const start = performance.now();
+  const dropsWarmup = warmupDropped(batches, warmupBatch);
 
   const report = (batch: number, label: BatchProgress["label"]) =>
     onProgress?.({ batch, batches, label, elapsed: performance.now() - start });
 
   for (let i = 0; i < batches; i++) {
     const reverse = i % 2 === 1;
+    const ctx: BatchContext = { batchIndex: i, warmup: i === 0 && dropsWarmup };
     // baseline runs before benchmarks on even batches, after on odd (alternation)
     if (!reverse && baseline) {
-      baselineBatches.push(await baseline());
+      baselineBatches.push(await baseline(ctx));
       report(i, "baseline");
     }
     for (let j = 0; j < runners.length; j++) {
-      runnerBatches[j].push(await runners[j]());
+      runnerBatches[j].push(await runners[j](ctx));
       report(i, "current");
     }
     if (reverse && baseline) {
-      baselineBatches.push(await baseline());
+      baselineBatches.push(await baseline(ctx));
       report(i, "baseline");
     }
   }
 
-  if (warmupDropped(batches, warmupBatch)) {
+  if (dropsWarmup) {
     for (const b of runnerBatches) b.shift();
     baselineBatches.shift();
   }

@@ -1,5 +1,6 @@
 import path from "node:path";
 import { afterAll, beforeAll, expect, test } from "vitest";
+import { runBrowserVariant } from "../cli/BrowserVariant.ts";
 import { profileBrowser } from "../profiling/browser/BrowserProfiler.ts";
 import type { ChromeInstance } from "../profiling/browser/ChromeLauncher.ts";
 import { launchChrome } from "../profiling/browser/ChromeLauncher.ts";
@@ -196,6 +197,36 @@ test("multi-page-load batching with auto-detect", {
   expect(current.samples.length).toBe(6);
   expect(current.batchOffsets).toEqual([0, 3]);
   for (const s of current.samples) expect(s).toBeGreaterThan(0);
+});
+
+test("page-load warmup batch runs a single load", {
+  timeout: 30000,
+}, async () => {
+  const url = `file://${examplesDir}/browser-page-load/index.html`;
+  const params = {
+    source: { pageUrl: url, variantId: "page" },
+    caseId: "default",
+    options: { maxIterations: 5 },
+    // A fresh ctx per run so page-load auto-detection starts from scratch.
+    browser: { chrome, url },
+  };
+
+  // Warmup batch (dropped from stats) should load the page exactly once, not
+  // spend the full maxIterations budget on samples that are discarded.
+  const [warm] = await runBrowserVariant(
+    { ...params, browser: { chrome, url } },
+    "page/default",
+    { batchIndex: 0, warmup: true },
+  );
+  expect(warm.samples.length).toBe(1);
+
+  // A measured batch runs the full budget.
+  const [measured] = await runBrowserVariant(
+    { ...params, browser: { chrome, url } },
+    "page/default",
+    { batchIndex: 1, warmup: false },
+  );
+  expect(measured.samples.length).toBe(5);
 });
 
 test("batched fresh tabs with baseline-url", { timeout: 60000 }, async () => {

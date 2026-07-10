@@ -2,6 +2,7 @@ import type { BrowserRunCtx } from "../profiling/browser/BrowserProfiler.ts";
 import type { BenchmarkFunction, BenchmarkSpec } from "./BenchmarkSpec.ts";
 import { BenchRunner, type RunnerOptions } from "./BenchRunner.ts";
 import type { MeasuredResults } from "./MeasuredResults.ts";
+import type { BatchContext } from "./MergeBatches.ts";
 import {
   importBenchFn,
   resolveVariantFn,
@@ -47,9 +48,11 @@ export async function runBenchmark<T = unknown>({
   return runWorkerWithMessage(spec.name, options, msg);
 }
 
-/** Run a matrix variant benchmark, directly or in a worker. */
+/** Run a matrix variant benchmark, directly or in a worker. `batch` is only
+ *  consumed by the browser page-load path (to shorten the warmup batch). */
 export async function runMatrixVariant(
   params: RunMatrixVariantParams,
+  batch?: BatchContext,
 ): Promise<MeasuredResults[]> {
   const { source, caseId, caseData, casesModule, options } = params;
   const { useWorker = true } = params;
@@ -59,7 +62,7 @@ export async function runMatrixVariant(
     // Browser has no worker/process analog; lazy-import keeps CDP/Chrome deps
     // out of the Node run path.
     const { runBrowserVariant } = await import("../cli/BrowserVariant.ts");
-    return runBrowserVariant(params, name);
+    return runBrowserVariant(params, name, batch);
   }
 
   if ("pageUrl" in source)
