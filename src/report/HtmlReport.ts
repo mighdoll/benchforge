@@ -29,6 +29,7 @@ import {
   resampleInto,
 } from "../stats/Bootstrap.ts";
 import { mean } from "../stats/CoreStats.ts";
+import { type NoiseFloor, noiseFloor } from "../stats/NoiseFloor.ts";
 import type {
   BenchmarkEntry,
   BenchmarkGroup,
@@ -221,8 +222,9 @@ function prepareGroupData(
   comparison?: ComparisonOptions,
   profile?: ProfileReportOptions,
 ): BenchmarkGroup {
+  const tracks = resolveTracks(group);
   const built = sections
-    ? buildCaseSections(sections, resolveTracks(group), comparison)
+    ? buildCaseSections(sections, tracks, comparison)
     : undefined;
   return {
     name: group.name,
@@ -233,9 +235,25 @@ function prepareGroupData(
       benchmarkEntry(r, profile, comparison?.noBatchTrim),
     ),
     warnings: groupWarnings(group, comparison),
+    noiseFloor: groupNoiseFloor(tracks, comparison?.noBatchTrim),
     sections: built?.sections,
     rawSections: built?.rawSections,
   };
+}
+
+/** The case's noise floor, read off the baseline series the verdict compares
+ *  against. Takes the same resolved tracks the tables and plots use (the named
+ *  baseline in variant mode, the shadow baseline in version mode); falls back
+ *  to a comparison track's paired baseline. */
+function groupNoiseFloor(
+  tracks: CaseTrack[],
+  noTrim?: boolean,
+): NoiseFloor | undefined {
+  const base =
+    tracks.find(t => t.isBaseline)?.measured ??
+    tracks.find(t => t.baseline)?.baseline?.measured;
+  if (!base) return undefined;
+  return noiseFloor(base.samples, base.batchOffsets, noTrim);
 }
 
 /** The function's percent change in self-time share vs baseline with a 95%

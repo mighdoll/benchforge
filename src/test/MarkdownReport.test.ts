@@ -4,6 +4,7 @@ import { prepareHtmlData } from "../report/HtmlReport.ts";
 import { markdownReport } from "../report/MarkdownReport.ts";
 import { timeSection } from "../report/StandardSections.ts";
 import type { MeasuredResults } from "../runners/MeasuredResults.ts";
+import type { NoiseFloor } from "../stats/NoiseFloor.ts";
 import type {
   ProfileSummary,
   ReportData,
@@ -245,6 +246,76 @@ test("integration: baseline run flows through prepareHtmlData into a shift table
   expect(md).toMatch(/^\| p50 \|/m);
   // current is faster than the 1.3x-slower baseline
   expect(md).toContain("better");
+  // the free A-vs-A baseline noise floor rides along on every A/B run
+  expect(md).toContain("**baseline noise floor:**");
+  expect(md).toContain("baseline batches");
+});
+
+/** A one-case ReportData whose group carries only a noise floor (no sections),
+ *  with an optional equiv-margin in the CLI args. */
+function noiseData(nf: NoiseFloor, margin?: number): ReportData {
+  return {
+    groups: [
+      {
+        name: "sort",
+        benchmarks: [{ name: "current", samples: [], stats: zeroStats }],
+        noiseFloor: nf,
+      },
+    ],
+    metadata: {
+      timestamp: "",
+      bencherVersion: "0",
+      cliArgs: margin != null ? { "equiv-margin": margin } : undefined,
+    },
+  };
+}
+
+const cleanFloor: NoiseFloor = {
+  halfWidthPct: 0.42,
+  dispersionPct: 0.5,
+  batches: 24,
+  driftPct: 0.05,
+  crossRoundAcf: 0,
+};
+
+test("noise floor renders a compact context line with the batch count", () => {
+  const md = markdownReport(noiseData(cleanFloor));
+  expect(md).toContain(
+    "**baseline noise floor:** +/-0.42% over 24 baseline batches.",
+  );
+  // no margin configured => no margin text, and clean case stays one line
+  expect(md).not.toContain("equiv-margin");
+  expect(md).not.toContain("likely environmental");
+});
+
+test("noise floor warns only when it reaches the margin", () => {
+  const atMargin = markdownReport(
+    noiseData({ ...cleanFloor, halfWidthPct: 0.6 }, 0.5),
+  );
+  expect(atMargin).toContain("equiv-margin 0.50%");
+  expect(atMargin).toContain("likely environmental, not a real change");
+
+  const underMargin = markdownReport(noiseData(cleanFloor, 0.5));
+  expect(underMargin).toContain("equiv-margin 0.50%");
+  expect(underMargin).not.toContain("likely environmental");
+});
+
+test("noise floor softens wording below ~20 batches", () => {
+  const md = markdownReport(noiseData({ ...cleanFloor, batches: 8 }));
+  expect(md).toContain("few batches, so this floor is itself rough");
+});
+
+test("noise floor flags drift only when it exceeds the run's resolution", () => {
+  const drifted = markdownReport(
+    noiseData({ ...cleanFloor, halfWidthPct: 0.3, driftPct: 1.1 }),
+  );
+  expect(drifted).toContain("drifted +1.1%");
+  expect(drifted).toContain("environment was not stationary");
+
+  const steady = markdownReport(
+    noiseData({ ...cleanFloor, halfWidthPct: 0.5, driftPct: 0.1 }),
+  );
+  expect(steady).not.toContain("not stationary");
 });
 
 test("renders a hot-functions table without a baseline (4 columns)", () => {

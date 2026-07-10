@@ -15,6 +15,11 @@ import { groupReports } from "../report/BenchmarkReport.ts";
 import type { GitVersion } from "../report/GitUtils.ts";
 import { keptProfilesOf, prepareHtmlData } from "../report/HtmlReport.ts";
 import { markdownReport } from "../report/MarkdownReport.ts";
+import {
+  abNoiseRecords,
+  appendNoiseLog,
+  machineId,
+} from "../report/NoiseLog.ts";
 import type { ReportData } from "../viewer/ReportData.ts";
 import type { DefaultCliArgs } from "./CliArgs.ts";
 import {
@@ -74,6 +79,7 @@ export async function exportReports(options: ExportOptions): Promise<void> {
     );
 
   writeMarkdownReport(reportData, args);
+  appendNoiseLog(abNoiseRecords(reportData, machineId()));
   exportFileFormats(results, args);
 
   const profileFile = buildSpeedscopeFile(results);

@@ -24,6 +24,11 @@ import type { ReportSection } from "../report/BenchmarkReport.ts";
 import { calibrationMarkdown } from "../report/CalibrationReport.ts";
 import { consoleSummary } from "../report/ConsoleSummary.ts";
 import type { GitVersion } from "../report/GitUtils.ts";
+import {
+  appendNoiseLog,
+  calibrateNoiseRecord,
+  machineId,
+} from "../report/NoiseLog.ts";
 import { browserBenchExports } from "./BrowserBench.ts";
 import { formatCalibration, reportCalibrateRun } from "./CalibrateRunner.ts";
 import {
@@ -222,6 +227,9 @@ async function runMatrixCalibratePipeline(
   };
   const md = calibrationMarkdown(result, meta);
   writeCalibrationReport(md, meta.timestamp, args);
+  appendNoiseLog([
+    calibrateNoiseRecord(result, meta.timestamp, matrix.name, machineId()),
+  ]);
 }
 
 /** Load a benchmark file and shape its default export into a BuildResult. A

@@ -7,6 +7,7 @@ import type {
   DifferenceCI,
   HistogramBin,
 } from "../stats/Bootstrap.ts";
+import type { NoiseFloor } from "../stats/NoiseFloor.ts";
 
 /** Top-level data structure for the HTML benchmark report. */
 export interface ReportData {
@@ -35,6 +36,11 @@ export interface BenchmarkGroup {
   baseline?: BenchmarkEntry;
   benchmarks: BenchmarkEntry[];
   warnings?: string[];
+
+  /** The run's measurement noise floor, read off the baseline series (same code
+   *  across batches). Context for the verdict, not a second test. Absent for
+   *  single-batch runs and cases without a baseline. */
+  noiseFloor?: NoiseFloor;
 
   /** Case-level report sections, one ViewerEntry per track. The trimmed
    *  (slow-outlier-removed) view; rawSections holds the untrimmed view, present
