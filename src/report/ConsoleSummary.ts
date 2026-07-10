@@ -143,7 +143,7 @@ function marginClause(
 
 function colorVerdict(direction: CIDirection): string {
   const word = verdictWord(direction);
-  if (word === "better") return green(word);
-  if (word === "worse") return red(word);
+  if (word === "faster") return green(word);
+  if (word === "slower") return red(word);
   return dim(word);
 }

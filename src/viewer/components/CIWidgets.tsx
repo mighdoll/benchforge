@@ -1,5 +1,6 @@
 import { marginArg } from "../../report/CiFormatting.ts";
 import { formatSignedPercent } from "../../report/Formatters.ts";
+import { verdictLabel } from "../../report/Verdict.ts";
 import type { CIDirection, DifferenceCI } from "../../stats/Bootstrap.ts";
 import {
   type AbsolutePercentile,
@@ -16,13 +17,6 @@ import { useLazyPlot } from "./LazyPlot.ts";
 
 /** Proportional horizontal offset range for aligning bootstrap CI plots. */
 export const maxCIShift = 80;
-
-const directionLabels: Record<CIDirection, string> = {
-  faster: "Faster",
-  slower: "Slower",
-  uncertain: "Inconclusive",
-  equivalent: "Equivalent",
-};
 
 /** Open the shared detail popup for one point of a shift function. */
 export function openShiftDetail(shift: ShiftFunction, point: ShiftPercentile) {
@@ -85,7 +79,7 @@ export function ComparisonBadge(
   return (
     <span class="comparison-badge">
       <span class={cls}>
-        {compact ? formatSignedPercent(ci.percent) : directionLabels[ci.direction]}
+        {compact ? formatSignedPercent(ci.percent) : verdictLabel(ci.direction)}
       </span>
       {help && <HelpButton topic="verdict" />}
       {ci.histogram && <CIPlotMount ci={ci} compact={compact} onOpen={onOpen} marginBand={marginBand} />}

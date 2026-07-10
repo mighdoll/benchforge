@@ -67,7 +67,7 @@ test("abNoiseRecords carries the floor, verdict, and margin per case", () => {
     driftPct: 0.12,
     crossRoundAcf: 0.05,
     equivMargin: 0.5,
-    verdict: "better",
+    verdict: "faster",
     deltaPct: -2.34,
     timestamp: "2026-07-01T00:00:00Z",
   });

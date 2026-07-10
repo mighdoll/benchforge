@@ -1,5 +1,5 @@
 import { formatSignedPercent } from "../../report/Formatters.ts";
-import { verdictWord } from "../../report/Verdict.ts";
+import { verdictLabel } from "../../report/Verdict.ts";
 import type { DifferenceCI } from "../../stats/Bootstrap.ts";
 import type {
   AbsolutePercentile,
@@ -106,7 +106,7 @@ function ShiftVerdict({ point }: { point: ShiftPercentile }) {
   const { direction, percent } = point.diff;
   return (
     <span class="shift-verdict">
-      <span class={`badge badge-${direction}`}>{cap(verdictWord(direction))}</span>
+      <span class={`badge badge-${direction}`}>{verdictLabel(direction)}</span>
       <span class="shift-verdict-pct">{formatSignedPercent(percent)}</span>
     </span>
   );
@@ -147,9 +147,4 @@ function ShiftPopupAbsolute(
       <div ref={ref} />
     </div>
   );
-}
-
-/** Capitalize the first letter (verdict words are lowercase). */
-function cap(s: string): string {
-  return s.charAt(0).toUpperCase() + s.slice(1);
 }

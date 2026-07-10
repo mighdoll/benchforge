@@ -163,10 +163,10 @@ test("renders a shift table with mean, percentiles, and reliability", () => {
   expect(md).toContain("## WESL Parser");
   expect(md).toContain("#### lines / sec");
   expect(md).toContain(
-    "| mean | 1,240,000 | 1,214,000 | -2.1% | [-3.8%, -0.4%] | better |",
+    "| mean | 1,240,000 | 1,214,000 | -2.1% | [-3.8%, -0.4%] | faster |",
   );
   expect(md).toContain(
-    "| p99 | 980,000 | 1,150,000 | +14.8% | [+7.0%, +22.0%] | worse (unreliable, n=6) |",
+    "| p99 | 980,000 | 1,150,000 | +14.8% | [+7.0%, +22.0%] | slower (unreliable, n=6) |",
   );
   // shared row (no baseline) rendered as a value table below the shift table
   expect(md).toContain("| lines | 85,000 |");
@@ -273,7 +273,7 @@ test("integration: baseline run flows through prepareHtmlData into a shift table
   expect(md).toMatch(/^\| mean \|/m);
   expect(md).toMatch(/^\| p50 \|/m);
   // current is faster than the 1.3x-slower baseline
-  expect(md).toContain("better");
+  expect(md).toContain("faster");
   // the free A-vs-A baseline noise floor rides along on every A/B run
   expect(md).toContain("**baseline noise floor:**");
   expect(md).toContain("baseline batches");
@@ -310,7 +310,7 @@ test("integration: a reciprocal metric renders the display-domain percent", () =
   expect(md).toContain("lines / sec (Δ% vs baseline)");
   // 1.15ms vs 4ms baseline: not the -71% sign flip but the ~+247.8% throughput.
   expect(md).toMatch(/\| mean \| [\d,]+ \| [\d,]+ \| \+247\.\d% \|/);
-  expect(md).toContain("better");
+  expect(md).toContain("faster");
 });
 
 test("noise floor renders a compact context line with the batch count", () => {

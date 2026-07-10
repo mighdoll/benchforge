@@ -1,5 +1,6 @@
 import colors from "../report/Colors.ts";
 import { benchLabel, primaryMetricRow } from "../report/ConsoleSummary.ts";
+import { verdictWord } from "../report/Verdict.ts";
 import type { CIDirection } from "../stats/Bootstrap.ts";
 import type { BenchmarkGroup, ReportData } from "../viewer/ReportData.ts";
 
@@ -9,7 +10,7 @@ interface LabeledDiff {
 }
 
 /** Roll up the per-benchmark verdicts already in ReportData into a one-line
- *  matrix tally (N better, M worse, ...) plus the names of the non-equivalent
+ *  matrix tally (N faster, M slower, ...) plus the names of the non-equivalent
  *  results. Reads each group's comparisonCI -- the SAME annotated CI the console
  *  summary prints per benchmark -- so the tally can never disagree with the
  *  per-benchmark verdict lines. The single-comparison verdict is omitted: the
@@ -43,19 +44,20 @@ function multiVerdict(diffs: LabeledDiff[]): string {
   };
   for (const d of diffs) tally[d.direction].push(d);
   const { green, red, dim } = colors;
-  const parts = [
-    green(`${tally.faster.length} better`),
-    red(`${tally.slower.length} worse`),
-    green(`${tally.equivalent.length} equivalent`),
-    dim(`${tally.uncertain.length} uncertain`),
-  ];
+  const paint: Record<CIDirection, (s: string) => string> = {
+    faster: green,
+    slower: red,
+    equivalent: green,
+    uncertain: dim,
+  };
+  const order: CIDirection[] = ["faster", "slower", "equivalent", "uncertain"];
+  const parts = order.map(d =>
+    paint[d](`${tally[d].length} ${verdictWord(d)}`),
+  );
   const head = `Verdicts (${diffs.length} vs baseline): ${parts.join(", ")}`;
   const names = (xs: LabeledDiff[]) => xs.map(d => d.label).join(", ");
-  const detail: string[] = [];
-  if (tally.faster.length)
-    detail.push(green(`  better: ${names(tally.faster)}`));
-  if (tally.slower.length) detail.push(red(`  worse: ${names(tally.slower)}`));
-  if (tally.uncertain.length)
-    detail.push(dim(`  uncertain: ${names(tally.uncertain)}`));
+  const detail = order
+    .filter(d => d !== "equivalent" && tally[d].length)
+    .map(d => paint[d](`  ${verdictWord(d)}: ${names(tally[d])}`));
   return [head, ...detail].join("\n");
 }

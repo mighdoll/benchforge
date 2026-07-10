@@ -81,7 +81,7 @@ condition is unresolved: the output CI is still useful, but the tool has not
 separated equivalence from insufficient data for that threshold.
 
 Benchforge turns this interval check into an explicit four-way verdict for each
-reported statistic: better, worse, equivalent, or inconclusive. With
+reported statistic: faster, slower, equivalent, or inconclusive. With
 `--equiv-margin 2`, a comparison is `equivalent` only when the entire CI fits
 inside `[-2%, +2%]`; it is `inconclusive` when the CI straddles either margin
 edge. That distinction matters because "we measured a small change precisely"

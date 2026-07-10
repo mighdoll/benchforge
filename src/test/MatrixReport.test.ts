@@ -45,8 +45,8 @@ test("reportMatrixResults: multiple comparisons roll up into a tally", () => {
   ]);
   const report = reportMatrixResults(data);
   expect(report).toContain("Verdicts (2 vs baseline):");
-  expect(report).toContain("better");
-  expect(report).toContain("worse");
+  expect(report).toContain("faster");
+  expect(report).toContain("slower");
 });
 
 test("reportMatrixResults: tally labels name each variant / case", () => {

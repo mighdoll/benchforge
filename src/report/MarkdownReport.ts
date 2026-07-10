@@ -200,8 +200,8 @@ function sharedTable(rows: ViewerRow[]): string | undefined {
 }
 
 /** Actionable reading only when the floor reaches the margin: within that band
- *  a better/worse verdict is likely environmental, not real. Silent otherwise so
- *  the clean case stays a single line. */
+ *  a faster/slower verdict is likely environmental, not real. Silent otherwise
+ *  so the clean case stays a single line. */
 function marginReading(
   nf: NoiseFloor,
   margin?: number,
