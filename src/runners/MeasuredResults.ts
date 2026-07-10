@@ -11,8 +11,9 @@ export interface MeasuredResults {
   /** Raw execution time samples for custom statistics */
   samples: number[];
 
-  /** Total iterations actually measured. Equals samples.length unless
-   *  MergeBatches subsampled to fit V8 array limits. */
+  /** Total iterations actually measured. Exceeds samples.length when the
+   *  per-batch reservoir cap (maxSamples) or a MergeBatches subsample dropped
+   *  stored samples; throughput and per-iteration heap divide by this. */
   iterations?: number;
 
   /** Per-batch GC stats, preserved through merge so distribution (min/max/p50

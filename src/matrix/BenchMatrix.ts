@@ -95,6 +95,8 @@ export interface RunMatrixOptions {
   iterations?: number;
   /** Maximum time in ms per benchmark */
   maxTime?: number;
+  /** Cap on retained timing samples per batch (reservoir subsample) */
+  maxSamples?: number;
   /** Number of warmup iterations before measurement */
   warmup?: number;
   /** Use worker process isolation (default: true for variantDir) */

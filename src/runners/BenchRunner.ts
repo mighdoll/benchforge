@@ -9,6 +9,12 @@ export interface RunnerOptions {
   maxTime?: number;
   /** Maximum iterations per benchmark */
   maxIterations?: number;
+  /** Cap on retained timing samples per batch. A fast benchmark under a time
+   *  budget produces millions of samples; beyond this the loop keeps running
+   *  (so GC/JIT still land in the window) but reservoir-subsamples what it
+   *  stores, bounding memory, IPC serialization, and downstream stats.
+   *  0 (or negative) disables the cap; undefined applies the runner default. */
+  maxSamples?: number;
   /** Warmup iterations before measurement (default: 0) */
   warmup?: number;
   /** Force GC after each iteration (requires --expose-gc) */
@@ -44,6 +50,23 @@ export interface ProfileBoundary {
   stop: () => Promise<void>;
 }
 
+/** A streaming reservoir over paired (sample, heap) readings. Under the cap it
+ *  just appends; past it, Algorithm R keeps a uniform-random subset of size
+ *  `cap` in one pass with no advance count. Replacement draws scatter later
+ *  arrivals into earlier slots, so `finish` sorts the kept subset back into
+ *  arrival order (by each slot's recorded arrival index) to keep the merged
+ *  sample timeline and time-series plots ordered. */
+export interface Reservoir {
+  offer(sample: number, heap: number): void;
+  finish(): {
+    samples: number[];
+    heapSamples: number[];
+    /** True offered count, which exceeds the retained length once capped. */
+    count: number;
+    capped: boolean;
+  };
+}
+
 type CollectParams<T = unknown> = RunnerOptions &
   Required<Pick<RunnerOptions, "maxTime" | "maxIterations" | "warmup">> & {
     benchmark: BenchmarkSpec<T>;
@@ -57,16 +80,15 @@ type CollectResult = {
   warmupSamples: number[];
   heapGrowth: number;
   heapSamples: number[];
+
+  /** True iterations executed, which exceeds samples.length when the reservoir
+   *  cap trimmed what was stored. Drives throughput and per-iteration heap. */
+  iterations: number;
+
   startTime: number;
   /** performance.now() at loop start, sharing the clock of --trace-gc-nvp
    *  offsets, so GC events can be rebased to loop-relative time. */
   loopStartTime: number;
-  pausePoints: PausePoint[];
-};
-
-type SampleArrays = {
-  samples: number[];
-  heapSamples: number[];
   pausePoints: PausePoint[];
 };
 
@@ -79,6 +101,12 @@ const defaultCollectOptions: Required<
   warmup: 0,
   pauseWarmup: 0,
 };
+
+/** Default per-batch retained-sample cap. Chosen well above any normal
+ *  benchmark (only sub-~microsecond fns under a time budget reach it) and low
+ *  enough that even hundreds of batches stay within the 5M merge budget.
+ *  The bootstrap CI already caps its input at 10K, so this loses no precision. */
+const defaultMaxSamples = 100_000;
 
 /**
  * Timing-based runner that collects samples within time/iteration limits.
@@ -110,6 +138,47 @@ export function executeBenchmark<T>(
   (benchmark.fn as (params?: T) => void)(params);
 }
 
+/** Create a reservoir holding at most `cap` paired readings, pre-sized to
+ *  `initialSize` to avoid growth churn during the measured loop. */
+export function createReservoir(cap: number, initialSize = 0): Reservoir {
+  const samples = new Array<number>(Math.min(cap, initialSize));
+  const heapSamples = new Array<number>(Math.min(cap, initialSize));
+  let origins: number[] | undefined; // arrival index per slot, only once capped
+  let count = 0;
+
+  return {
+    offer(sample, heap) {
+      if (count < cap) {
+        samples[count] = sample;
+        heapSamples[count] = heap;
+      } else {
+        origins ??= Array.from({ length: cap }, (_, i) => i);
+        const j = Math.floor(Math.random() * (count + 1));
+        if (j < cap) {
+          samples[j] = sample;
+          heapSamples[j] = heap;
+          origins[j] = count;
+        }
+      }
+      count++;
+    },
+    finish() {
+      if (!origins) {
+        samples.length = heapSamples.length = Math.min(count, cap);
+        return { samples, heapSamples, count, capped: false };
+      }
+      const slots = origins;
+      const order = slots.map((_, i) => i).sort((a, b) => slots[a] - slots[b]);
+      return {
+        samples: order.map(i => samples[i]),
+        heapSamples: order.map(i => heapSamples[i]),
+        count,
+        capped: true,
+      };
+    },
+  };
+}
+
 /** Collect timing samples with warmup and heap tracking. */
 async function collectSamples<T>(
   config: CollectParams<T>,
@@ -128,7 +197,7 @@ async function collectSamples<T>(
       `No samples collected for benchmark: ${config.benchmark.name}`,
     );
   const heapGrowth =
-    Math.max(0, heapAfter - heapBefore) / 1024 / loop.samples.length;
+    Math.max(0, heapAfter - heapBefore) / 1024 / loop.iterations;
   return { ...loop, warmupSamples, heapGrowth };
 }
 
@@ -138,12 +207,13 @@ function buildMeasuredResults(
   collected: CollectResult,
 ): MeasuredResults {
   const { samples, warmupSamples, heapSamples, pausePoints } = collected;
-  const { heapGrowth, startTime, loopStartTime } = collected;
+  const { heapGrowth, startTime, loopStartTime, iterations } = collected;
   const time = computeStats(samples);
   const heapSize = { avg: heapGrowth, min: heapGrowth, max: heapGrowth };
   return {
     name,
     samples,
+    iterations,
     warmupSamples,
     heapSamples,
     time,
@@ -189,15 +259,25 @@ async function runWarmup<T>(config: CollectParams<T>): Promise<number[]> {
   return samples;
 }
 
+/** Loop timings and the true iteration count, plus the loop's clock anchors. */
+type LoopResult = {
+  samples: number[];
+  heapSamples: number[];
+  pausePoints: PausePoint[];
+  iterations: number;
+  startTime: number;
+  loopStartTime: number;
+};
+
 /** Collect timing samples with optional periodic pauses for V8 background compilation to complete. */
-async function runSampleLoop<T>(
-  config: CollectParams<T>,
-): Promise<SampleArrays & { startTime: number; loopStartTime: number }> {
+async function runSampleLoop<T>(config: CollectParams<T>): Promise<LoopResult> {
   const { maxTime, maxIterations, pauseFirst } = config;
   const { pauseInterval = 0, pauseDuration = 100 } = config;
   const forceGc = config.gcForce ? gcFunction() : () => {};
+  const cap = sampleCap(config.maxSamples);
   const estimated = maxIterations || Math.ceil(maxTime / 0.1);
-  const arrays = createSampleArrays(estimated);
+  const reservoir = createReservoir(cap, Math.min(estimated, cap));
+  const pausePoints: PausePoint[] = [];
 
   let count = 0;
   let elapsed = 0;
@@ -212,14 +292,12 @@ async function runSampleLoop<T>(
     const start = performance.now();
     executeBenchmark(config.benchmark, config.params);
     const end = performance.now();
-    arrays.samples[count] = end - start;
-    arrays.heapSamples[count] = getHeapStatistics().used_heap_size;
+    reservoir.offer(end - start, getHeapStatistics().used_heap_size);
     count++;
     forceGc();
 
     if (shouldPause(count, pauseFirst, pauseInterval)) {
-      const sampleIndex = count - 1;
-      arrays.pausePoints.push({ sampleIndex, durationMs: pauseDuration });
+      pausePoints.push({ sampleIndex: count - 1, durationMs: pauseDuration });
       const pauseStart = performance.now();
       await new Promise(r => setTimeout(r, pauseDuration));
       totalPauseTime += performance.now() - pauseStart;
@@ -227,18 +305,29 @@ async function runSampleLoop<T>(
     elapsed = performance.now() - loopStart - totalPauseTime;
   }
 
-  trimArrays(arrays, count);
-  return { ...arrays, startTime, loopStartTime: loopStart };
+  const {
+    samples,
+    heapSamples,
+    count: iterations,
+    capped,
+  } = reservoir.finish();
+  return {
+    samples,
+    heapSamples,
+    // Pause sampleIndexes point into the full stream, which no longer maps once
+    // the reservoir dropped samples; matches the merge-subsample precedent.
+    pausePoints: capped ? [] : pausePoints,
+    iterations,
+    startTime,
+    loopStartTime: loopStart,
+  };
 }
 
-/** Pre-allocate sample arrays to reduce GC pressure during measurement. */
-function createSampleArrays(n: number): SampleArrays {
-  const arr = () => new Array<number>(n);
-  return {
-    samples: arr(),
-    heapSamples: arr(),
-    pausePoints: [],
-  };
+/** Resolve the per-batch retained-sample cap. A flag of 0 (or negative) means
+ *  unlimited; otherwise the caller's value, else the runner default. */
+function sampleCap(maxSamples: number | undefined): number {
+  if (maxSamples === undefined) return defaultMaxSamples;
+  return maxSamples > 0 ? maxSamples : Number.POSITIVE_INFINITY;
 }
 
 /** @return true if this iteration should pause for V8 background compilation. */
@@ -251,9 +340,4 @@ function shouldPause(
   if (interval <= 0) return false;
   if (first === undefined) return iter % interval === 0;
   return (iter - first) % interval === 0;
-}
-
-/** Trim pre-allocated arrays to the actual sample count. */
-function trimArrays(arrays: SampleArrays, count: number): void {
-  arrays.samples.length = arrays.heapSamples.length = count;
 }

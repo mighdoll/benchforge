@@ -14,6 +14,7 @@ export type DefaultCliArgs = InferredOptionTypes<typeof cliOptions> & {
 const cliOptions = {
   duration:         { type: "number",  requiresArg: true, describe: "duration per batch in seconds (default: 0.642)" },
   iterations:       { type: "number",  requiresArg: true, describe: "iterations per batch (page loads for page-load mode, inner loop for bench)" },
+  "max-samples":    { type: "number",  requiresArg: true, describe: "cap retained timing samples per batch (reservoir subsample; 0 = unlimited, default 100000)" },
   warmup:           { type: "number",  default: 0, describe: "warmup iterations before measurement" },
   filter:           { type: "string",  requiresArg: true, describe: "filter by name/regex. Matrix: case/variant, case/, /variant" },
   all:              { type: "boolean", default: false, describe: "run all cases (ignore defaultCases)" },
@@ -78,7 +79,7 @@ export const cliDefaults: Record<string, unknown> = Object.fromEntries(
 );
 
 const optionGroups = {
-  "Run:": ["duration", "iterations"],
+  "Run:": ["duration", "iterations", "max-samples"],
   "Batching:": ["batches", "warmup-batch", "no-batch-trim"],
   "Calibration:": ["calibrate", "calibrate-runs"],
   "Node:": ["worker", "inspect"],

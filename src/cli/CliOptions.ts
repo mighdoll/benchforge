@@ -117,6 +117,7 @@ export function resolveLimits(args: {
 /** Runner/matrix options shared across all CLI modes. */
 function cliCommonOptions(args: DefaultCliArgs) {
   const { warmup } = args;
+  const { "max-samples": maxSamples } = args;
   const { "gc-force": gcForce, "gc-stats": gcStats } = args;
   const { "call-counts": callCounts } = args;
   const { "pause-warmup": pauseWarmup, "pause-first": pauseFirst } = args;
@@ -127,6 +128,7 @@ function cliCommonOptions(args: DefaultCliArgs) {
   return {
     gcForce,
     warmup,
+    maxSamples,
     gcStats,
     callCounts,
     pauseWarmup,
