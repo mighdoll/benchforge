@@ -64,23 +64,6 @@ export function prepareBenchmarks(
   return series;
 }
 
-/** Adapt a viewer benchmark entry into a resolver input (payload is the entry
- *  itself, so its sample series ride along to the flattening step). */
-function toTrackInput(entry: BenchmarkEntry): TrackInput<BenchmarkEntry> {
-  return {
-    name: entry.name,
-    payload: entry,
-    meta: entry.metadata,
-    baseline: entry.baseline
-      ? {
-          name: entry.baseline.name,
-          payload: entry.baseline,
-          meta: entry.baseline.metadata,
-        }
-      : undefined,
-  };
-}
-
 /** Collect all sample data across benchmarks into flat arrays for plotting */
 export function flattenSamples(benchmarks: PreparedBenchmark[]): FlattenedData {
   const out: FlattenedData = {
@@ -153,12 +136,81 @@ export function filterToBatch(
   };
 }
 
+/** Remap x from per-series sample index to batch fraction so interleaved
+ *  baseline and current batches align on a shared "Batch" axis. Each point's x
+ *  becomes batchIndex + (sampleIndex - batchStart) / batchLength, computed per
+ *  benchmark from its own batchOffsets. Warmup samples (negative index) map into
+ *  the first batch's fraction so they stay just left of 0. Used for the "All"
+ *  view; the per-batch drill-down keeps the raw per-iteration axis. */
+export function batchAlignX(
+  flat: FlattenedData,
+  benchmarks: PreparedBenchmark[],
+): FlattenedData {
+  const mappers = new Map<string, (i: number) => number>();
+  for (const b of benchmarks) {
+    if (b.batchOffsets?.length)
+      mappers.set(
+        b.name,
+        batchFractionMapper(b.batchOffsets, b.samples.length),
+      );
+  }
+  const mapX = (name: string, x: number) => mappers.get(name)?.(x) ?? x;
+  const mapIter = <T extends { benchmark: string; iteration: number }>(
+    arr: T[],
+  ) => arr.map(d => ({ ...d, iteration: mapX(d.benchmark, d.iteration) }));
+  const mapSample = <T extends { benchmark: string; sampleIndex: number }>(
+    arr: T[],
+  ) => arr.map(d => ({ ...d, sampleIndex: mapX(d.benchmark, d.sampleIndex) }));
+  return {
+    allSamples: mapIter(flat.allSamples),
+    timeSeries: mapIter(flat.timeSeries),
+    heapSeries: mapIter(flat.heapSeries),
+    baselineHeapSeries: mapIter(flat.baselineHeapSeries),
+    allGcEvents: mapSample(flat.allGcEvents),
+    allPausePoints: mapSample(flat.allPausePoints),
+  };
+}
+
+/** Adapt a viewer benchmark entry into a resolver input (payload is the entry
+ *  itself, so its sample series ride along to the flattening step). */
+function toTrackInput(entry: BenchmarkEntry): TrackInput<BenchmarkEntry> {
+  return {
+    name: entry.name,
+    payload: entry,
+    meta: entry.metadata,
+    baseline: entry.baseline
+      ? {
+          name: entry.baseline.name,
+          payload: entry.baseline,
+          meta: entry.baseline.metadata,
+        }
+      : undefined,
+  };
+}
+
 /** Extract time series, heap, GC, and pause data from one benchmark */
 function flattenBenchmark(b: PreparedBenchmark, out: FlattenedData): void {
   flattenWarmup(b, b.name, out);
   flattenSamplesAndHeap(b, b.name, out);
   flattenGcEvents(b, b.name, out);
   flattenPausePoints(b, b.name, out);
+}
+
+/** Build a function mapping a sample index (or negative warmup index) to a batch
+ *  fraction, given a benchmark's batch start offsets and total sample count. */
+function batchFractionMapper(
+  offsets: number[],
+  total: number,
+): (i: number) => number {
+  const end = (k: number) => (k + 1 < offsets.length ? offsets[k + 1] : total);
+  return (i: number) => {
+    if (i < 0) return i / (end(0) - offsets[0] || 1);
+    for (let k = offsets.length - 1; k >= 0; k--) {
+      if (i >= offsets[k])
+        return k + (i - offsets[k]) / (end(k) - offsets[k] || 1);
+    }
+    return 0;
+  };
 }
 
 /** Warmup samples get negative iteration indices so they appear left of zero */
