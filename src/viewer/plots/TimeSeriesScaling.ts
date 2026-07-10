@@ -51,7 +51,8 @@ export function computeYRange(values: number[]): {
   const dataMax = d3.max(values)!;
   const range = dataMax - dataMin;
   let yMin = dataMin - range * 0.15;
-  const mag = 10 ** Math.floor(Math.log10(Math.abs(yMin)));
+  const absYMin = Math.abs(yMin);
+  const mag = absYMin === 0 ? 1 : 10 ** Math.floor(Math.log10(absYMin));
   yMin = Math.floor(yMin / mag) * mag;
   if (dataMin > 0 && yMin < 0) yMin = 0;
   return { yMin, yMax: dataMax + range * 0.05 };

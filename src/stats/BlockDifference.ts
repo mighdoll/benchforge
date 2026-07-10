@@ -174,7 +174,9 @@ export function pairedBlockBootstrap(
   };
 }
 
-/** Paired block-pool difference CI from an already prepared paired batch set. */
+/** Paired block-pool difference CI from an already prepared paired batch set.
+ *  percent is non-finite when baseVal is 0 (a degenerate all-zero-sample
+ *  pool); callers should treat that as unmeasurable rather than a real delta. */
 export function pairedBlockDifference(
   pair: PreparedPairedBlocks,
   statFn: (s: number[]) => number,
