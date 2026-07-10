@@ -1,8 +1,10 @@
+import type { BrowserRunOptions } from "../profiling/browser/BrowserProfiler.ts";
 import type { RunnerOptions } from "../runners/BenchRunner.ts";
 import type { MeasuredResults } from "../runners/MeasuredResults.ts";
 import { mean } from "../stats/CoreStats.ts";
 import type { CasesModule } from "./CaseLoader.ts";
 import { loadCasesModule } from "./CaseLoader.ts";
+import { runMatrixBrowser } from "./MatrixBrowserRunner.ts";
 import { runMatrixWithDir } from "./MatrixDirRunner.ts";
 import { runMatrixInline } from "./MatrixInlineRunner.ts";
 
@@ -137,6 +139,8 @@ export interface RunMatrixOptions {
   profileInterval?: number;
   /** Track function call counts via V8 coverage */
   callCounts?: boolean;
+  /** Run inline variants in the browser against this harness instead of Node. */
+  browser?: BrowserRunOptions;
 }
 
 /** Run a BenchMatrix with inline variants or variantDir */
@@ -152,6 +156,8 @@ export async function runMatrix<T>(
     throw new Error("BenchMatrix requires either 'variants' or 'variantDir'");
 
   const effectiveOptions = { ...matrix.defaults, ...options };
+  if (effectiveOptions.browser)
+    return runMatrixBrowser(matrix, effectiveOptions);
   // baselineVariant is interleaved per-variant inside the runners (like
   // baselineDir), so each variant is paired against its own measurement of the
   // reference rather than compared post-hoc against a single shared run.

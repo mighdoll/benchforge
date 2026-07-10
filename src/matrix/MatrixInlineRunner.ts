@@ -65,8 +65,8 @@ export async function runMatrixCalibrationInline<T>(
   return calibrateSource(matrix, options, source, caseId, onRun);
 }
 
-/** Serialize an inline variant to a worker-reconstructable source. */
-function inlineSource<T>(
+/** Serialize an inline variant to a worker- or browser-reconstructable source. */
+export function inlineSource<T>(
   variantId: string,
   variant: Variant<T>,
 ): VariantSource {

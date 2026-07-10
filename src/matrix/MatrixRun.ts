@@ -1,3 +1,4 @@
+import type { BrowserRunCtx } from "../profiling/browser/BrowserProfiler.ts";
 import type { RunnerOptions } from "../runners/BenchRunner.ts";
 import {
   type CalibrationResult,
@@ -52,6 +53,8 @@ export interface MatrixPlan<T> {
   batches: number;
   warmupBatch: boolean;
   useWorker: boolean;
+  /** When set, every variant/case runs in the browser against this harness. */
+  browser?: BrowserRunCtx;
 }
 
 /** Pre-resolve the per-case data passed to the worker as the variant argument:
@@ -131,6 +134,7 @@ export async function calibrateSource<T>(
   source: VariantSource,
   caseId: string,
   onRun?: (p: RunProgress, label: string) => void,
+  browser?: BrowserRunCtx,
 ): Promise<CalibrationResult> {
   const label = `${source.variantId}/${caseId}`;
   const caseData = await inlineCaseDataMap(matrix, [caseId]);
@@ -141,6 +145,7 @@ export async function calibrateSource<T>(
     casesModule: matrix.casesModule,
     options: buildRunnerOptions(options),
     useWorker: options.useWorker ?? true,
+    browser,
   };
   const current = () => runVariantOnce(variantArgs);
   return runCalibration({
@@ -203,6 +208,7 @@ function caseArgs<T>(
     casesModule: plan.casesModuleUrl,
     options: plan.runnerOpts,
     useWorker: plan.useWorker,
+    browser: plan.browser,
   };
 }
 

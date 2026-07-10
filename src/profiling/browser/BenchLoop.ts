@@ -7,7 +7,12 @@ import { loopStartMark } from "./BrowserGcStats.ts";
 import type { BrowserProfileResult, ProfileCtx } from "./BrowserProfiler.ts";
 
 /**
- * Bench function mode: run window.__bench in a timed iteration loop.
+ * Bench function mode: run a bench function in a timed iteration loop.
+ *
+ * The bench is either the page's own `window.__bench` or, in matrix parity mode,
+ * a serialized inline variant injected via `params.inject` (its run/setup code is
+ * eval'd in-page and bound to the serialized case data, mirroring how the Node
+ * worker reconstructs an inline variant).
  *
  * Simplified vs BenchRunner because it runs inside page.evaluate()
  * where shared code, Node APIs, and V8 intrinsics are unavailable.
@@ -28,8 +33,21 @@ export async function runBenchLoop(
   await startInstruments(cdp, opts);
 
   const { samples, totalMs } = await page.evaluate(
-    async ({ maxTime, maxIter, loopMark }) => {
-      const bench = (globalThis as any).__bench;
+    async ({ maxTime, maxIter, loopMark, inject }) => {
+      const compile = (code: string) =>
+        // biome-ignore lint/security/noGlobalEval: self-authored variant code, same trust as the Node worker
+        eval(`(${code})`);
+      let bench: () => unknown = (globalThis as any).__bench;
+      if (inject) {
+        const run = compile(inject.runCode);
+        if (inject.setupCode) {
+          const state = await compile(inject.setupCode)(inject.caseData);
+          bench = () => run(state);
+        } else {
+          const data = inject.caseData;
+          bench = () => run(data);
+        }
+      }
       const estimated = Math.min(maxIter, Math.ceil(maxTime / 0.1));
       const samples = new Array<number>(estimated);
       let count = 0;
@@ -45,7 +63,7 @@ export async function runBenchLoop(
       samples.length = count;
       return { samples, totalMs: performance.now() - startAll };
     },
-    { maxTime, maxIter, loopMark: loopStartMark },
+    { maxTime, maxIter, loopMark: loopStartMark, inject: params.inject },
   );
 
   const collected = await stopInstruments(cdp, opts);

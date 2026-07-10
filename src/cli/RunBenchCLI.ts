@@ -9,6 +9,7 @@ import {
   runMatrix,
 } from "../matrix/BenchMatrix.ts";
 import { loadCasesModule } from "../matrix/CaseLoader.ts";
+import { runMatrixCalibrationBrowser } from "../matrix/MatrixBrowserRunner.ts";
 import { runMatrixCalibration } from "../matrix/MatrixDirRunner.ts";
 import {
   type FilteredMatrix,
@@ -45,7 +46,11 @@ import {
   matrixToReportGroups,
   withStatus,
 } from "./CliReport.ts";
-import { applyRunDefaults, type RunDefaults, readPreset } from "./RunPresets.ts";
+import {
+  applyRunDefaults,
+  type RunDefaults,
+  readPreset,
+} from "./RunPresets.ts";
 
 export interface BuildResult {
   suite: MatrixSuite;
@@ -129,6 +134,9 @@ export async function dispatchCli(): Promise<void> {
   }
 
   const args = parseCliArgs();
+  // --url with a bench file: run that file's inline matrix in the browser against
+  // the harness url. --url alone: profile the page's own window.__bench.
+  if (args.url && args.file) return runFileBench(args.file, args);
   if (args.url) return browserBenchExports(args);
   if (args.file) return runFileBench(args.file, args);
   throw new Error("Provide a benchmark file or --url for browser mode.");
@@ -203,6 +211,18 @@ async function runMatrixPipeline(
   await finishReports(groups, args, { ...reportMeta, reportData });
 }
 
+/** Route calibration to the browser, directory, or inline runner. */
+function calibrateMatrix(
+  filtered: FilteredMatrix<any>,
+  runOpts: ReturnType<typeof cliToMatrixOptions>,
+): Promise<Awaited<ReturnType<typeof runMatrixCalibration>>> {
+  if (runOpts.browser)
+    return runMatrixCalibrationBrowser(filtered, runOpts, reportCalibrateRun);
+  if (filtered.variantDir)
+    return runMatrixCalibration(filtered, runOpts, reportCalibrateRun);
+  return runMatrixCalibrationInline(filtered, runOpts, reportCalibrateRun);
+}
+
 /** Require a file argument for a subcommand, exiting with usage on missing. */
 function requireFile(filePath: string | undefined, subcommand: string): string {
   if (filePath) return filePath;
@@ -253,9 +273,7 @@ async function runMatrixCalibratePipeline(
   const filtered = await applyMatrixFilters(matrix, args.all, filter);
   const { filteredCases, filteredVariants } = filtered;
   const runOpts = { ...options, filteredCases, filteredVariants };
-  const result = filtered.variantDir
-    ? await runMatrixCalibration(filtered, runOpts, reportCalibrateRun)
-    : await runMatrixCalibrationInline(filtered, runOpts, reportCalibrateRun);
+  const result = await calibrateMatrix(filtered, runOpts);
   console.log(formatCalibration(result));
   const meta = {
     timestamp: new Date().toISOString(),

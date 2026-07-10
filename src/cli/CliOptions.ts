@@ -1,4 +1,5 @@
 import type { RunMatrixOptions } from "../matrix/BenchMatrix.ts";
+import type { BrowserRunOptions } from "../profiling/browser/BrowserProfiler.ts";
 import type { HeapReportOptions } from "../profiling/node/HeapSampleReport.ts";
 import type { ComparisonOptions } from "../report/BenchmarkReport.ts";
 import { type DefaultCliArgs, defaultDuration } from "./CliArgs.ts";
@@ -32,7 +33,26 @@ export function cliToMatrixOptions(args: DefaultCliArgs): RunMatrixOptions {
     warmupBatch: args["warmup-batch"],
     calibrate: args.calibrate,
     calibrateRuns: args["calibrate-runs"],
+    browser: args.url ? browserRunOptions(args) : undefined,
     ...common,
+  };
+}
+
+/** Build browser matrix launch options from CLI args (when --url is given
+ *  alongside a bench file, so inline variants run against the harness page). */
+function browserRunOptions(args: DefaultCliArgs): BrowserRunOptions {
+  const chromeArgs = args["chrome-args"]
+    ?.flatMap(a => a.split(/\s+/))
+    .filter(Boolean);
+  return {
+    url: args.url!,
+    pageLoad: args["page-load"] || !!args["wait-for"],
+    waitFor: args["wait-for"],
+    timeout: args.timeout,
+    headless: args.headless,
+    chromePath: args.chrome,
+    chromeProfile: args["chrome-profile"],
+    chromeArgs,
   };
 }
 

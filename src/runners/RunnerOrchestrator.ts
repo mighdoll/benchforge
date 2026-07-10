@@ -1,3 +1,4 @@
+import type { BrowserRunCtx } from "../profiling/browser/BrowserProfiler.ts";
 import type { BenchmarkFunction, BenchmarkSpec } from "./BenchmarkSpec.ts";
 import { BenchRunner, type RunnerOptions } from "./BenchRunner.ts";
 import type { MeasuredResults } from "./MeasuredResults.ts";
@@ -17,6 +18,8 @@ export interface RunMatrixVariantParams {
   casesModule?: string;
   options: RunnerOptions;
   useWorker?: boolean;
+  /** When set, run in the browser against this harness/Chrome instead of Node. */
+  browser?: BrowserRunCtx;
 }
 
 interface RunBenchmarkParams<T = unknown> {
@@ -51,6 +54,13 @@ export async function runMatrixVariant(
   const { source, caseId, caseData, casesModule, options } = params;
   const { useWorker = true } = params;
   const name = `${source.variantId}/${caseId}`;
+
+  if (params.browser) {
+    // Browser has no worker/process analog; lazy-import keeps CDP/Chrome deps
+    // out of the Node run path.
+    const { runBrowserVariant } = await import("../cli/BrowserVariant.ts");
+    return runBrowserVariant(params, name);
+  }
 
   if (!useWorker) return runMatrixVariantDirect(params, name);
 

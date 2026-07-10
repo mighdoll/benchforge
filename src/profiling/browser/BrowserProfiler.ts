@@ -50,6 +50,48 @@ export interface BrowserProfileParams {
   waitFor?: string;
   /** Reuse an existing Chrome instance (caller manages lifecycle) */
   chrome?: ChromeInstance;
+  /** Matrix parity mode: run this serialized inline variant against `url` as a
+   *  harness, instead of the page's own window.__bench. */
+  inject?: InjectVariant;
+}
+
+/** Run-level browser context for a matrix run: a Chrome launched once and the
+ *  harness page + mode flags shared by every variant/case/batch. Instrument and
+ *  limit settings ride in the per-run RunnerOptions, not here. */
+export interface BrowserRunCtx {
+  /** Chrome launched once for the whole matrix (a fresh tab isolates each batch). */
+  chrome: ChromeInstance;
+  /** Harness page URL the injected variant runs against. */
+  url: string;
+  /** Passive page-load profiling instead of a bench loop. */
+  pageLoad?: boolean;
+  /** Completion signal for page-load mode. */
+  waitFor?: string;
+  /** Page timeout in seconds. */
+  timeout?: number;
+}
+
+/** Launch-level browser options for a matrix run (from the CLI). The producer
+ *  launches Chrome from these once, then derives a {@link BrowserRunCtx}. */
+export interface BrowserRunOptions {
+  url: string;
+  pageLoad?: boolean;
+  waitFor?: string;
+  timeout?: number;
+  headless?: boolean;
+  chromePath?: string;
+  chromeProfile?: string;
+  chromeArgs?: string[];
+}
+
+/** A serialized inline matrix variant to eval and time inside the page. */
+export interface InjectVariant {
+  /** Source of the variant run function (from `fn.toString()`). */
+  runCode: string;
+  /** Source of the optional stateful setup function. */
+  setupCode?: string;
+  /** Structured-clone-serializable case data passed to the variant. */
+  caseData?: unknown;
 }
 
 /** Navigation timing metrics from the Performance API. */
@@ -141,7 +183,11 @@ async function runProfile(
   const ctx = { page, cdp, params, samplingInterval };
 
   let result: BrowserProfileResult;
-  if (params.pageLoad) {
+  if (params.inject) {
+    // Parity mode: harness page + injected variant; force bench mode, no detection.
+    await page.navigate(params.url, { waitUntil: "load" });
+    result = await runBenchLoop(ctx);
+  } else if (params.pageLoad) {
     result = await runPageLoad(ctx);
   } else {
     await page.navigate(params.url, { waitUntil: "load" });

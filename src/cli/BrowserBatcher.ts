@@ -108,7 +108,7 @@ async function runBatchedTabs(
 }
 
 /** Convert a browser profile result into a MeasuredResults for the report pipeline. */
-function toBrowserMeasured(
+export function toBrowserMeasured(
   name: string,
   result: BrowserProfileResult,
 ): MeasuredResults {
