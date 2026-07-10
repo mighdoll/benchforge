@@ -29,6 +29,10 @@ interface PointArgs {
   lowBatches: boolean;
   noBatchTrim: boolean | undefined;
   verdict: StatKind;
+  currentBlocks?: number[][];
+  baselineBlocks?: number[][];
+  currentOffsets?: number[];
+  baselineOffsets?: number[];
 }
 
 /** A percentile estimate is reliable when enough samples lie beyond it and
@@ -57,8 +61,13 @@ export function buildPoint(args: PointArgs): ShiftPercentile | undefined {
   const base = buildPointBase(args);
   if (!base) return undefined;
 
-  const curCoverage = tailCoverage(current, p, noBatchTrim);
-  const baseCoverage = tailCoverage(baseline, p, noBatchTrim);
+  const curCoverage = tailCoverage(current, p, noBatchTrim, args.currentBlocks);
+  const baseCoverage = tailCoverage(
+    baseline,
+    p,
+    noBatchTrim,
+    args.baselineBlocks,
+  );
   const tailCount = Math.min(curCoverage.count, baseCoverage.count);
   const tailBatches = Math.min(curCoverage.batches, baseCoverage.batches);
   const reliable =
@@ -88,10 +97,14 @@ export function buildMeanPoint(args: PointArgs): ShiftPercentile | undefined {
   const base = buildPointBase(args);
   if (!base) return undefined;
 
-  const tailCount = Math.min(current.samples.length, baseline.samples.length);
+  const currentCount =
+    sampleCount(args.currentBlocks) ?? current.samples.length;
+  const baselineCount =
+    sampleCount(args.baselineBlocks) ?? baseline.samples.length;
+  const tailCount = Math.min(currentCount, baselineCount);
   const tailBatches = Math.min(
-    effectiveBatches(current, noBatchTrim),
-    effectiveBatches(baseline, noBatchTrim),
+    args.currentBlocks?.length ?? effectiveBatches(current, noBatchTrim),
+    args.baselineBlocks?.length ?? effectiveBatches(baseline, noBatchTrim),
   );
   return {
     ...base,
@@ -120,15 +133,21 @@ function buildPointBase(
     r: BootstrapResult,
     m: MeasuredResults,
     meta?: UnknownRecord,
-  ) => formatBootstrapCI(section, r, m.batchOffsets, meta);
+    offsets?: number[],
+  ) => formatBootstrapCI(section, r, offsets ?? m.batchOffsets, meta);
   const runs: ShiftRun[] = [
     {
       runName: current.name,
-      bootstrapCI: runCI(curResult, current, currentMeta),
+      bootstrapCI: runCI(curResult, current, currentMeta, args.currentOffsets),
     },
     {
       runName: baselineLabel(args.baselineName),
-      bootstrapCI: runCI(baseResult, baseline, baselineMeta),
+      bootstrapCI: runCI(
+        baseResult,
+        baseline,
+        baselineMeta,
+        args.baselineOffsets,
+      ),
     },
   ];
   return { diff: annotated, runs };
@@ -145,12 +164,17 @@ function tailCoverage(
   m: MeasuredResults,
   p: number,
   noBatchTrim: boolean | undefined,
+  keptBlocks?: number[][],
 ): { count: number; batches: number } {
   const { samples, batchOffsets } = m;
   const blocks =
-    batchOffsets && batchOffsets.length >= 2
-      ? prepareBlocks(samples, batchOffsets, mean, noBatchTrim).keptSplits
-      : [samples];
+    keptBlocks ??
+    (batchOffsets && batchOffsets.length >= 2
+      ? prepareBlocks(samples, batchOffsets, mean, {
+          noTrim: noBatchTrim,
+          rand: Math.random,
+        }).keptSplits
+      : [samples]);
   const threshold = percentile(blocks.flat(), p);
   const inTail =
     p > 0.5 ? (v: number) => v >= threshold : (v: number) => v <= threshold;
@@ -158,6 +182,10 @@ function tailCoverage(
   const count = perBlock.reduce((sum, n) => sum + n, 0);
   const batches = perBlock.filter(n => n > 0).length;
   return { count, batches };
+}
+
+function sampleCount(blocks: number[][] | undefined): number | undefined {
+  return blocks?.reduce((sum, block) => sum + block.length, 0);
 }
 
 /** @return distinct batches the bootstrap kept (Tukey-trimmed unless noTrim),

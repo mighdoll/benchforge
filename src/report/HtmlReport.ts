@@ -50,6 +50,7 @@ import { gcByBatch } from "./GcByBatch.ts";
 import type { GitVersion } from "./GitUtils.ts";
 import { defaultReportSections } from "./StandardSections.ts";
 import { resolveTracks } from "./TrackResolution.ts";
+import { pairedCurrentTrack } from "./ViewerRows.ts";
 import {
   buildViewerSections,
   type CaseContext,
@@ -258,8 +259,8 @@ function batchDeltaCI(
   const bBuf = new Array<number>(base.length);
   const deltas: number[] = [];
   for (let i = 0; i < deltaResamples; i++) {
-    resampleInto(cur, cBuf);
-    resampleInto(base, bBuf);
+    resampleInto(cur, cBuf, Math.random);
+    resampleInto(base, bBuf, Math.random);
     const rb = mean(bBuf);
     if (rb > 0) deltas.push(((mean(cBuf) - rb) / rb) * 100);
   }
@@ -378,9 +379,12 @@ function buildRawCaseSections(
   if (!anyTrimmed) return undefined;
 
   const reuse: SectionCICache[] = trimmedCaches.map(c => ({
-    track: c.track?.map((r, i) =>
-      untrimmed(ctx.tracks[i]?.measured) ? r : undefined,
-    ),
+    track: c.track?.map((r, i) => {
+      const t = ctx.tracks[i];
+      const other = t?.baseline?.measured ?? pairedCurrent(ctx.tracks, i);
+      const ok = untrimmed(t?.measured) && untrimmed(other);
+      return ok ? r : undefined;
+    }),
     // diff depends on both sides; reuse only when neither was trimmed
     diff: c.diff?.map((d, i) => {
       const t = ctx.tracks[i];
@@ -440,4 +444,13 @@ function buildWarnings(
   if (singleBatch) parts.push(single);
   if (lowBatches) parts.push(low);
   return parts.length ? parts : undefined;
+}
+
+/** The current results paired with a baseline cell, so the raw-view reuse gate
+ *  can require both paired sides untrimmed before reusing the baseline's CI. */
+function pairedCurrent(
+  tracks: CaseTrack[],
+  baselineIndex: number,
+): MeasuredResults | undefined {
+  return pairedCurrentTrack(tracks, baselineIndex)?.measured;
 }

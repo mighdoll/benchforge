@@ -50,9 +50,70 @@ export async function runBenchCLITest<T = DefaultCliArgs>(
   return consoleSummary(defaultReportData(groups, parsedArgs));
 }
 
+/** All-zero summary stats for report-data fixtures that never read them. */
+export const zeroStats = {
+  min: 0,
+  max: 0,
+  avg: 0,
+  p50: 0,
+  p75: 0,
+  p99: 0,
+  p999: 0,
+};
+
+/** Near-constant batches centered on `value` (tiny symmetric jitter keeps the
+ *  median well-defined), for exact reciprocal-delta assertions. */
+export function constBatches(
+  batches: number,
+  perBatch: number,
+  value: number,
+  name = "x",
+): MeasuredResults {
+  const samples: number[] = [];
+  const batchOffsets: number[] = [];
+  for (let b = 0; b < batches; b++) {
+    batchOffsets.push(samples.length);
+    for (let i = 0; i < perBatch; i++)
+      samples.push(value + (i - (perBatch - 1) / 2) * 1e-6);
+  }
+  return { name, samples, batchOffsets, time: zeroStats };
+}
+
 /** @return slice of bevy30 samples for consistent test data */
 export function getSampleData(start: number, end: number): number[] {
   return bevy30SamplesMs.slice(start, end);
+}
+
+/** Batch offsets for `batches` equal batches of `perBatch` samples each
+ *  (cumulative sample counts starting at 0, the shape validateOffsets expects). */
+export function batchOffsets(batches: number, perBatch: number): number[] {
+  return Array.from({ length: batches }, (_, i) => i * perBatch);
+}
+
+/** Flatten `values` into samples, repeating each `perBatch` times so each entry
+ *  becomes one constant-valued batch. */
+export function repeatedBatches(values: number[], perBatch: number): number[] {
+  return values.flatMap(v => Array.from({ length: perBatch }, () => v));
+}
+
+/** Per-round drift shared by baseline and current (current scaled by `scale`),
+ *  with a within-batch ramp -- a clean positive-correlation pairing case. */
+export function sharedDriftData(
+  batches: number,
+  perBatch: number,
+  scale: number,
+): { baseline: number[]; current: number[]; blocks: number[] } {
+  const baseline: number[] = [];
+  const current: number[] = [];
+  for (let b = 0; b < batches; b++) {
+    const drift = 100 + b * 50;
+    for (let i = 0; i < perBatch; i++) {
+      const value = drift + i;
+      baseline.push(value);
+      current.push(value * scale);
+    }
+  }
+  return { baseline, current, blocks: batchOffsets(batches, perBatch) };
 }
 
 /** @return test MeasuredResults from bevy30 samples */

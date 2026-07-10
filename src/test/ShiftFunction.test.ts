@@ -53,14 +53,9 @@ function withSlowBatch(batches: number, perBatch: number): MeasuredResults {
 }
 
 test("returns undefined without a baseline", () => {
-  const sf = buildShiftFunction(
-    timeMetric,
-    batched(30, 50),
-    undefined,
-    {},
-    {},
-    fast,
-  );
+  const sf = buildShiftFunction(timeMetric, batched(30, 50), undefined, {
+    comparison: fast,
+  });
   expect(sf).toBeUndefined();
 });
 
@@ -69,9 +64,7 @@ test("leads with mean, then one point per sampled percentile", () => {
     timeMetric,
     batched(30, 50, 0.1),
     batched(30, 50),
-    {},
-    {},
-    fast,
+    { comparison: fast },
   );
   expect(sf).toBeDefined();
   expect(sf!.points.length).toBe(10);
@@ -86,9 +79,7 @@ test("isPrimary marks the configured verdict percentile, not the mean", () => {
     timeMetric, // statKind: { percentile: 0.5 }
     batched(30, 50, 0.1),
     batched(30, 50),
-    {},
-    {},
-    fast,
+    { comparison: fast },
   )!;
   expect(sf.points[0].isPrimary).toBe(false); // leading mean is not the verdict
   const primary = sf.points.filter(p => p.isPrimary);
@@ -102,9 +93,7 @@ test("isPrimary marks the mean when the verdict stat is mean", () => {
     meanMetric,
     batched(30, 50, 0.1),
     batched(30, 50),
-    {},
-    {},
-    fast,
+    { comparison: fast },
   )!;
   expect(sf.points[0].isMean).toBe(true);
   expect(sf.points[0].isPrimary).toBe(true);
@@ -116,9 +105,7 @@ test("percentile points are sorted ascending (mean stays first)", () => {
     timeMetric,
     batched(30, 50, 0.1),
     batched(30, 50),
-    {},
-    {},
-    fast,
+    { comparison: fast },
   )!;
   expect(sf.points[0].isMean).toBe(true);
   const ps = sf.points.slice(1).map(p => p.percentile);
@@ -132,9 +119,7 @@ test("higherIsBetter keeps absolute estimates monotonic across percentiles", () 
     locMetric,
     batched(30, 50, 0.1),
     batched(30, 50),
-    {},
-    {},
-    fast,
+    { comparison: fast },
   )!;
   expect(sf.points[0].isMean).toBe(true);
   // skip the leading mean point; the percentile estimates should ramp upward.
@@ -148,9 +133,7 @@ test("each point carries current and baseline absolute distributions", () => {
     timeMetric,
     batched(30, 50, 0.1),
     batched(30, 50),
-    {},
-    {},
-    fast,
+    { comparison: fast },
   )!;
   for (const point of sf.points) {
     expect(point.runs.map(r => r.runName)).toEqual(["x", "baseline"]);
@@ -164,10 +147,7 @@ test("baseline run shows its name, suffixed (baseline) when not already", () => 
     timeMetric,
     batched(30, 50, 0.1),
     batched(30, 50),
-    {},
-    {},
-    fast,
-    "native sort",
+    { comparison: fast, baselineName: "native sort" },
   )!;
   expect(named.points[0].runs[1].runName).toBe("native sort (baseline)");
 
@@ -175,10 +155,7 @@ test("baseline run shows its name, suffixed (baseline) when not already", () => 
     timeMetric,
     batched(30, 50, 0.1),
     batched(30, 50),
-    {},
-    {},
-    fast,
-    "native sort (baseline)",
+    { comparison: fast, baselineName: "native sort (baseline)" },
   )!;
   expect(preSuffixed.points[0].runs[1].runName).toBe("native sort (baseline)");
 });
@@ -189,9 +166,7 @@ test("extreme tail percentiles are unreliable with too few samples", () => {
     timeMetric,
     batched(30, 5, 0.1),
     batched(30, 5),
-    {},
-    {},
-    fast,
+    { comparison: fast },
   )!;
   expect(sf.points.find(p => p.label === "p1")!.reliable).toBe(false);
   expect(sf.points.find(p => p.label === "p50")!.reliable).toBe(true);
@@ -202,9 +177,7 @@ test("equivMargin is recorded for the plot band", () => {
     timeMetric,
     batched(30, 50, 0.1),
     batched(30, 50),
-    {},
-    {},
-    { ...fast, equivMargin: 2 },
+    { comparison: { ...fast, equivMargin: 2 } },
   )!;
   expect(sf.equivMargin).toBe(2);
 });
@@ -215,18 +188,12 @@ test("tail coverage counts only the batches the bootstrap kept", () => {
   // than the untrimmed view sees.
   const cur = withSlowBatch(8, 50);
   const base = withSlowBatch(8, 50);
-  const trimmed = buildShiftFunction(timeMetric, cur, base, {}, {}, fast)!;
-  const raw = buildShiftFunction(
-    timeMetric,
-    cur,
-    base,
-    {},
-    {},
-    {
-      ...fast,
-      noBatchTrim: true,
-    },
-  )!;
+  const trimmed = buildShiftFunction(timeMetric, cur, base, {
+    comparison: fast,
+  })!;
+  const raw = buildShiftFunction(timeMetric, cur, base, {
+    comparison: { ...fast, noBatchTrim: true },
+  })!;
   const p95Trim = trimmed.points.find(p => p.label === "p95")!;
   const p95Raw = raw.points.find(p => p.label === "p95")!;
   expect(p95Trim.tailCount).toBeLessThan(p95Raw.tailCount);

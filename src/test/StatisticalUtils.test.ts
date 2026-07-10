@@ -6,9 +6,12 @@ import {
 } from "../stats/BlockBootstrap.ts";
 import {
   blockDifferenceCI,
-  blockPoolDifferenceCI,
   diffCIs,
+  pairedBlockBootstrap,
+  pairedBlockDifference,
+  preparePairedBlocks,
 } from "../stats/BlockDifference.ts";
+import { seededRng } from "../stats/Bootstrap.ts";
 import {
   coefficientOfVariation,
   integerCounts,
@@ -19,7 +22,13 @@ import {
   standardDeviation,
 } from "../stats/CoreStats.ts";
 import { classifyDirection } from "../stats/SingleSampleDifference.ts";
-import { assertValid, getSampleData } from "./TestUtils.ts";
+import {
+  assertValid,
+  batchOffsets,
+  getSampleData,
+  repeatedBatches,
+  sharedDriftData,
+} from "./TestUtils.ts";
 
 /** Build samples where per-batch p50s skew low but the pooled p50 sits high:
  *  4 batches of 20 samples ~100, 1 batch of 20 samples ~50. Pool p50 ~= 100,
@@ -94,7 +103,7 @@ test("identifies outliers in mixed data", () => {
 test("blockBootstrap estimates median with confidence intervals", () => {
   const stable = getSampleData(400, 450);
   const actual = percentile(stable, 0.5);
-  const blocks = Array.from({ length: 5 }, (_, i) => i * 10);
+  const blocks = batchOffsets(5, 10);
   const result = blockBootstrap(stable, blocks, median, { resamples: 1000 });
 
   expect(result.ciLevel).toBe("block");
@@ -108,7 +117,7 @@ test("blockBootstrap estimates median with confidence intervals", () => {
 test("blockDifferenceCI detects improvement", () => {
   const baseline = getSampleData(0, 100);
   const improved = baseline.map(v => v * 0.8);
-  const blocks = Array.from({ length: 10 }, (_, i) => i * 10);
+  const blocks = batchOffsets(10, 10);
   const result = blockDifferenceCI(baseline, blocks, improved, median, {
     resamples: 1000,
   });
@@ -122,7 +131,7 @@ test("blockDifferenceCI detects improvement", () => {
 test("blockDifferenceCI detects regression", () => {
   const baseline = getSampleData(0, 100);
   const slower = baseline.map(v => v * 1.2);
-  const blocks = Array.from({ length: 10 }, (_, i) => i * 10);
+  const blocks = batchOffsets(10, 10);
   const result = blockDifferenceCI(baseline, blocks, slower, median, {
     resamples: 1000,
   });
@@ -134,17 +143,108 @@ test("blockDifferenceCI detects regression", () => {
 });
 
 test("blockDifferenceCI shows uncertainty for noise", () => {
-  const baseline = getSampleData(0, 100);
-  const noisy = baseline.map(v => v + (Math.random() - 0.5) * 2);
-  const blocks = Array.from({ length: 10 }, (_, i) => i * 10);
+  // Ten batches that swing +/-5% with no consistent direction: the paired delta
+  // has no trend to lock onto, so the CI straddles zero. Deterministic, unlike
+  // random noise, whose verdict flips ~5% of the time on resampling luck.
+  const baseline: number[] = [];
+  const noisy: number[] = [];
+  const blocks = batchOffsets(10, 10);
+  for (let b = 0; b < 10; b++) {
+    const swing = b % 2 === 0 ? 1.05 : 0.95;
+    for (let i = 0; i < 10; i++) {
+      baseline.push(100 + i);
+      noisy.push((100 + i) * swing);
+    }
+  }
   const result = blockDifferenceCI(baseline, blocks, noisy, median, {
     resamples: 1000,
   });
 
   expect(result.ciLevel).toBe("block");
-  expect(result.ci[0]).toBeLessThanOrEqual(0);
-  expect(result.ci[1]).toBeGreaterThanOrEqual(0);
+  expect(result.ci[0]).toBeLessThan(0);
+  expect(result.ci[1]).toBeGreaterThan(0);
   expect(result.direction).toBe("uncertain");
+});
+
+test("paired block comparison cancels shared drift for mean and p99", () => {
+  const { baseline, current, blocks } = sharedDriftData(30, 5, 1.05);
+  const [meanCI, p99CI] = diffCIs(
+    baseline,
+    blocks,
+    current,
+    blocks,
+    ["mean", { percentile: 0.99 }],
+    { resamples: 500 },
+  );
+
+  for (const ci of [meanCI, p99CI]) {
+    expect(ci?.ciLevel).toBe("block");
+    expect(ci?.percent).toBeCloseTo(5, 6);
+    expect(ci?.ci[0]).toBeGreaterThan(4.99);
+    expect(ci?.ci[1]).toBeLessThan(5.01);
+    expect(ci?.direction).toBe("slower");
+  }
+});
+
+test("paired delta is sharp while standalone CIs overlap", () => {
+  const { baseline, current, blocks } = sharedDriftData(30, 5, 1.05);
+  const pair = preparePairedBlocks(baseline, blocks, current, blocks, {
+    noTrim: false,
+    rand: seededRng(1),
+  });
+  const baseAbs = pairedBlockBootstrap(pair.baseline, mean, { resamples: 500 });
+  const curAbs = pairedBlockBootstrap(pair.current, mean, { resamples: 500 });
+  const delta = pairedBlockDifference(pair, mean, { resamples: 500 });
+
+  // Strong run-to-run drift makes each standalone mean CI wide and overlapping,
+  const overlap =
+    baseAbs.ci[1] >= curAbs.ci[0] && curAbs.ci[1] >= baseAbs.ci[0];
+  expect(overlap).toBe(true);
+  expect(baseAbs.ci[1] - baseAbs.ci[0]).toBeGreaterThan(100);
+
+  // yet pairing the same rounds cancels the shared drift: the delta is sharp
+  // and excludes zero. Overlapping absolutes don't contradict the verdict.
+  expect(delta.percent).toBeCloseTo(5, 6);
+  expect(delta.ci[1] - delta.ci[0]).toBeLessThan(0.1);
+  expect(delta.direction).toBe("slower");
+});
+
+test("pairwise trimming drops the matching current batch", () => {
+  const blocks = batchOffsets(8, 5);
+  const baseline = repeatedBatches(
+    [100, 100, 100, 1000, 100, 100, 100, 100],
+    5,
+  );
+  const current = repeatedBatches([110, 110, 110, 10, 110, 110, 110, 110], 5);
+  const result = blockDifferenceCI(baseline, blocks, current, mean, {
+    resamples: 200,
+  });
+
+  expect(result.trimmed).toEqual([1, 0]);
+  expect(result.percent).toBeCloseTo(10, 6);
+  expect(result.ci[0]).toBeCloseTo(10, 6);
+  expect(result.ci[1]).toBeCloseTo(10, 6);
+});
+
+test("batched comparisons require aligned offsets", () => {
+  expect(() =>
+    diffCIs([1, 2, 3, 4], [0, 2], [1, 2, 3, 4], [0], ["mean"]),
+  ).toThrow(/aligned batch counts/);
+
+  expect(() =>
+    diffCIs([1, 2, 3, 4], [0, 2], [1, 2, 3, 4], undefined, ["mean"]),
+  ).toThrow(/batch offsets on both/);
+
+  expect(() =>
+    diffCIs([1, 2, 3, 4], [1, 2], [1, 2, 3, 4], [0, 2], ["mean"]),
+  ).toThrow(/first offset/);
+});
+
+test("unbatched comparisons keep the sample-level fallback", () => {
+  const [ci] = diffCIs([1, 2, 3, 4], undefined, [1, 2, 3, 5], undefined, [
+    "mean",
+  ]);
+  expect(ci?.ciLevel).toBe("sample");
 });
 
 test("classifyDirection without a margin colors any CI excluding zero", () => {
@@ -196,11 +296,11 @@ test("blockPoolBootstrap CI brackets the pooled estimate", () => {
   expect(result.ci[1]).toBeGreaterThanOrEqual(result.estimate);
 });
 
-test("blockPoolDifferenceCI detects scaled improvement", () => {
+test("blockDifferenceCI detects scaled improvement (percentile stat)", () => {
   const baseline = getSampleData(0, 100);
   const improved = baseline.map(v => v * 0.8);
-  const blocks = Array.from({ length: 10 }, (_, i) => i * 10);
-  const result = blockPoolDifferenceCI(baseline, blocks, improved, median, {
+  const blocks = batchOffsets(10, 10);
+  const result = blockDifferenceCI(baseline, blocks, improved, median, {
     resamples: 1000,
   });
   expect(result.ciLevel).toBe("block");
@@ -214,7 +314,7 @@ test("diffCIs routes percentile through the pool variant", () => {
   // to verify the dispatch wiring and the bracket invariant on the p50 CI.
   const base = getSampleData(0, 100);
   const cur = base.map(v => v * 0.9);
-  const blocks = Array.from({ length: 10 }, (_, i) => i * 10);
+  const blocks = batchOffsets(10, 10);
   const [meanCI, p50CI] = diffCIs(
     base,
     blocks,
@@ -225,8 +325,8 @@ test("diffCIs routes percentile through the pool variant", () => {
   );
   expect(meanCI?.direction).toBe("faster");
   expect(p50CI?.direction).toBe("faster");
-  // The p50 path used blockPoolDifferenceCI: its CI brackets the observed
-  // pooled-percentile diff (the property the pool variant fixes).
+  // The p50 path uses pooled draws: its CI brackets the observed
+  // pooled-percentile diff (the property that fixes non-linear stats).
   if (p50CI) {
     expect(p50CI.ci[0]).toBeLessThanOrEqual(p50CI.percent);
     expect(p50CI.ci[1]).toBeGreaterThanOrEqual(p50CI.percent);

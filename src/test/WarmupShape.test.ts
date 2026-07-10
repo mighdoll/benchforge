@@ -1,15 +1,11 @@
 import { expect, test } from "vitest";
 import { warmupShape } from "../report/WarmupShape.ts";
 import type { MeasuredResults } from "../runners/MeasuredResults.ts";
+import { zeroStats } from "./TestUtils.ts";
 
 /** MeasuredResults carrying just the fields warmupShape reads. */
 function results(samples: number[], batchOffsets?: number[]): MeasuredResults {
-  return {
-    name: "t",
-    samples,
-    batchOffsets,
-    time: { min: 0, max: 0, avg: 0, p50: 0, p75: 0, p99: 0, p999: 0 },
-  };
+  return { name: "t", samples, batchOffsets, time: zeroStats };
 }
 
 /** A batch whose first 5% runs at `hot` and the rest at `plateau`. */

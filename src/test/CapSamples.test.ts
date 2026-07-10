@@ -1,14 +1,14 @@
 import { expect, test } from "vitest";
 import { blockPoolBootstrap, prepareBlocks } from "../stats/BlockBootstrap.ts";
 import { blockDifferenceCI } from "../stats/BlockDifference.ts";
-import { maxBootstrapInput, multiSampleBootstrap } from "../stats/Bootstrap.ts";
+import {
+  maxBootstrapInput,
+  multiSampleBootstrap,
+  seededRng,
+} from "../stats/Bootstrap.ts";
 import { mean, percentile } from "../stats/CoreStats.ts";
 import { multiSampleDifferenceCI } from "../stats/SingleSampleDifference.ts";
-
-/** Batches of equal size starting at 0, total `batchSize * batches`. */
-function offsetsFor(batchSize: number, batches: number): number[] {
-  return Array.from({ length: batches }, (_, i) => i * batchSize);
-}
+import { batchOffsets } from "./TestUtils.ts";
 
 test("multiSampleBootstrap uses full samples for point estimate", () => {
   const samples = Array.from({ length: 5000 }, (_, i) => i);
@@ -92,13 +92,11 @@ test("prepareBlocks caps the resample source but keeps the full pool for estimat
   const batchSize = 3000;
   const batches = 6;
   const samples = Array.from({ length: batchSize * batches }, (_, i) => i);
-  const side = prepareBlocks(
-    samples,
-    offsetsFor(batchSize, batches),
-    mean,
-    true,
-    maxBootstrapInput,
-  );
+  const side = prepareBlocks(samples, batchOffsets(batches, batchSize), mean, {
+    noTrim: true,
+    cap: maxBootstrapInput,
+    rand: seededRng(1),
+  });
   const drawn = side.keptSplits.reduce((n, b) => n + b.length, 0);
   expect(drawn).toBeLessThanOrEqual(maxBootstrapInput);
   expect(side.filtered).toHaveLength(batchSize * batches);
@@ -106,13 +104,11 @@ test("prepareBlocks caps the resample source but keeps the full pool for estimat
 
 test("prepareBlocks leaves splits untouched when under the cap", () => {
   const samples = Array.from({ length: 600 }, (_, i) => i);
-  const side = prepareBlocks(
-    samples,
-    offsetsFor(200, 3),
-    mean,
-    true,
-    maxBootstrapInput,
-  );
+  const side = prepareBlocks(samples, batchOffsets(3, 200), mean, {
+    noTrim: true,
+    cap: maxBootstrapInput,
+    rand: seededRng(1),
+  });
   expect(side.keptSplits.reduce((n, b) => n + b.length, 0)).toBe(600);
 });
 
@@ -120,7 +116,7 @@ test("blockPoolBootstrap point estimate uses the full pool when capped", () => {
   const batchSize = 3000;
   const batches = 6;
   const samples = Array.from({ length: batchSize * batches }, (_, i) => i);
-  const offsets = offsetsFor(batchSize, batches);
+  const offsets = batchOffsets(batches, batchSize);
   const result = blockPoolBootstrap(samples, offsets, s => percentile(s, 0.5), {
     resamples: 50,
     noTrim: true,
@@ -136,7 +132,7 @@ test("blockDifferenceCI preserves the point estimate when capped", () => {
     () => 50 + Math.random() * 10,
   );
   const b = a.map(v => v * 1.1);
-  const offsets = offsetsFor(batchSize, batches);
+  const offsets = batchOffsets(batches, batchSize);
   const result = blockDifferenceCI(a, offsets, b, mean, {
     resamples: 50,
     noBatchTrim: true,

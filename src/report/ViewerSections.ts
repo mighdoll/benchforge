@@ -1,4 +1,5 @@
 import type { MeasuredResults } from "../runners/MeasuredResults.ts";
+import type { PreparedPairedBlocks } from "../stats/BlockDifference.ts";
 import type { BootstrapResult, DifferenceCI } from "../stats/Bootstrap.ts";
 import type { ViewerRow, ViewerSection } from "../viewer/ReportData.ts";
 import type {
@@ -8,7 +9,7 @@ import type {
   ScalarSection,
   UnknownRecord,
 } from "./BenchmarkReport.ts";
-import { metricRow, scalarRow } from "./ViewerRows.ts";
+import { comparisonPairs, metricRow, scalarRow } from "./ViewerRows.ts";
 
 /** One display track in a case: a measured series and, for a comparison track,
  *  the paired baseline it diffs against. The baseline track has no `baseline`. */
@@ -47,6 +48,11 @@ export function buildViewerSections(
   ctx: CaseContext,
   reuseCaches?: SectionCICache[],
 ): { sections: ViewerSection[]; caches: SectionCICache[] } {
+  // The pairing (Tukey trim, batch intersection, bootstrap cap draw) depends
+  // only on ctx/noTrim, not on which metric section is being built, so every
+  // metric section in this call shares one draw instead of each re-preparing
+  // (and re-drawing its own cap sample) independently.
+  const pairs = comparisonPairs(ctx, ctx.comparison?.noBatchTrim);
   const caches: SectionCICache[] = [];
   const viewerSections: ViewerSection[] = [];
   sections.forEach((section, i) => {
@@ -55,7 +61,7 @@ export function buildViewerSections(
     const placement = section.kind === "scalar" ? section.placement : undefined;
     const rows =
       section.kind === "metric"
-        ? metricRows(section, ctx, reuseCaches?.[i], cache)
+        ? metricRows(section, ctx, reuseCaches?.[i], cache, pairs)
         : scalarRows(section, ctx);
     caches[i] = cache;
     if (rows.length)
@@ -71,8 +77,9 @@ function metricRows(
   ctx: CaseContext,
   reuse: SectionCICache | undefined,
   cache: SectionCICache,
+  pairs: (PreparedPairedBlocks | undefined)[],
 ): ViewerRow[] {
-  const row = metricRow(section, ctx, reuse, cache);
+  const row = metricRow(section, ctx, reuse, cache, pairs);
   const extras = (section.extras ?? []).flatMap(r => {
     const out = scalarRow(r, ctx);
     return out ? [out] : [];

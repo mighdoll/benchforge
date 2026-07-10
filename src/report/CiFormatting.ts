@@ -22,14 +22,18 @@ interface Annotatable {
 
 export const minBatches = 20;
 
-/** @return true if comparing with fewer than minBatches on either side.
- *  Counts post-trim batches when trimming is on (default), so the threshold
- *  reflects the blocks actually fed to the bootstrap. */
+/** @return true if comparing with fewer than minBatches. When a paired batch
+ *  set was prepared, its kept pair count is the batch count actually fed to the
+ *  bootstrap, so pass it as `pairCount` and the per-side counts are ignored.
+ *  Otherwise counts post-trim batches per side when trimming is on (default),
+ *  for the same reason. */
 export function hasLowBatchCount(
   baseline: MeasuredResults | undefined,
   current: MeasuredResults | undefined,
   noTrim?: boolean,
+  pairCount?: number,
 ): boolean {
+  if (pairCount !== undefined) return pairCount < minBatches;
   if (!baseline) return false;
   return (
     effectiveBatchCount(baseline, noTrim) < minBatches ||
@@ -44,6 +48,17 @@ export function isSingleBatch(
 ): boolean {
   if (!baseline) return batchCount(current) < 2;
   return batchCount(baseline) < 2 || batchCount(current) < 2;
+}
+
+/** @return true if either side has 2+ batches, selecting the paired block path.
+ *  The runner batches baseline and current together (both sides or neither), so
+ *  `||` here still means "both batched"; if they ever disagree the paired prep
+ *  throws rather than silently degrading. */
+export function hasBatchBlocks(
+  baseline: MeasuredResults,
+  current: MeasuredResults,
+): boolean {
+  return batchCount(baseline) >= 2 || batchCount(current) >= 2;
 }
 
 /** Add label, mark unreliable, and override direction when batch count is low */
@@ -94,14 +109,25 @@ export function formatBootstrapCI(
   };
 }
 
+/** The equiv-margin (%) in effect from raw CLI args, or undefined when
+ *  unset/disabled (0). */
+export function marginArg(
+  cliArgs?: Record<string, unknown>,
+): number | undefined {
+  const margin = cliArgs?.["equiv-margin"];
+  return typeof margin === "number" && margin > 0 ? margin : undefined;
+}
+
 /** @return distinct batches the bootstrap keeps after Tukey trimming (all when
  *  noTrim). Assumes batch structure exists (2+ offsets). */
 export function keptBatchCount(
   m: MeasuredResults,
   noTrim: boolean | undefined,
 ): number {
-  return prepareBlocks(m.samples, m.batchOffsets!, mean, noTrim).keptSplits
-    .length;
+  return prepareBlocks(m.samples, m.batchOffsets!, mean, {
+    noTrim,
+    rand: Math.random,
+  }).keptSplits.length;
 }
 
 /** @return number of batches that survive Tukey trimming (or raw count if
