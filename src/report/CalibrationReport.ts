@@ -56,7 +56,7 @@ export function calibrationWarnings(
   const warnings: CalibrationWarning[] = [];
   if (s.overconfident) {
     warnings.push({
-      summary: `scatter (${pct(s.scatterP95)}) exceeds within-run CI (${pct(s.meanCiHalfWidth)})`,
+      summary: `scatter (${pct(s.scatterHalfWidth)}) exceeds within-run CI (${pct(s.meanCiHalfWidth)})`,
       detail:
         "per-run CIs are overconfident; displayed CIs understate run-to-run\n" +
         "noise. Margin taken from the scatter, not the CI.",
@@ -108,7 +108,7 @@ function noiseFloor(result: CalibrationResult): string {
     ["mean Δ%", `${formatSignedPercent(s.meanPoint)} (expected ~0)`],
     [
       "point-estimate scatter",
-      `${pct(s.scatterStd)} std, ${pct(s.scatterP95)} 95th pct abs`,
+      `${pct(s.scatterStd)} std, ${pct(s.scatterHalfWidth)} 95% band`,
     ],
     ["within-run CI half-width", `${pct(s.meanCiHalfWidth)} mean`],
     ["**suggested --equiv-margin**", `**${pct(s.suggestedMargin)}**`],

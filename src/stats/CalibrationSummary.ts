@@ -1,42 +1,60 @@
-import { mean, percentile, standardDeviation } from "./CoreStats.ts";
+import { mean, standardDeviation } from "./CoreStats.ts";
 
 /** Noise-floor summary from repeated current-vs-current comparisons. */
 export interface CalibrationSummary {
   /** Mean of per-run point estimates; expected ~0 for a true-zero signal. */
   meanPoint: number;
+
   /** Standard deviation of per-run point estimates. */
   scatterStd: number;
-  /** 95th percentile of |point estimate| across runs (drives the margin). */
-  scatterP95: number;
+
+  /** Parametric 95% between-run half-width (`z95 * scatterStd`), estimated from
+   *  all runs rather than the single worst one. Drives the margin. */
+  scatterHalfWidth: number;
+
   /** Mean within-run CI half-width (what the bootstrap claims). */
   meanCiHalfWidth: number;
-  /** Recommended --equiv-margin: max(scatterP95, meanCiHalfWidth), rounded up. */
+
+  /** Recommended --equiv-margin: max(|meanPoint| + scatterHalfWidth,
+   *  meanCiHalfWidth), rounded up. */
   suggestedMargin: number;
+
   /** True when between-run scatter exceeds the within-run CI: per-run CIs
    *  understate run-to-run noise (systematic error the bootstrap can't see). */
   overconfident: boolean;
 }
 
+/** Two-sided 95% normal multiplier: a centered normal keeps 95% of its mass
+ *  within +/-1.96 sigma, so `z95 * scatterStd` is the between-run twin of the
+ *  within-run 95% CI half-width. Bump to 2.0 (or a small-sample t multiplier)
+ *  for a wider, more conservative band. */
+const z95 = 1.96;
+
 /** Summarize repeated self-comparison runs into a noise floor and margin.
  *
- *  Two independent estimates of the floor: the within-run CI half-width
- *  (`meanCiHalfWidth`) and the between-run scatter of point estimates
- *  (`scatterP95`). The margin is the larger, so the self-comparison reads
- *  "equivalent" essentially always. */
+ *  Two independent estimates of the floor, both expressed as 95% half-widths:
+ *  the within-run CI half-width (`meanCiHalfWidth`) and the between-run scatter
+ *  (`scatterHalfWidth = z95 * scatterStd`). `overconfident` compares the two
+ *  spreads; the margin takes the larger and folds in any residual bias
+ *  (`meanPoint`), so the self-comparison reads "equivalent" essentially always. */
 export function summarizeCalibration(
   pointEstimates: number[],
   ciHalfWidths: number[],
 ): CalibrationSummary {
   const meanPoint = mean(pointEstimates);
   const scatterStd = standardDeviation(pointEstimates);
-  const scatterP95 = percentile(pointEstimates.map(Math.abs), 0.95);
+  const scatterHalfWidth = z95 * scatterStd;
   const meanCiHalfWidth = mean(ciHalfWidths);
-  const overconfident = scatterP95 > meanCiHalfWidth;
-  const suggestedMargin = roundUpMargin(Math.max(scatterP95, meanCiHalfWidth));
+  const overconfident = scatterHalfWidth > meanCiHalfWidth;
+  const margin = Math.max(
+    Math.abs(meanPoint) + scatterHalfWidth,
+    meanCiHalfWidth,
+  );
+  const suggestedMargin = roundUpMargin(margin);
   return {
     meanPoint,
     scatterStd,
-    scatterP95,
+    scatterHalfWidth,
     meanCiHalfWidth,
     suggestedMargin,
     overconfident,

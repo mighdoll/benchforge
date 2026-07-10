@@ -40,7 +40,7 @@ function conclusion(result: CalibrationResult): string {
       `noise-floor calibration (${runs} runs x ${batches} batches, current vs current)`,
     ),
     `  mean Δ%                  ${formatSignedPercent(s.meanPoint).padStart(7)}   (expected ~0)`,
-    `  point-estimate scatter   ${pct(s.scatterStd).padStart(7)}   std,  ${pct(s.scatterP95)} 95th pct |Δ|`,
+    `  point-estimate scatter   ${pct(s.scatterStd).padStart(7)}   std,  ${pct(s.scatterHalfWidth)} 95% band (1.96 std)`,
     `  within-run CI half-width ${pct(s.meanCiHalfWidth).padStart(7)}   mean`,
     bold(`  suggested --equiv-margin ${pct(s.suggestedMargin).padStart(7)}`),
   ];

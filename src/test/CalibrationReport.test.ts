@@ -6,6 +6,13 @@ import {
 import type { CalibrationResult } from "../runners/Calibration.ts";
 import { summarizeCalibration } from "../stats/CalibrationSummary.ts";
 
+const meta: CalibrationMeta = {
+  timestamp: "2026-06-22T10:30:45.123Z",
+  cliArgs: { _: [], calibrate: true, batches: 100, "gc-stats": true },
+  cliDefaults: { batches: 30 },
+  environment: { node: "v22.0.0", platform: "darwin", arch: "arm64" },
+};
+
 /** A clean calibration result (scatter within CI, ample GCs) with the GC fields
  *  overridable per test. */
 function calibrationResult(
@@ -22,13 +29,6 @@ function calibrationResult(
     ...over,
   };
 }
-
-const meta: CalibrationMeta = {
-  timestamp: "2026-06-22T10:30:45.123Z",
-  cliArgs: { _: [], calibrate: true, batches: 100, "gc-stats": true },
-  cliDefaults: { batches: 30 },
-  environment: { node: "v22.0.0", platform: "darwin", arch: "arm64" },
-};
 
 test("header carries the title, invocation, timestamp, and machine", () => {
   const md = calibrationMarkdown(calibrationResult(), meta);
@@ -57,7 +57,7 @@ test("scatter cell has no literal pipe that would break the table", () => {
   expect(scatterRow).toBeDefined();
   // exactly the two cell-boundary pipes plus the row's leading/trailing pipe
   expect(scatterRow!.match(/\|/g)).toHaveLength(3);
-  expect(scatterRow).toContain("95th pct abs");
+  expect(scatterRow).toContain("95% band");
 });
 
 test("per-run table lists every run", () => {
