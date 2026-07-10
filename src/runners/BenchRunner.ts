@@ -86,9 +86,15 @@ type CollectResult = {
   iterations: number;
 
   startTime: number;
+
   /** performance.now() at loop start, sharing the clock of --trace-gc-nvp
    *  offsets, so GC events can be rebased to loop-relative time. */
   loopStartTime: number;
+
+  /** performance.now() at loop end; bounds the in-loop GC event window so
+   *  teardown GC (result/profile collection) isn't attributed to the loop. */
+  loopEndTime: number;
+
   pausePoints: PausePoint[];
 };
 
@@ -207,7 +213,8 @@ function buildMeasuredResults(
   collected: CollectResult,
 ): MeasuredResults {
   const { samples, warmupSamples, heapSamples, pausePoints } = collected;
-  const { heapGrowth, startTime, loopStartTime, iterations } = collected;
+  const { heapGrowth, startTime, loopStartTime, loopEndTime, iterations } =
+    collected;
   const time = computeStats(samples);
   const heapSize = { avg: heapGrowth, min: heapGrowth, max: heapGrowth };
   return {
@@ -220,6 +227,7 @@ function buildMeasuredResults(
     heapSize,
     startTime,
     loopStartTime,
+    loopEndTime,
     pausePoints,
   };
 }
@@ -267,6 +275,7 @@ type LoopResult = {
   iterations: number;
   startTime: number;
   loopStartTime: number;
+  loopEndTime: number;
 };
 
 /** Collect timing samples with optional periodic pauses for V8 background compilation to complete. */
@@ -304,6 +313,7 @@ async function runSampleLoop<T>(config: CollectParams<T>): Promise<LoopResult> {
     }
     elapsed = performance.now() - loopStart - totalPauseTime;
   }
+  const loopEnd = performance.now();
 
   const {
     samples,
@@ -320,6 +330,7 @@ async function runSampleLoop<T>(config: CollectParams<T>): Promise<LoopResult> {
     iterations,
     startTime,
     loopStartTime: loopStart,
+    loopEndTime: loopEnd,
   };
 }
 

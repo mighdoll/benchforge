@@ -134,7 +134,7 @@ export async function runBatched(
     }
   }
 
-  if (!warmupBatch && batches > 1) {
+  if (warmupDropped(batches, warmupBatch)) {
     for (const b of runnerBatches) b.shift();
     baselineBatches.shift();
   }
@@ -144,6 +144,13 @@ export async function runBatched(
     ? mergeBatchResults(baselineBatches)
     : undefined;
   return { results, baseline: mergedBaseline };
+}
+
+/** True when {@link runBatched} drops round 0 as OS/cache warmup (the default
+ *  for multi-batch runs unless --warmup-batch keeps it). Readers of merged
+ *  results (e.g. analyze) use this to realign batch indices to original rounds. */
+export function warmupDropped(batches: number, warmupBatch: boolean): boolean {
+  return !warmupBatch && batches > 1;
 }
 
 /** Systematically subsample parallel sample arrays in a batch by `factor`.
@@ -185,10 +192,18 @@ function mergeTimelines(batches: MeasuredResults[]): MergedTimelines {
         sampleIndex: p.sampleIndex + offset,
         durationMs: p.durationMs,
       });
-    for (const e of r.gcEvents ?? [])
-      mergedGcEvents.push(shiftGcOffset(e, prefixTime));
+    const batchTime = r.samples.reduce((sum, s) => sum + s, 0);
+    // Event offsets are wall-clock while prefixTime sums samples only, so a
+    // late in-loop event can overshoot the batch's sample time by the loop's
+    // bookkeeping overhead; clamp so merged offsets never map into the next
+    // batch's samples.
+    for (const e of r.gcEvents ?? []) {
+      const overshoots = e.offset !== undefined && e.offset > batchTime;
+      const clamped = overshoots ? { ...e, offset: batchTime } : e;
+      mergedGcEvents.push(shiftGcOffset(clamped, prefixTime));
+    }
     offset += r.samples.length;
-    prefixTime += r.samples.reduce((sum, s) => sum + s, 0);
+    prefixTime += batchTime;
   }
   return { batchOffsets, offsetPauses, mergedGcEvents };
 }

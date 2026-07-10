@@ -107,8 +107,9 @@ function setupGcCapture(worker: ChildProcess, gcEvents: GcEvent[]): void {
 
 /** Attach profiling data collected by the worker to each result. The GC
  *  aggregate and per-event array both count only in-loop events; warmup and
- *  import GCs (offsets before loop start) are excluded so the GC summary
- *  reflects the measured iterations, not setup. */
+ *  import GCs (before loop start) and teardown GCs (after loop end, e.g.
+ *  during result/profile collection) are excluded so the GC summary reflects
+ *  the measured iterations, not setup or teardown. */
 function attachProfilingData(
   results: MeasuredResults[],
   gcEvents: GcEvent[] | undefined,
@@ -126,10 +127,10 @@ function attachProfilingData(
   attach("timeProfile", timeProfile);
   attach("coverage", coverage);
   // GC offsets are process-start-relative; rebase per result to loop time so
-  // they share the sample timeline, then drop pre-loop (warmup/import) events.
+  // they share the sample timeline, then drop out-of-loop events.
   if (!gcEvents?.length) return;
   for (const r of results) {
-    const loopEvents = loopGcEvents(gcEvents, r.loopStartTime);
+    const loopEvents = loopGcEvents(gcEvents, r.loopStartTime, r.loopEndTime);
     r.gcEvents = loopEvents;
     r.gcStats = loopEvents.length ? aggregateGcStats(loopEvents) : undefined;
   }
@@ -143,16 +144,24 @@ function resolveWorkerPath(): string {
   return path.join(dir, "runners", "WorkerScript.mjs");
 }
 
-/** Rebase GC offsets to loop-relative time and keep only in-loop events.
- *  Without a loop anchor we can't tell warmup from loop, so keep all (offsets
- *  dropped, since they can't be placed on the sample timeline). */
+/** Rebase GC offsets to loop-relative time and keep only in-loop events
+ *  (0 <= offset <= loop duration). Without a loop anchor we can't tell warmup
+ *  from loop, so keep all (offsets dropped, since they can't be placed on the
+ *  sample timeline); without an end anchor, clamp the start only. */
 function loopGcEvents(
   gcEvents: GcEvent[],
   loopStartTime: number | undefined,
+  loopEndTime: number | undefined,
 ): GcEvent[] {
   if (loopStartTime === undefined) return gcEvents.map(stripOffset);
+  const loopMs =
+    loopEndTime === undefined
+      ? Number.POSITIVE_INFINITY
+      : loopEndTime - loopStartTime;
   const rebased = gcEvents.map(e => shiftGcOffset(e, -loopStartTime));
-  return rebased.filter(e => e.offset === undefined || e.offset >= 0);
+  return rebased.filter(
+    e => e.offset === undefined || (e.offset >= 0 && e.offset <= loopMs),
+  );
 }
 
 /** Drop the offset (unanchored, so not placeable on the sample timeline). */

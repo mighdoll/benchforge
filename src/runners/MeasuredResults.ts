@@ -52,13 +52,6 @@ export interface MeasuredResults {
     max: number;
   };
 
-  /** Time for explicit gc() call after test execution (ms), excludes in-run GC. */
-  gcTime?: {
-    avg: number;
-    min: number;
-    max: number;
-  };
-
   /** Total time spent collecting samples (seconds) */
   totalTime?: number;
 
@@ -68,6 +61,10 @@ export interface MeasuredResults {
   /** performance.now() at sample-loop start, sharing the clock of
    *  --trace-gc-nvp offsets. Used to rebase GC events to loop-relative time. */
   loopStartTime?: number;
+
+  /** performance.now() at sample-loop end; bounds the in-loop GC event window
+   *  so teardown GC (result/profile collection) isn't counted as loop GC. */
+  loopEndTime?: number;
 
   /** Points where pauses occurred for V8 optimization */
   pausePoints?: PausePoint[];
