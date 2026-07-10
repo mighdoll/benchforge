@@ -20,26 +20,17 @@ export interface HeapSite {
 /** Predicate that returns true for user code (vs. runtime internals) */
 export type UserCodeFilter = (site: ResolvedFrame) => boolean;
 
-/** Options for {@link formatHeapReport} */
+/** Heap attribution display options (the markdown allocation table and the
+ *  --alloc-raw dump). */
 export interface HeapReportOptions {
   /** Max sites to display */
   topN: number;
   /** Caller stack frames to show per site (default 3) */
   stackDepth?: number;
-  /** Multi-line format with file paths (default false) */
-  verbose?: boolean;
-  /** Dump every raw sample */
-  raw?: boolean;
   /** Filter to user code only, hiding runtime internals */
   userOnly?: boolean;
   /** Predicate for user vs internal code (default {@link isNodeUserCode}) */
   isUserCode?: UserCodeFilter;
-  /** Total bytes across all nodes (before filtering) */
-  totalAll?: number;
-  /** Total bytes for user code only */
-  totalUserCode?: number;
-  /** Number of samples taken */
-  sampleCount?: number;
 }
 
 /** Flatten resolved profile into sorted list of allocation sites with call stacks.

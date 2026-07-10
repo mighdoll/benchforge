@@ -75,6 +75,9 @@ export interface BenchmarkEntry {
   totalTime?: number;
   coverageSummary?: CoverageSummary;
   heapSummary?: HeapSummary;
+  /** Top heap allocation sites (worker-mode --alloc runs), for the markdown
+   *  report's allocation table. Caller stacks are flattened to name strings. */
+  heapSites?: HeapSiteRow[];
   /** Top CPU self-time functions (worker-mode --profile runs). When this entry
    *  has a paired baseline profile, rows carry the per-function delta. */
   profileSummary?: ProfileSummary;
@@ -215,6 +218,27 @@ export interface CoverageSummary {
 export interface HeapSummary {
   totalBytes: number;
   userBytes: number;
+
+  /** Number of allocation samples the profile captured. */
+  sampleCount?: number;
+}
+
+/** One aggregated heap allocation site for the markdown report. Byte share and
+ *  caller function names are precomputed so the row is JSON-serializable (no
+ *  ResolvedFrame references or raw samples). */
+export interface HeapSiteRow {
+  name: string;
+
+  /** Source location as "url:line" or "url:line:col", "(unknown)" if unresolved. */
+  location: string;
+
+  bytes: number;
+
+  /** Percent of the reported total (all bytes, or user-code bytes when userOnly). */
+  pct: number;
+
+  /** Caller function names nearest-first, filtered to user code. */
+  callers?: string[];
 }
 
 /** One function in a CPU self-time summary, optionally compared against the

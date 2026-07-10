@@ -1,14 +1,5 @@
 import type { CaseResult, MatrixResults } from "../matrix/BenchMatrix.ts";
-import {
-  formatHeapReport,
-  formatRawSamples,
-} from "../profiling/node/HeapReportFormatter.ts";
-import {
-  aggregateSites,
-  filterSites,
-  flattenProfile,
-  type HeapReportOptions,
-} from "../profiling/node/HeapSampleReport.ts";
+import { formatRawSamples } from "../profiling/node/HeapReportFormatter.ts";
 import { resolveProfile } from "../profiling/node/ResolvedProfile.ts";
 import type {
   BenchmarkReport,
@@ -62,33 +53,15 @@ export function defaultReportData(
   });
 }
 
-/** Print heap allocation profiles for each benchmark in the report groups. */
-export function printHeapReports(
-  groups: ReportGroup[],
-  options: HeapReportOptions,
-): void {
+/** Dump every raw allocation sample (--alloc-raw) for each benchmark. The
+ *  aggregated attribution table lives in the markdown report; this stays a
+ *  console dump because it is a large tab-separated stream for piping/grep. */
+export function printRawSamples(groups: ReportGroup[]): void {
   for (const report of groups.flatMap(g => groupReports(g))) {
     const { heapProfile } = report.measuredResults;
     if (!heapProfile) continue;
-    console.log(dim(`\n─── Heap profile: ${report.name} ───`));
-    const resolved = resolveProfile(heapProfile);
-    const sites = flattenProfile(resolved);
-    const userSites = filterSites(sites, options.isUserCode);
-    const agg = aggregateSites(options.userOnly ? userSites : sites);
-    const { totalBytes, sortedSamples } = resolved;
-    const totalUserCode = userSites.reduce((sum, s) => sum + s.bytes, 0);
-    const sampleCount = sortedSamples?.length;
-    const heapOpts = {
-      ...options,
-      totalAll: totalBytes,
-      totalUserCode,
-      sampleCount,
-    };
-    console.log(formatHeapReport(agg, heapOpts));
-    if (options.raw) {
-      console.log(dim(`\n─── Raw samples: ${report.name} ───`));
-      console.log(formatRawSamples(resolved));
-    }
+    console.log(dim(`\n─── Raw samples: ${report.name} ───`));
+    console.log(formatRawSamples(resolveProfile(heapProfile)));
   }
 }
 

@@ -386,6 +386,50 @@ test("renders a hot-functions delta table with a baseline (5 columns)", () => {
   expect(md).toMatch(/\| new \| normalizeEol \| \/Eol\.ts:5 \|/);
 });
 
+test("renders a heap allocation table with sites, percent, callers, and footer", () => {
+  const data: ReportData = {
+    groups: [
+      {
+        name: "parse",
+        benchmarks: [
+          {
+            name: "current",
+            samples: [],
+            stats: zeroStats,
+            heapSites: [
+              {
+                name: "makeToken",
+                location: "user.ts:20:8",
+                bytes: 2000,
+                pct: 71.4,
+                callers: ["parseModule"],
+              },
+              {
+                name: "concat",
+                location: "node:internal/util:3",
+                bytes: 800,
+                pct: 28.6,
+              },
+            ],
+            heapSummary: { totalBytes: 2800, userBytes: 2000, sampleCount: 3 },
+          },
+        ],
+      },
+    ],
+    metadata: { timestamp: "", bencherVersion: "0" },
+  };
+  const md = markdownReport(data);
+
+  expect(md).toContain("#### heap allocation sites (top 2, garbage included)");
+  expect(md).toContain("| bytes | % | function | location | callers |");
+  expect(md).toContain(
+    "| 2.0KB | 71.4% | makeToken | user.ts:20:8 | parseModule |",
+  );
+  // a site with no resolved user-code callers leaves the caller cell blank
+  expect(md).toContain("| 800B | 28.6% | concat | node:internal/util:3 |  |");
+  expect(md).toContain("Total (all): 2.7KB -- user code: 2.0KB -- samples: 3");
+});
+
 test("renders the reconstructed cli command in the header", () => {
   const data: ReportData = {
     groups: [],

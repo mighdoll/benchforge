@@ -1,13 +1,20 @@
 import { cliDefaults } from "../cli/CliArgs.ts";
 import type { CoverageData } from "../profiling/node/CoverageTypes.ts";
 import {
+  aggregateSites,
   filterSites,
   flattenProfile,
+  type HeapReportOptions,
+  type HeapSite,
   isNodeUserCode,
   totalBytes,
+  type UserCodeFilter,
 } from "../profiling/node/HeapSampleReport.ts";
 import type { HeapProfile } from "../profiling/node/HeapSampler.ts";
-import { resolveProfile } from "../profiling/node/ResolvedProfile.ts";
+import {
+  type ResolvedFrame,
+  resolveProfile,
+} from "../profiling/node/ResolvedProfile.ts";
 import {
   poolFolds,
   siteKey,
@@ -34,6 +41,7 @@ import type {
   BenchmarkEntry,
   BenchmarkGroup,
   CoverageSummary,
+  HeapSiteRow,
   HeapSummary,
   ProfileSummary,
   ReportData,
@@ -47,6 +55,7 @@ import type {
   ReportSection,
 } from "./BenchmarkReport.ts";
 import { hasLowBatchCount, isSingleBatch, minBatches } from "./CiFormatting.ts";
+import { frameLocation } from "./Formatters.ts";
 import { gcByBatch } from "./GcByBatch.ts";
 import type { GitVersion } from "./GitUtils.ts";
 import { defaultReportSections } from "./StandardSections.ts";
@@ -66,6 +75,11 @@ export interface PrepareHtmlOptions extends ComparisonOptions {
   sections?: ReportSection[];
   currentVersion?: GitVersion;
   baselineVersion?: GitVersion;
+
+  /** Heap attribution display options (topN, userOnly, user-code filter). When
+   *  omitted they are derived from cliArgs; the browser path passes its own to
+   *  supply the browser user-code filter. */
+  heapReport?: HeapReportOptions;
 }
 
 /** How many CPU self-time rows to show and whether to hide runtime internals. */
@@ -98,8 +112,11 @@ export function prepareHtmlData(
   const sections =
     options.sections ?? defaultReportSections(cliArgs?.["gc-stats"] === true);
   const profile = profileOptions(cliArgs);
+  const heap = options.heapReport ?? heapOptions(cliArgs);
   return {
-    groups: groups.map(g => prepareGroupData(g, sections, comparison, profile)),
+    groups: groups.map(g =>
+      prepareGroupData(g, sections, comparison, profile, heap),
+    ),
     metadata: {
       timestamp: new Date().toISOString(),
       bencherVersion: process.env.npm_package_version || "unknown",
@@ -214,6 +231,16 @@ function profileOptions(
   };
 }
 
+/** Heap display options from raw (kebab-case) CLI args, with the same defaults
+ *  as the --alloc-* flags. */
+function heapOptions(cliArgs?: Record<string, unknown>): HeapReportOptions {
+  return {
+    topN: numArg(cliArgs, "alloc-rows", 20),
+    stackDepth: numArg(cliArgs, "alloc-stack", 3),
+    userOnly: cliArgs?.["alloc-user-only"] === true,
+  };
+}
+
 /** @return case data: raw per-series benchmarks plus the case-level,
  *  track-columned sections (trimmed + raw views). */
 function prepareGroupData(
@@ -221,39 +248,26 @@ function prepareGroupData(
   sections?: ReportSection[],
   comparison?: ComparisonOptions,
   profile?: ProfileReportOptions,
+  heap?: HeapReportOptions,
 ): BenchmarkGroup {
   const tracks = resolveTracks(group);
   const built = sections
     ? buildCaseSections(sections, tracks, comparison)
     : undefined;
+  const noTrim = comparison?.noBatchTrim;
   return {
     name: group.name,
     baseline: group.baseline
-      ? prepareBenchmarkData(group.baseline, profile, comparison?.noBatchTrim)
+      ? prepareBenchmarkData(group.baseline, profile, heap, noTrim)
       : undefined,
     benchmarks: group.reports.map(r =>
-      benchmarkEntry(r, profile, comparison?.noBatchTrim),
+      benchmarkEntry(r, profile, heap, noTrim),
     ),
     warnings: groupWarnings(group, comparison),
     noiseFloor: groupNoiseFloor(tracks, comparison?.noBatchTrim),
     sections: built?.sections,
     rawSections: built?.rawSections,
   };
-}
-
-/** The case's noise floor, read off the baseline series the verdict compares
- *  against. Takes the same resolved tracks the tables and plots use (the named
- *  baseline in variant mode, the shadow baseline in version mode); falls back
- *  to a comparison track's paired baseline. */
-function groupNoiseFloor(
-  tracks: CaseTrack[],
-  noTrim?: boolean,
-): NoiseFloor | undefined {
-  const base =
-    tracks.find(t => t.isBaseline)?.measured ??
-    tracks.find(t => t.baseline)?.baseline?.measured;
-  if (!base) return undefined;
-  return noiseFloor(base.samples, base.batchOffsets, noTrim);
 }
 
 /** The function's percent change in self-time share vs baseline with a 95%
@@ -286,6 +300,16 @@ function batchDeltaCI(
   return { pct, ci: computeInterval(deltas, defaultConfidence) };
 }
 
+/** Read a numeric CLI arg, falling back to a default when absent or non-numeric. */
+function numArg(
+  cliArgs: Record<string, unknown> | undefined,
+  key: string,
+  fallback: number,
+): number {
+  const v = cliArgs?.[key];
+  return typeof v === "number" ? v : fallback;
+}
+
 /** Build the case-level trimmed sections plus the raw (untrimmed) view when
  *  trimming changed something. */
 function buildCaseSections(
@@ -308,10 +332,14 @@ function buildCaseSections(
 function prepareBenchmarkData(
   report: BenchmarkReport,
   profile?: ProfileReportOptions,
+  heap?: HeapReportOptions,
   noTrim?: boolean,
 ): BenchmarkEntry {
   const { measuredResults: m, name, metadata } = report;
   const kept = keptProfilesOf(m, noTrim);
+  const heapData = m.heapProfile
+    ? summarizeHeap(m.heapProfile, heap)
+    : undefined;
   return {
     name,
     metadata,
@@ -327,7 +355,8 @@ function prepareBenchmarkData(
     stats: m.time,
     heapSize: m.heapSize,
     totalTime: m.totalTime,
-    heapSummary: m.heapProfile ? summarizeHeap(m.heapProfile) : undefined,
+    heapSummary: heapData?.summary,
+    heapSites: heapData?.sites,
     coverageSummary: m.coverage ? summarizeCoverage(m.coverage) : undefined,
     profileSummary: kept.profiles.length
       ? summarizeTime(kept.profiles, undefined, profile, kept.iterations)
@@ -341,12 +370,13 @@ function prepareBenchmarkData(
 function benchmarkEntry(
   report: BenchmarkReport,
   profile?: ProfileReportOptions,
+  heap?: HeapReportOptions,
   noTrim?: boolean,
 ): BenchmarkEntry {
   const baseline = report.baseline
-    ? prepareBenchmarkData(report.baseline, profile, noTrim)
+    ? prepareBenchmarkData(report.baseline, profile, heap, noTrim)
     : undefined;
-  const entry = prepareBenchmarkData(report, profile, noTrim);
+  const entry = prepareBenchmarkData(report, profile, heap, noTrim);
   const cur = keptProfilesOf(report.measuredResults, noTrim);
   const base = report.baseline
     ? keptProfilesOf(report.baseline.measuredResults, noTrim)
@@ -371,6 +401,21 @@ function groupWarnings(
   const singleBatch = pairs.some(p => isSingleBatch(p.base, p.cur));
   const lowBatches = pairs.some(p => hasLowBatchCount(p.base, p.cur, noTrim));
   return buildWarnings(singleBatch, lowBatches);
+}
+
+/** The case's noise floor, read off the baseline series the verdict compares
+ *  against. Takes the same resolved tracks the tables and plots use (the named
+ *  baseline in variant mode, the shadow baseline in version mode); falls back
+ *  to a comparison track's paired baseline. */
+function groupNoiseFloor(
+  tracks: CaseTrack[],
+  noTrim?: boolean,
+): NoiseFloor | undefined {
+  const base =
+    tracks.find(t => t.isBaseline)?.measured ??
+    tracks.find(t => t.baseline)?.baseline?.measured;
+  if (!base) return undefined;
+  return noiseFloor(base.samples, base.batchOffsets, noTrim);
 }
 
 /** A function's share of one batch's sampled time (normalizes batch duration). */
@@ -417,6 +462,29 @@ function buildRawCaseSections(
   return buildViewerSections(sections, rawCtx, reuse).sections;
 }
 
+/** Resolve a heap profile once into the two-number summary plus the top
+ *  allocation-site rows (when display options are available). */
+function summarizeHeap(
+  profile: HeapProfile,
+  options?: HeapReportOptions,
+): { summary: HeapSummary; sites?: HeapSiteRow[] } {
+  const resolved = resolveProfile(profile);
+  const allSites = flattenProfile(resolved);
+  // the summary and the site rows must agree on what "user code" means (the
+  // browser path supplies its own filter), so resolve the predicate once.
+  const isUser = options?.isUserCode ?? isNodeUserCode;
+  const userSites = filterSites(allSites, isUser);
+  const summary: HeapSummary = {
+    totalBytes: resolved.totalBytes,
+    userBytes: totalBytes(userSites),
+    sampleCount: resolved.sortedSamples?.length,
+  };
+  const sites = options
+    ? heapSiteRows({ all: allSites, user: userSites }, summary, isUser, options)
+    : undefined;
+  return { summary, sites };
+}
+
 /** Map engine GC events to the viewer's {offset, duration} shape, keeping only
  *  events whose offset was rebased to loop-relative time (others can't be placed
  *  on the time-series axis). */
@@ -431,13 +499,6 @@ function viewerGcEvents(
     type: e.type,
     collected: e.collected,
   }));
-}
-
-/** Compute heap allocation summary from profile */
-function summarizeHeap(profile: HeapProfile): HeapSummary {
-  const resolved = resolveProfile(profile);
-  const userSites = filterSites(flattenProfile(resolved));
-  return { totalBytes: resolved.totalBytes, userBytes: totalBytes(userSites) };
 }
 
 /** Compute coverage summary from V8 coverage data */
@@ -471,4 +532,55 @@ function pairedCurrent(
   baselineIndex: number,
 ): MeasuredResults | undefined {
   return pairedCurrentTrack(tracks, baselineIndex)?.measured;
+}
+
+/** Aggregate resolved sites into display-ready rows, applying topN and
+ *  user-only filtering. Percent is a share of the reported total (all bytes, or
+ *  user-code bytes under userOnly), matching the footer total. */
+function heapSiteRows(
+  sites: { all: HeapSite[]; user: HeapSite[] },
+  summary: HeapSummary,
+  isUser: UserCodeFilter,
+  options: HeapReportOptions,
+): HeapSiteRow[] {
+  const agg = aggregateSites(options.userOnly ? sites.user : sites.all);
+  const total = options.userOnly ? summary.userBytes : summary.totalBytes;
+  const depth = options.stackDepth ?? 3;
+  return agg
+    .slice(0, options.topN)
+    .map(s => heapSiteRow(s, total, depth, isUser));
+}
+
+/** One aggregated site as a JSON-serializable row: location string, byte share,
+ *  and caller function names (nearest-first, filtered to user code). */
+function heapSiteRow(
+  site: HeapSite,
+  total: number,
+  depth: number,
+  isUser: UserCodeFilter,
+): HeapSiteRow {
+  const location = site.url
+    ? frameLocation(site.url, site.line, site.col)
+    : "(unknown)";
+  const pct = total > 0 ? (site.bytes / total) * 100 : 0;
+  const callers = siteCallers(site, depth, isUser);
+  return { name: site.name, location, bytes: site.bytes, pct, callers };
+}
+
+/** The nearest `depth` user-code caller names (parent frames excluding self,
+ *  nearest-first); internal frames are skipped, not counted against depth.
+ *  Undefined when none remain. */
+function siteCallers(
+  site: HeapSite,
+  depth: number,
+  isUser: UserCodeFilter,
+): string[] | undefined {
+  if (!site.stack || site.stack.length <= 1) return undefined;
+  const names = site.stack
+    .slice(0, -1)
+    .reverse()
+    .filter((f: ResolvedFrame) => f.url && isUser(f))
+    .slice(0, depth)
+    .map((f: ResolvedFrame) => f.name);
+  return names.length ? names : undefined;
 }

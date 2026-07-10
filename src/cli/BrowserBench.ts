@@ -27,7 +27,7 @@ import {
   needsProfile,
   resolveLimits,
 } from "./CliOptions.ts";
-import { printHeapReports, withStatus } from "./CliReport.ts";
+import { printRawSamples, withStatus } from "./CliReport.ts";
 
 const { yellow } = colors;
 
@@ -127,19 +127,18 @@ function printBrowserReport(
     ...(result.gcStats ? [browserGcStatsSection] : []),
     ...(hasPageLoad || hasIterSamples ? [runsSection] : []),
   ];
+  const heapReport = {
+    ...cliHeapReportOptions(args),
+    isUserCode: isBrowserUserCode,
+  };
   let reportData: ReportData | undefined;
   if (sections.length > 0) {
     reportData = withStatus("computing report", () =>
-      prepareHtmlData(results, { cliArgs: args, sections }),
+      prepareHtmlData(results, { cliArgs: args, sections, heapReport }),
     );
     console.log(consoleSummary(reportData));
   }
-  if (result.heapProfile) {
-    printHeapReports(results, {
-      ...cliHeapReportOptions(args),
-      isUserCode: isBrowserUserCode,
-    });
-  }
+  if (result.heapProfile && args["alloc-raw"]) printRawSamples(results);
   return reportData;
 }
 

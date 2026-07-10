@@ -51,11 +51,17 @@ export function percentMagnitude(n: number, precision = 2): string {
   return `${n.toFixed(precision)}%`;
 }
 
-/** A profile frame's source location as "url:line", or "" for a synthetic frame
- *  with no source (e.g. "(garbage collector)", an eval'd inline variant). */
-export function frameLocation(url: string, line?: number): string {
+/** A profile frame's source location as "url:line:col", omitting the column
+ *  (and line) when unknown, or "" for a synthetic frame with no source
+ *  (e.g. "(garbage collector)", an eval'd inline variant). */
+export function frameLocation(
+  url: string,
+  line?: number,
+  col?: number,
+): string {
   if (!url) return "";
-  return line ? `${url}:${line}` : url;
+  if (!line) return url;
+  return col != null ? `${url}:${line}:${col}` : `${url}:${line}`;
 }
 
 /** @return a signed-percent CI as "[+1.2%, +3.4%]". */

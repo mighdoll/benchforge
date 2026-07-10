@@ -6,6 +6,8 @@ import {
 import type {
   BenchmarkEntry,
   BenchmarkGroup,
+  HeapSiteRow,
+  HeapSummary,
   HotFunction,
   ProfileSummary,
   ReportData,
@@ -162,7 +164,10 @@ function benchDiagnostics(entry: BenchmarkEntry, labeled: boolean): string[] {
   const hot = entry.profileSummary
     ? hotFunctionsMarkdown(entry.profileSummary)
     : [];
-  const parts = [...warmup, ...gc, ...hot];
+  const heap = entry.heapSites
+    ? heapSitesMarkdown(entry.heapSites, entry.heapSummary)
+    : [];
+  const parts = [...warmup, ...gc, ...hot, ...heap];
   if (!parts.length) return [];
   return labeled ? [`### ${entry.name}`, ...parts] : parts;
 }
@@ -259,6 +264,50 @@ function hotFunctionsMarkdown(s: ProfileSummary): string[] {
     ? "Self time per benchmark iteration, pooled across all batches of a sampled pass (`--profile`). Δ is each function's change in self-time *share* vs baseline with a 95% bootstrap CI over batches (`new` = absent in baseline, `~` = too few batches; a CI spanning 0 = no clear change). Resolution is sampling-limited -- a hot function's CI bottoms out near +/-1/sqrt(ticks), so tighten it by spending more samples (a longer run or a finer `--profile-interval`), and use enough batches (>= ~10) for a stable interval; batch size barely matters at a fixed budget. Self-time also shifts with JIT/inlining and module-load paths between builds, so read Δ as a hint."
     : "Self time per benchmark iteration, pooled across all batches of a sampled pass (`--profile`); the absolute times are lightly perturbed by sampling.";
   return [title, table, note];
+}
+
+/** Top heap allocation sites from an `--alloc` pass: bytes, share of the
+ *  reported total, function, and location, with a compact caller chain when the
+ *  stack resolved to user code. The footer carries the all/user-code totals and
+ *  sample count. Garbage is included (V8 samples allocations, not live objects). */
+function heapSitesMarkdown(
+  sites: HeapSiteRow[],
+  summary?: HeapSummary,
+): string[] {
+  if (!sites.length) return [];
+  const cols = ["bytes", "%", "function", "location", "callers"];
+  const rows = sites.map(heapSiteCells);
+  const table = mdTable(cols, rows);
+  const footer = heapFooter(summary);
+  return [
+    `#### heap allocation sites (top ${sites.length}, garbage included)`,
+    table,
+    ...footer,
+  ];
+}
+
+/** One allocation site row: bytes, percent share, name, location, caller chain. */
+function heapSiteCells(site: HeapSiteRow): string[] {
+  const callers = site.callers?.length ? site.callers.join(" <- ") : "";
+  return [
+    formatBytes(site.bytes) ?? "",
+    `${site.pct.toFixed(1)}%`,
+    site.name || "(anonymous)",
+    site.location,
+    callers,
+  ];
+}
+
+/** Total (all) / total (user code) / sample-count footer, from the heap summary. */
+function heapFooter(summary?: HeapSummary): string[] {
+  if (!summary) return [];
+  const parts = [
+    `Total (all): ${formatBytes(summary.totalBytes)}`,
+    `user code: ${formatBytes(summary.userBytes)}`,
+  ];
+  if (summary.sampleCount != null)
+    parts.push(`samples: ${summary.sampleCount.toLocaleString()}`);
+  return [parts.join(" -- ")];
 }
 
 /** Per-percentile diff table: mean first, then percentiles in displayed order.

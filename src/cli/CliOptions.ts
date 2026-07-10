@@ -50,8 +50,6 @@ export function cliHeapReportOptions(args: DefaultCliArgs): HeapReportOptions {
   return {
     topN: args["alloc-rows"],
     stackDepth: args["alloc-stack"],
-    verbose: args["alloc-verbose"],
-    raw: args["alloc-raw"],
     userOnly: args["alloc-user-only"],
   };
 }
@@ -62,7 +60,6 @@ export function needsAlloc(args: DefaultCliArgs): boolean {
     args.alloc ||
     args.archive != null ||
     args["alloc-raw"] ||
-    args["alloc-verbose"] ||
     args["alloc-user-only"]
   );
 }
@@ -76,11 +73,6 @@ export function needsProfile(args: DefaultCliArgs): boolean {
 export function shouldViewReport(args: DefaultCliArgs): boolean {
   if (args["view-serve"]) return true;
   return args.view ?? interactiveSession();
-}
-
-/** A human is watching: stdout is a real terminal and we are not in CI. */
-function interactiveSession(): boolean {
-  return !!process.stdout.isTTY && !process.env.CI;
 }
 
 /** Extract baseline comparison options from CLI args. */
@@ -141,4 +133,9 @@ function cliCommonOptions(args: DefaultCliArgs) {
     profile: needsProfile(args),
     profileInterval,
   };
+}
+
+/** A human is watching: stdout is a real terminal and we are not in CI. */
+function interactiveSession(): boolean {
+  return !!process.stdout.isTTY && !process.env.CI;
 }

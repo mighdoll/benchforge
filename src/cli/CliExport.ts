@@ -22,13 +22,8 @@ import {
 } from "../report/NoiseLog.ts";
 import type { ReportData } from "../viewer/ReportData.ts";
 import type { DefaultCliArgs } from "./CliArgs.ts";
-import {
-  cliComparisonOptions,
-  cliHeapReportOptions,
-  needsAlloc,
-  shouldViewReport,
-} from "./CliOptions.ts";
-import { printHeapReports, withStatus } from "./CliReport.ts";
+import { cliComparisonOptions, shouldViewReport } from "./CliOptions.ts";
+import { printRawSamples, withStatus } from "./CliReport.ts";
 import {
   optionalJson,
   startViewerServer,
@@ -102,15 +97,14 @@ export async function exportReports(options: ExportOptions): Promise<void> {
   }
 }
 
-/** Print heap reports (if enabled) and export results. */
+/** Dump raw allocation samples (if requested) and export results. The
+ *  aggregated heap attribution table is written into the markdown report. */
 export async function finishReports(
   results: ReportGroup[],
   args: DefaultCliArgs,
   exportOptions?: MatrixExportOptions,
 ): Promise<void> {
-  if (needsAlloc(args)) {
-    printHeapReports(results, cliHeapReportOptions(args));
-  }
+  if (args["alloc-raw"]) printRawSamples(results);
   await exportReports({ results, args, ...exportOptions });
 }
 
@@ -123,20 +117,36 @@ export function writeCalibrationReport(
   timestamp: string,
   args: DefaultCliArgs,
 ): void {
+  writeStampedReport(md, timestamp, args, "calibrate");
+}
+
+/** Write a markdown report to bench-report/: a single explicit file when
+ *  `--report-md <path>` overrides, else a timestamped file plus a stable
+ *  "latest" file. Shared by the benchmark and calibration report writers,
+ *  which differ only in filename prefix and log wording. */
+function writeStampedReport(
+  md: string,
+  timestamp: string,
+  args: DefaultCliArgs,
+  kind: "bench" | "calibrate",
+): void {
+  const label = kind === "calibrate" ? "Calibration report" : "Markdown report";
   const override = args["report-md"];
   if (override) {
     const path = resolve(override);
     writeFileSync(path, md);
-    console.log(`Calibration report written to: ${path}`);
+    console.log(`${label} written to: ${path}`);
     return;
   }
   mkdirSync(reportDir, { recursive: true });
   const stamp = fileStamp(timestamp);
-  const timestamped = resolve(join(reportDir, `calibrate-${stamp}.md`));
-  const latest = resolve(join(reportDir, "calibrate-latest.md"));
+  const prefix = kind === "calibrate" ? "calibrate-" : "bench-";
+  const latestName = kind === "calibrate" ? "calibrate-latest.md" : "latest.md";
+  const timestamped = resolve(join(reportDir, `${prefix}${stamp}.md`));
+  const latest = resolve(join(reportDir, latestName));
   writeFileSync(timestamped, md);
   writeFileSync(latest, md);
-  console.log(`Calibration report written to: ${latest} (and ${timestamped})`);
+  console.log(`${label} written to: ${latest} (and ${timestamped})`);
 }
 
 /** Write the always-on markdown report (shift tables + GC/scalar comparison) so
@@ -145,21 +155,12 @@ export function writeCalibrationReport(
  *  (history preserved, predictable path for agents). `--report-md <path>` writes
  *  a single explicit file instead. */
 function writeMarkdownReport(data: ReportData, args: DefaultCliArgs): void {
-  const md = markdownReport(data);
-  const override = args["report-md"];
-  if (override) {
-    const path = resolve(override);
-    writeFileSync(path, md);
-    console.log(`Markdown report written to: ${path}`);
-    return;
-  }
-  mkdirSync(reportDir, { recursive: true });
-  const stamp = fileStamp(data.metadata.timestamp);
-  const timestamped = resolve(join(reportDir, `bench-${stamp}.md`));
-  const latest = resolve(join(reportDir, "latest.md"));
-  writeFileSync(timestamped, md);
-  writeFileSync(latest, md);
-  console.log(`Markdown report written to: ${latest} (and ${timestamped})`);
+  writeStampedReport(
+    markdownReport(data),
+    data.metadata.timestamp,
+    args,
+    "bench",
+  );
 }
 
 /** Write Perfetto and time profile files if requested by CLI args. */

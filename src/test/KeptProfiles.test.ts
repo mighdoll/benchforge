@@ -2,15 +2,13 @@ import { expect, test } from "vitest";
 import type { TimeProfile } from "../profiling/node/TimeSampler.ts";
 import { keptProfilesOf } from "../report/HtmlReport.ts";
 import type { MeasuredResults } from "../runners/MeasuredResults.ts";
+import { zeroStats } from "./TestUtils.ts";
+
+const tags = (ps: TimeProfile[]) => ps.map(p => p.startTime);
 
 /** Minimal MeasuredResults; keptProfilesOf only reads samples/batch fields. */
 function results(over: Partial<MeasuredResults>): MeasuredResults {
-  return {
-    name: "b",
-    samples: [],
-    time: { min: 0, max: 0, avg: 0, p50: 0, p75: 0, p99: 0, p999: 0 },
-    ...over,
-  };
+  return { name: "b", samples: [], time: zeroStats, ...over };
 }
 
 /** A distinct profile tagged via startTime, so we can assert which survived. */
@@ -29,8 +27,6 @@ function fiveBatches(over: Partial<MeasuredResults> = {}): MeasuredResults {
     ...over,
   });
 }
-
-const tags = (ps: TimeProfile[]) => ps.map(p => p.startTime);
 
 test("drops the slow-outlier batch's profile and its iterations", () => {
   const kept = keptProfilesOf(fiveBatches());
