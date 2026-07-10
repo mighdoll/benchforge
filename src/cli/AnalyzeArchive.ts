@@ -2,14 +2,29 @@
 import { readFile } from "node:fs/promises";
 import { resolve } from "node:path";
 import colors from "../report/Colors.ts";
-import { formatSignedPercent, timeMs } from "../report/Formatters.ts";
+import {
+  formatSignedPercent,
+  percentMagnitude,
+  timeMs,
+} from "../report/Formatters.ts";
+import { warmupDropped } from "../runners/MergeBatches.ts";
 import { splitByOffsets, tukeyFences } from "../stats/BlockBootstrap.ts";
 import { mean, median, percentile } from "../stats/CoreStats.ts";
+import {
+  batchMeanAutocorrelation,
+  pairingBenefit,
+  roundPairCorrelation,
+  varianceInflation,
+  withinBatchAutocorrelation,
+} from "../stats/NoiseStructure.ts";
 import type { BenchmarkEntry, BenchmarkGroup } from "../viewer/ReportData.ts";
 
 const { bold, dim, red, green, yellow } = colors;
 
 const blockFenceMultiplier = 3;
+
+/** Autocorrelation magnitude above which a lag is flagged as correlated. */
+const acfFlag = 0.2;
 
 /** Read an archive and print per-batch diagnostic analysis (a benchforge
  *  development tool, not a general user tool). */
@@ -20,18 +35,183 @@ export async function analyzeArchive(filePath: string): Promise<void> {
     console.error("No report data found in archive.");
     return;
   }
-  const batchCount = report.metadata?.cliArgs?.batches as number | undefined;
+  const cliArgs = report.metadata?.cliArgs as
+    | Record<string, unknown>
+    | undefined;
+  const batchCount = cliArgs?.batches as number | undefined;
+  const firstRound = firstMergedRound(cliArgs, batchCount);
   for (const group of report.groups) {
-    analyzeGroup(group, batchCount);
+    analyzeGroup(group, batchCount, firstRound);
   }
 }
 
+/** Batch context shared by {@link printNoiseStructure} and {@link printPairing}. */
+interface BatchAnalysisContext {
+  bench: BenchmarkEntry;
+  baseline: BenchmarkEntry | undefined;
+  benchOffsets: number[];
+  baseOffsets: number[] | undefined;
+  batches: number[][];
+  baseBatches: number[][] | undefined;
+  firstRound?: number;
+}
+
+/** A {@link BatchAnalysisContext} with the baseline fields narrowed to present,
+ *  as guaranteed by {@link printNoiseStructure}'s pairing check. */
+type PairedBatchContext = BatchAnalysisContext & {
+  baseline: BenchmarkEntry;
+  baseOffsets: number[];
+  baseBatches: number[][];
+};
+
+/** Quantify how much block resampling and paired differencing actually buy on
+ *  this data: within/cross-batch autocorrelation, variance inflation (block vs
+ *  IID single-sample CI), and the paired-vs-unpaired delta CI ratio. */
+function printNoiseStructure(ctx: BatchAnalysisContext): void {
+  const { bench, baseline, benchOffsets, baseOffsets } = ctx;
+  const { batches, baseBatches } = ctx;
+  console.log();
+  console.log(bold("  Noise structure:"));
+  printAutocorr(batches);
+
+  if (batches.length < 2) return;
+  printVif(bench.samples, benchOffsets);
+
+  if (baseline && baseOffsets && baseBatches?.length === batches.length)
+    printPairing({ ...ctx, baseline, baseOffsets, baseBatches });
+}
+
+/** Paired-vs-unpaired delta CI ratio (trimmed and untrimmed) and the round-level
+ *  baseline/current correlation that pairing exploits. */
+function printPairing(ctx: PairedBatchContext): void {
+  const { bench, baseline, benchOffsets, baseOffsets } = ctx;
+  const { batches, baseBatches, firstRound = 0 } = ctx;
+  const base = baseline.samples;
+  const cur = bench.samples;
+  const trimmed = pairingBenefit(base, baseOffsets, cur, benchOffsets, "mean");
+  const untrimmed = pairingBenefit(
+    base,
+    baseOffsets,
+    cur,
+    benchOffsets,
+    "mean",
+    { noBatchTrim: true },
+  );
+  const widths = `paired ${percentMagnitude(trimmed.pairedWidth)} / unpaired ${percentMagnitude(trimmed.unpairedWidth)}, ${trimmed.rounds}/${untrimmed.rounds} rounds`;
+  console.log(
+    `    pairing (mean): ratio ${fmtRatio(trimmed.ratio)} trimmed / ${fmtRatio(untrimmed.ratio)} untrimmed` +
+      dim(`   (${widths})`) +
+      pairingVerdict(trimmed.ratio),
+  );
+  const corr = roundPairCorrelation(baseBatches, batches, firstRound);
+  console.log(
+    `    round corr: overall ${corr.overall.toFixed(2)}` +
+      dim(
+        `   (B-first ${corr.baselineFirst.toFixed(2)}, C-first ${corr.currentFirst.toFixed(2)})`,
+      ),
+  );
+}
+
+/** Within-batch (sample-lag) and cross-round (per-round-mean-lag) ACFs. */
+function printAutocorr(batches: number[][]): void {
+  const within = withinBatchAutocorrelation(batches);
+  const cross = batchMeanAutocorrelation(batches);
+  console.log(
+    `    within-batch acf: ${fmtAcf(within)}` +
+      acfVerdict(
+        within,
+        "within-batch correlation (blocking earns its keep)",
+        "samples ~ independent",
+      ),
+  );
+  console.log(
+    `    cross-round  acf: ${fmtAcf(cross)}` +
+      acfVerdict(cross, "multi-round drift", "no multi-round drift"),
+  );
+}
+
+/** Block vs IID single-sample CI widths and their inflation factor. */
+function printVif(samples: number[], offsets: number[]): void {
+  const inflation = varianceInflation(samples, offsets, "mean");
+  const widths = `block ${timeMs(inflation.blockWidth) ?? "?"} / iid ${timeMs(inflation.iidWidth) ?? "?"}`;
+  console.log(
+    `    VIF (mean): ${fmtRatio(inflation.vif)}` +
+      dim(`   (${widths})`) +
+      vifVerdict(inflation.vif),
+  );
+}
+
+/** Format a CI-width ratio; "n/a" when non-finite (zero-variance samples). */
+function fmtRatio(ratio: number): string {
+  return Number.isFinite(ratio) ? ratio.toFixed(2) : "n/a";
+}
+
+/** Verdict for the paired-vs-unpaired delta CI width ratio. No verdict when
+ *  the ratio is non-finite (zero-width unpaired CI). */
+function pairingVerdict(ratio: number): string {
+  if (!Number.isFinite(ratio)) return "";
+  if (ratio < 0.9) return green("   ==> pairing sharpens the delta");
+  if (ratio > 1.1) return red("   ==> pairing widens the delta (net cost)");
+  return dim("   ==> pairing buys ~nothing");
+}
+
+/** Format an autocorrelation vector, or note when there were too few rounds. */
+function fmtAcf(acf: number[]): string {
+  if (!acf.length) return dim("(too few)");
+  return acf.map(v => v.toFixed(2).padStart(6)).join(" ");
+}
+
+/** Flag autocorrelation when any of the first three lags exceeds the threshold.
+ *  No verdict when there were too few rounds to estimate an ACF at all. */
+function acfVerdict(
+  acf: number[],
+  correlated: string,
+  independent: string,
+): string {
+  if (!acf.length) return "";
+  const peak = Math.max(0, ...acf.slice(0, 3).map(Math.abs));
+  return peak > acfFlag
+    ? yellow(`   ==> ${correlated}`)
+    : dim(`   ==> ${independent}`);
+}
+
+/** Verdict for the block-vs-IID variance inflation factor. Distance from 1 in
+ *  either direction means blocking changes the CI: >1 wider (drift/autocorr),
+ *  <1 tighter (structured within-batch variation that averages out per batch).
+ *  No verdict when the ratio is non-finite (zero-width IID CI). */
+function vifVerdict(vif: number): string {
+  if (!Number.isFinite(vif)) return "";
+  if (vif > 1.3)
+    return yellow("   ==> blocking widens vs iid (drift/autocorrelation)");
+  if (vif < 0.77)
+    return yellow("   ==> blocking tightens vs iid (structured within-batch)");
+  return dim("   ==> block ~ iid");
+}
+
+/** Original round index of merged batch 0. Round 0 is dropped as warmup by
+ *  default (`runBatched`), which shifts batch parity -- and with it which
+ *  batches ran baseline-first -- unless --warmup-batch kept it. */
+function firstMergedRound(
+  cliArgs: Record<string, unknown> | undefined,
+  batchCount: number | undefined,
+): number {
+  const warmupKept = cliArgs?.["warmup-batch"] === true;
+  const dropped =
+    batchCount !== undefined && warmupDropped(batchCount, warmupKept);
+  return dropped ? 1 : 0;
+}
+
 /** Print analysis for all benchmarks in a group. */
-function analyzeGroup(group: BenchmarkGroup, batchCount?: number): void {
+function analyzeGroup(
+  group: BenchmarkGroup,
+  batchCount?: number,
+  firstRound = 0,
+): void {
   console.log(bold(`\n=== ${group.name} ===\n`));
 
   for (const bench of group.benchmarks) {
-    analyzeBenchmark(bench, bench.baseline ?? group.baseline, batchCount);
+    const baseline = bench.baseline ?? group.baseline;
+    analyzeBenchmark(bench, baseline, batchCount, firstRound);
   }
 }
 
@@ -40,11 +220,16 @@ function analyzeBenchmark(
   bench: BenchmarkEntry,
   baseline: BenchmarkEntry | undefined,
   batchCount?: number,
+  firstRound = 0,
 ): void {
+  // archives record offsets for merged batches: one fewer than requested
+  // rounds when the warmup round was dropped
+  const mergedCount =
+    batchCount === undefined ? undefined : batchCount - firstRound;
   const benchOffsets =
-    bench.batchOffsets ?? inferOffsets(bench.samples, batchCount);
+    bench.batchOffsets ?? inferOffsets(bench.samples, mergedCount);
   const baseOffsets =
-    baseline?.batchOffsets ?? inferOffsets(baseline?.samples, batchCount);
+    baseline?.batchOffsets ?? inferOffsets(baseline?.samples, mergedCount);
   if (!benchOffsets?.length) {
     console.log(dim("  No batch data (single batch run)"));
     return;
@@ -57,13 +242,22 @@ function analyzeBenchmark(
       : undefined;
 
   printBatchHeader(bench, baseline, batches.length);
-  printBatchTable(batches, baseBatches);
+  printBatchTable(batches, baseBatches, firstRound);
 
   if (baseBatches && baseBatches.length === batches.length) {
-    printOrderEffect(batches, baseBatches);
+    printOrderEffect(batches, baseBatches, firstRound);
     printPairedDeltas(batches, baseBatches);
     printTrimmedBlocks(batches, baseBatches, bench.name);
   }
+  printNoiseStructure({
+    bench,
+    baseline,
+    benchOffsets,
+    baseOffsets,
+    batches,
+    baseBatches,
+    firstRound,
+  });
   console.log();
 }
 
@@ -98,6 +292,7 @@ function printBatchHeader(
 function printBatchTable(
   benches: number[][],
   baselines: number[][] | undefined,
+  firstRound = 0,
 ): void {
   const header = baselines
     ? `  ${"batch".padEnd(7)} ${"n".padStart(4)}  ${"current".padStart(10)}  ${"baseline".padStart(10)}  ${"delta".padStart(8)}`
@@ -115,17 +310,22 @@ function printBatchTable(
     const baseMed = (timeMs(median(baselines[i])) ?? "").padStart(10);
     const pct = medianDelta(benches[i], baselines[i]);
     const delta = formatDelta(pct).padStart(8);
-    const order = i % 2 === 0 ? dim(" B>C") : dim(" C>B");
+    const order = (i + firstRound) % 2 === 0 ? dim(" B>C") : dim(" C>B");
     console.log(`  ${idx} ${n}  ${med}  ${baseMed}  ${delta}${order}`);
   }
 }
 
 /** Analyze order effect: does running second make a difference? */
-function printOrderEffect(benches: number[][], baselines: number[][]): void {
-  // Even batches: baseline runs first (B>C), odd: current runs first (C>B)
+function printOrderEffect(
+  benches: number[][],
+  baselines: number[][],
+  firstRound = 0,
+): void {
+  // even original rounds run baseline first (B>C), odd run current first (C>B);
+  // firstRound realigns merged batch indices to original round parity
   const deltas = benches.map((b, i) => medianDelta(b, baselines[i]));
-  const baseFirstDeltas = deltas.filter((_, i) => i % 2 === 0);
-  const currFirstDeltas = deltas.filter((_, i) => i % 2 === 1);
+  const baseFirstDeltas = deltas.filter((_, i) => (i + firstRound) % 2 === 0);
+  const currFirstDeltas = deltas.filter((_, i) => (i + firstRound) % 2 === 1);
   const baseFirstAvg = baseFirstDeltas.length ? mean(baseFirstDeltas) : 0;
   const currFirstAvg = currFirstDeltas.length ? mean(currFirstDeltas) : 0;
 
