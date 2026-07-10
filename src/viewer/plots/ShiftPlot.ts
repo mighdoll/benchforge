@@ -9,7 +9,12 @@ import {
   drawYAxis,
   drawZeroLine,
 } from "./ShiftAxis.ts";
-import { margin, type Scale, scalePoints } from "./ShiftLayout.ts";
+import {
+  margin,
+  type Scale,
+  scalePoints,
+  wideCiPoints,
+} from "./ShiftLayout.ts";
 import { drawMarker, drawPercentileLabel, drawViolin } from "./ShiftViolins.ts";
 import { createSvg, ensureClipRect, svgNS } from "./SvgHelpers.ts";
 
@@ -24,9 +29,10 @@ const defaults = { width: 760, height: 300 };
 
 /** Create a shift-function plot: one violin per percentile showing the diff
  *  distribution across the whole sample distribution. Violins are colored by
- *  per-percentile direction; unreliable percentiles (too few tail samples) are
- *  greyed and dashed to downweight them visually. A +/- equivalence band and
- *  zero line span the plot. */
+ *  per-percentile direction. A CI far wider than its peers' never sets the
+ *  y-axis: the violin clips at the plot edge with a caption instead, greyed
+ *  and dashed when the point is also inconclusive (nothing about it is
+ *  known). A +/- equivalence band and zero line span the plot. */
 export function createShiftPlot(
   shift: ShiftFunction,
   options: ShiftPlotOptions = {},
@@ -43,6 +49,7 @@ export function createShiftPlot(
   const centers = slotCenters(points, plotWidth);
   const halfMax = centers.slotWidth * 0.42;
   const maxCount = maxHistogramCount(points);
+  const wide = wideCiPoints(points);
 
   if (band) drawMarginBand(svg, band, yScale, opts.width);
   drawZeroLine(svg, yScale, opts.width);
@@ -53,15 +60,17 @@ export function createShiftPlot(
 
   points.forEach((point, i) => {
     const cx = centers.cx[i];
-    drawViolin(layer, point, cx, halfMax, maxCount, yScale, opts.onSelect);
-    drawMarker(layer, point, cx, yScale);
-    drawPercentileLabel(svg, point, cx, opts.height);
+    const wideCi = wide.has(point);
+    const markOpts = { yScale, wideCi, onSelect: opts.onSelect };
+    drawViolin(layer, point, cx, halfMax, maxCount, markOpts);
+    drawMarker(layer, point, cx, plotHeight, markOpts);
+    drawPercentileLabel(svg, point, cx, opts.height, wideCi);
   });
 
   return svg;
 }
 
-/** y-scale mapping diff-percent to pixels, spanning the reliable points' CI
+/** y-scale mapping diff-percent to pixels, spanning the well-measured points' CI
  *  bounds (see scalePoints), the margin band, and zero. Keyed to CI bounds, not
  *  the violin histograms: those span the full bootstrap range (binValues), so
  *  extreme outlier resamples would otherwise stretch the axis. Violin tails past
@@ -121,9 +130,9 @@ function maxHistogramCount(points: ShiftPercentile[]): number {
 }
 
 /** A clipped <g> covering the plot rect: violins/markers drawn into it are cut
- *  at the axis bounds. The y-scale is set by reliable points only (buildYScale),
- *  so an unreliable tail percentile's huge spread can't overflow into the axis
- *  and labels. */
+ *  at the axis bounds. The y-scale is set by the well-measured points only
+ *  (buildYScale), so a noisy tail percentile's huge spread can't overflow into
+ *  the axis and labels. */
 function clipLayer(
   svg: SVGSVGElement,
   plotWidth: number,

@@ -1,3 +1,4 @@
+import { median } from "../../stats/CoreStats.ts";
 import type { ShiftPercentile } from "../ReportData.ts";
 
 /** Maps a diff-percent value to a vertical pixel position. */
@@ -5,11 +6,38 @@ export type Scale = (v: number) => number;
 
 export const margin = { top: 14, right: 16, bottom: 34, left: 44 };
 
-/** Points that set the vertical scale: reliable ones only, so a sparse,
- *  unreliable tail percentile (huge noisy CI) can't dominate the axis and crush
- *  the informative percentiles. Falls back to all points when none are reliable,
- *  so the scale never collapses. */
+const maxCiWidthRatio = 3;
+
+/** Points that set the vertical scale: reliable points whose CI is in line
+ *  with their peers'. Unreliable percentiles (sparse tails) and wide-CI
+ *  outliers (see wideCiPoints) would stretch the axis and crush the
+ *  informative percentiles; their violins clip at the plot edge instead.
+ *  Falls back to all reliable points, then all points, so the scale never
+ *  collapses. */
 export function scalePoints(points: ShiftPercentile[]): ShiftPercentile[] {
   const reliable = points.filter(p => p.reliable);
-  return reliable.length ? reliable : points;
+  const candidates = reliable.length ? reliable : points;
+  const wide = wideCiPoints(points);
+  const bounded = candidates.filter(p => !wide.has(p));
+  return bounded.length ? bounded : candidates;
+}
+
+/** Points whose CI is far wider than their peers' (more than maxCiWidthRatio
+ *  times the median width of the reliable points). However it leans, such a
+ *  percentile's magnitude is too fuzzy to earn axis room, so it never keys the
+ *  y-axis; the violin clips at the plot edge with a caption instead. When
+ *  every CI is similarly wide the median grows with them and nothing is an
+ *  outlier, so the axis still covers everything. */
+export function wideCiPoints(points: ShiftPercentile[]): Set<ShiftPercentile> {
+  const reliable = points.filter(p => p.reliable);
+  const peers = reliable.length ? reliable : points;
+  const medianWidth = median(peers.map(ciWidth));
+  return new Set(
+    points.filter(p => ciWidth(p) > maxCiWidthRatio * medianWidth),
+  );
+}
+
+/** Width of a point's 95% CI in diff-percent. */
+export function ciWidth(p: ShiftPercentile): number {
+  return p.diff.ci[1] - p.diff.ci[0];
 }
