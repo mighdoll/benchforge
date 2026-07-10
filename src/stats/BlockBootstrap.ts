@@ -7,6 +7,7 @@ import {
   defaultConfidence,
   maxBootstrapInput,
   multiSampleBootstrap,
+  type Rand,
   subsample,
 } from "./Bootstrap.ts";
 import {
@@ -22,6 +23,19 @@ import {
 export type BlockBootstrapOptions = BootstrapOptions & {
   /** Disable Tukey trimming of outlier batches */
   noTrim?: boolean;
+};
+
+/** Options for preparing blocks for resampling. `rand` is required so callers
+ *  can't silently fall back to unseeded draws partway through a pipeline. */
+export type PrepareOptions = {
+  /** Disable Tukey trimming of outlier batches */
+  noTrim?: boolean;
+
+  /** Cap on total resample-source samples (see capSplits) */
+  cap?: number;
+
+  /** Random source for capping draws */
+  rand: Rand;
 };
 
 /** Trimmed-and-split blocks for one side: per-block stat values, the pooled
@@ -74,15 +88,14 @@ export function blockBootstrap(
 ): BootstrapResult {
   const { resamples = bootstrapSamples, confidence: conf = defaultConfidence } =
     options;
-  const side = prepareBlocks(
-    samples,
-    blocks,
-    statFn,
-    options.noTrim,
-    maxBootstrapInput,
-  );
+  const rand = options.random ?? Math.random;
+  const side = prepareBlocks(samples, blocks, statFn, {
+    noTrim: options.noTrim,
+    cap: maxBootstrapInput,
+    rand,
+  });
   const stats = Array.from({ length: resamples }, () =>
-    mean(createResample(side.blockVals)),
+    mean(createResample(side.blockVals, rand)),
   );
   return {
     estimate: statFn(side.filtered),
@@ -106,16 +119,15 @@ export function blockPoolBootstrap(
 ): BootstrapResult {
   const { resamples = bootstrapSamples, confidence: conf = defaultConfidence } =
     options;
-  const side = prepareBlocks(
-    samples,
-    blocks,
-    statFn,
-    options.noTrim,
-    maxBootstrapInput,
-  );
+  const rand = options.random ?? Math.random;
+  const side = prepareBlocks(samples, blocks, statFn, {
+    noTrim: options.noTrim,
+    cap: maxBootstrapInput,
+    rand,
+  });
   const buf = allocPoolBuf(side.keptSplits);
   const stats = Array.from({ length: resamples }, () =>
-    poolResampleStat(side.keptSplits, buf, statFn),
+    poolResampleStat(side.keptSplits, buf, statFn, rand),
   );
   return {
     estimate: statFn(side.filtered),
@@ -132,14 +144,13 @@ export function prepareBlocks(
   samples: number[],
   offsets: number[],
   fn: (s: number[]) => number,
-  noTrim?: boolean,
-  cap?: number,
+  { noTrim, cap, rand }: PrepareOptions,
 ): PreparedBlocks {
   const splits = splitByOffsets(samples, offsets);
   const means = splits.map(mean);
-  const keep = noTrim ? means.map((_, i) => i) : tukeyKeep(means);
+  const keep = keptIndices(means, noTrim);
   const keptSplits = keep.map(i => splits[i]);
-  const drawSplits = cap ? capSplits(keptSplits, cap) : keptSplits;
+  const drawSplits = cap ? capSplits(keptSplits, cap, rand) : keptSplits;
   return {
     blockVals: drawSplits.map(fn),
     filtered: keptSplits.flat(),
@@ -191,6 +202,11 @@ export function tukeyKeep(values: number[]): number[] {
   return values.flatMap((v, i) => (v <= hi ? [i] : []));
 }
 
+/** @return indices of batches kept by the Tukey trim, or all when noTrim. */
+export function keptIndices(means: number[], noTrim?: boolean): number[] {
+  return noTrim ? means.map((_, i) => i) : tukeyKeep(means);
+}
+
 /** @return outliers detected via Tukey's interquartile range method */
 export function findOutliers(samples: number[]): {
   rate: number;
@@ -224,19 +240,51 @@ export function poolResampleStat(
   splits: number[][],
   buf: number[],
   statFn: (s: number[]) => number,
+  rand: Rand,
 ): number {
   const n = splits.length;
   let pos = 0;
   for (let i = 0; i < n; i++) {
-    const block = splits[Math.floor(Math.random() * n)];
-    for (let k = 0; k < block.length; k++) buf[pos++] = block[k];
+    pos = appendBlock(splits[Math.floor(rand() * n)], buf, pos);
   }
-  return statFn(pos === buf.length ? buf : buf.slice(0, pos));
+  return statFn(filledBuf(buf, pos));
 }
 
-/** Block bootstrap CI for one stat: mean uses per-batch means, percentiles pool
- *  the resampled batches. Mirrors {@link blockDiff} on the difference side. */
-function blockCI(
+/** Copy `block` into `buf` starting at `pos`; @return the new fill position. */
+export function appendBlock(
+  block: number[],
+  buf: number[],
+  pos: number,
+): number {
+  let next = pos;
+  for (let i = 0; i < block.length; i++) buf[next++] = block[i];
+  return next;
+}
+
+/** The filled prefix of a pool buffer: `buf` itself when full, else a slice. */
+export function filledBuf(buf: number[], pos: number): number[] {
+  return pos === buf.length ? buf : buf.slice(0, pos);
+}
+
+/** Subsample each batch (without replacement) so the pooled draw size stays
+ *  within `cap`, keeping every batch represented to preserve batch-level IID.
+ *  Bounds the per-resample cost for large sample counts, mirroring the
+ *  single-sample path's `subsample` cap. */
+export function capSplits(
+  splits: number[][],
+  cap: number,
+  rand: Rand,
+): number[][] {
+  const total = splits.reduce((n, b) => n + b.length, 0);
+  if (total <= cap) return splits;
+  const perBatch = Math.max(1, Math.floor(cap / splits.length));
+  return splits.map(b => subsample(b, perBatch, rand));
+}
+
+/** Block bootstrap CI for one stat: mean resamples per-batch means
+ *  ({@link blockBootstrap}), percentiles pool the resampled batches
+ *  ({@link blockPoolBootstrap}). */
+export function blockCI(
   samples: number[],
   blocks: number[],
   stat: StatKind,
@@ -245,15 +293,4 @@ function blockCI(
   const fn = statKindToFn(stat);
   if (stat === "mean") return blockBootstrap(samples, blocks, fn, options);
   return blockPoolBootstrap(samples, blocks, fn, options);
-}
-
-/** Subsample each batch (without replacement) so the pooled draw size stays
- *  within `cap`, keeping every batch represented to preserve batch-level IID.
- *  Bounds the per-resample cost for large sample counts, mirroring the
- *  single-sample path's `subsample` cap. */
-function capSplits(splits: number[][], cap: number): number[][] {
-  const total = splits.reduce((n, b) => n + b.length, 0);
-  if (total <= cap) return splits;
-  const perBatch = Math.max(1, Math.floor(cap / splits.length));
-  return splits.map(b => subsample(b, perBatch));
 }

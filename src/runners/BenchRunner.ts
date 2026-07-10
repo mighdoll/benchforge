@@ -1,4 +1,5 @@
 import { getHeapStatistics } from "node:v8";
+import type { Rand } from "../stats/Bootstrap.ts";
 import type { BenchmarkSpec } from "./BenchmarkSpec.ts";
 import type { MeasuredResults, PausePoint } from "./MeasuredResults.ts";
 import { computeStats, gcFunction } from "./SampleStats.ts";
@@ -61,8 +62,10 @@ export interface Reservoir {
   finish(): {
     samples: number[];
     heapSamples: number[];
+
     /** True offered count, which exceeds the retained length once capped. */
     count: number;
+
     capped: boolean;
   };
 }
@@ -146,7 +149,11 @@ export function executeBenchmark<T>(
 
 /** Create a reservoir holding at most `cap` paired readings, pre-sized to
  *  `initialSize` to avoid growth churn during the measured loop. */
-export function createReservoir(cap: number, initialSize = 0): Reservoir {
+export function createReservoir(
+  cap: number,
+  initialSize = 0,
+  random: Rand = Math.random,
+): Reservoir {
   const samples = new Array<number>(Math.min(cap, initialSize));
   const heapSamples = new Array<number>(Math.min(cap, initialSize));
   let origins: number[] | undefined; // arrival index per slot, only once capped
@@ -159,7 +166,7 @@ export function createReservoir(cap: number, initialSize = 0): Reservoir {
         heapSamples[count] = heap;
       } else {
         origins ??= Array.from({ length: cap }, (_, i) => i);
-        const j = Math.floor(Math.random() * (count + 1));
+        const j = Math.floor(random() * (count + 1));
         if (j < cap) {
           samples[j] = sample;
           heapSamples[j] = heap;
@@ -173,8 +180,10 @@ export function createReservoir(cap: number, initialSize = 0): Reservoir {
         samples.length = heapSamples.length = Math.min(count, cap);
         return { samples, heapSamples, count, capped: false };
       }
-      const slots = origins;
-      const order = slots.map((_, i) => i).sort((a, b) => slots[a] - slots[b]);
+      const arrivals = origins;
+      const order = arrivals
+        .map((_, i) => i)
+        .sort((a, b) => arrivals[a] - arrivals[b]);
       return {
         samples: order.map(i => samples[i]),
         heapSamples: order.map(i => heapSamples[i]),

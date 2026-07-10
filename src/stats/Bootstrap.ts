@@ -57,12 +57,18 @@ export interface DifferenceCI {
   subsampled?: number;
 }
 
+/** Random source for resampling draws, returning values in [0, 1). */
+export type Rand = () => number;
+
 /** Options for bootstrap resampling */
 export type BootstrapOptions = {
   /** Number of bootstrap resamples (default: 10000) */
   resamples?: number;
   /** Confidence level 0-1 (default: 0.95) */
   confidence?: number;
+  /** Random source for resampling draws (default: Math.random). Pass
+   *  seededRng(n) for reproducible CIs. */
+  random?: Rand;
 };
 
 interface StatOp {
@@ -74,17 +80,6 @@ interface StatOp {
 export const defaultConfidence = 0.95;
 export const bootstrapSamples = 10000;
 export const maxBootstrapInput = 10_000;
-
-/** Swap direction labels for higher-is-better metrics (positive = faster) */
-export function swapDirection(ci: DifferenceCI): DifferenceCI {
-  const swap: Record<CIDirection, CIDirection> = {
-    faster: "slower",
-    slower: "faster",
-    uncertain: "uncertain",
-    equivalent: "equivalent",
-  };
-  return { ...ci, direction: swap[ci.direction] };
-}
 
 /** Negate percent and CI for "higher is better" metrics (e.g., throughput) */
 export function flipCI(ci: DifferenceCI): DifferenceCI {
@@ -105,14 +100,15 @@ export function multiSampleBootstrap(
 ): BootstrapResult[] {
   const { resamples = bootstrapSamples, confidence: conf = defaultConfidence } =
     options;
-  const sub = subsample(samples, maxBootstrapInput);
+  const rand = options.random ?? Math.random;
+  const sub = subsample(samples, maxBootstrapInput, rand);
   const n = sub.length;
   const buf = new Array(n);
   const ops = buildStatOps(stats, n);
   const allStats = ops.map(() => new Array<number>(resamples));
 
   for (let i = 0; i < resamples; i++) {
-    resampleInto(sub, buf);
+    resampleInto(sub, buf, rand);
     for (let j = 0; j < ops.length; j++) {
       allStats[j][i] = ops[j].compute(buf);
     }
@@ -133,31 +129,47 @@ export function multiSampleBootstrap(
 }
 
 /** Fill buf in-place with bootstrap resample (with replacement) from source */
-export function resampleInto(source: number[], buf: number[]): void {
+export function resampleInto(
+  source: number[],
+  buf: number[],
+  rand: Rand,
+): void {
   const n = source.length;
   for (let i = 0; i < n; i++) {
-    buf[i] = source[Math.floor(Math.random() * n)];
+    buf[i] = source[Math.floor(rand() * n)];
   }
 }
 
 /** @return bootstrap resample with replacement */
-export function createResample(samples: number[]): number[] {
+export function createResample(samples: number[], rand: Rand): number[] {
   const n = samples.length;
-  return Array.from(
-    { length: n },
-    () => samples[Math.floor(Math.random() * n)],
-  );
+  return Array.from({ length: n }, () => samples[Math.floor(rand() * n)]);
 }
 
 /** Random subsample without replacement via partial Fisher-Yates. Returns original if n <= max. */
-export function subsample(samples: number[], max: number): number[] {
+export function subsample(
+  samples: number[],
+  max: number,
+  rand: Rand,
+): number[] {
   if (samples.length <= max) return samples;
   const copy = samples.slice();
   for (let i = 0; i < max; i++) {
-    const j = i + Math.floor(Math.random() * (copy.length - i));
+    const j = i + Math.floor(rand() * (copy.length - i));
     [copy[i], copy[j]] = [copy[j], copy[i]];
   }
   return copy.slice(0, max);
+}
+
+/** Deterministic mulberry32 PRNG stream, for reproducible resampling. */
+export function seededRng(seed: number): Rand {
+  let s = seed;
+  return () => {
+    s = (s + 0x6d2b79f5) | 0;
+    let t = Math.imul(s ^ (s >>> 15), 1 | s);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
 }
 
 /** @return confidence interval [lower, upper] */

@@ -1,4 +1,5 @@
 import {
+  type BootstrapOptions,
   bootstrapSamples,
   type CIDirection,
   computeInterval,
@@ -18,11 +19,7 @@ import {
 } from "./CoreStats.ts";
 
 /** Options for difference CI functions */
-export type DiffOptions = {
-  /** Number of bootstrap resamples (default: 10000) */
-  resamples?: number;
-  /** Confidence level 0-1 (default: 0.95) */
-  confidence?: number;
+export type DiffOptions = BootstrapOptions & {
   /** Equivalence margin in percent. CI within [-margin, +margin] ==> "equivalent" */
   equivMargin?: number;
 };
@@ -45,8 +42,9 @@ export function multiSampleDifferenceCI(
 ): DifferenceCI[] {
   const { resamples = bootstrapSamples, confidence: conf = defaultConfidence } =
     options;
-  const subA = subsample(a, maxBootstrapInput);
-  const subB = subsample(b, maxBootstrapInput);
+  const rand = options.random ?? Math.random;
+  const subA = subsample(a, maxBootstrapInput, rand);
+  const subB = subsample(b, maxBootstrapInput, rand);
   const bufA = new Array(subA.length);
   const bufB = new Array(subB.length);
   const ops = buildDiffOps(stats, subA.length, subB.length);
@@ -59,8 +57,8 @@ export function multiSampleDifferenceCI(
   );
 
   for (let i = 0; i < resamples; i++) {
-    resampleInto(subA, bufA);
-    resampleInto(subB, bufB);
+    resampleInto(subA, bufA, rand);
+    resampleInto(subB, bufB, rand);
     for (let j = 0; j < ops.length; j++) {
       const base = ops[j].computeA(bufA);
       const curr = ops[j].computeB(bufB);
@@ -86,7 +84,7 @@ export function multiSampleDifferenceCI(
 }
 
 /** @return CI direction against an equivalence margin (in percent, default 0).
- *  Both verdicts are whole-CI tests (TOST): faster/slower require the entire CI
+ *  Both verdicts are whole-CI tests (TOST-style): faster/slower require the entire CI
  *  beyond +/-margin (the calibrated noise floor), equivalent requires it wholly
  *  inside. A CI straddling a margin edge is "uncertain": not provably beyond
  *  noise, so it needs more data. Margin 0 is not special -- it falls out as the
