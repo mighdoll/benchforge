@@ -1,7 +1,11 @@
 import { signal } from "@preact/signals";
 import { useEffect } from "preact/hooks";
 import type { DataProvider } from "./Providers.ts";
-import type { ReportData, ShiftPercentile } from "./ReportData.ts";
+import type {
+  AbsolutePercentile,
+  ReportData,
+  ShiftPercentile,
+} from "./ReportData.ts";
 
 /** Tracked state for an open source-code tab in the viewer. */
 export interface SourceTabState {
@@ -28,6 +32,13 @@ export interface ShiftDetail {
   marginBand?: [number, number];
 }
 
+/** Payload for the absolute-distribution detail popup (no-baseline fan): one
+ *  percentile's absolute distribution plus its metric label. */
+export interface AbsoluteDetail {
+  point: AbsolutePercentile;
+  metric: string;
+}
+
 /** Active data source (server or archive). */
 export const provider = signal<DataProvider | null>(null);
 
@@ -49,6 +60,9 @@ export const trimMode = signal<TrimMode>("trim");
 
 /** Open detail popup for a shift-function point (verdict or percentile). Null = closed. */
 export const shiftDetail = signal<ShiftDetail | null>(null);
+
+/** Open detail popup for an absolute-shift percentile. Null = closed. */
+export const absoluteDetail = signal<AbsoluteDetail | null>(null);
 
 /** Instance id of the open help "?" button (one popover at a time; the same
  *  topic can appear on several cards). Null = closed. */

@@ -28,7 +28,11 @@ import {
   hasBatchBlocks,
   hasLowBatchCount,
 } from "./CiFormatting.ts";
-import { buildShiftFunction, preparePairedResults } from "./ShiftFunction.ts";
+import {
+  buildAbsoluteShift,
+  buildShiftFunction,
+  preparePairedResults,
+} from "./ShiftFunction.ts";
 import { statLabel } from "./ShiftPoints.ts";
 import type {
   CaseContext,
@@ -36,6 +40,9 @@ import type {
   SectionCICache,
 } from "./ViewerSections.ts";
 
+/** One track's metric build: its absolute bootstrap and (for a comparison) diff
+ *  CI, plus the pairwise-kept samples/offsets the cell's value and CI derive
+ *  from (so value, CI, and diff all rest on one batch set). */
 interface MetricBootstrap {
   boot?: BootstrapResult;
   diff?: DifferenceCI;
@@ -66,11 +73,11 @@ export function metricRow(
       : undefined;
     // trackMetric leaves boot undefined for unpaired tracks (sampleMetric, or a
     // baseline with no preceding paired current); fall back to a standalone CI.
-    const boot =
-      metric?.boot ??
-      (canBoot
-        ? (reuse?.track?.[i] ?? bootstrapTrack(track.measured, stat, noTrim))
-        : undefined);
+    const boot = canBoot
+      ? (metric?.boot ??
+        reuse?.track?.[i] ??
+        bootstrapTrack(track.measured, stat, noTrim))
+      : undefined;
     trackBoot[i] = boot;
 
     const entry = baseEntry(
@@ -85,6 +92,8 @@ export function metricRow(
       const diff = canBoot ? metric?.diff : undefined;
       trackDiff[i] = diff;
       addComparison(entry, diff, section, track, ctx, pairs[i]);
+    } else if (!track.isBaseline && canBoot) {
+      addAbsoluteShift(entry, section, track, ctx);
     }
     return entry;
   });
@@ -260,6 +269,21 @@ function addComparison(
     prepared: pair,
   });
   if (shift) entry.shiftFunction = shift;
+}
+
+/** Attach the per-percentile absolute distribution fan for a track with no
+ *  baseline, so the summary card still shows a percentile view. */
+function addAbsoluteShift(
+  entry: ViewerEntry,
+  section: MetricSection,
+  track: CaseTrack,
+  ctx: CaseContext,
+): void {
+  const shift = buildAbsoluteShift(section, track.measured, {
+    currentMeta: track.meta,
+    comparison: ctx.comparison,
+  });
+  if (shift) entry.absoluteShift = shift;
 }
 
 /** @return a CI-less DifferenceCI for comparable scalar rows. Direction is

@@ -1,8 +1,12 @@
 import { formatSignedPercent } from "../../report/Formatters.ts";
 import { verdictWord } from "../../report/Verdict.ts";
 import type { DifferenceCI } from "../../stats/Bootstrap.ts";
-import type { BootstrapCIData, ShiftPercentile } from "../ReportData.ts";
-import { shiftDetail, useEscapeClose } from "../State.ts";
+import type {
+  AbsolutePercentile,
+  BootstrapCIData,
+  ShiftPercentile,
+} from "../ReportData.ts";
+import { absoluteDetail, shiftDetail, useEscapeClose } from "../State.ts";
 import { ciDomain, distributionOpts } from "./CIWidgets.tsx";
 import { useLazyPlot } from "./LazyPlot.ts";
 
@@ -17,6 +21,21 @@ export function ShiftDetailPopup() {
       metric={detail.metric}
       marginBand={detail.marginBand}
       onClose={() => (shiftDetail.value = null)}
+    />
+  );
+}
+
+/** The single shared absolute-distribution detail popup, opened from a
+ *  no-baseline fan's violin. */
+export function AbsoluteDetailPopup() {
+  const detail = absoluteDetail.value;
+  useEscapeClose(() => (absoluteDetail.value = null));
+  if (!detail) return null;
+  return (
+    <AbsolutePopup
+      point={detail.point}
+      metric={detail.metric}
+      onClose={() => (absoluteDetail.value = null)}
     />
   );
 }
@@ -52,6 +71,31 @@ function ShiftPopup({ point, metric, marginBand, onClose }: {
   );
 }
 
+/** Modal detailing one percentile's absolute distribution on its own scale,
+ *  where a tight CI the fan crushes against the full-range axis is legible. */
+function AbsolutePopup({ point, metric, onClose }: {
+  point: AbsolutePercentile;
+  metric: string;
+  onClose: () => void;
+}) {
+  return (
+    <div class="shift-overlay" onClick={e => e.target === e.currentTarget && onClose()}>
+      <div class="shift-popup">
+        <span class="shift-close" onClick={onClose}>{"×"}</span>
+        <div class="shift-popup-head">
+          <h3>{metric} &middot; {point.label}</h3>
+          {point.reliable
+            ? <span class="shift-verdict-pct">{point.ci.estimateLabel}</span>
+            : <span class="badge badge-insufficient">Insufficient data &middot; n={point.tailCount}</span>}
+        </div>
+        <div class="shift-charts">
+          <ShiftPopupAbsolute runName={metric} ci={point.ci} />
+        </div>
+      </div>
+    </div>
+  );
+}
+
 /** Popup-title verdict chip. Unreliable percentiles report insufficient data
  *  instead of a verdict (the direction is untrustworthy with too few samples). */
 function ShiftVerdict({ point }: { point: ShiftPercentile }) {
@@ -66,11 +110,6 @@ function ShiftVerdict({ point }: { point: ShiftPercentile }) {
       <span class="shift-verdict-pct">{formatSignedPercent(percent)}</span>
     </span>
   );
-}
-
-/** Capitalize the first letter (verdict words are lowercase). */
-function cap(s: string): string {
-  return s.charAt(0).toUpperCase() + s.slice(1);
 }
 
 /** The diff CI chart in the popup (reuses createCIPlot). The Δ% point estimate
@@ -108,4 +147,9 @@ function ShiftPopupAbsolute(
       <div ref={ref} />
     </div>
   );
+}
+
+/** Capitalize the first letter (verdict words are lowercase). */
+function cap(s: string): string {
+  return s.charAt(0).toUpperCase() + s.slice(1);
 }

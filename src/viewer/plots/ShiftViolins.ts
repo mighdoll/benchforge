@@ -1,9 +1,10 @@
 import { formatSignedPercent } from "../../report/Formatters.ts";
 import { verdictWord } from "../../report/Verdict.ts";
+import type { HistogramBin } from "../../stats/Bootstrap.ts";
 import type { ShiftPercentile } from "../ReportData.ts";
 import { directionColors, gaussianSmooth } from "./PlotTypes.ts";
 import { ciWidth, margin, type Scale } from "./ShiftLayout.ts";
-import { path, svgNS, text } from "./SvgHelpers.ts";
+import { arrowheadPath, circle, path, svgNS, text } from "./SvgHelpers.ts";
 
 /** Options shared by {@link drawViolin} and {@link drawMarker}. */
 export interface ShiftMarkOptions {
@@ -12,11 +13,13 @@ export interface ShiftMarkOptions {
   onSelect?: (point: ShiftPercentile) => void;
 }
 
-const weakColor = "#9ca3af";
-// Untrusted points read as a lighter grey, paired with a dashed outline, so
-// they stay distinct from the medium grey of a reliable-but-uncertain
-// percentile (directionColors.uncertain shares weakColor).
-const untrustedColor = "#cbd5e1";
+/** The bits {@link drawViolinBody} needs to draw one violin: its histogram,
+ *  whether it's trusted (solid vs dashed-grey), and its stroke color. */
+export interface ViolinVisual {
+  histogram: HistogramBin[] | undefined;
+  trusted: boolean;
+  stroke: string;
+}
 
 /** A point earns its direction color unless its tail is too sparse
  *  (unreliable) or it is inconclusive with an outlier-wide CI (see
@@ -24,6 +27,12 @@ const untrustedColor = "#cbd5e1";
  *  point keeps its color however wide its CI: only the magnitude is fuzzy. */
 const trusted = (p: ShiftPercentile, wideCi: boolean) =>
   p.reliable && !(wideCi && p.diff.direction === "uncertain");
+
+const weakColor = "#9ca3af";
+// Untrusted points read as a lighter grey, paired with a dashed outline, so
+// they stay distinct from the medium grey of a reliable-but-uncertain
+// percentile (directionColors.uncertain shares weakColor).
+const untrustedColor = "#cbd5e1";
 
 /** Per-percentile stroke: direction color when trusted, light grey otherwise
  *  (paired with a dashed outline). */
@@ -41,18 +50,57 @@ export function drawViolin(
   maxCount: number,
   options: ShiftMarkOptions,
 ): void {
-  if (!point.diff.histogram?.length) return;
   const { yScale, wideCi, onSelect } = options;
-  const stroke = strokeFor(point, wideCi);
-  const outlinePath = violinPath(point, cx, halfMax, maxCount, yScale);
+  const visual: ViolinVisual = {
+    histogram: point.diff.histogram,
+    trusted: trusted(point, wideCi),
+    stroke: strokeFor(point, wideCi),
+  };
+  drawViolinBody(
+    parent,
+    visual,
+    cx,
+    halfMax,
+    maxCount,
+    yScale,
+    violinTitle(point, wideCi),
+    onSelect && (() => onSelect(point)),
+  );
+}
+
+/** Violin body: smoothed fill + outline, grouped with its tooltip and click
+ *  handler. Shared by the diff-percentile ({@link drawViolin}) and
+ *  absolute-percentile (AbsoluteShiftPlot.ts) violin fans, which differ only
+ *  in how they derive `visual` and the tooltip from their own point shape. */
+export function drawViolinBody(
+  parent: SVGElement,
+  visual: ViolinVisual,
+  cx: number,
+  halfMax: number,
+  maxCount: number,
+  yScale: Scale,
+  title: SVGTitleElement,
+  onSelect?: () => void,
+): void {
+  const { histogram, trusted: isTrusted, stroke } = visual;
+  if (!histogram?.length) return;
+  const outlinePath = smoothedViolinPath(
+    histogram,
+    cx,
+    halfMax,
+    maxCount,
+    yScale,
+  );
 
   const group = document.createElementNS(svgNS, "g");
   group.classList.add("shift-violin");
-  if (!trusted(point, wideCi)) group.classList.add("shift-weak");
-  group.appendChild(violinTitle(point, wideCi));
+  if (!isTrusted) group.classList.add("shift-weak");
+  group.appendChild(title);
   if (onSelect) {
     group.style.cursor = "pointer";
-    group.addEventListener("click", () => onSelect(point));
+    group.addEventListener("click", onSelect);
+  } else {
+    group.style.cursor = "default";
   }
   const body = path(outlinePath, { fill: stroke });
   body.classList.add("shift-violin-fill");
@@ -62,7 +110,7 @@ export function drawViolin(
     fill: "none",
     strokeWidth: "1.5",
   };
-  if (!trusted(point, wideCi)) outlineAttrs.strokeDasharray = "3 2";
+  if (!isTrusted) outlineAttrs.strokeDasharray = "3 2";
   group.appendChild(path(outlinePath, outlineAttrs));
   parent.appendChild(group);
 }
@@ -94,15 +142,14 @@ export function drawMarker(
     parent.appendChild(arrow);
     return;
   }
-  const dot = document.createElementNS(svgNS, "circle");
-  dot.setAttribute("cx", String(cx));
-  dot.setAttribute("cy", String(cy));
-  dot.setAttribute("r", "3");
-  dot.setAttribute("fill", "#fff");
-  dot.setAttribute("stroke", stroke);
-  dot.setAttribute("stroke-width", "1.5");
-  dot.style.pointerEvents = "none";
-  parent.appendChild(dot);
+  parent.appendChild(
+    circle(cx, cy, 3, {
+      fill: "#fff",
+      stroke,
+      strokeWidth: "1.5",
+      pointerEvents: "none",
+    }),
+  );
 }
 
 /** Percentile label, with the verdict point enlarged and its Δ% value captioned
@@ -155,15 +202,17 @@ export function drawPercentileLabel(
     );
 }
 
-/** SVG path for a smoothed violin mirrored around cx (width encodes density). */
-function violinPath(
-  point: ShiftPercentile,
+/** SVG path for a smoothed violin from a raw histogram, mirrored around cx
+ *  (width encodes density). Shared by the diff and absolute shift plots; the
+ *  histogram's x is whatever domain the yScale maps (diff-percent or value). */
+export function smoothedViolinPath(
+  histogram: HistogramBin[],
   cx: number,
   halfMax: number,
   maxCount: number,
   yScale: Scale,
 ): string {
-  const sorted = [...point.diff.histogram!].sort((a, b) => a.x - b.x);
+  const sorted = [...histogram].sort((a, b) => a.x - b.x);
   // light smoothing (small sigma) rounds jagged bins without merging modes,
   // since violin width here encodes uncertainty
   const smoothed = gaussianSmooth(sorted, 0.8);
@@ -202,11 +251,7 @@ function offScaleArrow(
   fill: string,
   wideCi: boolean,
 ): SVGElement {
-  const dir = down ? 1 : -1;
-  const tipY = edge - dir * 2;
-  const baseY = tipY - dir * 7;
-  const d = `M${cx - 4},${baseY}L${cx + 4},${baseY}L${cx},${tipY}Z`;
-  const arrow = path(d, { fill });
+  const arrow = path(arrowheadPath(cx, edge, down), { fill });
   arrow.appendChild(violinTitle(point, wideCi));
   return arrow;
 }
@@ -242,5 +287,6 @@ function captionFor(
 /** Half the CI width, e.g. "±44%": how far the estimate could plausibly be off. */
 function ciHalfLabel(point: ShiftPercentile): string {
   const half = ciWidth(point) / 2;
-  return `±${half.toFixed(half >= 10 ? 0 : 1)}%`;
+  const decimals = half >= 10 ? 0 : 1;
+  return `±${half.toFixed(decimals)}%`;
 }

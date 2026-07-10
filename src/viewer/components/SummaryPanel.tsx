@@ -11,7 +11,7 @@ import { provider, reportData, trimMode } from "../State.ts";
 import { activeGroupView, CaseCard, caseHeaderCI } from "./CaseCard.tsx";
 import { ComparisonBadge, shiftDetailOpener } from "./CIWidgets.tsx";
 import { HelpButton } from "./HelpButton.tsx";
-import { ShiftDetailPopup } from "./ShiftPopup.tsx";
+import { AbsoluteDetailPopup, ShiftDetailPopup } from "./ShiftPopup.tsx";
 
 declare const __BENCHFORGE_GIT_HASH__: string;
 declare const __BENCHFORGE_GIT_DIRTY__: boolean;
@@ -53,6 +53,7 @@ export function SummaryPanel() {
         ))}
       </div>
       <ShiftDetailPopup />
+      <AbsoluteDetailPopup />
     </>
   );
 }

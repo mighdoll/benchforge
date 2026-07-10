@@ -4,6 +4,8 @@ import {
   significantDrift,
 } from "../stats/NoiseFloor.ts";
 import type {
+  AbsolutePercentile,
+  AbsoluteShift,
   BenchmarkEntry,
   BenchmarkGroup,
   HeapSiteRow,
@@ -98,7 +100,8 @@ function sectionMarkdown(section: ViewerSection): string[] {
   const primary = section.rows.find(r => r.primary);
   if (primary) {
     const shifts = shiftTables(primary);
-    const tables = shifts.length ? shifts : [trackTable([primary])];
+    const percentiles = shifts.length ? shifts : absoluteShiftTables(primary);
+    const tables = percentiles.length ? percentiles : [trackTable([primary])];
     const shared = sharedTable(section.rows.filter(r => r.shared));
     return [...header, ...tables, shared].filter((s): s is string => !!s);
   }
@@ -165,6 +168,16 @@ function shiftTables(primary: ViewerRow): string[] {
   const label = comparisons.length > 1;
   return comparisons.map(e =>
     shiftTable(e.shiftFunction!, label ? e.runName : undefined),
+  );
+}
+
+/** One absolute-distribution table per no-baseline variant; labeled by variant
+ *  only when the case has several. */
+function absoluteShiftTables(primary: ViewerRow): string[] {
+  const variants = primary.entries.filter(e => e.absoluteShift);
+  const label = variants.length > 1;
+  return variants.map(e =>
+    absoluteShiftTable(e.absoluteShift!, label ? e.runName : undefined),
   );
 }
 
@@ -306,6 +319,16 @@ function shiftTable(shift: ShiftFunction, label?: string): string {
   return `${title}\n${table}`;
 }
 
+/** Per-percentile absolute table (no baseline): mean first, then percentiles in
+ *  displayed order, with each percentile's value, 95% CI, and reliability. */
+function absoluteShiftTable(shift: AbsoluteShift, label?: string): string {
+  const prefix = label ? `${label}: ` : "";
+  const title = `${prefix}${shift.metric} by percentile`;
+  const cols = ["stat", "value", "95% CI", "reliable"];
+  const table = mdTable(cols, shift.points.map(absPointRow));
+  return `${title}\n${table}`;
+}
+
 /** One track cell: its value, with the Δ% appended on comparison tracks. */
 function cell(e: ViewerEntry): string {
   const v = entryValue(e) ?? "";
@@ -384,6 +407,14 @@ function pointRow(point: ShiftPercentile): string[] {
     formatPercentCI(diff.ci),
     verdict,
   ];
+}
+
+/** One absolute-shift point as a row of cells. */
+function absPointRow(point: AbsolutePercentile): string[] {
+  const { ci, label, reliable, tailCount } = point;
+  const range = ci.ciLabels ? `${ci.ciLabels[0]} .. ${ci.ciLabels[1]}` : "";
+  const trust = reliable ? "yes" : `no (n=${tailCount})`;
+  return [label, ci.estimateLabel ?? "", range, trust];
 }
 
 /** The Δ cell: the share change with its 95% CI when there were enough batches to

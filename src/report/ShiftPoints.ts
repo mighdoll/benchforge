@@ -2,7 +2,11 @@ import type { MeasuredResults } from "../runners/MeasuredResults.ts";
 import { prepareBlocks } from "../stats/BlockBootstrap.ts";
 import type { BootstrapResult, DifferenceCI } from "../stats/Bootstrap.ts";
 import { mean, percentile, type StatKind } from "../stats/CoreStats.ts";
-import type { ShiftPercentile, ShiftRun } from "../viewer/ReportData.ts";
+import type {
+  AbsolutePercentile,
+  ShiftPercentile,
+  ShiftRun,
+} from "../viewer/ReportData.ts";
 import type { MetricSection, UnknownRecord } from "./BenchmarkReport.ts";
 import {
   annotateCI,
@@ -30,6 +34,19 @@ export interface PointArgs {
   baselineBlocks?: number[][];
   currentOffsets?: number[];
   baselineOffsets?: number[];
+}
+
+/** Per-point inputs for the absolute (baseline-less) shift. One variant only:
+ *  its absolute bootstrap for the stat, plus the coverage inputs. */
+export interface AbsPointArgs {
+  p: number;
+  result: BootstrapResult | undefined;
+  section: MetricSection;
+  current: MeasuredResults;
+  currentMeta: UnknownRecord | undefined;
+  lowBatches: boolean;
+  noBatchTrim: boolean | undefined;
+  verdict: StatKind;
 }
 
 /** A percentile estimate is reliable when enough samples lie beyond it and
@@ -112,6 +129,63 @@ export function buildMeanPoint(args: PointArgs): ShiftPercentile | undefined {
     reliable: !lowBatches,
     tailCount,
     tailBatches,
+  };
+}
+
+/** Build one absolute percentile point: format the variant's absolute
+ *  distribution and gate reliability by tail coverage (as {@link buildPoint},
+ *  but current-side only since there is no baseline). */
+export function buildAbsolutePoint(
+  args: AbsPointArgs,
+): AbsolutePercentile | undefined {
+  const { p, result, section, current, currentMeta, lowBatches } = args;
+  if (!result) return undefined;
+  const ci = formatBootstrapCI(
+    section,
+    result,
+    current.batchOffsets,
+    currentMeta,
+  );
+
+  const { count, batches } = tailCoverage(current, p, args.noBatchTrim);
+  const reliable =
+    !lowBatches && count >= minTailSamples && batches >= minTailBatches;
+  const displayed = section.higherIsBetter ? 1 - p : p;
+  const isPrimary =
+    typeof args.verdict === "object" && args.verdict.percentile === p;
+  return {
+    isPrimary,
+    percentile: displayed,
+    label: percentileLabel(displayed),
+    ci,
+    reliable,
+    tailCount: count,
+    tailBatches: batches,
+  };
+}
+
+/** Build the leading mean point for the absolute shift: mean uses every sample,
+ *  so reliability is gated only by batch count. */
+export function buildAbsoluteMeanPoint(
+  args: AbsPointArgs,
+): AbsolutePercentile | undefined {
+  const { result, section, current, currentMeta, lowBatches } = args;
+  if (!result) return undefined;
+  const ci = formatBootstrapCI(
+    section,
+    result,
+    current.batchOffsets,
+    currentMeta,
+  );
+  return {
+    isMean: true,
+    isPrimary: args.verdict === "mean",
+    percentile: 0,
+    label: "mean",
+    ci,
+    reliable: !lowBatches,
+    tailCount: current.samples.length,
+    tailBatches: effectiveBatches(current, args.noBatchTrim),
   };
 }
 

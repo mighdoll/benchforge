@@ -3,6 +3,13 @@ export const svgNS = "http://www.w3.org/2000/svg";
 const toKebab = (k: string) => k.replace(/[A-Z]/g, c => "-" + c.toLowerCase());
 const svgEl = (tag: string) => document.createElementNS(svgNS, tag);
 
+// A report page mounts many plots (one <svg> per violin/sparkline) at once, and
+// SVG ids resolve document-wide (url(#id) is first-match, not scoped to the
+// containing <svg>). A bare literal id like "plot-clip" would collide across
+// every plot on the page, so `defs` ids are made unique per <svg> instance here.
+let nextPlotInstance = 0;
+const plotInstances = new WeakMap<SVGSVGElement, number>();
+
 /** Apply camelCase attributes to an SVG element, converting to kebab-case */
 export function setAttrs(el: SVGElement, attrs: Record<string, string>): void {
   for (const [k, v] of Object.entries(attrs)) el.setAttribute(toKebab(k), v);
@@ -76,9 +83,34 @@ export function path(d: string, attrs: Record<string, string>): SVGPathElement {
   return el;
 }
 
+export function circle(
+  cx: number,
+  cy: number,
+  r: number,
+  attrs: Record<string, string>,
+): SVGCircleElement {
+  const el = document.createElementNS(svgNS, "circle");
+  el.setAttribute("cx", String(cx));
+  el.setAttribute("cy", String(cy));
+  el.setAttribute("r", String(r));
+  setAttrs(el, attrs);
+  return el;
+}
+
+/** SVG path for a small solid arrowhead pointing from `edge` toward the plot
+ *  interior (`down` points down), marking a point estimate that sits past the
+ *  axis range. Shared by the diff-percentile and absolute-percentile violin
+ *  fans (ShiftViolins.ts / AbsoluteShiftPlot.ts). */
+export function arrowheadPath(cx: number, edge: number, down: boolean): string {
+  const dir = down ? 1 : -1;
+  const tipY = edge - dir * 2;
+  const baseY = tipY - dir * 7;
+  return `M${cx - 4},${baseY}L${cx + 4},${baseY}L${cx},${tipY}Z`;
+}
+
 /** Add a turbulence displacement filter for a sketchy/wobbly look */
 export function ensureSketchFilter(svg: SVGSVGElement): string {
-  const id = "ci-sketch";
+  const id = `ci-sketch-${instanceId(svg)}`;
   if (svg.querySelector(`#${id}`)) return id;
   const defs = ensureDefs(svg);
   const filter = svgEl("filter");
@@ -107,7 +139,7 @@ export function ensureSketchFilter(svg: SVGSVGElement): string {
 
 /** Add a diagonal hatch pattern to the SVG defs, reusing if already present */
 export function ensureHatchPattern(svg: SVGSVGElement): string {
-  const id = "margin-hatch";
+  const id = `margin-hatch-${instanceId(svg)}`;
   if (svg.querySelector(`#${id}`)) return id;
   const defs = ensureDefs(svg);
   const pattern = svgEl("pattern");
@@ -130,17 +162,45 @@ export function ensureHatchPattern(svg: SVGSVGElement): string {
  *  its id, for clipping content to the plot rect. */
 export function ensureClipRect(
   svg: SVGSVGElement,
-  id: string,
+  baseId: string,
   x: number,
   y: number,
   w: number,
   h: number,
 ): string {
+  const id = `${baseId}-${instanceId(svg)}`;
   if (!svg.querySelector(`#${id}`)) {
     const clip = svgEl("clipPath");
     clip.setAttribute("id", id);
     clip.appendChild(rect(x, y, w, h, {}));
     ensureDefs(svg).appendChild(clip);
+  }
+  return id;
+}
+
+/** A clipped `<g>` covering the plot rect: content drawn into it is cut at the
+ *  axis bounds, so a violin's over-wide tail can't overflow into the axis and
+ *  labels. */
+export function clipLayer(
+  svg: SVGSVGElement,
+  x: number,
+  y: number,
+  w: number,
+  h: number,
+  id = "plot-clip",
+): SVGGElement {
+  const clip = ensureClipRect(svg, id, x, y, w, h);
+  const layer = document.createElementNS(svgNS, "g");
+  layer.setAttribute("clip-path", `url(#${clip})`);
+  svg.appendChild(layer);
+  return layer;
+}
+
+function instanceId(svg: SVGSVGElement): number {
+  let id = plotInstances.get(svg);
+  if (id === undefined) {
+    id = nextPlotInstance++;
+    plotInstances.set(svg, id);
   }
   return id;
 }

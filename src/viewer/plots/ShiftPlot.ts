@@ -13,10 +13,11 @@ import {
   margin,
   type Scale,
   scalePoints,
+  slotCenters,
   wideCiPoints,
 } from "./ShiftLayout.ts";
 import { drawMarker, drawPercentileLabel, drawViolin } from "./ShiftViolins.ts";
-import { createSvg, ensureClipRect, svgNS } from "./SvgHelpers.ts";
+import { clipLayer, createSvg } from "./SvgHelpers.ts";
 
 export interface ShiftPlotOptions {
   width?: number;
@@ -56,7 +57,7 @@ export function createShiftPlot(
   drawYAxis(svg, yScale, points, band);
   if (centers.dividerX != null) drawDivider(svg, centers.dividerX, plotHeight);
 
-  const layer = clipLayer(svg, plotWidth, plotHeight);
+  const layer = clipLayer(svg, margin.left, margin.top, plotWidth, plotHeight);
 
   points.forEach((point, i) => {
     const cx = centers.cx[i];
@@ -101,25 +102,6 @@ function buildYScale(
   return (v: number) => margin.top + plotH - ((v - min) / range) * plotH;
 }
 
-/** Slot centers across the plot. A leading mean point gets its own slot, set off
- *  from the percentiles by an extra half-slot gap with a divider line between. */
-function slotCenters(
-  points: ShiftPercentile[],
-  plotWidth: number,
-): { cx: number[]; slotWidth: number; dividerX: number | null } {
-  const hasMean = points[0]?.isMean ?? false;
-  // the gap before p1 costs one extra half-slot of width
-  const slots = points.length + (hasMean ? 0.5 : 0);
-  const slotWidth = plotWidth / slots;
-  const gap = hasMean ? slotWidth * 0.5 : 0;
-  const cx = points.map((_, i) => {
-    const lead = i === 0 || !hasMean ? 0 : gap;
-    return margin.left + lead + slotWidth * (i + 0.5);
-  });
-  const dividerX = hasMean ? margin.left + slotWidth + gap * 0.5 : null;
-  return { cx, slotWidth, dividerX };
-}
-
 /** @return the largest histogram bin count across all percentiles, for a
  *  shared violin-width scale (fatter == more concentrated, not just rescaled). */
 function maxHistogramCount(points: ShiftPercentile[]): number {
@@ -127,27 +109,4 @@ function maxHistogramCount(points: ShiftPercentile[]): number {
   for (const p of points)
     for (const b of p.diff.histogram ?? []) if (b.count > max) max = b.count;
   return max;
-}
-
-/** A clipped <g> covering the plot rect: violins/markers drawn into it are cut
- *  at the axis bounds. The y-scale is set by the well-measured points only
- *  (buildYScale), so a noisy tail percentile's huge spread can't overflow into
- *  the axis and labels. */
-function clipLayer(
-  svg: SVGSVGElement,
-  plotWidth: number,
-  plotHeight: number,
-): SVGGElement {
-  const clip = ensureClipRect(
-    svg,
-    "plot-clip",
-    margin.left,
-    margin.top,
-    plotWidth,
-    plotHeight,
-  );
-  const layer = document.createElementNS(svgNS, "g");
-  layer.setAttribute("clip-path", `url(#${clip})`);
-  svg.appendChild(layer);
-  return layer;
 }

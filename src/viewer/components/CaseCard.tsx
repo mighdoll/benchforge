@@ -2,6 +2,7 @@ import { useEffect, useRef } from "preact/hooks";
 import { baselineLabel } from "../../report/Formatters.ts";
 import type { DifferenceCI } from "../../stats/Bootstrap.ts";
 import {
+  type AbsoluteShift,
   type BenchmarkGroup,
   type ShiftFunction,
   shiftMarginBand,
@@ -19,6 +20,7 @@ import {
 import {
   BootstrapCIMount,
   ciDomain,
+  openAbsoluteDetail,
   openShiftDetail,
   shiftDetailOpener,
 } from "./CIWidgets.tsx";
@@ -75,6 +77,7 @@ function MetricSection({ section }: { section: ViewerSection }) {
   const { entries } = primary;
   const domain = ciDomain(entries.flatMap(e => (e.bootstrapCI ? [e.bootstrapCI] : [])));
   const violins = entries.filter(e => e.shiftFunction);
+  const absViolins = entries.filter(e => e.absoluteShift);
   return (
     <div class="section-panel primary-section">
       <div class="panel-header">
@@ -91,6 +94,13 @@ function MetricSection({ section }: { section: ViewerSection }) {
           key={i}
           shift={e.shiftFunction!}
           label={violins.length > 1 ? e.runName : undefined}
+        />
+      ))}
+      {absViolins.map((e, i) => (
+        <AbsoluteShiftPanel
+          key={`a${i}`}
+          shift={e.absoluteShift!}
+          label={absViolins.length > 1 ? e.runName : undefined}
         />
       ))}
       {shared.length > 0 && (
@@ -144,6 +154,30 @@ function ShiftPanel({ shift, label }: { shift: ShiftFunction; label?: string }) 
       <div class="shift-plot-wrap" ref={wrapRef}>
         <div class="shift-plot" ref={ref} />
         {!!shiftMarginBand(shift) && <HelpButton topic="equivalenceMargin" />}
+      </div>
+    </div>
+  );
+}
+
+/** Per-percentile absolute distribution fan below the sparkline table, for a
+ *  variant with no baseline. Non-interactive: there is no comparison to drill
+ *  into, so the violins just show the distribution shape. */
+function AbsoluteShiftPanel({ shift, label }: { shift: AbsoluteShift; label?: string }) {
+  const ref = useResponsivePlot(async width => {
+    const { createAbsoluteShiftPlot } = await import("../plots/AbsoluteShiftPlot.ts");
+    return createAbsoluteShiftPlot(shift, {
+      width,
+      onSelect: p => openAbsoluteDetail(shift, p),
+    });
+  }, [shift], "Absolute shift plot");
+  return (
+    <div class="shift-panel">
+      <div class="shift-caption" title="click a percentile for its distribution detail">
+        value by percentile{label ? ` · ${label}` : ""}
+        <HelpButton topic="valueByPercentile" />
+      </div>
+      <div class="shift-plot-wrap">
+        <div class="shift-plot" ref={ref} />
       </div>
     </div>
   );

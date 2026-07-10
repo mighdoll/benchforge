@@ -2,13 +2,15 @@ import { marginArg } from "../../report/CiFormatting.ts";
 import { formatSignedPercent } from "../../report/Formatters.ts";
 import type { CIDirection, DifferenceCI } from "../../stats/Bootstrap.ts";
 import {
+  type AbsolutePercentile,
+  type AbsoluteShift,
   type BootstrapCIData,
   type ShiftFunction,
   type ShiftPercentile,
   shiftMarginBand,
 } from "../ReportData.ts";
 import type { DistributionPlotOptions } from "../plots/CIPlot.ts";
-import { reportData, shiftDetail } from "../State.ts";
+import { absoluteDetail, reportData, shiftDetail } from "../State.ts";
 import { HelpButton } from "./HelpButton.tsx";
 import { useLazyPlot } from "./LazyPlot.ts";
 
@@ -29,6 +31,14 @@ export function openShiftDetail(shift: ShiftFunction, point: ShiftPercentile) {
     metric: shift.metric,
     marginBand: shiftMarginBand(shift),
   };
+}
+
+/** Open the detail popup for one percentile of an absolute (no-baseline) fan. */
+export function openAbsoluteDetail(
+  shift: AbsoluteShift,
+  point: AbsolutePercentile,
+) {
+  absoluteDetail.value = { point, metric: shift.metric };
 }
 
 /** A thunk opening the popup for a shift function's verdict point, or undefined
@@ -85,6 +95,39 @@ export function ComparisonBadge(
   );
 }
 
+/** DistributionPlotOptions for an absolute (non-zero-anchored) bootstrap plot,
+ *  pulling CI labels/level/reliability off the data. Used by inline sparklines
+ *  and the shift-detail popup, which differ only in size and point label. */
+export function distributionOpts(
+  ci: BootstrapCIData,
+  size: { width: number; height: number; pointLabel?: string; domain?: [number, number] },
+): DistributionPlotOptions {
+  return {
+    width: size.width, height: size.height, title: "", direction: "uncertain",
+    ciLabels: ci.ciLabels, includeZero: false, smooth: true,
+    pointLabel: size.pointLabel, ciLevel: ci.ciLevel, ciReliable: ci.ciReliable,
+    domain: size.domain,
+  };
+}
+
+/** Lazy-imports CIPlot and renders a bootstrap distribution sparkline inline.
+ *  `shift` nudges it horizontally to position the estimate within a section's
+ *  range; `domain` pins a shared x-scale so sibling sparklines are comparable. */
+export function BootstrapCIMount({ ci, label, shift, domain }: {
+  ci: BootstrapCIData;
+  label?: string;
+  shift?: number;
+  domain?: [number, number];
+}) {
+  const ref = useLazyPlot(async () => {
+    const { createDistributionPlot } = await import("../plots/CIPlot.ts");
+    const opts = distributionOpts(ci, { width: 240, height: 80, pointLabel: label, domain });
+    return createDistributionPlot(ci.histogram, ci.ci, ci.estimate, opts);
+  }, [ci, label, domain], "Bootstrap CI plot");
+  const style = shift != null ? { marginLeft: `${Math.round(shift)}px` } : undefined;
+  return <div class="ci-plot-inline" style={style} ref={ref} />;
+}
+
 /** Lazy-imports CIPlot and renders a confidence interval chart inline. When
  *  `onOpen` is set the chart is clickable; the click is stopped from bubbling
  *  so enclosing click targets don't also fire. */
@@ -118,37 +161,4 @@ function CIPlotMount(
 function cliArgsMarginBand(): [number, number] | undefined {
   const m = marginArg(reportData.value?.metadata.cliArgs);
   return m === undefined ? undefined : [-m, m];
-}
-
-/** DistributionPlotOptions for an absolute (non-zero-anchored) bootstrap plot,
- *  pulling CI labels/level/reliability off the data. Used by inline sparklines
- *  and the shift-detail popup, which differ only in size and point label. */
-export function distributionOpts(
-  ci: BootstrapCIData,
-  size: { width: number; height: number; pointLabel?: string; domain?: [number, number] },
-): DistributionPlotOptions {
-  return {
-    width: size.width, height: size.height, title: "", direction: "uncertain",
-    ciLabels: ci.ciLabels, includeZero: false, smooth: true,
-    pointLabel: size.pointLabel, ciLevel: ci.ciLevel, ciReliable: ci.ciReliable,
-    domain: size.domain,
-  };
-}
-
-/** Lazy-imports CIPlot and renders a bootstrap distribution sparkline inline.
- *  `shift` nudges it horizontally to position the estimate within a section's
- *  range; `domain` pins a shared x-scale so sibling sparklines are comparable. */
-export function BootstrapCIMount({ ci, label, shift, domain }: {
-  ci: BootstrapCIData;
-  label?: string;
-  shift?: number;
-  domain?: [number, number];
-}) {
-  const ref = useLazyPlot(async () => {
-    const { createDistributionPlot } = await import("../plots/CIPlot.ts");
-    const opts = distributionOpts(ci, { width: 240, height: 80, pointLabel: label, domain });
-    return createDistributionPlot(ci.histogram, ci.ci, ci.estimate, opts);
-  }, [ci, label, domain], "Bootstrap CI plot");
-  const style = shift != null ? { marginLeft: `${Math.round(shift)}px` } : undefined;
-  return <div class="ci-plot-inline" style={style} ref={ref} />;
 }

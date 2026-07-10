@@ -9,50 +9,10 @@ export type HelpTopic =
   | "noiseRejection"
   | "metricValues"
   | "shiftChart"
+  | "valueByPercentile"
   | "equivalenceMargin"
   | "timeSeries"
   | "histogram";
-
-// TODO: help for the GC panel (--gc-stats): alloc/iter, collected, scav, full,
-// promo%, pause/iter -- read as GC cost behind the timing.
-
-const docBase = "https://github.com/mighdoll/benchforge/blob/main/";
-
-/** Link to a standalone doc on GitHub, opened in a new tab. */
-function DocLink({ doc, children }: { doc: string; children: ComponentChildren }) {
-  return (
-    <a href={docBase + doc} target="_blank" rel="noopener">
-      {children}
-    </a>
-  );
-}
-
-/** Swatch legend for violin colors: light fill with a colored outline, echoing
- *  how the violins are actually drawn (fill at low opacity + solid stroke). */
-function ViolinLegend() {
-  const entries: [CIDirection, string][] = [
-    ["faster", "faster"],
-    ["slower", "slower"],
-    ["equivalent", "equivalent (within the noise margin)"],
-    ["uncertain", "inconclusive"],
-  ];
-  return (
-    <ul class="help-legend">
-      {entries.map(([dir, label]) => {
-        const { stroke } = directionColors[dir];
-        const swatch = {
-          border: `1.5px solid ${stroke}`,
-          background: `color-mix(in srgb, ${stroke} 25%, transparent)`,
-        };
-        return (
-          <li key={dir}>
-            <i style={swatch} /> {label}
-          </li>
-        );
-      })}
-    </ul>
-  );
-}
 
 /** Popover text per help topic. Written for first-time readers: plain words,
  *  no unexplained stats jargon, generic (no specific benchmarks or numbers). */
@@ -179,6 +139,28 @@ export const helpContent: Record<
     ),
   },
 
+  valueByPercentile: {
+    title: "Value by percentile",
+    body: (
+      <>
+        <p>
+          Shows the metric's own distribution across iterations, from the
+          fastest to the slowest, with no baseline to compare against. The
+          verdict stat (usually the mean) is in bold.
+        </p>
+        <p>
+          Each violin is the estimate at one percentile, with a mark at the
+          best estimate; its width is the spread of the bootstrap. A gray
+          dashed violin had too few tail samples to pin down.
+        </p>
+        <p>
+          The axis is in the metric's own units. Re-run with a baseline to get
+          the change-by-percentile view instead.
+        </p>
+      </>
+    ),
+  },
+
   equivalenceMargin: {
     title: "The shaded band",
     body: (
@@ -239,3 +221,44 @@ export const helpContent: Record<
     ),
   },
 };
+
+// TODO: help for the GC panel (--gc-stats): alloc/iter, collected, scav, full,
+// promo%, pause/iter -- read as GC cost behind the timing.
+
+const docBase = "https://github.com/mighdoll/benchforge/blob/main/";
+
+/** Swatch legend for violin colors: light fill with a colored outline, echoing
+ *  how the violins are actually drawn (fill at low opacity + solid stroke). */
+function ViolinLegend() {
+  const entries: [CIDirection, string][] = [
+    ["faster", "faster"],
+    ["slower", "slower"],
+    ["equivalent", "equivalent (within the noise margin)"],
+    ["uncertain", "inconclusive"],
+  ];
+  return (
+    <ul class="help-legend">
+      {entries.map(([dir, label]) => {
+        const { stroke } = directionColors[dir];
+        const swatch = {
+          border: `1.5px solid ${stroke}`,
+          background: `color-mix(in srgb, ${stroke} 25%, transparent)`,
+        };
+        return (
+          <li key={dir}>
+            <i style={swatch} /> {label}
+          </li>
+        );
+      })}
+    </ul>
+  );
+}
+
+/** Link to a standalone doc on GitHub, opened in a new tab. */
+function DocLink({ doc, children }: { doc: string; children: ComponentChildren }) {
+  return (
+    <a href={docBase + doc} target="_blank" rel="noopener">
+      {children}
+    </a>
+  );
+}

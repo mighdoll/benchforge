@@ -182,6 +182,53 @@ export interface ShiftRun {
   bootstrapCI: BootstrapCIData;
 }
 
+/** A single variant's absolute distribution across percentiles, for a run with
+ *  no baseline to diff against. The summary card draws one violin per percentile
+ *  of the metric's own values (no comparison), restoring the percentile fan the
+ *  shift function gives when a baseline is present. */
+export interface AbsoluteShift {
+  /** Displayed metric label, e.g. "lines / sec" or "mean". */
+  metric: string;
+
+  /** Display-domain [min, max] the y-axis spans, keyed on the well-measured
+   *  points so a noisy tail percentile can't stretch the scale. */
+  domain: [number, number];
+
+  /** Pre-formatted y-axis ticks (labels carry the metric's units, which the
+   *  viewer has no formatter for). */
+  axisTicks: { value: number; label: string }[];
+
+  points: AbsolutePercentile[];
+}
+
+/** One percentile's absolute distribution for the {@link AbsoluteShift} fan. */
+export interface AbsolutePercentile {
+  /** true for the leading mean point (its own slot ahead of p1, set off by a
+   *  divider), mirroring {@link ShiftPercentile}. */
+  isMean?: boolean;
+
+  /** true for the point matching the section's verdict stat (larger label). */
+  isPrimary?: boolean;
+
+  /** Displayed-metric percentile in [0, 1] (e.g. 0.5 for the median). */
+  percentile: number;
+
+  /** Short label, e.g. "p50", "p99", "mean". */
+  label: string;
+
+  /** The variant's absolute distribution at this percentile (display domain). */
+  ci: BootstrapCIData;
+
+  /** false when too few tail samples/batches support a stable estimate. */
+  reliable: boolean;
+
+  /** Samples beyond this percentile; drives reliability. */
+  tailCount: number;
+
+  /** Distinct batches contributing tail samples. */
+  tailBatches: number;
+}
+
 /** A single track's cell in a row: its value and distribution, plus (for a
  *  comparison track) its diff vs the case baseline. */
 export interface ViewerEntry {
@@ -199,6 +246,11 @@ export interface ViewerEntry {
   /** This track's per-percentile diff distribution for the shift-function plot,
    *  present on the primary metric row of a comparison track. */
   shiftFunction?: ShiftFunction;
+
+  /** This track's per-percentile absolute distribution, present on the primary
+   *  metric row of a variant with no baseline (mutually exclusive with
+   *  {@link shiftFunction}). */
+  absoluteShift?: AbsoluteShift;
 }
 
 /** Bootstrap CI data for inline visualization. */

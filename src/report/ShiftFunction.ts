@@ -9,8 +9,13 @@ import {
   preparePairedBlocks,
 } from "../stats/BlockDifference.ts";
 import type { BootstrapResult, DifferenceCI } from "../stats/Bootstrap.ts";
-import { type StatKind, statKindToFn } from "../stats/CoreStats.ts";
-import type { ShiftFunction, ShiftPercentile } from "../viewer/ReportData.ts";
+import { median, type StatKind, statKindToFn } from "../stats/CoreStats.ts";
+import type {
+  AbsolutePercentile,
+  AbsoluteShift,
+  ShiftFunction,
+  ShiftPercentile,
+} from "../viewer/ReportData.ts";
 import type {
   ComparisonOptions,
   MetricSection,
@@ -21,8 +26,16 @@ import {
   displayMarginBand,
   hasBatchBlocks,
   hasLowBatchCount,
+  minBatches,
 } from "./CiFormatting.ts";
-import { buildMeanPoint, buildPoint, type PointArgs } from "./ShiftPoints.ts";
+import {
+  type AbsPointArgs,
+  buildAbsoluteMeanPoint,
+  buildAbsolutePoint,
+  buildMeanPoint,
+  buildPoint,
+  type PointArgs,
+} from "./ShiftPoints.ts";
 
 /** Options for {@link buildShiftFunction} beyond the two measured results. */
 export interface ShiftFunctionOptions {
@@ -37,6 +50,8 @@ export interface ShiftFunctionOptions {
  *  stat and its precomputed diff/abs results). */
 type ShiftContext = Omit<PointArgs, "p" | "diff" | "curResult" | "baseResult">;
 
+/** Per-stat results, indexed to match the stat list (mean at 0, percentiles
+ *  after), plus the shared pairing reused across points. */
 type ShiftStats = {
   diffs: (DifferenceCI | undefined)[];
   curAbs: (BootstrapResult | undefined)[];
@@ -96,6 +111,52 @@ export function buildShiftFunction(
     baselineMeta,
   );
   return { metric: section.title, equivMargin, equivMarginBand, points };
+}
+
+/** Build the per-percentile absolute distribution fan for a metric section from
+ *  a single variant's samples, for runs with no baseline to diff against.
+ *  Reuses the same stat list and reliability gating as the shift function, but
+ *  bootstraps only the current variant's absolute values. Returns undefined when
+ *  there are too few samples to bootstrap. */
+export function buildAbsoluteShift(
+  section: MetricSection,
+  current: MeasuredResults,
+  options: ShiftFunctionOptions = {},
+): AbsoluteShift | undefined {
+  if (current.samples.length <= 1) return undefined;
+  const { currentMeta, comparison } = options;
+  const noBatchTrim = comparison?.noBatchTrim;
+
+  const stats: StatKind[] = [
+    "mean",
+    ...shiftPercentiles.map(p => ({ percentile: p })),
+  ];
+  const results = bootstrapCIs(current.samples, current.batchOffsets, stats, {
+    noTrim: noBatchTrim,
+    resamples: comparison?.resamples,
+  });
+
+  const batches = current.batchOffsets?.length ?? 0;
+  const base: Omit<AbsPointArgs, "p" | "result"> = {
+    section,
+    current,
+    currentMeta,
+    lowBatches: batches < minBatches,
+    noBatchTrim,
+    verdict: metricStatKind(section),
+  };
+  const percentiles = shiftPercentiles.flatMap((p, i) => {
+    const point = buildAbsolutePoint({ ...base, p, result: results[i + 1] });
+    return point ? [point] : [];
+  });
+  percentiles.sort((a, b) => a.percentile - b.percentile);
+  const mean = buildAbsoluteMeanPoint({ ...base, p: 0, result: results[0] });
+  const points = mean ? [mean, ...percentiles] : percentiles;
+  if (!points.length) return undefined;
+
+  const domain = absoluteDomain(points);
+  const axisTicks = absoluteTicks(domain, section);
+  return { metric: section.title, domain, axisTicks, points };
 }
 
 /** Prepare paired batch blocks from two results, throwing if either lacks the
@@ -183,6 +244,40 @@ function marginBand(
   );
 }
 
+/** Display-domain [min, max] the absolute fan spans. Keyed on the well-measured
+ *  points (reliable, CI not far wider than peers') so a noisy tail percentile
+ *  can't stretch the scale; the plot clips wider violins at the edge. */
+function absoluteDomain(points: AbsolutePercentile[]): [number, number] {
+  const reliable = points.filter(p => p.reliable);
+  const candidates = reliable.length ? reliable : points;
+  const width = (p: AbsolutePercentile) => p.ci.ci[1] - p.ci.ci[0];
+  const medWidth = median(candidates.map(width)) || 0;
+  const bounded = candidates.filter(p => width(p) <= 3 * medWidth);
+  const use = bounded.length ? bounded : candidates;
+  let min = Number.POSITIVE_INFINITY;
+  let max = Number.NEGATIVE_INFINITY;
+  for (const p of use) {
+    min = Math.min(min, p.ci.ci[0], p.ci.estimate);
+    max = Math.max(max, p.ci.ci[1], p.ci.estimate);
+  }
+  const pad = (max - min) * 0.05 || 1;
+  return [min - pad, max + pad];
+}
+
+/** Pre-formatted y-axis ticks at a nice step across the domain, labeled in the
+ *  metric's own units (the viewer has no formatter to do this itself). */
+function absoluteTicks(
+  domain: [number, number],
+  section: MetricSection,
+): { value: number; label: string }[] {
+  const [min, max] = domain;
+  const step = niceStep((max - min) / 5);
+  const ticks: { value: number; label: string }[] = [];
+  for (let t = Math.ceil(min / step) * step; t <= max; t += step)
+    ticks.push({ value: t, label: section.formatter(t) ?? String(t) });
+  return ticks;
+}
+
 /** Block-bootstrap path: diffs and absolute CIs from the shared batch pairing,
  *  reusing a prepared pairing when one was passed in. Takes current before
  *  baseline, matching shiftStats and sampleShiftStats. */
@@ -246,4 +341,14 @@ function sampleShiftStats(
     absOpts,
   );
   return { diffs, curAbs, baseAbs };
+}
+
+/** @return a "nice" axis step (1, 2, or 5 times a power of ten) near raw. */
+function niceStep(raw: number): number {
+  const mag = 10 ** Math.floor(Math.log10(raw || 1));
+  const mantissa = raw / mag;
+  if (mantissa < 1.5) return mag;
+  if (mantissa < 3) return 2 * mag;
+  if (mantissa < 7) return 5 * mag;
+  return 10 * mag;
 }

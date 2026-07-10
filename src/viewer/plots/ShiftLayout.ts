@@ -41,3 +41,25 @@ export function wideCiPoints(points: ShiftPercentile[]): Set<ShiftPercentile> {
 export function ciWidth(p: ShiftPercentile): number {
   return p.diff.ci[1] - p.diff.ci[0];
 }
+
+/** Slot centers across the plot. A leading mean point gets its own slot, set off
+ *  from the percentiles by an extra half-slot gap with a divider line between.
+ *  Shared by the diff and absolute shift plots (keyed only on isMean); the
+ *  absolute plot passes a wider `left` to fit its value-domain axis labels. */
+export function slotCenters(
+  points: { isMean?: boolean }[],
+  plotWidth: number,
+  left: number = margin.left,
+): { cx: number[]; slotWidth: number; dividerX: number | null } {
+  const hasMean = points[0]?.isMean ?? false;
+  // the gap before p1 costs one extra half-slot of width
+  const slots = points.length + (hasMean ? 0.5 : 0);
+  const slotWidth = plotWidth / slots;
+  const gap = hasMean ? slotWidth * 0.5 : 0;
+  const cx = points.map((_, i) => {
+    const lead = i === 0 || !hasMean ? 0 : gap;
+    return left + lead + slotWidth * (i + 0.5);
+  });
+  const dividerX = hasMean ? left + slotWidth + gap * 0.5 : null;
+  return { cx, slotWidth, dividerX };
+}
