@@ -1,4 +1,8 @@
-import type { NoiseFloor } from "../stats/NoiseFloor.ts";
+import {
+  type NoiseFloor,
+  noiseFloorAtOrAboveMargin,
+  significantDrift,
+} from "../stats/NoiseFloor.ts";
 import type {
   BenchmarkEntry,
   BenchmarkGroup,
@@ -106,10 +110,10 @@ function noiseFloorMarkdown(nf: NoiseFloor, margin?: number): string[] {
  *  a better/worse verdict is likely environmental, not real. Silent otherwise so
  *  the clean case stays a single line. */
 function marginReading(nf: NoiseFloor, margin?: number): string {
-  if (!margin || nf.halfWidthPct < margin) return "";
+  if (!noiseFloorAtOrAboveMargin(nf, margin)) return "";
   return (
     `The noise floor is at or above the margin, so a verdict within about ` +
-    `+/-${margin.toFixed(2)}% is likely environmental, not a real change -- ` +
+    `+/-${margin!.toFixed(2)}% is likely environmental, not a real change -- ` +
     `re-run on a quieter machine or widen the margin.`
   );
 }
@@ -117,7 +121,7 @@ function marginReading(nf: NoiseFloor, margin?: number): string {
 /** Note a mid-run environment shift only when the half-to-half drift exceeds the
  *  run's own resolution (the environment moved by more than the run can resolve). */
 function driftNote(nf: NoiseFloor): string {
-  if (Math.abs(nf.driftPct) < nf.halfWidthPct) return "";
+  if (!significantDrift(nf)) return "";
   return (
     `Baseline timing drifted ${formatSignedPercent(nf.driftPct)} from the first ` +
     `to the second half of the run -- the environment was not stationary.`

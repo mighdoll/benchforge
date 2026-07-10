@@ -1,22 +1,33 @@
 import type { CIDirection, DifferenceCI } from "../stats/Bootstrap.ts";
+import {
+  type NoiseFloor,
+  noiseFloorAtOrAboveMargin,
+  significantDrift,
+} from "../stats/NoiseFloor.ts";
 import type {
   BenchmarkGroup,
   ReportData,
   ViewerEntry,
   ViewerRow,
 } from "../viewer/ReportData.ts";
+import { marginArg } from "./CiFormatting.ts";
 import colors from "./Colors.ts";
-import { formatPercentCI, formatSignedPercent } from "./Formatters.ts";
+import {
+  formatPercentCI,
+  formatSignedPercent,
+  percentMagnitude,
+} from "./Formatters.ts";
 import { verdictWord } from "./Verdict.ts";
 
-const { bold, dim, green, red } = colors;
+const { bold, dim, green, red, yellow } = colors;
 
 /** Render a pithy console summary: per comparison track a headline metric line
  *  and, when a baseline exists, a verdict line (direction, Δ%, CI). Reads the
  *  case-level metric row already computed in ReportData; scalar sections (gc,
  *  runs) are omitted here -- they live in the markdown report and HTML viewer. */
 export function consoleSummary(data: ReportData): string {
-  return data.groups.flatMap(groupLines).join("\n");
+  const margin = marginArg(data.metadata.cliArgs);
+  return data.groups.flatMap(g => groupLines(g, margin)).join("\n");
 }
 
 /** @return the group's primary (verdict-driving) metric row, if any. */
@@ -41,13 +52,34 @@ export function benchLabel(name: string, groupName: string): string {
 }
 
 /** Each comparison track's headline (+ verdict) for one group; no group header.
- *  Baseline tracks are skipped -- the verdict lines already read "vs baseline". */
-function groupLines(group: BenchmarkGroup): string[] {
+ *  Baseline tracks are skipped -- the verdict lines already read "vs baseline".
+ *  A "noisy run" caption trails the group when the environment looks unclean. */
+function groupLines(group: BenchmarkGroup, margin?: number): string[] {
   const metric = primaryMetricRow(group);
   if (!metric) return [];
-  return metric.entries
+  const tracks = metric.entries
     .filter(e => !e.isBaseline)
     .flatMap(e => trackLines(e, metric, group.name));
+  const noise = noiseLine(group.noiseFloor, margin);
+  return noise ? [...tracks, noise] : tracks;
+}
+
+/** A single yellow "noisy run" caption for the group, present only when the
+ *  baseline floor reaches the margin or the run drifted mid-run (the same gates
+ *  the markdown report uses). Only the clause whose gate fired is included, so a
+ *  clean run stays silent. Context for the verdict, not a second test. */
+function noiseLine(nf?: NoiseFloor, margin?: number): string | undefined {
+  if (!nf) return undefined;
+  const clauses: string[] = [];
+  if (noiseFloorAtOrAboveMargin(nf, margin))
+    clauses.push(
+      `baseline noise +/-${percentMagnitude(nf.halfWidthPct, 1)} ` +
+        `vs margin ${percentMagnitude(margin!, 1)}`,
+    );
+  if (significantDrift(nf))
+    clauses.push(`timing drifted ${formatSignedPercent(nf.driftPct)} mid-run`);
+  if (!clauses.length) return undefined;
+  return `  ${yellow(`noisy run: ${clauses.join("; ")}`)}`;
 }
 
 /** Headline line plus an optional verdict line for one track. */

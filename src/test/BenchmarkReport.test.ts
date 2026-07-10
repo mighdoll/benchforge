@@ -10,6 +10,8 @@ import { consoleSummary } from "../report/ConsoleSummary.ts";
 import { integer } from "../report/Formatters.ts";
 import { prepareHtmlData } from "../report/HtmlReport.ts";
 import { timeSection } from "../report/StandardSections.ts";
+import type { NoiseFloor } from "../stats/NoiseFloor.ts";
+import type { ReportData } from "../viewer/ReportData.ts";
 import { createBenchmarkReport, createMeasuredResults } from "./TestUtils.ts";
 
 test("produces a comparison CI and verdict for a baseline", () => {
@@ -110,4 +112,54 @@ test("report falls back to CLI defaults without opts", () => {
   const args = parseCliArgs(undefined, ["--duration", "0.1"]);
   const output = consoleSummary(defaultReportData(groups, args));
   expect(output).toContain("(mean)");
+});
+
+/** A ReportData whose single group carries the given noise floor (equiv-margin
+ *  defaults to 2%), for exercising the console noisy-run caption. */
+function reportWithNoiseFloor(nf?: NoiseFloor): ReportData {
+  const groups = [
+    {
+      name: "group1",
+      reports: [createBenchmarkReport("version1", [250, 300])],
+      baseline: createBenchmarkReport("baseVersion", [200, 250]),
+    },
+  ];
+  const args = parseCliArgs(undefined, ["--duration", "0.1"]);
+  const data = defaultReportData(groups, args, { sections: [timeSection] });
+  data.groups[0].noiseFloor = nf;
+  return data;
+}
+
+const noisyFloor: NoiseFloor = {
+  halfWidthPct: 3.1,
+  dispersionPct: 2.5,
+  batches: 40,
+  driftPct: 3.2,
+  crossRoundAcf: 0,
+};
+
+test("console summary flags a noisy run when both gates fire", () => {
+  const output = consoleSummary(reportWithNoiseFloor(noisyFloor));
+  expect(output).toContain("noisy run:");
+  expect(output).toContain("baseline noise +/-3.1% vs margin 2.0%");
+  expect(output).toContain("timing drifted +3.2% mid-run");
+});
+
+test("console summary includes only the clause whose gate fired", () => {
+  const driftOnly = { ...noisyFloor, halfWidthPct: 0.5, driftPct: 1.2 };
+  const output = consoleSummary(reportWithNoiseFloor(driftOnly));
+  expect(output).toContain("noisy run:");
+  expect(output).toContain("timing drifted +1.2% mid-run");
+  expect(output).not.toContain("baseline noise");
+});
+
+test("console summary omits the noisy-run line without a noise floor", () => {
+  const output = consoleSummary(reportWithNoiseFloor(undefined));
+  expect(output).not.toContain("noisy run:");
+});
+
+test("console summary stays quiet when both gates are below threshold", () => {
+  const quiet = { ...noisyFloor, halfWidthPct: 0.5, driftPct: 0.1 };
+  const output = consoleSummary(reportWithNoiseFloor(quiet));
+  expect(output).not.toContain("noisy run:");
 });

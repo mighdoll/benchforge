@@ -54,10 +54,7 @@ export function noiseFloor(
   const grand = mean(batchMeans);
   if (grand <= 0) return undefined;
 
-  const { ci } = blockBootstrap(samples, offsets, mean, {
-    noTrim,
-    random,
-  });
+  const { ci } = blockBootstrap(samples, offsets, mean, { noTrim, random });
   const acf = batchMeanAutocorrelation(side.keptSplits);
   return {
     halfWidthPct: ((ci[1] - ci[0]) / 2 / grand) * 100,
@@ -66,6 +63,24 @@ export function noiseFloor(
     driftPct: (halfSplitDrift(batchMeans) / grand) * 100,
     crossRoundAcf: acf[0] ?? 0,
   };
+}
+
+/** The baseline floor reaches the equiv margin, so a verdict within about the
+ *  margin is likely environmental rather than a real change. Gated in the time
+ *  domain (floor and margin are both time-percent). Undefined/disabled margin
+ *  never fires. Shared by the markdown reading and the console caption. */
+export function noiseFloorAtOrAboveMargin(
+  nf: NoiseFloor,
+  margin?: number,
+): boolean {
+  if (margin === undefined || margin <= 0) return false;
+  return nf.halfWidthPct >= margin;
+}
+
+/** The half-to-half drift exceeds the run's own resolution: the environment
+ *  moved by more than the run can resolve. Shared by markdown and console. */
+export function significantDrift(nf: NoiseFloor): boolean {
+  return Math.abs(nf.driftPct) >= nf.halfWidthPct;
 }
 
 /** Mean of the second half minus mean of the first half of the batch means. A
