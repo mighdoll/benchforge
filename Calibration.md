@@ -1,43 +1,45 @@
 # Calibration
 
-How much you can trust a benchmark's numbers depends on two things you control:
-sizing each run so its result is stable, and knowing your setup's noise floor,
-how much its measurements move between runs. The noise floor also sets the
-equivalence margin for comparing versions.
+Trusting a benchmark's numbers depends on two things you control: sizing each
+run so its result is stable, and knowing your noise floor.
 
 ## Sizing your runs
 
-Two things determine the measurement: how long each batch runs, and how many
-batches there are. `--duration` sets a time budget per batch (`--iterations`
-fixes an exact iteration count instead); `--batches` sets the batch count.
+There are two primary levers to control measurement: how long each batch runs,
+and how many batches there are. `--duration` sets a time budget per batch
+(`--iterations` fixes an exact iteration count instead); `--batches` sets the
+batch count.
 
-Batch length matters most for allocation-heavy code, because each batch starts
-with a fresh heap. If a batch is too short, the heap never fills enough to
-trigger a full (major) garbage collection, and the batch average misses that
-cost entirely. If a batch is just long enough for a single full collection, the
-average swings depending on exactly when that collection lands. Give such a
-batch enough time for several full collections and its average settles.
+Use longer batches if repeated runs of your benchmark within the batch can
+trigger full garbage collection cycles. Collection impacts are important to
+measure, and so you want the batch to be long enough to trigger full collection.
+In fact, make the batch long enough for several full collections, not just one.
+That will help the measurement converge on more precise.
 
-Many workloads never trigger a full collection at all -- low-allocation code, or
-code whose allocation was tuned down, collects only cheap minor GCs (scavenges),
-and every batch sees plenty of those. There is no collection-placement artifact
-to average out, so batch length only needs to be long enough for a stable sample
-count; you tighten the margin by adding batches, not by lengthening them. Run
-`--calibrate --gc-stats` to see which regime you are in: it reports full GCs per
-batch, and reads "no major GCs" when the workload is scavenge-dominated.
+If the program you're benchmarking doesn't trigger full collections when run
+repeatedly. batch length only needs to be long enough for a stable sample count;
+you tighten the margin by adding batches, not by lengthening them. Low
+allocation code on smaller data sets won't trigger full collection at all, cheap
+minor collections (scavanges) will keep up. Also consider benchmarking with
+larger data sets if appropriate.
 
-Total time is roughly `--duration` times `--batches`, and you can trade one
-against the other: longer batches give steadier per-batch averages when full
-collections are in play, more batches give a tighter confidence interval. When
-per-batch averages swing because of full-collection placement, lengthen
-`--duration`; otherwise prefer more batches. To see whether each batch triggers
-full collections, step through the batches on the time-per-iteration chart,
-where each one is marked.
+You can look at the iterations tab in the UI and to see the full collections per
+batch if you benchmark with `--gc-stats`. Summary collection numbers are also in
+the GC panel on the summary page.
 
-Aim for 40 batches or more for a reliable comparison.
+Total time to benchmark is roughly `--duration` times `--batches`, and you can
+trade one against the other: longer batches give steadier per-batch averages
+when full collections are in play, more batches give a tighter confidence
+interval. When per-batch averages swing because of full-collection placement,
+lengthen `--duration` to get more collections per batch; otherwise prefer more
+batches. To see whether each batch triggers full collections, step through the
+batches on the time-per-iteration chart.
 
-For profiling (finding which functions spend the time or memory), the run
-settings differ; see [Profiling.md](Profiling.md#run-settings-for-profiling).
+Aim for 40 batches or more for reliable comparison statistics.
+
+For profiling (finding which functions spend the time or memory), note that the
+run settings differ; see
+[Profiling.md](Profiling.md#run-settings-for-profiling).
 
 ## Presets
 
@@ -52,16 +54,16 @@ batches.
 
 ## Measuring the noise floor
 
-Even with well-chosen run settings, comparing identical code will not report
-exactly zero. Machine state drifts between measurements (CPU frequency, caches,
-background load), and garbage collection is timing-sensitive: collections fire
-at slightly different moments, and sometimes in different numbers, from one run
-to the next. That residual movement is your setup's **noise floor**. You set the
-equivalence margin to cover that floor, so real differences can be distinguished
-from noise.
+Even with well-chosen run settings, comparing identical code against itself will
+not report zero differences. Machine state drifts between measurements (CPU
+frequency, caches, background load), and garbage collection is timing-sensitive:
+collections fire at slightly different moments, and sometimes in different
+numbers, from one run to the next. That residual movement is your setup's
+**noise floor**. You set the equivalence margin to cover that floor, so real
+differences can be distinguished from noise.
 
 `--calibrate` runs a series of tests to measure the noise floor. Each test runs
-your benchmark against an identical copy of itself; because both sides are the
+your benchmark against an identical copy of itself. Because both sides are the
 same code, the true difference is zero, so whatever spread the tests show is
 pure measurement noise. From that spread, calibrate prints a suggested
 `--equiv-margin`.
@@ -125,6 +127,8 @@ real comparisons run with an editor and browser open, calibrate that way too, so
 the floor matches your everyday conditions.
 
 **Bursty noise cannot be calibrated away.** A background task that fires during
-some runs but not others is not a steady floor. Run more batches when the
-machine is noisy, so any single burst counts for less in the result. A burst
-large enough to be a slow outlier may also be dropped.
+some runs but not others is not a steady floor. Benchforge will reject only
+obvious outlier batches as noise, lower intensity noise mixes in with the data.
+Run more batches when the machine is noisy, so any single burst counts for less
+in the result, and expect benchforge to report wider (less certain) confidince
+intervals.
