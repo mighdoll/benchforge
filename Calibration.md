@@ -12,18 +12,18 @@ batch count.
 
 Use longer batches if repeated runs of your benchmark within the batch can
 trigger full garbage collection cycles. Collection impacts are important to
-measure, and so you want the batch to be long enough to trigger full collection.
+measure, so you want the batch to be long enough to trigger full collection.
 In fact, make the batch long enough for several full collections, not just one.
-That will help the measurement converge on more precise.
+That helps the measurement converge on a more precise value.
 
 If the program you're benchmarking doesn't trigger full collections when run
-repeatedly. batch length only needs to be long enough for a stable sample count;
-you tighten the margin by adding batches, not by lengthening them. Low
-allocation code on smaller data sets won't trigger full collection at all, cheap
-minor collections (scavanges) will keep up. Also consider benchmarking with
-larger data sets if appropriate.
+repeatedly, batch length only needs to be long enough for a stable sample count;
+you tighten the margin by adding batches, not by lengthening them. Low-allocation
+code on smaller data sets won't trigger full collection at all; cheap minor
+collections (scavenges) will keep up. Also consider benchmarking with larger data
+sets if appropriate.
 
-You can look at the iterations tab in the UI and to see the full collections per
+You can look at the iterations tab in the UI to see the full collections per
 batch if you benchmark with `--gc-stats`. Summary collection numbers are also in
 the GC panel on the summary page.
 
@@ -128,7 +128,7 @@ the floor matches your everyday conditions.
 
 **Bursty noise cannot be calibrated away.** A background task that fires during
 some runs but not others is not a steady floor. Benchforge will reject only
-obvious outlier batches as noise, lower intensity noise mixes in with the data.
+obvious outlier batches as noise; lower-intensity noise mixes in with the data.
 Run more batches when the machine is noisy, so any single burst counts for less
-in the result, and expect benchforge to report wider (less certain) confidince
+in the result, and expect benchforge to report wider (less certain) confidence
 intervals.
