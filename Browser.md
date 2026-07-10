@@ -13,6 +13,21 @@ benchforge --url http://localhost:5173 --baseline-url http://localhost:5174
 benchforge --url http://localhost:5173 --alloc --gc-stats --view
 ```
 
+## Comparing Variants in the Browser
+
+A `MatrixSuite` file runs in the browser by adding `--url`: benchforge launches
+Chrome and runs each variant in a fresh tab against that harness page, with the
+same cases x variants model, `Δ%` verdict, and report as a Node run.
+
+```bash
+benchforge copy.ts --url http://localhost:5173
+```
+
+Browser matrix runs need **inline** sources: `variants` and `caseData` written in
+the suite. `variantDir` and `casesModule` are Node-only (they would need a browser
+bundle step). See [Configuration.md](Configuration.md) for the suite model,
+presets, and custom metric sections, which apply to browser and Node runs alike.
+
 ## Bench Function Mode (`window.__bench`)
 
 Provide a function, benchforge handles iteration and timing:

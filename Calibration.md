@@ -41,17 +41,6 @@ For profiling (finding which functions spend the time or memory), note that the
 run settings differ; see
 [Profiling.md](Profiling.md#run-settings-for-profiling).
 
-## Presets
-
-A benchmark suite can ship named bundles of run settings so you need not retype
-them. A suite might define a `quick` preset for everyday checks and a `thorough`
-one for slower, more reliable comparisons; select a bundle with
-`--preset thorough`. A preset carries its `--equiv-margin` alongside the
-`--batches` and `--duration` it was calibrated at, which keeps the margin valid,
-since a margin measured at one batch count is wrong for another. Explicit flags
-still win, so `--preset quick --batches 200` runs the quick preset with 200
-batches.
-
 ## Measuring the noise floor
 
 Even with well-chosen run settings, comparing identical code against itself will
@@ -84,7 +73,9 @@ benchforge my-bench.ts --baseline --batches 40 --duration 2 --equiv-margin 0.5
 The margin is tied to those run settings. Confidence interval width scales
 roughly as one over the square root of the batch count, so a margin measured at
 one batch count is wrong for another. `--calibrate-runs` sets how many
-self-comparisons to average (default 15).
+self-comparisons to average (default 15). To keep the margin with the settings it
+was measured at, bundle them as a preset (see
+[Configuration.md](Configuration.md#presets)).
 
 ## The suggested margin
 

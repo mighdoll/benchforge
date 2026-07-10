@@ -106,8 +106,8 @@ benchforge copy.ts --batches 40
 ```
 
 Each variant is interleaved against the baseline and reported with a Δ% and a
-verdict. See [Node.md](Node.md) for multiple cases, directory variants, and
-custom metrics such as throughput.
+verdict. See [Configuration.md](Configuration.md) for multiple cases, directory
+variants, and custom metrics such as throughput.
 
 ## Quick Start: Browser
 
@@ -182,10 +182,11 @@ Core flags for common workflows. Run `benchforge --help` for the full list.
 
 ## Further Reading
 
-- [Node.md](Node.md) -- MatrixSuite details, custom metric sections, worker
-  mode, external debugger attachment
-- [Browser.md](Browser.md) -- Bench function and page-load modes, completion
-  signals, CDP flow
+- [Configuration.md](Configuration.md) -- MatrixSuite details, presets, and
+  custom metric sections (shared by Node and browser)
+- [Node.md](Node.md) -- Worker mode and external debugger attachment
+- [Browser.md](Browser.md) -- Comparing variants in the browser, bench function
+  and page-load modes, completion signals, CDP flow
 - [Profiling.md](Profiling.md) -- Allocation sampling, GC stats, V8 flags,
   Perfetto export
 - [Statistics.md](Statistics.md) -- Batches, block bootstrap, paired

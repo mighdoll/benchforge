@@ -20,7 +20,7 @@ In browser mode, the same flags work via CDP:
 
 Profiling wants different run settings than a timing comparison. For a timing
 verdict you want longer batches so each batch's mean is stable across GC timing
-(see [Statistics.md](Statistics.md#batch-duration)). A profile doesn't depend on
+(see [Statistics.md](Statistics.md#batches)). A profile doesn't depend on
 per-batch means at all -- each batch runs in its own worker and collects its own
 CPU/heap profile, and benchforge pools the sampled ticks (and allocation
 samples) across every batch. Resolution, and per-function baseline-delta noise

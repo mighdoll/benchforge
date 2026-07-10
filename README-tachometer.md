@@ -64,7 +64,7 @@ shared machine state before estimating the CI. When a disturbance contaminates
 a whole time window, an explicit batch boundary also lets benchforge drop that
 round from both sides instead of averaging the disturbance into the result.
 
-See [Statistics.md](Statistics.md#batched-execution) for details on the batch
+See [Statistics.md](Statistics.md#batches) for details on the batch
 model and block bootstrap.
 
 ### Verdicts and the Noise Floor
