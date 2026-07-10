@@ -4,6 +4,7 @@ export {
   type BuildResult,
   runBenchCli,
 } from "./cli/RunBenchCLI.ts";
+export type { RunDefaults } from "./cli/RunPresets.ts";
 export type {
   AnyVariant,
   BenchMatrix,

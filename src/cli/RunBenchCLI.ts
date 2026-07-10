@@ -22,6 +22,7 @@ import { runMatrixCalibrationInline } from "../matrix/MatrixInlineRunner.ts";
 import { reportMatrixResults } from "../matrix/MatrixReport.ts";
 import type { ReportSection } from "../report/BenchmarkReport.ts";
 import { calibrationMarkdown } from "../report/CalibrationReport.ts";
+import { formatCliCommand } from "../report/CliCommand.ts";
 import { consoleSummary } from "../report/ConsoleSummary.ts";
 import type { GitVersion } from "../report/GitUtils.ts";
 import {
@@ -44,6 +45,7 @@ import {
   matrixToReportGroups,
   withStatus,
 } from "./CliReport.ts";
+import { applyRunDefaults, type RunDefaults, readPreset } from "./RunPresets.ts";
 
 export interface BuildResult {
   suite: MatrixSuite;
@@ -60,6 +62,10 @@ export interface BenchCliConfig<Extra = Record<string, never>> {
   configure?: (yargs: Argv<DefaultCliArgs>) => Argv<DefaultCliArgs & Extra>;
   /** Build the suite and report metadata from parsed args. */
   build: (args: DefaultCliArgs & Extra) => Promise<BuildResult> | BuildResult;
+  /** Named bundles of run/calibration defaults, selected with --preset. */
+  presets?: Record<string, RunDefaults>;
+  /** Preset applied when --preset is omitted. */
+  defaultPreset?: string;
 }
 
 /** Single entry point: parse args, run the user's build, run the matrix pipeline. */
@@ -68,10 +74,44 @@ export async function runBenchCli<Extra = Record<string, never>>(
 ): Promise<void> {
   const configure =
     config.configure ?? (y => y as Argv<DefaultCliArgs & Extra>);
-  const args = parseCliArgs(y => configure(defaultCliArgs(y)));
+  const { presets, defaultPreset } = config;
+  const argv = hideBin(process.argv);
+  const chosen = presetDefaults(presets, defaultPreset, argv);
+  const args = parseCliArgs(y => {
+    const withOpts = configure(defaultCliArgs(y));
+    const withPreset = presets
+      ? registerPreset(withOpts, presets, defaultPreset)
+      : withOpts;
+    return applyRunDefaults(withPreset, chosen);
+  }, argv);
   const result = await config.build(args);
   if (args.list) return listMatrixSuite(result.suite);
   return runMatrixPipeline(result, args);
+}
+
+/** Resolve the run defaults for the selected (or default) preset. */
+function presetDefaults(
+  presets: Record<string, RunDefaults> | undefined,
+  defaultPreset: string | undefined,
+  argv: string[],
+): RunDefaults {
+  if (!presets) return {};
+  const name = readPreset(argv) ?? defaultPreset;
+  return (name && presets[name]) || {};
+}
+
+/** Add the --preset option (valid names, default) to yargs. */
+function registerPreset<T>(
+  y: Argv<T>,
+  presets: Record<string, RunDefaults>,
+  defaultPreset: string | undefined,
+): Argv<T> {
+  return y.option("preset", {
+    type: "string",
+    choices: Object.keys(presets),
+    default: defaultPreset,
+    describe: "run-settings preset (explicit flags override it)",
+  }) as unknown as Argv<T>;
 }
 
 /** Top-level CLI dispatch: route to view, analyze, or run a benchmark file/url. */
@@ -148,6 +188,9 @@ async function runMatrixPipeline(
   args: DefaultCliArgs,
 ): Promise<void> {
   if (args.calibrate) return runMatrixCalibratePipeline(m, args);
+  // Echo the effective invocation (including preset-injected settings) so the
+  // run's parameters are visible on the console, as they are in the HTML header.
+  console.log(formatCliCommand(args, cliDefaults));
   const results = await runFilteredMatrices(m.suite, args);
   const groups = matrixToReportGroups(results);
   const { sections, currentVersion, baselineVersion } = m;
