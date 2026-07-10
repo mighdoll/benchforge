@@ -10,8 +10,9 @@ export function timeMs(ms: unknown): string | null {
     return `${us.toFixed(precision)}μs`;
   }
   if (ms >= 1000) return `${(ms / 1000).toFixed(2)}s`;
-  if (ms >= 10) return `${ms.toFixed(0)}ms`;
-  return `${ms.toFixed(2)}ms`;
+  if (ms < 10) return `${ms.toFixed(2)}ms`;
+  if (ms < 100) return `${ms.toFixed(1)}ms`;
+  return `${ms.toFixed(0)}ms`;
 }
 
 /** Format integer with thousand separators */
