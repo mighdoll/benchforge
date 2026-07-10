@@ -16,21 +16,32 @@ test("baselineLabel is idempotent and drops redundant suffixes", () => {
   expect(baselineLabel("link (baseline)")).toBe("link (baseline)");
 });
 
-test("prepareBenchmarks surfaces each variant's own paired baseline", () => {
+test("prepareBenchmarks surfaces each variant's own paired baseline (version mode)", () => {
+  const group: BenchmarkGroup = {
+    name: "WESL",
+    benchmarks: [
+      entry("link", entry("link (baseline)")),
+      entry("parse", entry("parse (baseline)")),
+    ],
+  };
+  const prepared = prepareBenchmarks(group);
+  // baselines first, then the comparison variants
+  expect(prepared.map(b => b.name)).toEqual([
+    "link (baseline)",
+    "parse (baseline)",
+    "link",
+    "parse",
+  ]);
+  expect(prepared.filter(b => b.isBaseline).map(b => b.name)).toEqual([
+    "link (baseline)",
+    "parse (baseline)",
+  ]);
+});
+
+test("prepareBenchmarks names a lone version baseline 'baseline', like the tables", () => {
   const group: BenchmarkGroup = {
     name: "WESL",
     benchmarks: [entry("link", entry("link (baseline)"))],
-  };
-  const prepared = prepareBenchmarks(group);
-  expect(prepared.map(b => b.name)).toEqual(["link (baseline)", "link"]);
-  expect(prepared.find(b => b.isBaseline)?.name).toBe("link (baseline)");
-});
-
-test("prepareBenchmarks prefers a shared group baseline when present", () => {
-  const group: BenchmarkGroup = {
-    name: "WESL",
-    baseline: entry("baseline"),
-    benchmarks: [entry("link", entry("ignored (baseline)"))],
   };
   expect(prepareBenchmarks(group).map(b => b.name)).toEqual([
     "baseline",
@@ -38,11 +49,38 @@ test("prepareBenchmarks prefers a shared group baseline when present", () => {
   ]);
 });
 
-test("prepareBenchmarks de-duplicates a baseline shared across variants", () => {
-  const shared = entry("ref (baseline)");
+test("prepareBenchmarks uses a shared group baseline when a variant has none", () => {
   const group: BenchmarkGroup = {
     name: "WESL",
-    benchmarks: [entry("a", shared), entry("b", shared)],
+    baseline: entry("baseline"),
+    benchmarks: [entry("link")],
   };
-  expect(prepareBenchmarks(group).filter(b => b.isBaseline)).toHaveLength(1);
+  expect(prepareBenchmarks(group).map(b => b.name)).toEqual([
+    "baseline",
+    "link",
+  ]);
+});
+
+test("prepareBenchmarks shows the reference variant once in baselineVariant mode", () => {
+  const group: BenchmarkGroup = {
+    name: "Array Copy",
+    baselineVariantId: "spread",
+    benchmarks: [entry("slice", entry("spread (baseline)")), entry("spread")],
+  };
+  const prepared = prepareBenchmarks(group);
+  // one "spread" (the reference, baseline-flagged), no duplicate "spread (baseline)"
+  expect(prepared.map(b => b.name)).toEqual(["spread", "slice"]);
+  expect(prepared.find(b => b.isBaseline)?.name).toBe("spread");
+  expect(prepared.filter(b => b.name.includes("spread"))).toHaveLength(1);
+});
+
+test("prepareBenchmarks omits a filtered-out reference variant, matching the tables", () => {
+  const group: BenchmarkGroup = {
+    name: "Array Copy",
+    baselineVariantId: "spread",
+    benchmarks: [entry("slice", entry("spread (baseline)"))],
+  };
+  const prepared = prepareBenchmarks(group);
+  expect(prepared.map(b => b.name)).toEqual(["slice"]);
+  expect(prepared.some(b => b.isBaseline)).toBe(false);
 });

@@ -42,6 +42,11 @@ export interface BenchmarkGroup {
    *  single-batch runs and cases without a baseline. */
   noiseFloor?: NoiseFloor;
 
+  /** In baselineVariant mode, the id of the reference variant (shown once,
+   *  flagged as the baseline). Undefined in version/baselineDir mode. Drives the
+   *  same mode-aware track resolution the stat sections use. */
+  baselineVariantId?: string;
+
   /** Case-level report sections, one ViewerEntry per track. The trimmed
    *  (slow-outlier-removed) view; rawSections holds the untrimmed view, present
    *  when trimming changed something (otherwise the two views are identical). */

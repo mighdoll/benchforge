@@ -1,4 +1,7 @@
-import { baselineLabel } from "../../report/Formatters.ts";
+import {
+  resolveDisplayTracks,
+  type TrackInput,
+} from "../../report/TrackResolution.ts";
 import { splitByOffsets, tukeyKeep } from "../../stats/BlockBootstrap.ts";
 import {
   cumulativeSum,
@@ -29,33 +32,53 @@ export interface FlattenedData {
   allPausePoints: FlatPausePoint[];
 }
 
-/** Combine baseline and benchmarks into a single list with display names */
+/** Resolve a group into the series to plot, using the same mode-aware resolver
+ *  as the stat sections so plots and tables agree on a case's display tracks.
+ *  Draws one series per track (the paired baselines the resolver attaches are
+ *  for the tables' Δ%, not plotted), baselines first to preserve z-order/legend,
+ *  de-duplicated by name (a version baseline shared across variants shows once). */
 export function prepareBenchmarks(
   group: ReportData["groups"][0],
 ): PreparedBenchmark[] {
-  const current = group.benchmarks.map(b => ({ ...b, isBaseline: false }));
-  const baseline = baselineEntries(group).map(b => ({
-    ...b,
-    name: baselineLabel(b.name),
-    isBaseline: true,
-  }));
-  return [...baseline, ...current];
+  const inputs = group.benchmarks.map(toTrackInput);
+  const groupBaseline = group.baseline
+    ? toTrackInput(group.baseline)
+    : undefined;
+  const tracks = resolveDisplayTracks(
+    inputs,
+    group.baselineVariantId,
+    groupBaseline,
+  );
+
+  const ordered = [
+    ...tracks.filter(t => t.isBaseline),
+    ...tracks.filter(t => !t.isBaseline),
+  ];
+  const seen = new Set<string>();
+  const series: PreparedBenchmark[] = [];
+  for (const t of ordered) {
+    if (seen.has(t.name)) continue;
+    seen.add(t.name);
+    series.push({ ...t.payload, name: t.name, isBaseline: t.isBaseline });
+  }
+  return series;
 }
 
-/** Baseline series for the plots: the shared group baseline if present, else each
- *  benchmark's own interleaved baseline (matrix variants each carry their own),
- *  de-duplicated by name. */
-function baselineEntries(group: ReportData["groups"][0]): BenchmarkEntry[] {
-  if (group.baseline) return [group.baseline];
-  const seen = new Set<string>();
-  const out: BenchmarkEntry[] = [];
-  for (const { baseline } of group.benchmarks) {
-    if (baseline && !seen.has(baseline.name)) {
-      seen.add(baseline.name);
-      out.push(baseline);
-    }
-  }
-  return out;
+/** Adapt a viewer benchmark entry into a resolver input (payload is the entry
+ *  itself, so its sample series ride along to the flattening step). */
+function toTrackInput(entry: BenchmarkEntry): TrackInput<BenchmarkEntry> {
+  return {
+    name: entry.name,
+    payload: entry,
+    meta: entry.metadata,
+    baseline: entry.baseline
+      ? {
+          name: entry.baseline.name,
+          payload: entry.baseline,
+          meta: entry.baseline.metadata,
+        }
+      : undefined,
+  };
 }
 
 /** Collect all sample data across benchmarks into flat arrays for plotting */

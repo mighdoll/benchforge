@@ -11,10 +11,7 @@ import {
   type UserCodeFilter,
 } from "../profiling/node/HeapSampleReport.ts";
 import type { HeapProfile } from "../profiling/node/HeapSampler.ts";
-import {
-  type ResolvedFrame,
-  resolveProfile,
-} from "../profiling/node/ResolvedProfile.ts";
+import { resolveProfile } from "../profiling/node/ResolvedProfile.ts";
 import {
   poolFolds,
   siteKey,
@@ -263,6 +260,7 @@ function prepareGroupData(
     benchmarks: group.reports.map(r =>
       benchmarkEntry(r, profile, heap, noTrim),
     ),
+    baselineVariantId: group.baselineVariantId,
     warnings: groupWarnings(group, comparison),
     noiseFloor: groupNoiseFloor(tracks, comparison?.noBatchTrim),
     sections: built?.sections,
@@ -579,8 +577,8 @@ function siteCallers(
   const names = site.stack
     .slice(0, -1)
     .reverse()
-    .filter((f: ResolvedFrame) => f.url && isUser(f))
+    .filter(f => f.url && isUser(f))
     .slice(0, depth)
-    .map((f: ResolvedFrame) => f.name);
+    .map(f => f.name);
   return names.length ? names : undefined;
 }
