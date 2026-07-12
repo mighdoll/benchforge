@@ -42,6 +42,7 @@ export type BlockDiffOptions = DiffOptions & {
   noBatchTrim?: boolean;
 };
 
+/** Samples and batch structure for one side of a paired comparison. */
 export type PairedSide = {
   /** Full kept pool used for point estimates and visible values. */
   filtered: number[];
@@ -56,6 +57,7 @@ export type PairedSide = {
   batchOffsets: number[];
 };
 
+/** Aligned baseline and current blocks after pairwise outlier trimming. */
 export type PreparedPairedBlocks = {
   baseline: PairedSide;
   current: PairedSide;
@@ -306,6 +308,7 @@ function pairedPoolDiff(
   return percentDelta(statFn(filledBuf(curBuf, curPos)), base);
 }
 
+/** Validate that offsets define ordered, non-empty batches within the samples. */
 function validateOffsets(
   label: "baseline" | "current",
   samples: number[],
