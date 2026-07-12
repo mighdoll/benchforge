@@ -159,39 +159,40 @@ export function createReservoir(
   let origins: number[] | undefined; // arrival index per slot, only once capped
   let count = 0;
 
-  return {
-    offer(sample, heap) {
-      if (count < cap) {
-        samples[count] = sample;
-        heapSamples[count] = heap;
-      } else {
-        origins ??= Array.from({ length: cap }, (_, i) => i);
-        const j = Math.floor(random() * (count + 1));
-        if (j < cap) {
-          samples[j] = sample;
-          heapSamples[j] = heap;
-          origins[j] = count;
-        }
+  function offer(sample: number, heap: number): void {
+    if (count < cap) {
+      samples[count] = sample;
+      heapSamples[count] = heap;
+    } else {
+      origins ??= Array.from({ length: cap }, (_, i) => i);
+      const j = Math.floor(random() * (count + 1));
+      if (j < cap) {
+        samples[j] = sample;
+        heapSamples[j] = heap;
+        origins[j] = count;
       }
-      count++;
-    },
-    finish() {
-      if (!origins) {
-        samples.length = heapSamples.length = Math.min(count, cap);
-        return { samples, heapSamples, count, capped: false };
-      }
-      const arrivals = origins;
-      const order = arrivals
-        .map((_, i) => i)
-        .sort((a, b) => arrivals[a] - arrivals[b]);
-      return {
-        samples: order.map(i => samples[i]),
-        heapSamples: order.map(i => heapSamples[i]),
-        count,
-        capped: true,
-      };
-    },
-  };
+    }
+    count++;
+  }
+
+  function finish() {
+    if (!origins) {
+      samples.length = heapSamples.length = Math.min(count, cap);
+      return { samples, heapSamples, count, capped: false };
+    }
+    const arrivals = origins;
+    const order = arrivals
+      .map((_, i) => i)
+      .sort((a, b) => arrivals[a] - arrivals[b]);
+    return {
+      samples: order.map(i => samples[i]),
+      heapSamples: order.map(i => heapSamples[i]),
+      count,
+      capped: true,
+    };
+  }
+
+  return { offer, finish };
 }
 
 /** Collect timing samples with warmup and heap tracking. */
