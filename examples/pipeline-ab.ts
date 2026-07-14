@@ -8,6 +8,12 @@ import type { BenchMatrix, MatrixSuite } from "../src/index.ts";
 // the loop avoids -- so the change by percentile chart stays modest in the body and
 // fans out sharply at p90/p99 where the GC pauses land. A good illustration of a
 // difference that lives in the tail, not the average.
+//
+// Bound the batches by --iterations, not --duration: the GC columns (collected,
+// scav, full) are run totals, so under a time budget the slower variant runs fewer
+// iterations and its extra garbage goes undercounted.
+//
+//   benchforge examples/pipeline-ab.ts --gc-stats --batches 50 --iterations 25 --equiv-margin 0.5
 interface Row {
   id: number;
   name: string;

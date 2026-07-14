@@ -12,9 +12,17 @@ interface Out {
 
 // Build the same retained array of 100k objects with the same per-element hash,
 // differing only in how the result array is grown: push (the backing store is
-// reallocated as it grows) vs a preallocated array written by index. A modest,
-// conclusive win for preallocation; identical object allocation means both sides
-// promote and take major GCs.
+// reallocated as it grows) vs a preallocated array written by index. A conclusive
+// ~10% win for preallocation, and unlike pipeline-ab the whole distribution shifts
+// together rather than only the tail. Both sides allocate the same objects and
+// promote them, but push also churns through the discarded backing stores, so it
+// allocates ~75% more bytes per iteration.
+//
+// Bound the batches by --iterations, not --duration: the GC columns (collected,
+// scav, full) are run totals, so under a time budget the faster variant simply runs
+// more iterations and collects more, which hides the real difference.
+//
+//   benchforge examples/prealloc-ab.ts --gc-stats --batches 50 --iterations 20 --equiv-margin 0.5
 const build: BenchMatrix<Row[]> = {
   name: "Build 100k objects",
   caseData: {

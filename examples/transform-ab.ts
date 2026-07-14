@@ -5,12 +5,15 @@ import type { BenchMatrix, MatrixSuite } from "../src/index.ts";
 // identical allocation. The only difference is the map callback overhead: a small
 // (~2%) but real and reproducible edge for the loop. That is the point of the
 // example -- a difference this small is exactly what coarser tools dismiss as noise.
-// Run with the equivalence margin set to the machine's measured noise floor (well
-// under 1%, e.g. --equiv-margin 0.5) and benchforge resolves it as a conclusive
-// "better", not an "uncertain" straddle of the default 2% band. The retained result
-// array is promoted to old space, so major GCs also show up in the GC table.
+// Set the equivalence margin near the machine's measured noise floor (a quiet laptop
+// measures about 0.5%) and benchforge resolves the 2% gap as a conclusive "faster"
+// rather than an "inconclusive" straddle of the default 2% band. Each batch needs
+// ~40 iterations; fewer leaves the tail percentiles estimated from too few samples
+// to trust. The retained result array is promoted to old space, so major GCs also
+// show up in the GC table -- and those GC columns are run totals, so bound the
+// batches by --iterations to keep both variants doing equal work.
 //
-//   benchforge examples/transform-ab.ts --gc-stats --batches 50 --duration 0.3 --equiv-margin 0.5
+//   benchforge examples/transform-ab.ts --gc-stats --batches 40 --iterations 40 --equiv-margin 1
 interface Row {
   id: number;
   name: string;
