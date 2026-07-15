@@ -27,19 +27,31 @@ samples) across every batch. Resolution, and per-function baseline-delta noise
 when comparing, are limited by the *total* number of samples, not by how any
 single batch behaves.
 
-So prefer **many short batches** over a few long ones:
+So prefer **many short batches** over a few long ones, and bound each batch by
+`--iterations`:
 
 ```bash
-benchforge my-bench.ts --profile --batches 50 --duration 0.1
+benchforge my-bench.ts --profile --batches 50 --iterations 100
 ```
 
-Short batches collect samples quickly; many batches accumulate total coverage
-and (against a baseline) average out per-function noise. Total samples are
-roughly `duration x batches / interval`, so you can trade duration down and
-batches up to keep wall-clock reasonable while still gathering enough ticks.
-Keep each batch "relatively short", not tiny -- short enough to spread coverage
-across many fresh workers, long enough that the measured window still gathers
-ticks. The same applies to `--alloc` and `--call-counts`.
+Many batches accumulate total coverage and (against a baseline) average out
+per-function noise; each runs in a fresh worker, so coverage spreads instead of
+piling onto one long-lived heap. Keep each batch relatively short -- enough
+iterations to gather samples, few enough to stay spread across workers.
+
+### Typically use --iterations for profiling
+
+For profiling, it's usually wisest to set the batch size with `--iterations` (rather than `--duration`).
+The reason is that the instrumentation 
+for `--call-counts`, `--profile`, and `--alloc`
+add significant delays to execution. 
+By using `--iterations`, you're free to change the
+instrumentation settings.
+
+Note that if a preset already sets a `duration`, 
+`--iterations` alone will not
+take effect, because the loop stops at whichever limit comes first. Pass
+`--duration 0` alongside `--iterations` in that case.
 
 ### Excluding Warmup
 
@@ -56,7 +68,7 @@ state. Code that takes many iterations to reach its optimized plateau (sometimes
 dozens) benefits most:
 
 ```bash
-benchforge my-bench.ts --profile --batches 50 --duration 0.1 --warmup 50
+benchforge my-bench.ts --profile --batches 50 --iterations 100 --warmup 50
 ```
 
 ### Sampling Resolution
@@ -85,6 +97,11 @@ In Node, this uses V8's `--trace-gc-nvp` and adds these columns:
 | full | Number of full (mark-compact) GCs |
 | promo% | Percentage of allocations promoted to old generation |
 | pause/iter | GC pause time per iteration |
+
+`alloc/iter` and `pause/iter` are per-iteration rates, but `scav`, `full`, and
+collected bytes are run totals. Compare variants with `--iterations` so both
+sides do equal work; under `--duration` the slower variant fits fewer iterations
+into the budget and its totals shrink for that reason alone.
 
 In browser mode, collection counts and pause times come from CDP tracing.
 `alloc/iter` and `promo%` are not available from CDP.
