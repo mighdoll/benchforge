@@ -20,7 +20,11 @@ export function TabBar() {
 
   return (
     <div class="tab-bar">
-      <TabButton tabId="summary" disabled={!config.hasReport} title="Verdicts and metrics per case">
+      <TabButton
+        tabId="summary"
+        disabled={!config.hasReport}
+        title="Verdicts and metrics per case"
+      >
         Summary
       </TabButton>
       <TabButton
@@ -31,10 +35,18 @@ export function TabBar() {
       >
         Iterations
       </TabButton>
-      <TabButton tabId="flamechart" disabled={!config.hasProfile} title="Allocation profile (see Profiling.md)">
+      <TabButton
+        tabId="flamechart"
+        disabled={!config.hasProfile}
+        title="Allocation profile (see Profiling.md)"
+      >
         Allocation
       </TabButton>
-      <TabButton tabId="time-flamechart" disabled={!config.hasTimeProfile} title="CPU time profile (see Profiling.md)">
+      <TabButton
+        tabId="time-flamechart"
+        disabled={!config.hasTimeProfile}
+        title="CPU time profile (see Profiling.md)"
+      >
         Timing
       </TabButton>
 
@@ -50,8 +62,17 @@ export function TabBar() {
 }
 
 /** Fixed tab button that sets the active tab on click. */
-function TabButton({ tabId, disabled, onActivate, title, children }: {
-  tabId: string; disabled: boolean; onActivate?: () => void; title?: string;
+function TabButton({
+  tabId,
+  disabled,
+  onActivate,
+  title,
+  children,
+}: {
+  tabId: string;
+  disabled: boolean;
+  onActivate?: () => void;
+  title?: string;
   children: preact.ComponentChildren;
 }) {
   const active = activeTabId.value === tabId;
@@ -73,7 +94,15 @@ function TabButton({ tabId, disabled, onActivate, title, children }: {
 }
 
 /** Source-file tab with close button; clicking the close span removes the tab instead of activating it. */
-function SourceTabBtn({ tabId, file, line }: { tabId: string; file: string; line: number }) {
+function SourceTabBtn({
+  tabId,
+  file,
+  line,
+}: {
+  tabId: string;
+  file: string;
+  line: number;
+}) {
   const active = activeTabId.value === tabId;
   const shortName = file.split("/").pop() || file;
   const label = line ? `${shortName}:${line}` : shortName;
@@ -107,7 +136,10 @@ function ArchiveButton({ provider: dataProvider }: { provider: DataProvider }) {
     try {
       const { blob, filename } = await dataProvider.createArchive();
       const url = URL.createObjectURL(blob);
-      const link = Object.assign(document.createElement("a"), { href: url, download: filename });
+      const link = Object.assign(document.createElement("a"), {
+        href: url,
+        download: filename,
+      });
       document.body.appendChild(link);
       link.click();
       link.remove();

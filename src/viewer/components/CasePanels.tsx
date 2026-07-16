@@ -37,8 +37,12 @@ export function ScalarSection({ section }: { section: ViewerSection }) {
           <span class="m-label" />
           {tracks.map((t, i) => (
             <Fragment key={i}>
-              <span class="m-head">{t.isBaseline ? baselineLabel(t.runName) : t.runName}</span>
-              {delta && <span class="m-head m-delta">{t.isBaseline ? "" : "Δ%"}</span>}
+              <span class="m-head">
+                {t.isBaseline ? baselineLabel(t.runName) : t.runName}
+              </span>
+              {delta && (
+                <span class="m-head m-delta">{t.isBaseline ? "" : "Δ%"}</span>
+              )}
             </Fragment>
           ))}
           {section.rows.map((row, ri) => (
@@ -49,7 +53,9 @@ export function ScalarSection({ section }: { section: ViewerSection }) {
                   <span class="m-val">{e.value}</span>
                   {delta && (
                     <span class="m-delta m-val">
-                      {e.comparisonCI ? formatSignedPercent(e.comparisonCI.percent) : ""}
+                      {e.comparisonCI
+                        ? formatSignedPercent(e.comparisonCI.percent)
+                        : ""}
                     </span>
                   )}
                 </Fragment>
@@ -70,11 +76,15 @@ export function SharedRow({ row }: { row: ViewerRow }) {
 /** Footer strip: one row per footer section row, a single value when all tracks
  *  agree (e.g. runs identical across a case), else per-variant. */
 export function GroupFooter({ sections }: { sections: ViewerSection[] }) {
-  const rows = sections.filter(s => s.placement === "footer").flatMap(s => s.rows);
+  const rows = sections
+    .filter(s => s.placement === "footer")
+    .flatMap(s => s.rows);
   if (!rows.length) return null;
   return (
     <div class="group-footer">
-      {rows.map((row, i) => <FooterStat key={i} row={row} />)}
+      {rows.map((row, i) => (
+        <FooterStat key={i} row={row} />
+      ))}
     </div>
   );
 }
@@ -85,19 +95,31 @@ export function HeapPanel({ entry }: { entry: BenchmarkEntry }) {
   return (
     <div class="section-panel">
       <div class="panel-header">
-        <a class="panel-title-link" onClick={() => (activeTabId.value = "flamechart")}>
+        <a
+          class="panel-title-link"
+          onClick={() => (activeTabId.value = "flamechart")}
+        >
           heap allocation
         </a>
       </div>
       <div class="panel-body">
         {heap && (
           <>
-            <SharedStat label="total bytes" value={formatDecimalBytes(heap.totalBytes)} />
-            <SharedStat label="user bytes" value={formatDecimalBytes(heap.userBytes)} />
+            <SharedStat
+              label="total bytes"
+              value={formatDecimalBytes(heap.totalBytes)}
+            />
+            <SharedStat
+              label="user bytes"
+              value={formatDecimalBytes(heap.userBytes)}
+            />
           </>
         )}
         {allocSamples && allocSamples.length > 0 && (
-          <SharedStat label="alloc samples" value={allocSamples.length.toLocaleString()} />
+          <SharedStat
+            label="alloc samples"
+            value={allocSamples.length.toLocaleString()}
+          />
         )}
       </div>
     </div>
@@ -109,9 +131,14 @@ export function CoveragePanel({ entry }: { entry: BenchmarkEntry }) {
   if (!cov) return null;
   return (
     <div class="section-panel">
-      <div class="panel-header"><span>calls</span></div>
+      <div class="panel-header">
+        <span>calls</span>
+      </div>
       <div class="panel-body">
-        <SharedStat label="functions tracked" value={cov.functionCount.toLocaleString()} />
+        <SharedStat
+          label="functions tracked"
+          value={cov.functionCount.toLocaleString()}
+        />
         <SharedStat label="total calls" value={formatCount(cov.totalCalls)} />
       </div>
     </div>
@@ -124,11 +151,17 @@ function FooterStat({ row }: { row: ViewerRow }) {
   return (
     <div class="footer-stat">
       <span class="row-label">{row.label}</span>
-      {uniform
-        ? <span class="row-value">{vals[0]?.value}</span>
-        : <span class="footer-per-variant">
-            {vals.map((v, i) => <span key={i}>{v.runName} <b>{v.value}</b></span>)}
-          </span>}
+      {uniform ? (
+        <span class="row-value">{vals[0]?.value}</span>
+      ) : (
+        <span class="footer-per-variant">
+          {vals.map((v, i) => (
+            <span key={i}>
+              {v.runName} <b>{v.value}</b>
+            </span>
+          ))}
+        </span>
+      )}
     </div>
   );
 }

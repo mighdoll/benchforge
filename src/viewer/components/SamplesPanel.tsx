@@ -1,17 +1,19 @@
 import { useMemo, useState } from "preact/hooks";
-import type { BenchmarkGroup, ReportData } from "../ReportData.ts";
 import {
   batchAlignX,
   batchCount,
-  filterToBatch,
   type FlattenedData,
+  filterToBatch,
   flattenSamples,
   type PreparedBenchmark,
   prepareBenchmarks,
 } from "../plots/RenderPlots.ts";
 import type { SeriesVisibility } from "../plots/SampleTimeSeries.ts";
 import { maxDots } from "../plots/TimeSeriesSamples.ts";
+import type { BenchmarkGroup, ReportData } from "../ReportData.ts";
 import { reportData, samplesLoaded } from "../State.ts";
+import { HelpButton } from "./HelpButton.tsx";
+import { useLazyPlot } from "./LazyPlot.ts";
 import {
   BatchStepper,
   benchmarkPills,
@@ -19,10 +21,12 @@ import {
   SeriesToggles,
   toggledSet,
 } from "./SamplesControls.tsx";
-import { HelpButton } from "./HelpButton.tsx";
-import { useLazyPlot } from "./LazyPlot.ts";
 
-interface PlotProps { benchmarks: PreparedBenchmark[]; flat: FlattenedData; index: number }
+interface PlotProps {
+  benchmarks: PreparedBenchmark[];
+  flat: FlattenedData;
+  index: number;
+}
 interface TimeSeriesPlotProps extends PlotProps {
   visibility: SeriesVisibility;
   batchMode: boolean;
@@ -50,15 +54,25 @@ export function SamplesPanel() {
 /** True when any benchmark or baseline in the group has multiple samples. */
 function groupHasSamples(group: BenchmarkGroup): boolean {
   const multiSample = (b: { samples: unknown[] }) => b.samples.length > 1;
-  return group.benchmarks.some(multiSample) || (!!group.baseline && multiSample(group.baseline));
+  return (
+    group.benchmarks.some(multiSample) ||
+    (!!group.baseline && multiSample(group.baseline))
+  );
 }
 
 /** Renders time-series and histogram plots for one benchmark group, with batch stepping and series toggles. */
-function SamplesGroup({ group, index }: { group: BenchmarkGroup; index: number }) {
+// biome-ignore lint/complexity/noExcessiveLinesPerFunction: cohesive samples view (hooks + conditional plot render); splitting hurts readability
+function SamplesGroup({
+  group,
+  index,
+}: {
+  group: BenchmarkGroup;
+  index: number;
+}) {
   const hasSamples = groupHasSamples(group);
   const benchmarks = useMemo(() => prepareBenchmarks(group), [group]);
   const flat = useMemo(
-    () => hasSamples ? flattenSamples(benchmarks) : null,
+    () => (hasSamples ? flattenSamples(benchmarks) : null),
     [benchmarks, hasSamples],
   );
   const numBatches = hasSamples ? batchCount(benchmarks) : 0;
@@ -68,7 +82,10 @@ function SamplesGroup({ group, index }: { group: BenchmarkGroup; index: number }
   const activeBatch = batch > numBatches ? 0 : batch;
 
   const viewFlat = useMemo(
-    () => flat && activeBatch > 0 ? filterToBatch(flat, benchmarks, activeBatch - 1) : flat,
+    () =>
+      flat && activeBatch > 0
+        ? filterToBatch(flat, benchmarks, activeBatch - 1)
+        : flat,
     [flat, benchmarks, activeBatch],
   );
 
@@ -76,7 +93,8 @@ function SamplesGroup({ group, index }: { group: BenchmarkGroup; index: number }
   // shared batch-fraction x axis; per-batch drill-down keeps per-iteration x.
   const batchMode = numBatches > 1 && activeBatch === 0;
   const tsFlat = useMemo(
-    () => viewFlat && batchMode ? batchAlignX(viewFlat, benchmarks) : viewFlat,
+    () =>
+      viewFlat && batchMode ? batchAlignX(viewFlat, benchmarks) : viewFlat,
     [viewFlat, benchmarks, batchMode],
   );
 
@@ -89,16 +107,17 @@ function SamplesGroup({ group, index }: { group: BenchmarkGroup; index: number }
   });
 
   if (!group.benchmarks?.length) return null;
-  if (!hasSamples || !flat || !viewFlat || !tsFlat) return (
-    <div>
-      <div class="group-header">
-        <h2>{group.name}</h2>
+  if (!hasSamples || !flat || !viewFlat || !tsFlat)
+    return (
+      <div>
+        <div class="group-header">
+          <h2>{group.name}</h2>
+        </div>
+        <p class="single-sample-notice">
+          Single sample collected &mdash; plots require multiple samples.
+        </p>
       </div>
-      <p class="single-sample-notice">
-        Single sample collected &mdash; plots require multiple samples.
-      </p>
-    </div>
-  );
+    );
 
   const hasHeap = flat.heapSeries.length > 0;
   const hasBaselineHeap = flat.baselineHeapSeries.length > 0;
@@ -146,7 +165,11 @@ function SamplesGroup({ group, index }: { group: BenchmarkGroup; index: number }
               onToggleGc={toggleGc}
             />
             {numBatches > 1 && (
-              <BatchStepper batch={activeBatch} total={numBatches} onChange={setBatch} />
+              <BatchStepper
+                batch={activeBatch}
+                total={numBatches}
+                onChange={setBatch}
+              />
             )}
           </div>
           <TimeSeriesPlot
@@ -164,7 +187,11 @@ function SamplesGroup({ group, index }: { group: BenchmarkGroup; index: number }
           <div class="plot-description">
             Frequency distribution of execution times
           </div>
-          <HistogramPlot benchmarks={benchmarks} flat={viewFlat} index={index} />
+          <HistogramPlot
+            benchmarks={benchmarks}
+            flat={viewFlat}
+            index={index}
+          />
         </div>
       </div>
     </div>
@@ -208,15 +235,33 @@ function countSeries(
 }
 
 /** Lazy-imports and renders a time-series chart for one benchmark group. */
-function TimeSeriesPlot({ flat, index, visibility, batchMode }: TimeSeriesPlotProps) {
-  const ref = useLazyPlot(async () => {
-    if (flat.timeSeries.length === 0) return null;
-    const { createSampleTimeSeries } = await import("../plots/SampleTimeSeries.ts");
-    const { timeSeries, allGcEvents, allPausePoints, heapSeries, baselineHeapSeries } = flat;
-    return createSampleTimeSeries(
-      timeSeries, allGcEvents, allPausePoints, heapSeries, baselineHeapSeries, visibility, batchMode,
-    );
-  }, [flat, visibility, batchMode], "Time series plot");
+function TimeSeriesPlot({
+  flat,
+  index,
+  visibility,
+  batchMode,
+}: TimeSeriesPlotProps) {
+  const ref = useLazyPlot(
+    async () => {
+      if (flat.timeSeries.length === 0) return null;
+      const { createSampleTimeSeries } = await import(
+        "../plots/SampleTimeSeries.ts"
+      );
+      const { timeSeries, allGcEvents, allPausePoints } = flat;
+      const { heapSeries, baselineHeapSeries } = flat;
+      return createSampleTimeSeries(
+        timeSeries,
+        allGcEvents,
+        allPausePoints,
+        heapSeries,
+        baselineHeapSeries,
+        visibility,
+        batchMode,
+      );
+    },
+    [flat, visibility, batchMode],
+    "Time series plot",
+  );
   return (
     <div id={`sample-timeseries-${index}`} class="plot-area" ref={ref}>
       <div class="loading">Loading time series...</div>
@@ -227,11 +272,15 @@ function TimeSeriesPlot({ flat, index, visibility, batchMode }: TimeSeriesPlotPr
 /** Lazy-imports and renders a histogram with KDE for one benchmark group. */
 function HistogramPlot({ benchmarks, flat, index }: PlotProps) {
   const names = benchmarks.map(b => b.name);
-  const ref = useLazyPlot(async () => {
-    if (flat.allSamples.length === 0) return null;
-    const { createHistogramKde } = await import("../plots/HistogramKde.ts");
-    return createHistogramKde(flat.allSamples, names);
-  }, [flat, benchmarks], "Histogram plot");
+  const ref = useLazyPlot(
+    async () => {
+      if (flat.allSamples.length === 0) return null;
+      const { createHistogramKde } = await import("../plots/HistogramKde.ts");
+      return createHistogramKde(flat.allSamples, names);
+    },
+    [flat, benchmarks],
+    "Histogram plot",
+  );
   return (
     <div id={`histogram-${index}`} class="plot-area" ref={ref}>
       <div class="loading">Loading histogram...</div>

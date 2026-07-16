@@ -8,6 +8,7 @@
     "ignoreUnknown": false,
     "includes": [
       "**/*.ts",
+      "**/*.tsx",
       "**/*.json",
       "**/*.html",
       "**/biome.jsonc",
@@ -27,6 +28,11 @@
     "enabled": true,
     "rules": {
       "recommended": true,
+      // The viewer is a local dev tool that uses clickable spans/divs/anchors,
+      // untitled svgs, and iframes by design; the a11y group doesn't apply.
+      "a11y": {
+        "recommended": false
+      },
       "style": {
         "useTemplate": "off",
         "noUselessElse": "off",

@@ -85,30 +85,74 @@ export function SeriesToggles(props: ToggleProps) {
   return (
     <div class="series-toggles">
       {seriesPills.map(p => (
-        <SwatchPill key={p.name} label={p.name} color={p.color} active={p.active} onClick={() => onToggleBenchmark(p.name)} />
+        <SwatchPill
+          key={p.name}
+          label={p.name}
+          color={p.color}
+          active={p.active}
+          onClick={() => onToggleBenchmark(p.name)}
+        />
       ))}
-      {hasHeap && <TogglePill label="heap" title="Overlay heap size: the allocation sawtooth between collections" active={visibility.heap} onClick={() => onToggle("heap")} />}
-      {hasBaselineHeap && <TogglePill label="heap (baseline)" title="Overlay the baseline's heap size" active={visibility.baselineHeap} onClick={() => onToggle("baselineHeap")} />}
-      {hasRejected && <TogglePill label="rejected" title="Highlight samples in batches removed by noise rejection" active={visibility.rejected} onClick={() => onToggle("rejected")} />}
+      {hasHeap && (
+        <TogglePill
+          label="heap"
+          title="Overlay heap size: the allocation sawtooth between collections"
+          active={visibility.heap}
+          onClick={() => onToggle("heap")}
+        />
+      )}
+      {hasBaselineHeap && (
+        <TogglePill
+          label="heap (baseline)"
+          title="Overlay the baseline's heap size"
+          active={visibility.baselineHeap}
+          onClick={() => onToggle("baselineHeap")}
+        />
+      )}
+      {hasRejected && (
+        <TogglePill
+          label="rejected"
+          title="Highlight samples in batches removed by noise rejection"
+          active={visibility.rejected}
+          onClick={() => onToggle("rejected")}
+        />
+      )}
       {gcPills.map(p => (
-        <SwatchPill key={`gc-${p.name}`} label={p.label} color={p.color} title="Mark where major (full) garbage collections occurred" active={p.active} onClick={() => onToggleGc(p.name)} />
+        <SwatchPill
+          key={`gc-${p.name}`}
+          label={p.label}
+          color={p.color}
+          title="Mark where major (full) garbage collections occurred"
+          active={p.active}
+          onClick={() => onToggleGc(p.name)}
+        />
       ))}
     </div>
   );
 }
 
 /** Prev/next stepper for cycling through batches or showing all. */
-export function BatchStepper({ batch, total, onChange }: {
-  batch: number; total: number; onChange: (batch: number) => void;
+export function BatchStepper({
+  batch,
+  total,
+  onChange,
+}: {
+  batch: number;
+  total: number;
+  onChange: (batch: number) => void;
 }) {
   const prev = () => onChange(batch <= 0 ? total : batch - 1);
   const next = () => onChange(batch >= total ? 0 : batch + 1);
   const label = batch === 0 ? "All" : `Batch ${batch} of ${total}`;
   return (
     <div class="batch-stepper">
-      <button class="batch-btn" onClick={prev}>&lsaquo;</button>
+      <button class="batch-btn" onClick={prev}>
+        &lsaquo;
+      </button>
       <span class="batch-label">{label}</span>
-      <button class="batch-btn" onClick={next}>&rsaquo;</button>
+      <button class="batch-btn" onClick={next}>
+        &rsaquo;
+      </button>
     </div>
   );
 }
@@ -119,18 +163,32 @@ function benchmarkColors(benchmarks: PreparedBenchmark[]): Map<string, string> {
   const baselineNames = new Set(
     benchmarks.filter(b => b.isBaseline).map(b => b.name),
   );
-  return seriesColorMap(benchmarks.map(b => b.name), baselineNames);
+  return seriesColorMap(
+    benchmarks.map(b => b.name),
+    baselineNames,
+  );
 }
 
 /** Toggle pill carrying a series color as a leading swatch (benchmarks and GC). */
-function SwatchPill(
-  { label, color, title, active, onClick }: {
-    label: string; color: string; title?: string; active: boolean;
-    onClick: () => void;
-  },
-) {
+function SwatchPill({
+  label,
+  color,
+  title,
+  active,
+  onClick,
+}: {
+  label: string;
+  color: string;
+  title?: string;
+  active: boolean;
+  onClick: () => void;
+}) {
   return (
-    <button class={`toggle-pill${active ? " active" : ""}`} title={title} onClick={onClick}>
+    <button
+      class={`toggle-pill${active ? " active" : ""}`}
+      title={title}
+      onClick={onClick}
+    >
       <span class="pill-swatch" style={{ background: color }} />
       {label}
     </button>
@@ -138,11 +196,23 @@ function SwatchPill(
 }
 
 /** Pill button that toggles a boolean state with active/inactive styling. */
-function TogglePill({ label, title, active, onClick }: {
-  label: string; title?: string; active: boolean; onClick: () => void;
+function TogglePill({
+  label,
+  title,
+  active,
+  onClick,
+}: {
+  label: string;
+  title?: string;
+  active: boolean;
+  onClick: () => void;
 }) {
   return (
-    <button class={`toggle-pill${active ? " active" : ""}`} title={title} onClick={onClick}>
+    <button
+      class={`toggle-pill${active ? " active" : ""}`}
+      title={title}
+      onClick={onClick}
+    >
       {label}
     </button>
   );

@@ -1,6 +1,6 @@
 import { useEffect, useId, useLayoutEffect, useRef } from "preact/hooks";
 import { openHelp, useEscapeClose } from "../State.ts";
-import { helpContent, type HelpTopic } from "./HelpContent.tsx";
+import { type HelpTopic, helpContent } from "./HelpContent.tsx";
 
 /** Small circled "?" that opens the help popover for one topic. One popover
  *  is open at a time (shared openHelp signal), keyed by button instance: the
@@ -35,8 +35,12 @@ export function HelpButton({ topic }: { topic: HelpTopic }) {
  *  viewport (flipped above when it would overflow the bottom). Closes on an
  *  outside click, except on another "?" button, which its own toggle handles
  *  so switching topics stays one click. */
-function HelpPopover({ topic, anchor }: {
-  topic: HelpTopic; anchor: preact.RefObject<HTMLButtonElement>;
+function HelpPopover({
+  topic,
+  anchor,
+}: {
+  topic: HelpTopic;
+  anchor: preact.RefObject<HTMLButtonElement>;
 }) {
   const popRef = useRef<HTMLDivElement>(null);
   const close = () => (openHelp.value = null);
@@ -49,17 +53,26 @@ function HelpPopover({ topic, anchor }: {
     if (!pop || !btn) return;
     const rect = btn.getBoundingClientRect();
     const { width, height } = pop.getBoundingClientRect();
-    const left = Math.max(8, Math.min(rect.left, window.innerWidth - width - 8));
+    const left = Math.max(
+      8,
+      Math.min(rect.left, window.innerWidth - width - 8),
+    );
     let top = rect.bottom + 6;
     if (top + height > window.innerHeight - 8)
       top = Math.max(8, rect.top - height - 6);
-    Object.assign(pop.style, { left: `${left}px`, top: `${top}px`, zIndex: "60" });
+    Object.assign(pop.style, {
+      left: `${left}px`,
+      top: `${top}px`,
+      zIndex: "60",
+    });
   }, [topic]);
 
   const { title, body } = helpContent[topic];
   return (
     <div class="help-popover" role="dialog" ref={popRef}>
-      <span class="shift-close" onClick={close}>{"×"}</span>
+      <span class="shift-close" onClick={close}>
+        {"×"}
+      </span>
       <h3>{title}</h3>
       {body}
     </div>
@@ -77,7 +90,8 @@ function useOutsideClose(
     function onDown(e: MouseEvent) {
       const target = e.target;
       if (!(target instanceof Element)) return;
-      if (ref.current?.contains(target) || target.closest(".help-button")) return;
+      if (ref.current?.contains(target) || target.closest(".help-button"))
+        return;
       close();
     }
     document.addEventListener("mousedown", onDown);
