@@ -52,8 +52,20 @@ export function cliHeapReportOptions(args: DefaultCliArgs): HeapReportOptions {
   return {
     topN: args["alloc-rows"],
     stackDepth: args["alloc-stack"],
-    userOnly: args["alloc-user-only"],
+    userOnly: allocUserOnly(args),
   };
+}
+
+/** CPU profile output hides node internals (default on; --no-profile-user-only
+ *  to include them). Shared by the summary rows and the flamegraph filter. */
+export function profileUserOnly(args?: Record<string, unknown>): boolean {
+  return args?.["profile-user-only"] === true;
+}
+
+/** Allocation output hides node internals (default on; --no-alloc-user-only to
+ *  include them). Shared by the summary rows and the flamegraph filter. */
+export function allocUserOnly(args?: Record<string, unknown>): boolean {
+  return args?.["alloc-user-only"] === true;
 }
 
 /** True if any alloc-related flag implies allocation sampling. (alloc-user-only

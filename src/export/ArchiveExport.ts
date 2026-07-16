@@ -16,6 +16,9 @@ import type { SpeedscopeFile } from "./SpeedscopeTypes.ts";
 
 export interface ArchiveOptions {
   groups: ReportGroup[];
+  /** Prebuilt alloc flamegraph (already user-only filtered); rebuilt from
+   *  groups (unfiltered) when omitted. */
+  allocProfile?: SpeedscopeFile;
   reportData?: ReportData;
   timeProfileData?: string;
   coverageData?: string;
@@ -36,7 +39,7 @@ export async function archiveBenchmark(
 ): Promise<string | undefined> {
   const { groups, reportData, timeProfileData, coverageData, outputPath } =
     options;
-  const allocProfile = buildSpeedscopeFile(groups) ?? undefined;
+  const allocProfile = options.allocProfile ?? buildSpeedscopeFile(groups);
   const timeProfile = timeProfileData ? JSON.parse(timeProfileData) : undefined;
   if (!allocProfile && !timeProfile && !reportData) {
     console.log("No data to archive.");

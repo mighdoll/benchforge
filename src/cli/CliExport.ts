@@ -8,6 +8,7 @@ import {
 } from "../export/CoverageExport.ts";
 import { resolveEditorUri } from "../export/EditorUri.ts";
 import { exportPerfettoTrace } from "../export/PerfettoExport.ts";
+import { userOnlySpeedscope } from "../export/SpeedscopeFilter.ts";
 import { buildTimeSpeedscopeFile } from "../export/TimeExport.ts";
 import type { CoverageData } from "../profiling/node/CoverageTypes.ts";
 import type { ReportGroup, ReportSection } from "../report/BenchmarkReport.ts";
@@ -22,7 +23,12 @@ import {
 } from "../report/NoiseLog.ts";
 import type { ReportData } from "../viewer/ReportData.ts";
 import type { DefaultCliArgs } from "./CliArgs.ts";
-import { cliComparisonOptions, shouldViewReport } from "./CliOptions.ts";
+import {
+  allocUserOnly,
+  cliComparisonOptions,
+  profileUserOnly,
+  shouldViewReport,
+} from "./CliOptions.ts";
 import { printRawSamples, withStatus } from "./CliReport.ts";
 import {
   optionalJson,
@@ -77,8 +83,17 @@ export async function exportReports(options: ExportOptions): Promise<void> {
   appendNoiseLog(abNoiseRecords(reportData, machineId()));
   exportFileFormats(results, args);
 
-  const profileFile = buildSpeedscopeFile(results);
-  const timeFile = buildAllTimeProfiles(results, comparison.noBatchTrim);
+  // User-only (default on) hides node internals, GC, and the profiler's own
+  // inspector frames from the flamegraphs, matching the summary rows; the same
+  // filtered files feed the live viewer and the archive.
+  const profileFile = userOnlySpeedscope(
+    buildSpeedscopeFile(results),
+    allocUserOnly(args),
+  );
+  const timeFile = userOnlySpeedscope(
+    buildAllTimeProfiles(results, comparison.noBatchTrim),
+    profileUserOnly(args),
+  );
   const coverageData = await annotateCoverage(results, profileFile, timeFile);
   const timeData = optionalJson(timeFile);
 
@@ -86,6 +101,7 @@ export async function exportReports(options: ExportOptions): Promise<void> {
     const outputPath = args.archive || undefined;
     await archiveBenchmark({
       groups: results,
+      allocProfile: profileFile,
       reportData,
       timeProfileData: timeData,
       coverageData,

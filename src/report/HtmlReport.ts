@@ -1,4 +1,5 @@
 import { cliDefaults } from "../cli/CliArgs.ts";
+import { allocUserOnly, profileUserOnly } from "../cli/CliOptions.ts";
 import type { CoverageData } from "../profiling/node/CoverageTypes.ts";
 import {
   aggregateSites,
@@ -225,7 +226,7 @@ function profileOptions(
   const topN = cliArgs["profile-rows"];
   return {
     topN: typeof topN === "number" ? topN : defaultProfileOptions.topN,
-    userOnly: cliArgs["profile-user-only"] === true,
+    userOnly: profileUserOnly(cliArgs),
   };
 }
 
@@ -235,7 +236,7 @@ function heapOptions(cliArgs?: Record<string, unknown>): HeapReportOptions {
   return {
     topN: numArg(cliArgs, "alloc-rows", 20),
     stackDepth: numArg(cliArgs, "alloc-stack", 3),
-    userOnly: cliArgs?.["alloc-user-only"] === true,
+    userOnly: allocUserOnly(cliArgs),
   };
 }
 
