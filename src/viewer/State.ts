@@ -2,7 +2,7 @@ import { signal } from "@preact/signals";
 import { useEffect } from "preact/hooks";
 import type { DataProvider } from "./Providers.ts";
 import type {
-  AbsolutePercentile,
+  BootstrapCIData,
   ReportData,
   ShiftPercentile,
 } from "./ReportData.ts";
@@ -32,11 +32,25 @@ export interface ShiftDetail {
   marginBand?: [number, number];
 }
 
-/** Payload for the absolute-distribution detail popup (no-baseline fan): one
- *  percentile's absolute distribution plus its metric label. */
+/** Payload for the distribution-detail popup: one series' absolute distribution
+ *  with its labels. Opened from a no-baseline fan's violin or from an unpaired
+ *  baseline sparkline (both show a single distribution, no diff). */
 export interface AbsoluteDetail {
-  point: AbsolutePercentile;
   metric: string;
+
+  /** Point/stat label for the title, e.g. "p50" or "mean". */
+  label?: string;
+
+  /** Series name shown above the chart, e.g. the baseline run or the metric. */
+  runName: string;
+
+  ci: BootstrapCIData;
+
+  /** false marks too-few-samples (fan tail); shows an insufficient-data chip. */
+  reliable?: boolean;
+
+  /** Samples beyond the percentile, for the insufficient-data chip. */
+  tailCount?: number;
 }
 
 /** Active data source (server or archive). */

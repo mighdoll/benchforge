@@ -239,6 +239,13 @@ export interface ViewerEntry {
   /** True for the reference (baseline) track: carries no Δ% or shift. */
   isBaseline?: boolean;
 
+  /** On a baseline entry, the `runName` of the comparison track this baseline
+   *  series is the reference for (version mode, where the baseline's CI derives
+   *  from that comparison's paired blocks). Lets the baseline sparkline open the
+   *  same current-vs-baseline modal. Absent for a peer-mode reference variant
+   *  (its own independent series) and for archives predating this field. */
+  pairedRun?: string;
+
   /** This track's comparison vs the case baseline. Absent on the baseline track
    *  and on non-comparable rows. */
   comparisonCI?: DifferenceCI;

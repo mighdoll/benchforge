@@ -96,6 +96,45 @@ test("baselineVariant mode consolidates variants into one track-columned row", (
   ).toBeDefined();
 });
 
+test("version-mode baseline entry records the comparison it pairs with", () => {
+  const groups = [
+    {
+      name: "group1",
+      reports: [createBenchmarkReport("version1", [250, 300])],
+      baseline: createBenchmarkReport("baseVersion", [200, 250]),
+    },
+  ];
+  const data = prepareHtmlData(groups, { sections: [timeSection] });
+  const metric = primaryMetricRow(data.groups[0])!;
+  const baseline = metric.entries.find(e => e.isBaseline)!;
+  expect(baseline.pairedRun).toBe("version1");
+});
+
+test("peer-mode baseline entry has no paired comparison", () => {
+  const groups: ReportGroup[] = [
+    {
+      name: "case",
+      baselineVariantId: "spread",
+      reports: [
+        {
+          ...createBenchmarkReport("slice", [0, 60]),
+          baseline: createBenchmarkReport("spread", [60, 120]),
+        },
+        createBenchmarkReport("spread", [60, 120]),
+        {
+          ...createBenchmarkReport("from", [120, 180]),
+          baseline: createBenchmarkReport("spread", [60, 120]),
+        },
+      ],
+    },
+  ];
+  const data = prepareHtmlData(groups, { sections: [timeSection] });
+  const metric = primaryMetricRow(data.groups[0])!;
+  const spread = metric.entries.find(e => e.runName === "spread")!;
+  expect(spread.isBaseline).toBe(true);
+  expect(spread.pairedRun).toBeUndefined();
+});
+
 test("report uses custom sections when provided", () => {
   const locSection = metricSection({
     title: "lines / sec",

@@ -88,13 +88,15 @@ export function metricRow(
       metric?.samples,
       metric?.batchOffsets,
     );
-    if (!track.isBaseline && track.baseline) {
-      const diff = canBoot ? metric?.diff : undefined;
-      trackDiff[i] = diff;
-      addComparison(entry, diff, section, track, ctx, pairs[i]);
-    } else if (!track.isBaseline && canBoot) {
-      addAbsoluteShift(entry, section, track, ctx);
-    }
+    trackDiff[i] = annotateTrack(entry, {
+      section,
+      track,
+      ctx,
+      canBoot,
+      i,
+      metric,
+      pairs,
+    });
     return entry;
   });
 
@@ -250,40 +252,33 @@ function baseEntry(
   return entry;
 }
 
-/** Attach the diff CI and shift function comparing a track to its baseline. */
-function addComparison(
+/** Annotate one track: a comparison track gets its diff + shift, a no-baseline
+ *  track gets an absolute fan, and a baseline track records the run it is the
+ *  reference for. @return the diff CI so the caller can cache it for the raw view. */
+function annotateTrack(
   entry: ViewerEntry,
-  diff: DifferenceCI | undefined,
-  section: MetricSection,
-  track: CaseTrack,
-  ctx: CaseContext,
-  pair: PreparedPairedBlocks | undefined,
-): void {
-  const base = track.baseline!;
-  if (diff) entry.comparisonCI = diff;
-  const shift = buildShiftFunction(section, track.measured, base.measured, {
-    currentMeta: track.meta,
-    baselineMeta: base.meta,
-    comparison: ctx.comparison,
-    baselineName: base.name,
-    prepared: pair,
-  });
-  if (shift) entry.shiftFunction = shift;
-}
-
-/** Attach the per-percentile absolute distribution fan for a track with no
- *  baseline, so the summary card still shows a percentile view. */
-function addAbsoluteShift(
-  entry: ViewerEntry,
-  section: MetricSection,
-  track: CaseTrack,
-  ctx: CaseContext,
-): void {
-  const shift = buildAbsoluteShift(section, track.measured, {
-    currentMeta: track.meta,
-    comparison: ctx.comparison,
-  });
-  if (shift) entry.absoluteShift = shift;
+  args: {
+    section: MetricSection;
+    track: CaseTrack;
+    ctx: CaseContext;
+    canBoot: boolean;
+    i: number;
+    metric: MetricBootstrap | undefined;
+    pairs: (PreparedPairedBlocks | undefined)[];
+  },
+): DifferenceCI | undefined {
+  const { section, track, ctx, canBoot, i, metric, pairs } = args;
+  if (track.isBaseline) {
+    entry.pairedRun = pairedCurrentTrack(ctx.tracks, i)?.name;
+    return undefined;
+  }
+  if (track.baseline) {
+    const diff = canBoot ? metric?.diff : undefined;
+    addComparison(entry, diff, section, track, ctx, pairs[i]);
+    return diff;
+  }
+  if (canBoot) addAbsoluteShift(entry, section, track, ctx);
+  return undefined;
 }
 
 /** @return a CI-less DifferenceCI for comparable scalar rows. Direction is
@@ -357,6 +352,42 @@ function baselineMetric(
     samples: pair.baseline.filtered,
     batchOffsets: pair.baseline.batchOffsets,
   };
+}
+
+/** Attach the diff CI and shift function comparing a track to its baseline. */
+function addComparison(
+  entry: ViewerEntry,
+  diff: DifferenceCI | undefined,
+  section: MetricSection,
+  track: CaseTrack,
+  ctx: CaseContext,
+  pair: PreparedPairedBlocks | undefined,
+): void {
+  const base = track.baseline!;
+  if (diff) entry.comparisonCI = diff;
+  const shift = buildShiftFunction(section, track.measured, base.measured, {
+    currentMeta: track.meta,
+    baselineMeta: base.meta,
+    comparison: ctx.comparison,
+    baselineName: base.name,
+    prepared: pair,
+  });
+  if (shift) entry.shiftFunction = shift;
+}
+
+/** Attach the per-percentile absolute distribution fan for a track with no
+ *  baseline, so the summary card still shows a percentile view. */
+function addAbsoluteShift(
+  entry: ViewerEntry,
+  section: MetricSection,
+  track: CaseTrack,
+  ctx: CaseContext,
+): void {
+  const shift = buildAbsoluteShift(section, track.measured, {
+    currentMeta: track.meta,
+    comparison: ctx.comparison,
+  });
+  if (shift) entry.absoluteShift = shift;
 }
 
 /** Current cell's absolute CI, baseline delta, and kept rounds, all from the

@@ -85,6 +85,38 @@ test("static viewer: archive upload shows summary with stats", {
   expect(consoleErrors).toEqual([]);
 });
 
+test("static viewer: clicking the baseline sparkline opens the detail popup", {
+  timeout: 30_000,
+}, async () => {
+  const page = await browser.newPage();
+  try {
+    await page.goto(`http://localhost:${port}`, { waitUntil: "networkidle" });
+    const fileInput = page.locator('.drop-zone input[type="file"]');
+    await fileInput.setInputFiles(archivePath);
+    await page
+      .locator(".drop-zone")
+      .waitFor({ state: "detached", timeout: 15_000 });
+
+    const summaryPanel = page.locator("#summary-panel");
+    await summaryPanel
+      .locator(".sparkline-row")
+      .first()
+      .waitFor({ state: "visible", timeout: 15_000 });
+
+    const baselineRow = summaryPanel
+      .locator(".sparkline-row")
+      .filter({ hasText: "baseline" })
+      .first();
+    await baselineRow.locator(".sparkline-cell").click();
+
+    await page
+      .locator(".shift-popup")
+      .waitFor({ state: "visible", timeout: 15_000 });
+  } finally {
+    await page.close();
+  }
+});
+
 test("static viewer: typed notes ride along with the archive download", {
   timeout: 30_000,
 }, async () => {

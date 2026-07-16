@@ -1,12 +1,13 @@
 import { formatSignedPercent } from "../../report/Formatters.ts";
 import { verdictLabel } from "../../report/Verdict.ts";
 import type { DifferenceCI } from "../../stats/Bootstrap.ts";
-import type {
-  AbsolutePercentile,
-  BootstrapCIData,
-  ShiftPercentile,
-} from "../ReportData.ts";
-import { absoluteDetail, shiftDetail, useEscapeClose } from "../State.ts";
+import type { BootstrapCIData, ShiftPercentile } from "../ReportData.ts";
+import {
+  type AbsoluteDetail,
+  absoluteDetail,
+  shiftDetail,
+  useEscapeClose,
+} from "../State.ts";
 import { ciDomain, distributionOpts } from "./CIWidgets.tsx";
 import { useLazyPlot } from "./LazyPlot.ts";
 
@@ -25,16 +26,15 @@ export function ShiftDetailPopup() {
   );
 }
 
-/** The single shared absolute-distribution detail popup, opened from a
- *  no-baseline fan's violin. */
+/** The single shared distribution-detail popup, opened from a no-baseline fan's
+ *  violin or from an unpaired baseline sparkline. */
 export function AbsoluteDetailPopup() {
   const detail = absoluteDetail.value;
   useEscapeClose(() => (absoluteDetail.value = null));
   if (!detail) return null;
   return (
     <AbsolutePopup
-      point={detail.point}
-      metric={detail.metric}
+      detail={detail}
       onClose={() => (absoluteDetail.value = null)}
     />
   );
@@ -42,7 +42,12 @@ export function AbsoluteDetailPopup() {
 
 /** Modal detailing one percentile: the diff CI chart, then each run's absolute
  *  distribution. */
-function ShiftPopup({ point, metric, marginBand, onClose }: {
+function ShiftPopup({
+  point,
+  metric,
+  marginBand,
+  onClose,
+}: {
   point: ShiftPercentile;
   metric: string;
   marginBand?: [number, number];
@@ -53,17 +58,29 @@ function ShiftPopup({ point, metric, marginBand, onClose }: {
   // positions mean equal values, making medians and CIs comparable across runs.
   const domain = ciDomain(point.runs.map(r => r.bootstrapCI));
   return (
-    <div class="shift-overlay" onClick={e => e.target === e.currentTarget && onClose()}>
+    <div
+      class="shift-overlay"
+      onClick={e => e.target === e.currentTarget && onClose()}
+    >
       <div class="shift-popup">
-        <span class="shift-close" onClick={onClose}>{"×"}</span>
+        <span class="shift-close" onClick={onClose}>
+          {"×"}
+        </span>
         <div class="shift-popup-head">
-          <h3>{metric} &middot; {point.label}</h3>
+          <h3>
+            {metric} &middot; {point.label}
+          </h3>
           <ShiftVerdict point={point} />
         </div>
         <div class="shift-charts">
           <ShiftPopupDiff ci={diff} marginBand={marginBand} />
           {point.runs.map((run, i) => (
-            <ShiftPopupAbsolute key={i} runName={run.runName} ci={run.bootstrapCI} domain={domain} />
+            <ShiftPopupAbsolute
+              key={i}
+              runName={run.runName}
+              ci={run.bootstrapCI}
+              domain={domain}
+            />
           ))}
         </div>
       </div>
@@ -71,25 +88,40 @@ function ShiftPopup({ point, metric, marginBand, onClose }: {
   );
 }
 
-/** Modal detailing one percentile's absolute distribution on its own scale,
- *  where a tight CI the fan crushes against the full-range axis is legible. */
-function AbsolutePopup({ point, metric, onClose }: {
-  point: AbsolutePercentile;
-  metric: string;
+/** Modal detailing one series' absolute distribution on its own scale, where a
+ *  tight CI the fan crushes against the full-range axis is legible. */
+function AbsolutePopup({
+  detail,
+  onClose,
+}: {
+  detail: AbsoluteDetail;
   onClose: () => void;
 }) {
+  const { metric, label, runName, ci, reliable, tailCount } = detail;
   return (
-    <div class="shift-overlay" onClick={e => e.target === e.currentTarget && onClose()}>
+    <div
+      class="shift-overlay"
+      onClick={e => e.target === e.currentTarget && onClose()}
+    >
       <div class="shift-popup">
-        <span class="shift-close" onClick={onClose}>{"×"}</span>
+        <span class="shift-close" onClick={onClose}>
+          {"×"}
+        </span>
         <div class="shift-popup-head">
-          <h3>{metric} &middot; {point.label}</h3>
-          {point.reliable
-            ? <span class="shift-verdict-pct">{point.ci.estimateLabel}</span>
-            : <span class="badge badge-insufficient">Insufficient data &middot; n={point.tailCount}</span>}
+          <h3>
+            {metric}
+            {label && <> &middot; {label}</>}
+          </h3>
+          {reliable === false ? (
+            <span class="badge badge-insufficient">
+              Insufficient data &middot; n={tailCount}
+            </span>
+          ) : (
+            <span class="shift-verdict-pct">{ci.estimateLabel}</span>
+          )}
         </div>
         <div class="shift-charts">
-          <ShiftPopupAbsolute runName={metric} ci={point.ci} />
+          <ShiftPopupAbsolute runName={runName} ci={ci} />
         </div>
       </div>
     </div>
@@ -101,7 +133,9 @@ function AbsolutePopup({ point, metric, onClose }: {
 function ShiftVerdict({ point }: { point: ShiftPercentile }) {
   if (!point.reliable)
     return (
-      <span class="badge badge-insufficient">Insufficient data &middot; n={point.tailCount}</span>
+      <span class="badge badge-insufficient">
+        Insufficient data &middot; n={point.tailCount}
+      </span>
     );
   const { direction, percent } = point.diff;
   return (
@@ -114,12 +148,28 @@ function ShiftVerdict({ point }: { point: ShiftPercentile }) {
 
 /** The diff CI chart in the popup (reuses createCIPlot). The Δ% point estimate
  *  is drawn as a bold label above the median line, not in the popup title. */
-function ShiftPopupDiff({ ci, marginBand }: { ci: DifferenceCI; marginBand?: [number, number] }) {
-  const ref = useLazyPlot(async () => {
-    const { createCIPlot } = await import("../plots/CIPlot.ts");
-    const opts = { width: 320, height: 90, title: "", pointLabel: formatSignedPercent(ci.percent), marginBand };
-    return createCIPlot(ci, opts);
-  }, [ci, marginBand?.[0], marginBand?.[1]], "Shift diff plot");
+function ShiftPopupDiff({
+  ci,
+  marginBand,
+}: {
+  ci: DifferenceCI;
+  marginBand?: [number, number];
+}) {
+  const ref = useLazyPlot(
+    async () => {
+      const { createCIPlot } = await import("../plots/CIPlot.ts");
+      const opts = {
+        width: 320,
+        height: 90,
+        title: "",
+        pointLabel: formatSignedPercent(ci.percent),
+        marginBand,
+      };
+      return createCIPlot(ci, opts);
+    },
+    [ci, marginBand?.[0], marginBand?.[1]],
+    "Shift diff plot",
+  );
   return (
     <div class="shift-chart">
       <div class="shift-chart-label">difference</div>
@@ -130,17 +180,29 @@ function ShiftPopupDiff({ ci, marginBand }: { ci: DifferenceCI; marginBand?: [nu
 
 /** One run's absolute distribution in the popup (reuses createDistributionPlot).
  *  `domain` shares the x-scale across runs so positions are comparable. */
-function ShiftPopupAbsolute(
-  { runName, ci, domain }:
-  { runName: string; ci: BootstrapCIData; domain?: [number, number] },
-) {
-  const ref = useLazyPlot(async () => {
-    const { createDistributionPlot } = await import("../plots/CIPlot.ts");
-    const opts = distributionOpts(ci, {
-      width: 320, height: 90, pointLabel: ci.estimateLabel, domain,
-    });
-    return createDistributionPlot(ci.histogram, ci.ci, ci.estimate, opts);
-  }, [ci, domain], "Shift absolute plot");
+function ShiftPopupAbsolute({
+  runName,
+  ci,
+  domain,
+}: {
+  runName: string;
+  ci: BootstrapCIData;
+  domain?: [number, number];
+}) {
+  const ref = useLazyPlot(
+    async () => {
+      const { createDistributionPlot } = await import("../plots/CIPlot.ts");
+      const opts = distributionOpts(ci, {
+        width: 320,
+        height: 90,
+        pointLabel: ci.estimateLabel,
+        domain,
+      });
+      return createDistributionPlot(ci.histogram, ci.ci, ci.estimate, opts);
+    },
+    [ci, domain],
+    "Shift absolute plot",
+  );
   return (
     <div class="shift-chart">
       <div class="shift-chart-label">{runName}</div>
