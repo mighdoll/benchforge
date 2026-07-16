@@ -56,14 +56,10 @@ export function cliHeapReportOptions(args: DefaultCliArgs): HeapReportOptions {
   };
 }
 
-/** True if any alloc-related flag implies allocation sampling. */
+/** True if any alloc-related flag implies allocation sampling. (alloc-user-only
+ *  is a display filter that defaults on, so it never enables sampling itself.) */
 export function needsAlloc(args: DefaultCliArgs): boolean {
-  return (
-    args.alloc ||
-    args.archive != null ||
-    args["alloc-raw"] ||
-    args["alloc-user-only"]
-  );
+  return args.alloc || args.archive != null || args["alloc-raw"];
 }
 
 /** True if any profiling flag implies CPU time sampling. */
