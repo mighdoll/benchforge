@@ -9,7 +9,8 @@ export function TabContent() {
   const dataProvider = provider.value!;
   const { config } = dataProvider;
   const tabId = activeTabId.value;
-  const panelClass = (id: string) => `report-panel${tabId === id ? " active" : ""}`;
+  const panelClass = (id: string) =>
+    `report-panel${tabId === id ? " active" : ""}`;
 
   return (
     <div class="tab-content">
@@ -39,7 +40,7 @@ export function TabContent() {
 /** Build a Speedscope iframe hash-URL with optional editor URI. */
 function iframeSrc(url: string | null, config: ViewerConfig): string {
   if (!url) return "";
-  const parts = ["profileURL=" + encodeURIComponent(url)];
+  const parts = ["profileURL=" + encodeURIComponent(url), "view=sandwich"];
   if (config.editorUri)
     parts.push("editorUri=" + encodeURIComponent(config.editorUri));
   return "speedscope/#" + parts.join("&");
