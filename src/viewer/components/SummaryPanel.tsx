@@ -11,6 +11,7 @@ import { provider, reportData, trimMode } from "../State.ts";
 import { activeGroupView, CaseCard, caseHeaderCI } from "./CaseCard.tsx";
 import { ComparisonBadge, shiftDetailOpener } from "./CIWidgets.tsx";
 import { HelpButton } from "./HelpButton.tsx";
+import { NotesPanel } from "./NotesPanel.tsx";
 import { AbsoluteDetailPopup, ShiftDetailPopup } from "./ShiftPopup.tsx";
 
 declare const __BENCHFORGE_GIT_HASH__: string;
@@ -25,7 +26,8 @@ export function SummaryPanel() {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    dataProvider.fetchReportData()
+    dataProvider
+      .fetchReportData()
       .then(result => (reportData.value = result as ReportData))
       .catch(err => {
         console.error("Report load failed:", err);
@@ -34,13 +36,22 @@ export function SummaryPanel() {
   }, [dataProvider]);
 
   if (error)
-    return <div class="empty-state"><p>Failed to load report data: {error}</p></div>;
+    return (
+      <div class="empty-state">
+        <p>Failed to load report data: {error}</p>
+      </div>
+    );
   if (!data)
-    return <div class="empty-state"><p>Loading report&hellip;</p></div>;
+    return (
+      <div class="empty-state">
+        <p>Loading report&hellip;</p>
+      </div>
+    );
 
   return (
     <>
       <ReportHeader data={data} />
+      <NotesPanel />
       <div class="report-body">
         {hasRawView(data) && (
           <div class="report-toolbar">
@@ -142,7 +153,11 @@ function CollapsibleGroup({ group }: { group: BenchmarkGroup }) {
         )}
         {group.warnings && (
           <span class="batch-warnings">
-            {group.warnings.map((w, i) => <span key={i} class="batch-warning">{w}</span>)}
+            {group.warnings.map((w, i) => (
+              <span key={i} class="batch-warning">
+                {w}
+              </span>
+            ))}
           </span>
         )}
       </div>
@@ -172,4 +187,3 @@ function benchforgeLabel(): string {
 function safeGlobal<T>(v: T, fallback: T): T {
   return typeof v !== "undefined" ? v : fallback;
 }
-

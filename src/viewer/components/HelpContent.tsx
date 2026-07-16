@@ -1,6 +1,7 @@
 import type { ComponentChildren } from "preact";
 import type { CIDirection } from "../../stats/Bootstrap.ts";
 import { directionColors } from "../plots/PlotTypes.ts";
+import { provider } from "../State.ts";
 
 /** Topic ids for the "?" help popovers, one per explained UI element. */
 export type HelpTopic =
@@ -12,7 +13,8 @@ export type HelpTopic =
   | "valueByPercentile"
   | "equivalenceMargin"
   | "timeSeries"
-  | "histogram";
+  | "histogram"
+  | "notes";
 
 /** Popover text per help topic. Written for first-time readers: plain words,
  *  no unexplained stats jargon, generic (no specific benchmarks or numbers). */
@@ -25,8 +27,7 @@ export const helpContent: Record<
     body: (
       <>
         <p>
-          The colored pill sums up how this case compares against the
-          baseline:
+          The colored pill sums up how this case compares against the baseline:
         </p>
         <ul>
           <li>
@@ -56,13 +57,12 @@ export const helpContent: Record<
       <>
         <p>
           The percentage is the measured change from the baseline; for time,
-          negative means faster. The chart shows how precisely it was
-          measured:
+          negative means faster. The chart shows how precisely it was measured:
         </p>
         <ul>
           <li>
-            The <b>curve</b> spans the plausible values for the change,
-            peaked at the most likely ones.
+            The <b>curve</b> spans the plausible values for the change, peaked
+            at the most likely ones.
           </li>
           <li>
             The <b>colored box</b> covers the middle 95% of that range.
@@ -86,8 +86,8 @@ export const helpContent: Record<
       <>
         <p>
           Drops batches that look like environmental noise (other apps, OS
-          scheduling, thermal throttling) so they don't distort the results.
-          A batch is dropped when it runs slower than the others by more than
+          scheduling, thermal throttling) so they don't distort the results. A
+          batch is dropped when it runs slower than the others by more than
           three times their typical variation.
         </p>
       </>
@@ -99,9 +99,9 @@ export const helpContent: Record<
     body: (
       <>
         <p>
-          One row for each version of the code that was benchmarked. The
-          small curve shows the plausible range for the true value: a narrow
-          spike is a precise measurement, a wide curve a rough one.
+          One row for each version of the code that was benchmarked. The small
+          curve shows the plausible range for the true value: a narrow spike is
+          a precise measurement, a wide curve a rough one.
         </p>
         <p>Click a row for details.</p>
       </>
@@ -113,9 +113,9 @@ export const helpContent: Record<
     body: (
       <>
         <p>
-          Shows how the change from the baseline varies across iterations,
-          from the fastest to the slowest. The value that drives the
-          faster/slower call is in bold (usually the mean).
+          Shows how the change from the baseline varies across iterations, from
+          the fastest to the slowest. The value that drives the faster/slower
+          call is in bold (usually the mean).
         </p>
         <p>
           Each violin shows the change at one percentile, with a mark at the
@@ -126,11 +126,11 @@ export const helpContent: Record<
         <p>Colors show the result at each percentile:</p>
         <ViolinLegend />
         <p>
-          Gray is common on short runs: an extreme percentile like p99 needs
-          a lot of data out in the tail. The axis is scaled to the
-          well-measured percentiles, so an extreme violin can run off the
-          chart: a gray dashed one was too noisy to pin down at all, while a
-          colored one shows its change below its label.
+          Gray is common on short runs: an extreme percentile like p99 needs a
+          lot of data out in the tail. The axis is scaled to the well-measured
+          percentiles, so an extreme violin can run off the chart: a gray dashed
+          one was too noisy to pin down at all, while a colored one shows its
+          change below its label.
         </p>
         <p>
           Learn more: <DocLink doc="Statistics.md">Statistics.md</DocLink>
@@ -149,9 +149,9 @@ export const helpContent: Record<
           verdict stat (usually the mean) is in bold.
         </p>
         <p>
-          Each violin is the estimate at one percentile, with a mark at the
-          best estimate; its width is the spread of the bootstrap. A gray
-          dashed violin had too few tail samples to pin down.
+          Each violin is the estimate at one percentile, with a mark at the best
+          estimate; its width is the spread of the bootstrap. A gray dashed
+          violin had too few tail samples to pin down.
         </p>
         <p>
           The axis is in the metric's own units. Re-run with a baseline to get
@@ -171,9 +171,9 @@ export const helpContent: Record<
           told apart from measurement noise on this machine.
         </p>
         <p>
-          A violin inside the band is effectively unchanged at that
-          percentile; one fully clear of the band is a real change; one
-          straddling an edge is inconclusive.
+          A violin inside the band is effectively unchanged at that percentile;
+          one fully clear of the band is a real change; one straddling an edge
+          is inconclusive.
         </p>
         <p>
           Learn more: <DocLink doc="Calibration.md">Calibration.md</DocLink>{" "}
@@ -190,8 +190,8 @@ export const helpContent: Record<
         <p>
           Execution time for each iteration, in the order collected. Use it to
           spot the warmup ramp, the GC sawtooth, a disturbed batch, or drift
-          over the run. The batch stepper views all batches at once or one at
-          a time.
+          over the run. The batch stepper views all batches at once or one at a
+          time.
         </p>
         <p>Overlays correlate timing with engine activity:</p>
         <ul>
@@ -214,11 +214,16 @@ export const helpContent: Record<
     title: "Time distribution",
     body: (
       <p>
-        How often each execution time occurred. Reveals bimodality (a fast
-        mode and a slow GC mode as two humps) and long tails that a single
-        average hides.
+        How often each execution time occurred. Reveals bimodality (a fast mode
+        and a slow GC mode as two humps) and long tails that a single average
+        hides.
       </p>
     ),
+  },
+
+  notes: {
+    title: "Notes",
+    body: <NotesHelp />,
   },
 };
 
@@ -255,10 +260,39 @@ function ViolinLegend() {
 }
 
 /** Link to a standalone doc on GitHub, opened in a new tab. */
-function DocLink({ doc, children }: { doc: string; children: ComponentChildren }) {
+function DocLink({
+  doc,
+  children,
+}: {
+  doc: string;
+  children: ComponentChildren;
+}) {
   return (
     <a href={docBase + doc} target="_blank" rel="noopener">
       {children}
     </a>
+  );
+}
+
+/** Notes help, worded to match how the current viewer persists them: written
+ *  back to the file when one is open, otherwise only via the archive download. */
+function NotesHelp() {
+  const file = provider.value?.config.notesFile;
+  return (
+    <>
+      <p>
+        You can add notes about this benchmark run. Notes are saved with the
+        archive.
+      </p>
+      {file && (
+        <p>
+          Your edits are saved automatically to <b>{file}</b>.
+        </p>
+      )}
+      <p>
+        The <b>Archive {"\u2193"}</b> button (top right) bundles the report and
+        notes into a new <code>.benchforge</code> file you can share.
+      </p>
+    </>
   );
 }

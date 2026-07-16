@@ -1,9 +1,11 @@
+import { readFile } from "node:fs/promises";
 import { createServer, type Server } from "node:http";
 import path from "node:path";
 import type { Browser } from "playwright";
 import { chromium } from "playwright";
 import sirv from "sirv";
 import { afterAll, beforeAll, expect, test } from "vitest";
+import { archiveSchemaVersion } from "../export/ArchiveFormat.ts";
 
 const viewerDir = path.resolve(import.meta.dirname!, "../../dist/viewer");
 const archivePath = path.resolve(
@@ -81,6 +83,33 @@ test("static viewer: archive upload shows summary with stats", {
     await page.close();
   }
   expect(consoleErrors).toEqual([]);
+});
+
+test("static viewer: typed notes ride along with the archive download", {
+  timeout: 30_000,
+}, async () => {
+  const page = await browser.newPage();
+  try {
+    await page.goto(`http://localhost:${port}`, { waitUntil: "networkidle" });
+    const fileInput = page.locator('.drop-zone input[type="file"]');
+    await fileInput.setInputFiles(archivePath);
+    await page
+      .locator(".drop-zone")
+      .waitFor({ state: "detached", timeout: 15_000 });
+
+    const input = page.locator(".notes-input");
+    await input.waitFor({ state: "visible", timeout: 15_000 });
+    await input.fill("annotated in the browser");
+
+    const downloadP = page.waitForEvent("download");
+    await page.locator('[data-action="archive"]').click();
+    const download = await downloadP;
+    const saved = JSON.parse(await readFile(await download.path(), "utf-8"));
+    expect(saved.notes).toBe("annotated in the browser");
+    expect(saved.schema).toBe(archiveSchemaVersion);
+  } finally {
+    await page.close();
+  }
 });
 
 test("static viewer: tab navigation after archive upload", {

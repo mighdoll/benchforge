@@ -20,6 +20,9 @@ export interface BenchforgeArchive {
   /** Benchmark report with suite results and statistics. */
   report?: ReportData;
 
+  /** User notes entered in the viewer, saved with the archive. */
+  notes?: string;
+
   /** Source file contents keyed by file URL. */
   sources: Record<string, string>;
 
@@ -35,6 +38,9 @@ export interface ArchiveMetadata {
   benchforgeVersion: string;
 }
 
+/** Bump only for breaking changes: `archiveSchemaError` rejects any mismatch, so
+ *  a bump invalidates every existing archive. Optional additive fields (e.g.
+ *  `notes`) are compatible in both directions and need no bump. */
 export const archiveSchemaVersion = 3;
 
 /** Validate an archive's schema field against the supported version.

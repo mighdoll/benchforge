@@ -58,6 +58,15 @@ export const urlError = signal<{ url: string; detail: string } | null>(null);
 export const sourceTabs = signal<SourceTabState[]>([]);
 export const trimMode = signal<TrimMode>("trim");
 
+/** User notes saved with the archive. */
+export const notes = signal("");
+
+/** Save state of the notes text area. "idle"/"saved" read as persisted;
+ *  "dirty"/"saving" as pending. */
+export const notesStatus = signal<
+  "idle" | "dirty" | "saving" | "saved" | "error"
+>("idle");
+
 /** Open detail popup for a shift-function point (verdict or percentile). Null = closed. */
 export const shiftDetail = signal<ShiftDetail | null>(null);
 

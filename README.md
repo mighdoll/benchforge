@@ -180,6 +180,10 @@ Core flags for common workflows. Run `benchforge --help` for the full list.
 
 `benchforge view <file.benchforge>` reopens an archive in the viewer.
 
+Notes typed in the box at the top of the viewer's Summary page are saved with the
+archive; opening a file with `benchforge view <file>` writes edits back to that
+file.
+
 ## Further Reading
 
 - [Configuration.md](Configuration.md) -- MatrixSuite details, presets, and

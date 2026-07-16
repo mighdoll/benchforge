@@ -8,6 +8,8 @@ import {
 import {
   activeTabId,
   defaultTabId,
+  notes,
+  notesStatus,
   provider,
   reportData,
   samplesLoaded,
@@ -24,6 +26,8 @@ export function initViewer(p: DataProvider): void {
   samplesLoaded.value = false;
   urlError.value = null;
   sourceTabs.value = [];
+  notes.value = "";
+  notesStatus.value = "idle";
   activeTabId.value = defaultTabId();
 }
 

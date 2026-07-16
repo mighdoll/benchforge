@@ -24,6 +24,10 @@ export interface ViewerServerOptions {
   open?: boolean;
   /** Pre-loaded sources (e.g. from an archive) to seed the source cache */
   sources?: Record<string, string>;
+  /** Notes loaded from the archive being viewed */
+  notes?: string;
+  /** Archive file that edited notes are written back to (absolute path) */
+  notesFile?: string;
 }
 
 /** Start the viewer HTTP server and open in browser. */
@@ -52,8 +56,8 @@ export async function startViewerServer(
 
 /** Open a .benchforge archive in the viewer. */
 export async function viewArchive(filePath: string): Promise<void> {
-  const content = await readFile(resolve(filePath), "utf-8");
-  const raw = JSON.parse(content);
+  const archivePath = resolve(filePath);
+  const raw = JSON.parse(await readFile(archivePath, "utf-8"));
 
   const schemaError = archiveSchemaError(raw.schema ?? 0);
   if (schemaError) {
@@ -68,6 +72,8 @@ export async function viewArchive(filePath: string): Promise<void> {
     coverageData: optionalJson(raw.coverage),
     reportData: optionalJson(raw.report),
     sources,
+    notes: raw.notes,
+    notesFile: archivePath,
   });
 
   await waitForCtrlC();

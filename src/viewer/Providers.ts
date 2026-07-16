@@ -15,6 +15,10 @@ export interface ViewerConfig {
   hasProfile: boolean;
   hasTimeProfile: boolean;
   hasCoverage: boolean;
+
+  /** Archive filename that notes are written back to; null when notes only ride
+   *  along with the next `Archive` download. */
+  notesFile: string | null;
 }
 
 /** Coverage data keyed by source URL. */
@@ -44,6 +48,8 @@ export interface DataProvider {
   fetchSource(url: string): Promise<string>;
   fetchProfileData(type: ProfileType): Promise<ViewerSpeedscopeFile | null>;
   fetchCoverageData(): Promise<ViewerCoverageData | null>;
+  fetchNotes(): Promise<string>;
+  saveNotes(text: string): Promise<void>;
   // LATER once we replace the speedscope iframe with an integrated viewer,
   // we can pass profile data directly instead of returning URLs.
   profileUrl(type: ProfileType): string | null;
@@ -103,6 +109,22 @@ export class ServerProvider implements DataProvider {
     return this.coverageCache;
   }
 
+  async fetchNotes(): Promise<string> {
+    const resp = await fetch("/api/notes");
+    if (!resp.ok) return "";
+    const { notes } = (await resp.json()) as { notes?: string };
+    return notes ?? "";
+  }
+
+  async saveNotes(text: string): Promise<void> {
+    const resp = await fetch("/api/notes", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ notes: text }),
+    });
+    if (!resp.ok) throw new Error("Notes save failed: " + resp.status);
+  }
+
   profileUrl(type: ProfileType): string | null {
     if (type === "alloc") return this.config.hasProfile ? "/api/profile" : null;
     return this.config.hasTimeProfile ? "/api/profile/time" : null;
@@ -137,6 +159,7 @@ export class ArchiveProvider implements DataProvider {
       hasProfile: !!archive.allocProfile,
       hasTimeProfile: !!archive.timeProfile,
       hasCoverage: !!archive.coverage,
+      notesFile: null,
     };
   }
 
@@ -165,6 +188,16 @@ export class ArchiveProvider implements DataProvider {
 
   async fetchCoverageData(): Promise<ViewerCoverageData | null> {
     return (this.archive.coverage as ViewerCoverageData) ?? null;
+  }
+
+  async fetchNotes(): Promise<string> {
+    return this.archive.notes ?? "";
+  }
+
+  /** Notes live in the in-memory archive; they reach disk on the next download. */
+  async saveNotes(text: string): Promise<void> {
+    if (text.trim()) this.archive.notes = text;
+    else delete this.archive.notes;
   }
 
   /** Return a blob URL for the profile, lazily created and cached. */

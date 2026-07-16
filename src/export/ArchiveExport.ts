@@ -1,7 +1,7 @@
 /** .benchforge archive creation, source collection, and archive filename derivation. */
 
 import { writeFileSync } from "node:fs";
-import { readFile } from "node:fs/promises";
+import { readFile, rename, writeFile } from "node:fs/promises";
 import { resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import type { ReportGroup } from "../report/BenchmarkReport.ts";
@@ -30,6 +30,7 @@ export interface ArchiveInput {
   timeProfile?: SpeedscopeFile;
   coverage?: Record<string, LineCoverage[]>;
   report?: ReportData;
+  notes?: string;
   sources: Record<string, string>;
 }
 
@@ -75,6 +76,7 @@ export function buildArchiveObject(input: ArchiveInput): {
     timeProfile: input.timeProfile,
     coverage: input.coverage,
     report: input.report,
+    notes: blankToUndefined(input.notes),
     sources: input.sources,
     metadata: {
       timestamp,
@@ -82,6 +84,30 @@ export function buildArchiveObject(input: ArchiveInput): {
     },
   };
   return { archive, timestamp };
+}
+
+/** Map blank (empty or whitespace-only) notes to undefined so blank text never
+ *  persists; the value itself is returned unchanged (not trimmed). */
+export function blankToUndefined(
+  notes: string | undefined,
+): string | undefined {
+  return notes?.trim() ? notes : undefined;
+}
+
+/** Set or clear the notes of an existing archive file, preserving every other
+ *  field. Re-reads and re-parses the file so fields this version doesn't model
+ *  survive, and writes via temp + rename so a crash can't truncate the archive. */
+export async function saveArchiveNotes(
+  filePath: string,
+  notes: string,
+): Promise<void> {
+  const raw = await readFile(filePath, "utf-8");
+  const archive = JSON.parse(raw) as BenchforgeArchive;
+  if (notes.trim()) archive.notes = notes;
+  else delete archive.notes;
+  const temp = `${filePath}.tmp`;
+  await writeFile(temp, JSON.stringify(archive));
+  await rename(temp, filePath);
 }
 
 export function collectProfileFrames(

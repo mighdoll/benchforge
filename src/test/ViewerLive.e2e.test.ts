@@ -32,6 +32,7 @@ beforeAll(async () => {
   });
 
   // Parse port from stdout line like "Viewer: http://localhost:3939"
+  let portTimer: ReturnType<typeof setTimeout>;
   const portP = new Promise<number>((resolve, reject) => {
     let stdout = "";
     proc.stdout!.on("data", (chunk: Buffer) => {
@@ -48,12 +49,14 @@ beforeAll(async () => {
           ),
         );
     });
-    setTimeout(
+    portTimer = setTimeout(
       () =>
         reject(new Error(`Timed out waiting for viewer.\nstdout: ${stdout}`)),
       60_000,
     );
-  });
+    // Clear the timer once the port resolves so it can't outlive the test and
+    // hold the worker's event loop open during teardown.
+  }).finally(() => clearTimeout(portTimer));
 
   [port, browser] = await Promise.all([
     portP,
@@ -120,6 +123,53 @@ test("live viewer: samples tab shows chart SVG", {
     await page.close();
   }
   expect(consoleErrors).toEqual([]);
+});
+
+test("live viewer: notes save into the archive and the field auto-grows", {
+  timeout: 30_000,
+}, async () => {
+  const page = await browser.newPage();
+  try {
+    await page.goto(`http://localhost:${port}`, { waitUntil: "networkidle" });
+
+    const input = page.locator(".notes-input");
+    await input.waitFor({ state: "visible", timeout: 15_000 });
+
+    const emptyHeight = (await input.boundingBox())!.height;
+    expect(emptyHeight).toBeLessThan(45);
+
+    // The debounced save PUTs to the server; wait for it before asking for the
+    // archive so ctx.notes is populated.
+    const savedP = page.waitForResponse(
+      r => r.url().includes("/api/notes") && r.request().method() === "PUT",
+    );
+    await input.fill("line1\nline2\nline3\nline4");
+    const grownHeight = (await input.boundingBox())!.height;
+    expect(grownHeight).toBeGreaterThan(emptyHeight);
+
+    // No file backs a --view-serve run, so the note stays "(unsaved)".
+    const status = page.locator(".notes-status");
+    await status.waitFor({ state: "visible" });
+    expect(await status.textContent()).toBe("(unsaved)");
+
+    await savedP;
+    const notes = await page.evaluate(async () => {
+      const resp = await fetch("/api/archive", { method: "POST" });
+      const archive = JSON.parse(await resp.text());
+      return archive.notes as string | undefined;
+    });
+    expect(notes).toBe("line1\nline2\nline3\nline4");
+
+    // The "?" explains how notes persist via the Archive button. Anchored at
+    // the right edge, the popover must still open full-width, not a sliver.
+    await page.locator(".notes-meta .help-button").click();
+    const popover = page.locator(".help-popover");
+    await popover.waitFor({ state: "visible" });
+    expect(await popover.textContent()).toContain("Archive");
+    expect((await popover.boundingBox())!.width).toBeGreaterThan(300);
+  } finally {
+    await page.close();
+  }
 });
 
 test("live viewer: allocation tab has speedscope content", {
