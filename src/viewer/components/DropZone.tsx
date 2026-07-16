@@ -1,8 +1,7 @@
 import { useRef, useState } from "preact/hooks";
+import { openArchiveFile } from "../ArchiveLoad.ts";
 import { benchforgeLabel } from "../BenchforgeVersion.ts";
-import { type ArchiveData, ArchiveProvider } from "../Providers.ts";
 import { urlError } from "../State.ts";
-import { initViewer } from "./App.tsx";
 
 /** Landing page for loading `.benchforge` archive files via drag-drop or file picker. */
 export function DropZone() {
@@ -13,9 +12,7 @@ export function DropZone() {
   /** Parse an archive JSON file and initialize the viewer with its data. */
   async function loadFile(file: File): Promise<void> {
     try {
-      const text = await file.text();
-      const archive = JSON.parse(text) as ArchiveData;
-      initViewer(new ArchiveProvider(archive));
+      await openArchiveFile(file);
     } catch (err) {
       console.error("Failed to load archive:", err);
       setError(String(err));

@@ -1,4 +1,5 @@
 import { useEffect } from "preact/hooks";
+import { DropOverlay } from "./DropOverlay.tsx";
 import { openSourceTab } from "./SourcePanel.tsx";
 import { TabBar } from "./TabBar.tsx";
 import { TabContent } from "./TabContent.tsx";
@@ -20,6 +21,7 @@ export function Shell() {
     <>
       <TabBar />
       <TabContent />
+      <DropOverlay />
     </>
   );
 }

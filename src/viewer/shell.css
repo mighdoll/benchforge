@@ -382,3 +382,34 @@ p.drop-zone-error { color: #ef4444; margin-top: 5em; }
   font-size: 10px;
   color: var(--muted-color);
 }
+
+/* Full-window drop target for opening another archive from any tab */
+
+.drop-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 200;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: color-mix(in srgb, var(--body-bg) 75%, transparent);
+  border: 3px dashed var(--tab-accent);
+  color: var(--source-color);
+  font-size: 20px;
+  pointer-events: none;
+}
+
+.drop-error-banner {
+  position: fixed;
+  top: 44px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 200;
+  background: var(--body-bg);
+  border: 1px solid #ef4444;
+  color: #ef4444;
+  padding: 8px 16px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 13px;
+}

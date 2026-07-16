@@ -1,4 +1,5 @@
-import { useState } from "preact/hooks";
+import { useRef, useState } from "preact/hooks";
+import { replaceArchive } from "../ArchiveLoad.ts";
 import type { DataProvider } from "../Providers.ts";
 import {
   activeTabId,
@@ -56,6 +57,7 @@ export function TabBar() {
 
       <div class="tab-spacer" />
       <ThemeToggle />
+      <OpenButton />
       <ArchiveButton provider={dataProvider} />
     </div>
   );
@@ -124,6 +126,32 @@ function SourceTabBtn({
         &times;
       </span>
     </button>
+  );
+}
+
+/** File picker that opens another `.benchforge` archive, replacing the current view. */
+function OpenButton() {
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  return (
+    <label
+      class="tab archive-btn"
+      data-action="open"
+      title="Open a .benchforge archive file"
+    >
+      Open&hellip;
+      <input
+        ref={inputRef}
+        type="file"
+        accept=".benchforge"
+        hidden
+        onChange={() => {
+          const file = inputRef.current?.files?.[0];
+          if (file) replaceArchive(file);
+          if (inputRef.current) inputRef.current.value = "";
+        }}
+      />
+    </label>
   );
 }
 
