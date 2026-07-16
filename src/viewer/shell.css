@@ -349,3 +349,11 @@ body { display: flex; flex-direction: column; }
 
 .drop-zone-browse:hover { opacity: 0.9; }
 p.drop-zone-error { color: #ef4444; margin-top: 5em; }
+
+.drop-zone-version {
+  position: absolute;
+  left: 12px;
+  bottom: 10px;
+  font-size: 10px;
+  color: var(--muted-color);
+}

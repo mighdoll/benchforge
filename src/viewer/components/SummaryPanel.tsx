@@ -1,6 +1,7 @@
 import { useEffect, useState } from "preact/hooks";
 import { formatCliCommand } from "../../report/CliCommand.ts";
 import type { GitVersion } from "../../report/GitUtils.ts";
+import { benchforgeLabel } from "../BenchforgeVersion.ts";
 import { formatRelativeTime } from "../DateFormat.ts";
 import {
   type BenchmarkGroup,
@@ -13,10 +14,6 @@ import { ComparisonBadge, shiftDetailOpener } from "./CIWidgets.tsx";
 import { HelpButton } from "./HelpButton.tsx";
 import { NotesPanel } from "./NotesPanel.tsx";
 import { AbsoluteDetailPopup, ShiftDetailPopup } from "./ShiftPopup.tsx";
-
-declare const __BENCHFORGE_GIT_HASH__: string;
-declare const __BENCHFORGE_GIT_DIRTY__: boolean;
-declare const __BENCHFORGE_BUILD_DATE__: string;
 
 /** Main summary view: fetches report data, shows CLI args header and collapsible
  *  benchmark groups (one consolidated card per case). */
@@ -172,18 +169,4 @@ function formatVersion(v: GitVersion): string {
   const hash = v.dirty ? v.hash + "*" : v.hash;
   if (!v.date) return hash;
   return `${hash} (${formatRelativeTime(v.date)})`;
-}
-
-/** Assemble "benchforge <hash> <relative-date>" from compile-time globals. */
-function benchforgeLabel(): string {
-  const hash = safeGlobal(__BENCHFORGE_GIT_HASH__, "dev");
-  const dirty = safeGlobal(__BENCHFORGE_GIT_DIRTY__, false);
-  const date = safeGlobal(__BENCHFORGE_BUILD_DATE__, "");
-  const label = `benchforge ${hash}${dirty ? "*" : ""}`;
-  return date ? `${label} ${formatRelativeTime(date)}` : label;
-}
-
-/** Fallback for dev/unbundled builds where compile-time globals are absent. */
-function safeGlobal<T>(v: T, fallback: T): T {
-  return typeof v !== "undefined" ? v : fallback;
 }

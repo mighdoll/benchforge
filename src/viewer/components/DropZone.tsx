@@ -1,4 +1,5 @@
 import { useRef, useState } from "preact/hooks";
+import { benchforgeLabel } from "../BenchforgeVersion.ts";
 import { type ArchiveData, ArchiveProvider } from "../Providers.ts";
 import { urlError } from "../State.ts";
 import { initViewer } from "./App.tsx";
@@ -62,10 +63,9 @@ export function DropZone() {
             <p>Download the file and drop it here instead.</p>
           </p>
         )}
-        {error && (
-          <p class="drop-zone-error">Failed to load file: {error}</p>
-        )}
+        {error && <p class="drop-zone-error">Failed to load file: {error}</p>}
       </div>
+      <div class="drop-zone-version">{benchforgeLabel()}</div>
     </div>
   );
 }
