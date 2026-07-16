@@ -231,11 +231,7 @@ function xScale(ctx: PlotContext, batchMode: boolean) {
     domain: [ctx.xMin, ctx.xMax],
   };
   if (batchMode) {
-    const last = Math.ceil(ctx.xMax);
-    const centers = d3
-      .ticks(1, last, 10)
-      .filter(k => Number.isInteger(k))
-      .map(k => k - 0.5);
+    const centers = batchTickCenters(ctx.xMin, ctx.xMax);
     const tickFormat = (t: number) => `${Math.round(t + 0.5)}`;
     return { ...base, label: "Batch", grid: false, ticks: centers, tickFormat };
   }
@@ -279,6 +275,22 @@ function buildMarks(p: MarkParams): Plot.Markish[] {
   ];
 }
 
+/** Batch-number tick positions at band centers (k - 0.5), thinned so labels
+ *  never overprint. A long warmup run pushes xMin far negative (warmup maps to
+ *  negative batch fractions), compressing the measured batches into a slice of
+ *  the plot; a fixed ~10 ticks over [1, last] then crams every batch label into
+ *  that slice. Deriving a nice step from pixels-per-batch keeps labels spaced;
+ *  boundary gridlines still mark every batch (see `batchBoundaryGrid`). */
+function batchTickCenters(xMin: number, xMax: number): number[] {
+  const last = Math.ceil(xMax);
+  const inner =
+    plotLayout.width - plotLayout.marginLeft - plotLayout.marginRight;
+  const pxPerBatch = inner / (xMax - xMin);
+  const minLabelPx = 32;
+  const step = Math.min(last, Math.max(1, niceStep(minLabelPx / pxPerBatch)));
+  return d3.range(step, last + 1, step).map(k => k - 0.5);
+}
+
 /** Batch-boundary gridlines on the integer batch delimiters (0..last). The
  *  batch-mode scale grid is disabled (its ticks sit mid-band at centers), so
  *  this restores the delimiters where the automatic grid used to draw them. */
@@ -287,4 +299,10 @@ function batchBoundaryGrid(xMax: number, batchMode: boolean): Plot.Markish[] {
   const last = Math.ceil(xMax);
   const boundaries = d3.range(0, last + 1);
   return [Plot.gridX(boundaries)];
+}
+
+/** Round up to the next 1/2/5 x 10^n step, for readable axis tick spacing. */
+function niceStep(x: number): number {
+  const pow = 10 ** Math.floor(Math.log10(x));
+  return ([1, 2, 5, 10].find(m => m * pow >= x) ?? 10) * pow;
 }
