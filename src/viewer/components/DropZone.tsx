@@ -3,6 +3,20 @@ import { openArchiveFile } from "../ArchiveLoad.ts";
 import { benchforgeLabel } from "../BenchforgeVersion.ts";
 import { urlError } from "../State.ts";
 
+/** Public sample archives, loaded via the `?url=` param (see App.tsx `resolve`). */
+const sampleArchives = [
+  {
+    title: "Statistical comparison",
+    description: "Two versions, within the noise floor",
+    url: "https://raw.githubusercontent.com/mighdoll/big-files/main/benchforge/wesl-link-equivalent-1.benchforge",
+  },
+  {
+    title: "Profiling",
+    description: "Allocation, time, and call count per function",
+    url: "https://raw.githubusercontent.com/mighdoll/big-files/main/benchforge/wesl-link-investigate-1.benchforge",
+  },
+];
+
 /** Landing page for loading `.benchforge` archive files via drag-drop or file picker. */
 export function DropZone() {
   const [dragOver, setDragOver] = useState(false);
@@ -53,6 +67,21 @@ export function DropZone() {
             }}
           />
         </label>
+        <div class="drop-zone-samples">
+          <div class="drop-zone-samples-heading">or explore a sample</div>
+          <div class="drop-zone-sample-grid">
+            {sampleArchives.map(sample => (
+              <a
+                key={sample.url}
+                class="drop-zone-sample"
+                href={`?url=${encodeURIComponent(sample.url)}`}
+              >
+                <span class="drop-zone-sample-title">{sample.title}</span>
+                <span class="drop-zone-sample-desc">{sample.description}</span>
+              </a>
+            ))}
+          </div>
+        </div>
         {urlError.value && (
           <p class="drop-zone-error">
             Failed to load archive from <b>{urlError.value.url}</b>.{" "}
