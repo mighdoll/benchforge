@@ -61,7 +61,9 @@ export function gcByBatch(
   if (!placed.length) return undefined;
 
   const full = placed.filter(p => p.event.type === "mark-compact");
-  const scavenges = placed.filter(p => p.event.type === "scavenge").length;
+  // Exact in-loop count from the aggregate; individual scavenge events are
+  // dropped from gcEvents at collection to bound its size.
+  const scavenges = results.gcStats?.scavenges ?? 0;
 
   const perBatchCounts = countFullPerBatch(full, batchOffsets);
   return {

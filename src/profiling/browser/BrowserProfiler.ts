@@ -1,4 +1,8 @@
-import type { GcEvent, GcStats } from "../../runners/GcStats.ts";
+import {
+  fullGcEvents,
+  type GcEvent,
+  type GcStats,
+} from "../../runners/GcStats.ts";
 import type { CoverageData } from "../node/CoverageTypes.ts";
 import type { HeapProfile, HeapSampleOptions } from "../node/HeapSampler.ts";
 import type { TimeProfile } from "../node/TimeSampler.ts";
@@ -204,10 +208,12 @@ async function runProfile(
 
   if (params.gcStats) {
     const { stats, events } = await collectTracing(cdp, traceEvents);
+    // Store only full GCs; stats above keeps exact young-gen counts.
+    const full = fullGcEvents(events);
     return {
       ...result,
       gcStats: stats,
-      gcEvents: events.length ? events : undefined,
+      gcEvents: full.length ? full : undefined,
     };
   }
   return result;

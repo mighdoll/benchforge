@@ -106,6 +106,15 @@ export function aggregateGcStats(events: GcEvent[]): GcStats {
   };
 }
 
+/** Keep only the events consumers place individually (full GCs); drop the
+ *  high-frequency young-gen events (scavenge/minor-ms) that grow without bound
+ *  on fast, allocation-heavy benchmarks. The exact scavenge count lives in
+ *  GcStats and no view renders individual scavenges (the time-series plot marks
+ *  mark-compact only), so nothing downstream loses data. */
+export function fullGcEvents(events: GcEvent[]): GcEvent[] {
+  return events.filter(e => e.type !== "scavenge" && e.type !== "minor-ms");
+}
+
 /** Parse name=value pairs from a trace-gc-nvp line. */
 function parseNvpFields(line: string): Record<string, string> {
   const pairs = [...line.matchAll(/(\w+)=([^\s,]+)/g)];

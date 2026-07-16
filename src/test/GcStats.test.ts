@@ -1,5 +1,10 @@
 import { expect, test } from "vitest";
-import { aggregateGcStats, parseGcLine } from "../runners/GcStats.ts";
+import {
+  aggregateGcStats,
+  fullGcEvents,
+  type GcEvent,
+  parseGcLine,
+} from "../runners/GcStats.ts";
 
 test("parseGcLine parses scavenge event from real V8 output", () => {
   // Real V8 --trace-gc-nvp format
@@ -103,4 +108,27 @@ test("aggregateGcStats handles empty events", () => {
   expect(stats.scavenges).toBe(0);
   expect(stats.markCompacts).toBe(0);
   expect(stats.gcPauseTime).toBe(0);
+});
+
+test("fullGcEvents drops young-gen events, keeps full GCs in order", () => {
+  const ev = (type: GcEvent["type"], offset: number): GcEvent => ({
+    type,
+    offset,
+    pauseMs: 1,
+    collected: 100,
+  });
+  const events = [
+    ev("scavenge", 1),
+    ev("mark-compact", 2),
+    ev("minor-ms", 3),
+    ev("unknown", 4),
+    ev("mark-compact", 5),
+  ];
+  const kept = fullGcEvents(events);
+  expect(kept.map(e => e.type)).toEqual([
+    "mark-compact",
+    "unknown",
+    "mark-compact",
+  ]);
+  expect(kept.map(e => e.offset)).toEqual([2, 4, 5]);
 });

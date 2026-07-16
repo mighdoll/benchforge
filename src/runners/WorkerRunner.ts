@@ -7,6 +7,7 @@ import type { TimeProfile } from "../profiling/node/TimeSampler.ts";
 import type { RunnerOptions } from "./BenchRunner.ts";
 import {
   aggregateGcStats,
+  fullGcEvents,
   type GcEvent,
   parseGcLine,
   shiftGcOffset,
@@ -131,8 +132,10 @@ function attachProfilingData(
   if (!gcEvents?.length) return;
   for (const r of results) {
     const loopEvents = loopGcEvents(gcEvents, r.loopStartTime, r.loopEndTime);
-    r.gcEvents = loopEvents;
     r.gcStats = loopEvents.length ? aggregateGcStats(loopEvents) : undefined;
+    // Store only full GCs; the aggregate above keeps exact young-gen counts.
+    const full = fullGcEvents(loopEvents);
+    r.gcEvents = full.length ? full : undefined;
   }
 }
 

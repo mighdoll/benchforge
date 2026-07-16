@@ -1,9 +1,11 @@
 import { expect, test } from "vitest";
 import { gcByBatch } from "../report/GcByBatch.ts";
-import type { GcEvent } from "../runners/GcStats.ts";
+import { aggregateGcStats, type GcEvent } from "../runners/GcStats.ts";
 import type { MeasuredResults } from "../runners/MeasuredResults.ts";
 
-/** Build a MeasuredResults with uniform 1ms samples so offset==sampleIndex+1. */
+/** Build a MeasuredResults with uniform 1ms samples so offset==sampleIndex+1.
+ *  gcStats mirrors real collection (aggregated before events are trimmed), the
+ *  source gcByBatch reads scavenge counts from. */
 function results(
   sampleCount: number,
   batchOffsets: number[],
@@ -15,6 +17,7 @@ function results(
     samples,
     batchOffsets,
     gcEvents,
+    gcStats: gcEvents.length ? aggregateGcStats(gcEvents) : undefined,
     time: { min: 1, max: 1, avg: 1, p50: 1, p75: 1, p99: 1, p999: 1 },
   };
 }
