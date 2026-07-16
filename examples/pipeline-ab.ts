@@ -1,17 +1,10 @@
 import type { BenchMatrix, MatrixSuite } from "../src/index.ts";
 
-// The same record transform two ways over 100k rows, both doing an identical (and
-// moderately expensive) per-element string hash. `chained` runs map -> filter -> map,
-// allocating two throwaway intermediate arrays before the result; `loop` does one
-// pass and allocates only the result. The shared per-element work keeps the means
-// within ~20%, but the extra garbage makes chained promote more and take major GCs
-// the loop avoids -- so the change by percentile chart stays modest in the body and
-// fans out sharply at p90/p99 where the GC pauses land. A good illustration of a
-// difference that lives in the tail, not the average.
-//
-// Bound the batches by --iterations, not --duration: the GC columns (collected,
-// scav, full) are run totals, so under a time budget the slower variant runs fewer
-// iterations and its extra garbage goes undercounted.
+// The same record transform two ways over 100k rows with identical per-element
+// work: chained (map -> filter -> map, allocating throwaway intermediates) vs a
+// single loop that allocates only the result. The extra garbage makes chained take
+// major GCs the loop avoids, so the difference lives in the tail (p90/p99 where the
+// GC pauses land), not the average.
 //
 //   benchforge examples/pipeline-ab.ts --gc-stats --batches 50 --iterations 25 --equiv-margin 0.5
 interface Row {
