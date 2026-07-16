@@ -217,6 +217,31 @@ body { display: flex; flex-direction: column; }
   flex: 1;
 }
 
+.source-large-banner {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 6px 10px;
+  margin-bottom: 8px;
+  border: 1px solid var(--tab-border);
+  border-radius: 6px;
+  font-family: system-ui, sans-serif;
+  font-size: 12px;
+  color: var(--tab-color);
+}
+
+.source-highlight-btn {
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
+  padding: 2px 10px;
+  border: 1px solid var(--tab-border);
+  border-radius: 5px;
+  background: transparent;
+}
+
+.source-highlight-btn:hover { border-color: var(--source-line-color); }
+
 .source-editor-link {
   color: var(--tab-accent);
   text-decoration: none;

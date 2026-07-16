@@ -63,6 +63,7 @@ export class ServerProvider implements DataProvider {
     Promise<ViewerSpeedscopeFile | null>
   >();
   private coverageCache?: Promise<ViewerCoverageData | null>;
+  private sourceCache = new Map<string, Promise<string>>();
 
   readonly config: ViewerConfig;
   constructor(config: ViewerConfig) {
@@ -81,10 +82,20 @@ export class ServerProvider implements DataProvider {
     return resp.json();
   }
 
-  async fetchSource(url: string): Promise<string> {
-    const resp = await fetch("/api/source?url=" + encodeURIComponent(url));
-    if (!resp.ok) throw new Error("Source unavailable");
-    return resp.text();
+  /** Fetch source text, caching by url so a jump-to-line into an already-open
+   *  file doesn't refetch. A failed request is evicted so a re-open retries. */
+  fetchSource(url: string): Promise<string> {
+    let cached = this.sourceCache.get(url);
+    if (!cached) {
+      const respPromise = fetch("/api/source?url=" + encodeURIComponent(url));
+      cached = respPromise.then(resp => {
+        if (!resp.ok) throw new Error("Source unavailable");
+        return resp.text();
+      });
+      cached.catch(() => this.sourceCache.delete(url));
+      this.sourceCache.set(url, cached);
+    }
+    return cached;
   }
 
   /** Fetch a speedscope profile, caching the result by type. */
