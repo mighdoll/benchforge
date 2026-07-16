@@ -133,7 +133,7 @@ export async function dispatchCli(): Promise<void> {
     return analyzeArchive(requireFile(argv[1], "analyze"));
   }
 
-  const args = parseCliArgs();
+  const args = parseCliArgs(subcommandCliArgs);
   // --url with a bench file: run that file's inline matrix in the browser against
   // the harness url. --url alone: profile the page's own window.__bench.
   if (args.url && args.file) {
@@ -143,6 +143,19 @@ export async function dispatchCli(): Promise<void> {
   if (args.url) return browserBenchExports(args);
   if (args.file) return runFileBench(args.file, args);
   throw new Error("Provide a benchmark file or --url for browser mode.");
+}
+
+/** yargs config for the benchforge binary: the standard run options plus the
+ *  view and analyze subcommands. Those are dispatched manually in dispatchCli
+ *  (above, so they can lazy-load their modules); declaring them here is what
+ *  lists them in `--help`. */
+function subcommandCliArgs(y: Argv): Argv<DefaultCliArgs> {
+  return defaultCliArgs(y)
+    .command("view <file>", "open a .benchforge archive in the browser viewer")
+    .command(
+      "analyze <file>",
+      "print per-batch diagnostics for a .benchforge archive",
+    ) as Argv<DefaultCliArgs>;
 }
 
 /** Run every matrix in a suite, applying default cases/variants or --filter.
