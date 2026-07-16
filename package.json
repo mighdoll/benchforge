@@ -48,7 +48,7 @@
     "test:static:e2e": "NODE_OPTIONS=--expose-gc vitest run '.static.e2e.'",
     "test:once": "NODE_OPTIONS=--expose-gc vitest run --exclude '**/*.e2e.test.ts'",
     "typecheck": "tsgo && tsgo -p src/viewer",
-    "prepush": "run-s fix typecheck test:once build test:e2e test:static:e2e",
+    "prepush": "run-s fix typecheck build && run-p test:once test:e2e test:static:e2e",
     "publish:all": "pnpm publish"
   },
   "publishConfig": {

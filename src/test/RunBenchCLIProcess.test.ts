@@ -25,7 +25,7 @@ function executeBenchforgeFile(file: string, args = ""): string {
 }
 
 test("e2e: runs user script", { timeout: 30000 }, () => {
-  const output = executeTestScript("--duration 0.1");
+  const output = executeTestScript("--iterations 5");
 
   expect(output).toContain("plus");
   expect(output).toContain("multiply");
@@ -37,7 +37,7 @@ test("e2e: runs user script", { timeout: 30000 }, () => {
 });
 
 test("e2e: filter flag", { timeout: 30000 }, () => {
-  const output = executeTestScript('--filter "/plus" --duration 0.1');
+  const output = executeTestScript('--filter "/plus" --iterations 5');
 
   expect(output).toContain("plus");
   expect(output).not.toContain("multiply");

@@ -43,7 +43,7 @@ const suiteWithSetup: MatrixSuite = {
 };
 
 test("runs all benchmarks", { timeout: 30000 }, async () => {
-  const output = await runBenchCLITest(testSuite, "--duration 0.1 --no-worker");
+  const output = await runBenchCLITest(testSuite, "--iterations 5 --no-worker");
 
   expect(output).toContain("concatenation");
   expect(output).toContain("template literal");
@@ -55,7 +55,7 @@ test("runs all benchmarks", { timeout: 30000 }, async () => {
 test("filters by variant substring", { timeout: 15000 }, async () => {
   const output = await runBenchCLITest(
     testSuite,
-    "--filter /concat --duration 0.1 --no-worker",
+    "--filter /concat --iterations 5 --no-worker",
   );
 
   expect(output).toContain("concatenation");
@@ -65,7 +65,7 @@ test("filters by variant substring", { timeout: 15000 }, async () => {
 test("filters by another variant substring", { timeout: 15000 }, async () => {
   const output = await runBenchCLITest(
     testSuite,
-    "--filter /template --duration 0.1 --no-worker",
+    "--filter /template --iterations 5 --no-worker",
   );
   expect(output).toContain("template literal");
   expect(output).not.toContain("addition");
@@ -74,7 +74,7 @@ test("filters by another variant substring", { timeout: 15000 }, async () => {
 test("runs benchmarks with shared case data", { timeout: 30000 }, async () => {
   const output = await runBenchCLITest(
     suiteWithSetup,
-    "--duration 0.1 --no-worker",
+    "--iterations 5 --no-worker",
   );
 
   expect(output).toContain("sum numbers");
