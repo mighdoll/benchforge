@@ -16,6 +16,14 @@ Combine flags freely: `benchforge my-bench.ts --gc-stats --alloc --view`
 In browser mode, the same flags work via CDP:
 `benchforge --url http://localhost:5173 --alloc --gc-stats --view`
 
+## Source panels with profile annotations 
+
+To open a source file, cmd-click (ctrl-click on Windows/Linux) a source
+reference in the Allocation or Timing viewer tabs. 
+Look for profile information in the left gutter: 
+call count, allocated bytes, and self time.
+Call counts are precisely counted by V8, allocation and timing is sampled by v8.
+
 ## Run Settings for Profiling
 
 Profiling wants different run settings than a timing comparison. For a timing
@@ -41,27 +49,25 @@ iterations to gather samples, few enough to stay spread across workers.
 
 ### Typically use --iterations for profiling
 
-For profiling, it's usually wisest to set the batch size with `--iterations` (rather than `--duration`).
-The reason is that the instrumentation 
-for `--call-counts`, `--profile`, and `--alloc`
-add significant delays to execution. 
-By using `--iterations`, you're free to change the
-instrumentation settings.
+For profiling, it's usually wisest to set the batch size with `--iterations`
+(rather than `--duration`). The reason is that the instrumentation for
+`--call-counts`, `--profile`, and `--alloc` add significant delays to execution.
+By using `--iterations`, you're free to change the instrumentation settings.
 
-Note that if a preset already sets a `duration`, 
-`--iterations` alone will not
+Note that if a preset already sets a `duration`, `--iterations` alone will not
 take effect, because the loop stops at whichever limit comes first. Pass
 `--duration 0` alongside `--iterations` in that case.
 
 ### Excluding Warmup
 
 Warmup iterations run *before* profiling starts, so they stay out of the CPU and
-heap profile (just as they already stay out of the timing stats). With `--warmup`
-unset (default `0`), the measured loop includes the cold tier-up transient
-(Ignition -> Sparkplug -> Maglev -> TurboFan, plus deopts and refill scavenges),
-and those ticks land in the profile. Many short batches *amplify* this: each
-batch is a fresh worker that re-tiers from cold, so a non-trivial fraction of
-pooled ticks can land in warmup code rather than steady-state hot code.
+heap profile (just as they already stay out of the timing stats). With
+`--warmup` unset (default `0`), the measured loop includes the cold tier-up
+transient (Ignition -> Sparkplug -> Maglev -> TurboFan, plus deopts and refill
+scavenges), and those ticks land in the profile. Many short batches *amplify*
+this: each batch is a fresh worker that re-tiers from cold, so a non-trivial
+fraction of pooled ticks can land in warmup code rather than steady-state hot
+code.
 
 Set `--warmup N` to drop that transient and profile only the optimized steady
 state. Code that takes many iterations to reach its optimized plateau (sometimes
@@ -116,25 +122,20 @@ profiler in both Node and browser.
 benchforge my-bench.ts --alloc --iterations 100
 ```
 
-**Output (default compact):**
-```
-─── Heap profile: parse-document ───
-Heap allocation sites (top 20, garbage included):
-  13.62 MB  allocNode <- parseExpr <- parseProgram
-  12.36 MB  nextToken <- scanTokens <- tokenize
-   5.15 MB  pushScope <- enterBlock <- evalProgram
+The top allocation sites (bytes, share, function, location, and caller chain)
+are written to the markdown report at `bench-report/latest.md`, along with the
+all/user-code totals and sample count.
 
-Total (all):       56.98 MB
-Total (user-code): 28.45 MB
-Samples: 1,842
-```
-
-View allocation profiles as interactive icicle charts:
+To explore the profile interactively, open it in the viewer:
 
 ```bash
 benchforge my-bench.ts --alloc --view
 benchforge my-bench.ts --alloc --archive   # save for sharing
 ```
+
+The **Allocation** tab shows the profile as an icicle chart. Switch to the
+**Sandwich** view to rank allocation sites by function (self and total bytes),
+with the callers and callees of the selected function.
 
 ### How V8 Heap Sampling Works
 

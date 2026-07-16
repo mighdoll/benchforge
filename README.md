@@ -1,21 +1,13 @@
 # Benchforge
 
-Benchforge measures JavaScript performance in Node.js and Chrome. It is built
-around the two questions every optimization loop asks: **did that change
-help?** and **where did the time and memory go?**
-
-Micro-benchmark harnesses print an ops/sec figure that wobbles from run to
-run, leaving you to judge whether a change is real. Benchforge is built for
-that judgment: it measures its own noise floor, compares whole distributions,
-and reports a verdict you can act on.
+Benchforge measures JavaScript performance in Node.js and Chrome. 
 
 - **Equivalence testing** -- each comparison ends in a verdict: faster,
   slower, equivalent, or inconclusive, separating "no real difference" from
   "too noisy to tell".
 - **Measured noise floor** -- `--calibrate` runs identical code against itself
-  to find what your setup can resolve.
-- **GC-aware** -- garbage collection triggered by your code is real cost, so
-  it stays in the measurement rather than being trimmed as an outlier; the
+  to find what your setup can resolve. 
+- **GC-aware** -- garbage collection is _not_ trimmed as an outlier; the
   report shows it directly, with GC events overlaid on the iteration timeline
   plus allocation rates, collection counts, and pause times.
 - **Integrated investigation** -- rerun the same benchmark with `--alloc`,
