@@ -70,14 +70,21 @@ export function NotesPanel() {
 }
 
 /** Muted tag showing whether the current note is persisted. Without a durable
- *  file the note only lives in this view, so it always reads "(unsaved)"; the
- *  help popover explains how the Archive button keeps it. */
+ *  file, edits only live in this view, so anything typed reads "(unsaved)";
+ *  the help popover explains how the Archive button keeps it. An untouched
+ *  note loaded from a dropped archive is already persisted there, so it shows
+ *  no tag. */
 function NotesStatus({ file }: { file: string | null }) {
   const status = notesStatus.value;
   if (status === "error")
     return <span class="notes-status error">(save failed)</span>;
   if (!notes.value.trim()) return null;
-  if (!file) return <span class="notes-status">(unsaved)</span>;
+  if (!file) {
+    // Archive saveNotes only reaches the in-memory copy, so any edit
+    // (dirty/saving/"saved") is unsaved until the archive is re-downloaded.
+    if (status === "idle") return null;
+    return <span class="notes-status">(unsaved)</span>;
+  }
   const saved = status === "idle" || status === "saved";
   return <span class="notes-status">{saved ? "(saved)" : "(unsaved)"}</span>;
 }
