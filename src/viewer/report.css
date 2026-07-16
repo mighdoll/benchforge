@@ -135,7 +135,9 @@
   line-height: 1.5;
   resize: none;
   max-height: 40vh;
-  overflow-y: auto; /* engages only at max-height; JS keeps the height exact */
+  /* Hidden so zoom rounding never shows a stray scrollbar; fitHeight switches
+     to auto once content exceeds max-height. */
+  overflow-y: hidden;
 }
 
 .report-panel .notes-input::placeholder { color: var(--muted-color); }

@@ -89,10 +89,14 @@ function NotesStatus({ file }: { file: string | null }) {
   return <span class="notes-status">{saved ? "(saved)" : "(unsaved)"}</span>;
 }
 
-/** Size the textarea to its content (one row when empty). */
+/** Size the textarea to its content (one row when empty). Scrolling stays
+ *  hidden until content exceeds the CSS max-height; browser zoom rounding can
+ *  leave a sub-pixel overflow that would otherwise paint a scrollbar. */
 function fitHeight(el: HTMLTextAreaElement | null): void {
   if (!el) return;
   el.style.height = "auto";
   const borders = el.offsetHeight - el.clientHeight; // 0 with the notes CSS
   el.style.height = `${el.scrollHeight + borders}px`;
+  const capped = el.scrollHeight > el.clientHeight + 2;
+  el.style.overflowY = capped ? "auto" : "hidden";
 }
