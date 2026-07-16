@@ -9,9 +9,7 @@ export function DropOverlay() {
 
   return (
     <>
-      {dragDepth > 0 && (
-        <div class="drop-overlay">Drop to open archive</div>
-      )}
+      {dragDepth > 0 && <div class="drop-overlay">Drop to open archive</div>}
       {openError.value && (
         <div class="drop-error-banner" onClick={() => (openError.value = null)}>
           Failed to load archive: {openError.value}
