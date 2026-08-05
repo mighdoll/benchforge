@@ -166,7 +166,7 @@ Core flags for common workflows. Run `benchforge --help` for the full list.
 | `--call-counts` | Count executions per function |
 | `--filter <pattern>` | Run only benchmarks matching regex/substring |
 | `--view` | Open interactive viewer (on by default in an interactive terminal; `--no-view` disables) |
-| `--archive [file]` | Archive profiles + sources to a `.benchforge` file |
+| `--archive [file]` | Archive profiles + sources to a `.benchforge` file or directory/ (default: a timestamped file in `bench-report/`) |
 | `--url <url>` | Benchmark a browser page |
 | `--baseline-url <url>` | A/B comparison in browser |
 

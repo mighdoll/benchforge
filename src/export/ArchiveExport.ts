@@ -1,8 +1,8 @@
 /** .benchforge archive creation, source collection, and archive filename derivation. */
 
-import { writeFileSync } from "node:fs";
+import { mkdirSync, statSync, writeFileSync } from "node:fs";
 import { readFile, rename, writeFile } from "node:fs/promises";
-import { resolve } from "node:path";
+import { dirname, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 import type { ReportGroup } from "../report/BenchmarkReport.ts";
 import type { ReportData } from "../viewer/ReportData.ts";
@@ -22,7 +22,14 @@ export interface ArchiveOptions {
   reportData?: ReportData;
   timeProfileData?: string;
   coverageData?: string;
+
+  /** Explicit destination. A directory value (existing, or written with a
+   *  trailing separator) gets the default timestamped filename inside it. */
   outputPath?: string;
+
+  /** Directory for the default filename when outputPath is omitted (cwd if
+   *  unset). */
+  outputDir?: string;
 }
 
 export interface ArchiveInput {
@@ -58,10 +65,11 @@ export async function archiveBenchmark(
     sources,
   };
   const { archive, timestamp } = buildArchiveObject(input);
-  const filename = outputPath || defaultArchiveName(allocProfile, timestamp);
-  const absPath = resolve(filename);
+  const name = defaultArchiveName(allocProfile, timestamp);
+  const absPath = archivePath(outputPath, options.outputDir, name);
+  mkdirSync(dirname(absPath), { recursive: true });
   writeFileSync(absPath, JSON.stringify(archive));
-  console.log(`Archive written to: ${filename}`);
+  console.log(`Archive written to: ${absPath}`);
   return absPath;
 }
 
@@ -160,6 +168,25 @@ export async function fetchSource(url: string): Promise<string | undefined> {
   } catch {
     return undefined;
   }
+}
+
+/** Resolve where the archive lands: an explicit file path as given, a directory
+ *  value auto-named with `name`, and an omitted path inside `outputDir`. */
+function archivePath(
+  outputPath: string | undefined,
+  outputDir: string | undefined,
+  name: string,
+): string {
+  if (!outputPath) return resolve(outputDir ?? ".", name);
+  if (isDirPath(outputPath)) return resolve(outputPath, name);
+  return resolve(outputPath);
+}
+
+/** True when the path names a directory: it exists as one, or was written with
+ *  a trailing separator (a dir that doesn't exist yet). */
+function isDirPath(path: string): boolean {
+  if (path.endsWith("/") || path.endsWith(sep)) return true;
+  return statSync(path, { throwIfNoEntry: false })?.isDirectory() ?? false;
 }
 
 /** Derive an archive filename from the profile name (sanitizes URLs to safe filenames). */

@@ -47,7 +47,7 @@ const cliOptions = {
   "view-serve":     { type: "boolean", default: false, describe: "start viewer server without opening browser (reload an existing tab)" },
   "export-perfetto":{ type: "string",  requiresArg: true, describe: "export Perfetto trace file (view at ui.perfetto.dev)" },
   "export-profile": { type: "string",  requiresArg: true, alias: "export-time", describe: "export CPU profile as .cpuprofile (V8/Chrome DevTools format)" },
-  archive:          { type: "string",  describe: "archive profile + sources to .benchforge file" },
+  archive:          { type: "string",  describe: "archive profile + sources to .benchforge file or directory/ (default: timestamped file in bench-report/)" },
   "report-md":      { type: "string",  requiresArg: true, describe: "markdown report path (default: bench-report/latest.md + timestamped copy; always written)" },
   editor:           { type: "string",  default: "vscode", describe: "editor for source links: vscode, cursor, or custom://scheme" },
   inspect:          { type: "boolean", default: false, describe: "run once for external profiler attach" },

@@ -54,8 +54,10 @@ type FrameContainer = {
   shared: { frames: { name: string; file?: string; line?: number }[] };
 };
 
-// The shared output dir users gitignore. benchforge writes no HTML to disk
-// (reports are JSON archives + the in-memory viewer), so markdown sits here flat.
+// The shared output dir users gitignore, where everything a run emits lands:
+// markdown reports, the noise log, and archives. benchforge writes no HTML to
+// disk (reports are JSON archives + the in-memory viewer), so markdown sits
+// here flat.
 const reportDir = "bench-report";
 
 /** Export reports (JSON, Perfetto, archive, viewer) based on CLI args. */
@@ -98,14 +100,14 @@ export async function exportReports(options: ExportOptions): Promise<void> {
   const timeData = optionalJson(timeFile);
 
   if (args.archive != null) {
-    const outputPath = args.archive || undefined;
     await archiveBenchmark({
       groups: results,
       allocProfile: profileFile,
       reportData,
       timeProfileData: timeData,
       coverageData,
-      outputPath,
+      outputPath: args.archive || undefined,
+      outputDir: reportDir,
     });
   }
   if (shouldViewReport(args)) {
